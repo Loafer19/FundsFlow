@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @plugin "daisyui";
+
 @plugin "daisyui/theme" {
     /* biome-ignore lint: DaisyUI stuff */
     name: "bumblebee2";
@@ -36,4 +37,12 @@
     --border: 2px;
     --depth: 1;
     --noise: 0;
+}
+
+html {
+    overflow-y: scroll;
+}
+
+.toast {
+    z-index: 1000;
 }
