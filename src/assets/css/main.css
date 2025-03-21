@@ -50,3 +50,11 @@ body {
 .toast {
     z-index: 1000;
 }
+
+.icon-trash {
+    fill: var(--color-error);
+}
+
+.btn-error:hover .icon-trash {
+    fill: var(--color-base-100);
+}

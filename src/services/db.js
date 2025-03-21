@@ -1,4 +1,4 @@
-const DB_NAME = 'FundsFlow'
+const DB_NAME = 'FundsFlowDB'
 const DB_VERSION = 1
 const STORE_NAME = 'transactions'
 
@@ -16,7 +16,11 @@ async function openDB() {
 
         request.onupgradeneeded = (event) => {
             const db = event.target.result
-            db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
+
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
+                store.createIndex('date', 'date', { unique: false })
+            };
         }
     })
 }
@@ -27,7 +31,8 @@ export async function DB_Transactions_All() {
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly')
         const store = tx.objectStore(STORE_NAME)
-        const request = store.getAll()
+        const index = store.index('date')
+        const request = index.getAll()
 
         request.onsuccess = (event) => {
             resolve(event.target.result)

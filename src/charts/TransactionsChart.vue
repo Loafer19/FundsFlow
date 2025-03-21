@@ -1,7 +1,7 @@
 <template>
     <div class="card card-border border-base-300 bg-base-100 mb-4">
         <div class="card-body">
-            <h2 class="card-title">Cash Flow by Day</h2>
+            <h2 class="card-title">Money Flow by Day</h2>
             <LineChart :data="chartData" :options="chartOptions" />
         </div>
     </div>
@@ -30,7 +30,6 @@ const props = defineProps({
 
 const transactionsFormatted = computed(() => {
     return props.transactions
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
         .reduce((acc, t) => {
             const date = t.date.split('T')[0]
             if (acc[date]) {

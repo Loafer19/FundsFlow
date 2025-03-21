@@ -4,12 +4,6 @@
     <div class="container mx-auto p-4">
         <TransactionAddModal @transaction-new="transactionAdd" />
 
-        <div class="mb-4">
-            <button class="btn btn-primary" onclick="transaction_add_modal.showModal()">
-                Add Transaction
-            </button>
-        </div>
-
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div class="card card-border border-base-300 bg-base-100">
                 <div class="card-body">
@@ -43,7 +37,9 @@ const transactions = ref([])
 const toasts = inject('toasts')
 const formatMoney = inject('formatMoney')
 
-onMounted(async () => {
+onMounted(async () => loadTransactions())
+
+const loadTransactions = async () => {
     DB_Transactions_All()
         .then(loadedTransactions => {
             transactions.value = loadedTransactions
@@ -54,12 +50,12 @@ onMounted(async () => {
                 type: 'error'
             })
         })
-})
+}
 
 const transactionAdd = async (transaction) => {
     DB_Transactions_Add(transaction)
         .then(id => {
-            transactions.value.push({ ...transaction, id })
+            loadTransactions()
 
             toasts.push({
                 message: 'Transaction added successfully!',
