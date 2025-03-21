@@ -43,6 +43,10 @@ html {
     overflow-y: scroll;
 }
 
+body {
+    min-height: 100vh;
+}
+
 .toast {
     z-index: 1000;
 }
