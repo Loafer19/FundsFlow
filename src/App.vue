@@ -19,7 +19,7 @@
             </div>
         </div>
 
-        <TransactionsChart :transactions />
+        <FlowByDayChart :transactions />
 
         <TransactionListTable :transactions @transaction-remove="transactionDelete" />
     </div>
@@ -31,7 +31,7 @@ import { DB_Transactions_All, DB_Transactions_Add, DB_Transactions_Delete } from
 import TransactionAddModal from './modals/TransactionAddModal.vue'
 import TransactionListTable from './tables/TransactionListTable.vue'
 import Toasts from './components/Toasts.vue'
-import TransactionsChart from './charts/TransactionsChart.vue'
+import FlowByDayChart from './charts/FlowByDayChart.vue'
 
 const transactions = ref([])
 const toasts = inject('toasts')
