@@ -106,13 +106,13 @@ const chartData = computed(() => ({
     labels: Object.keys(transactionsFormatted.value),
     datasets: [
         {
-            label: 'Positive Sum',
+            label: 'Income',
             data: Object.values(transactionsFormatted.value).map((t) => t.positive),
             backgroundColor: 'oklch(76% 0.177 163.223)',
             stack: 'Stack 0',
         },
         {
-            label: 'Negative Sum',
+            label: 'Expenses',
             data: Object.values(transactionsFormatted.value).map((t) => t.negative),
             backgroundColor: 'oklch(70% 0.191 22.216)',
             stack: 'Stack 0',

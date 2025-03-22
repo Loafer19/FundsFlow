@@ -21,3 +21,55 @@ jobs:
 
       - name: Run Biome Check
         run: bun run check
+
+  release:
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: bun install
+      - name: Get current version
+        id: current_version
+        run: |
+          VERSION=$(bun -e "console.log(require('./package.json').version);")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Get latest release version
+        id: latest_release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const response = await github.rest.repos.getLatestRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              });
+              return response.data.tag_name.replace('v-', '');
+            } catch (error) {
+              return '0.0.0';
+            }
+          result-encoding: string
+
+      - name: Create Release
+        if: steps.current_version.outputs.version != steps.latest_release.outputs.result
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: v-${{ steps.current_version.outputs.version }}
+          name: Version ${{ steps.current_version.outputs.version }}
+          body: |
+            Automated release for version: ${{ steps.current_version.outputs.version }}
+          draft: true
+          prerelease: false

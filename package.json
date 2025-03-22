@@ -17,5 +17,6 @@
         "dev": "vite --open",
         "prod": "vite build"
     },
-    "type": "module"
+    "type": "module",
+    "version": "1.0.0"
 }
