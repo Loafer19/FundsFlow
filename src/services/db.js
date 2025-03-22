@@ -20,7 +20,7 @@ async function openDB() {
             if (!db.objectStoreNames.contains(STORE_NAME)) {
                 const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
                 store.createIndex('date', 'date', { unique: false })
-            };
+            }
         }
     })
 }

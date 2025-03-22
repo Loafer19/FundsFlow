@@ -62,8 +62,8 @@ const formatDate = inject('formatDate')
 defineProps({
     transactions: {
         type: Array,
-        required: true
-    }
+        required: true,
+    },
 })
 
 defineEmits(['transaction-remove'])

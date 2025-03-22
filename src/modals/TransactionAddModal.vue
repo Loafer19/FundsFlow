@@ -30,7 +30,7 @@ const emit = defineEmits(['transaction-new'])
 const transaction_default = {
     date: new Date().toISOString().split('T')[0],
     amount: '',
-    note: ''
+    note: '',
 }
 
 const transaction = ref({ ...transaction_default })

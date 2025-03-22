@@ -23,6 +23,14 @@
         }
     },
     "linter": {
-        "enabled": true
+        "enabled": true,
+        "rules": {
+            "style": {
+                "useTemplate": "off"
+            },
+            "complexity": {
+                "noForEach": "off"
+            }
+        }
     }
 }

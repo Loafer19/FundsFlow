@@ -13,10 +13,9 @@
         "vite": "^6.2.0"
     },
     "scripts": {
-        "build": "vite build",
         "check": "biome check --write .",
-        "dev": "vite --open"
+        "dev": "vite --open",
+        "prod": "vite build"
     },
-    "type": "module",
-    "version": "0.0.0"
+    "type": "module"
 }

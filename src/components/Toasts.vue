@@ -35,7 +35,7 @@ watch(
                 toast.timeoutId = setTimeout(() => removeToast(toast.id), 2500)
             }
         })
-    }
+    },
 )
 </script>
 

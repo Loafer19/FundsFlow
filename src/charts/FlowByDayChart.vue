@@ -18,24 +18,17 @@
 </template>
 
 <script setup>
-import { inject, ref, computed } from 'vue'
+import { BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Tooltip } from 'chart.js'
+import { computed, inject, ref } from 'vue'
 import { Bar as BarChart } from 'vue-chartjs'
-import {
-    Chart as ChartJS,
-    Tooltip,
-    BarElement,
-    CategoryScale,
-    LinearScale,
-    Legend
-} from 'chart.js'
 
 ChartJS.register(Tooltip, BarElement, CategoryScale, LinearScale, Legend)
 
 const props = defineProps({
     transactions: {
         type: Array,
-        required: true
-    }
+        required: true,
+    },
 })
 
 const selectedRange = ref('thisWeek')
@@ -45,7 +38,8 @@ const getDateRange = () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    let startDate, endDate
+    let startDate
+    let endDate
 
     switch (selectedRange.value) {
         case 'thisWeek':
@@ -78,7 +72,7 @@ const transactionsFormatted = computed(() => {
     endDate.setDate(endDate.getDate() + 1)
 
     const initialData = props.transactions
-        .filter(t => {
+        .filter((t) => {
             const date = new Date(t.date)
             return date >= startDate && date <= endDate
         })
@@ -96,7 +90,7 @@ const transactionsFormatted = computed(() => {
         }, {})
 
     const result = {}
-    let currentDate = new Date(startDate)
+    const currentDate = new Date(startDate)
     currentDate.setDate(currentDate.getDate() + 1)
 
     while (currentDate <= endDate) {
@@ -113,17 +107,17 @@ const chartData = computed(() => ({
     datasets: [
         {
             label: 'Positive Sum',
-            data: Object.values(transactionsFormatted.value).map(t => t.positive),
+            data: Object.values(transactionsFormatted.value).map((t) => t.positive),
             backgroundColor: 'oklch(76% 0.177 163.223)',
-            stack: 'Stack 0'
+            stack: 'Stack 0',
         },
         {
             label: 'Negative Sum',
-            data: Object.values(transactionsFormatted.value).map(t => t.negative),
+            data: Object.values(transactionsFormatted.value).map((t) => t.negative),
             backgroundColor: 'oklch(70% 0.191 22.216)',
-            stack: 'Stack 0'
-        }
-    ]
+            stack: 'Stack 0',
+        },
+    ],
 }))
 
 const chartOptions = {
@@ -133,14 +127,14 @@ const chartOptions = {
             stacked: true,
         },
         y: {
-            stacked: true
-        }
+            stacked: true,
+        },
     },
     plugins: {
         legend: {
             display: false,
-        }
-    }
+        },
+    },
 }
 </script>
 
