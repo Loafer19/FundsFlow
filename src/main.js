@@ -8,9 +8,11 @@ const formatMoney = (amount) =>
     new Intl.NumberFormat('uk-UA', {
         style: 'currency',
         currency: 'UAH',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
     }).format(amount)
 
-const formatDate = (date) => new Date(date).toLocaleDateString()
+const formatDate = (date) => new Date(date).toLocaleDateString('uk-UA')
 
 createApp(App)
     .provide('toasts', toasts)
