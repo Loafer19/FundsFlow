@@ -16,12 +16,27 @@
                     Money Flow by Day
                 </h2>
 
-                <select class="select select-sm select-primary w-40" v-model="selectedRange">
-                    <option value="thisWeek">This Week</option>
-                    <option value="lastWeek">Last Week</option>
-                    <option value="thisMonth">This Month</option>
-                    <option value="lastMonth">Last Month</option>
-                </select>
+                <div class="flex items-center gap-2">
+                    <select class="select select-xs select-primary w-25 cursor-pointer" v-model="selectedRange">
+                        <option value="week">Week</option>
+                        <option value="month">Month</option>
+                        <!-- <option value="year">Year</option> -->
+                    </select>
+
+                    <button class="btn btn-xs btn-outline btn-primary" @click="adjustPeriod(-1)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m15 18-6-6 6-6" />
+                        </svg>
+                    </button>
+
+                    <button class="btn btn-xs btn-outline btn-primary" @click="adjustPeriod(1)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m9 18 6-6-6-6" />
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <BarChart :data="chartData" :options="chartOptions" />
@@ -31,7 +46,7 @@
 
 <script setup>
 import { BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Tooltip } from 'chart.js'
-import { computed, inject, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Bar as BarChart } from 'vue-chartjs'
 
 ChartJS.register(Tooltip, BarElement, CategoryScale, LinearScale, Legend)
@@ -43,7 +58,8 @@ const props = defineProps({
     },
 })
 
-const selectedRange = ref('thisWeek')
+const selectedRange = ref('week')
+const periodOffset = ref(0)
 
 const getDateRange = () => {
     const today = new Date()
@@ -53,29 +69,27 @@ const getDateRange = () => {
     let endDate
 
     switch (selectedRange.value) {
-        case 'thisWeek':
+        case 'week':
             startDate = new Date(today)
-            startDate.setDate(today.getDate() - today.getDay() + 1)
+            startDate.setDate(today.getDate() - today.getDay() + periodOffset.value * 7 + 1)
             endDate = new Date(startDate)
             endDate.setDate(startDate.getDate() + 6)
             break
-        case 'lastWeek':
-            startDate = new Date(today)
-            startDate.setDate(today.getDate() - today.getDay() - 6)
-            endDate = new Date(startDate)
-            endDate.setDate(startDate.getDate() + 6)
+        case 'month':
+            startDate = new Date(today.getFullYear(), today.getMonth() + periodOffset.value, 1)
+            endDate = new Date(today.getFullYear(), today.getMonth() + periodOffset.value + 1, 0)
             break
-        case 'thisMonth':
-            startDate = new Date(today.getFullYear(), today.getMonth(), 1)
-            endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0)
-            break
-        case 'lastMonth':
-            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1)
-            endDate = new Date(today.getFullYear(), today.getMonth(), 0)
-            break
+        // case 'year':
+        //     startDate = new Date(today.getFullYear() + periodOffset.value, 0, 1)
+        //     endDate = new Date(today.getFullYear() + periodOffset.value, 11, 31)
+        //     break
     }
 
     return { startDate, endDate }
+}
+
+const adjustPeriod = (direction) => {
+    periodOffset.value += direction
 }
 
 const transactionsFormatted = computed(() => {
@@ -117,16 +131,12 @@ const chartData = computed(() => ({
     labels: Object.keys(transactionsFormatted.value),
     datasets: [
         {
-            label: 'Income',
             data: Object.values(transactionsFormatted.value).map((t) => t.positive),
             backgroundColor: 'oklch(76% 0.177 163.223)',
-            stack: 'Stack 0',
         },
         {
-            label: 'Expenses',
             data: Object.values(transactionsFormatted.value).map((t) => t.negative),
             backgroundColor: 'oklch(70% 0.191 22.216)',
-            stack: 'Stack 0',
         },
     ],
 }))
@@ -135,9 +145,6 @@ const chartOptions = {
     responsive: true,
     scales: {
         x: {
-            stacked: true,
-        },
-        y: {
             stacked: true,
         },
     },

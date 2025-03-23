@@ -12,8 +12,8 @@
             <form @submit.prevent="transactionSubmit">
                 <input type="date" v-model="transaction.date" class="input w-full mb-4" required />
 
-                <input type="number" v-model="transaction.amount" class="input w-full mb-4" step="0.01"
-                    placeholder="Amount" required />
+                <input type="number" v-model="transaction.amount" class="input w-full mb-4" placeholder="Amount"
+                    step="0.01" required />
 
                 <input type="text" v-model="transaction.note" class="input w-full" placeholder="Note" />
 
