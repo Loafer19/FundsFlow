@@ -13,14 +13,14 @@
                         <path
                             d="M3.00001 21.25C2.58579 21.25 2.25001 21.5858 2.25001 22C2.25001 22.4142 2.58579 22.75 3.00001 22.75H21C21.4142 22.75 21.75 22.4142 21.75 22C21.75 21.5858 21.4142 21.25 21 21.25H3.00001Z" />
                     </svg>
-                    Money Flow by Day
+                    Balance Trend
                 </h2>
 
                 <div class="flex items-center gap-2">
                     <select class="select select-xs select-primary w-25 cursor-pointer" v-model="selectedRange">
                         <option value="week">Week</option>
                         <option value="month">Month</option>
-                        <!-- <option value="year">Year</option> -->
+                        <option value="year">Year</option>
                     </select>
 
                     <button class="btn btn-xs btn-outline btn-primary" @click="adjustPeriod(-1)">
@@ -39,17 +39,17 @@
                 </div>
             </div>
 
-            <BarChart :data="chartData" :options="chartOptions" />
+            <LineChart :data="chartData" :options="chartOptions" />
         </div>
     </div>
 </template>
 
 <script setup>
-import { BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Tooltip } from 'chart.js'
+import { LineElement, PointElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Tooltip } from 'chart.js'
 import { computed, ref } from 'vue'
-import { Bar as BarChart } from 'vue-chartjs'
+import { Line as LineChart } from 'vue-chartjs'
 
-ChartJS.register(Tooltip, BarElement, CategoryScale, LinearScale, Legend)
+ChartJS.register(Tooltip, LineElement, PointElement, CategoryScale, LinearScale, Legend)
 
 const props = defineProps({
     transactions: {
@@ -65,89 +65,115 @@ const getDateRange = () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    let startDate
-    let endDate
+    let currentStart
+    let currentEnd
+    let previousStart
+    let previousEnd
 
     switch (selectedRange.value) {
         case 'week':
-            startDate = new Date(today)
-            startDate.setDate(today.getDate() - today.getDay() + periodOffset.value * 7 + 1)
-            endDate = new Date(startDate)
-            endDate.setDate(startDate.getDate() + 6)
+            currentStart = new Date(today)
+            currentStart.setDate(today.getDate() - today.getDay() + periodOffset.value * 7 + 1)
+            currentEnd = new Date(currentStart)
+            currentEnd.setDate(currentStart.getDate() + 6)
+
+            previousStart = new Date(currentStart)
+            previousStart.setDate(currentStart.getDate() - 7)
+            previousEnd = new Date(currentStart)
+            previousEnd.setDate(currentStart.getDate() - 1)
             break
         case 'month':
-            startDate = new Date(today.getFullYear(), today.getMonth() + periodOffset.value, 1)
-            endDate = new Date(today.getFullYear(), today.getMonth() + periodOffset.value + 1, 0)
+            currentStart = new Date(today.getFullYear(), today.getMonth() + periodOffset.value, 1)
+            currentEnd = new Date(today.getFullYear(), today.getMonth() + periodOffset.value + 1, 0)
+
+            previousStart = new Date(today.getFullYear(), today.getMonth() + periodOffset.value - 1, 1)
+            previousEnd = new Date(today.getFullYear(), today.getMonth() + periodOffset.value, 0)
             break
-        // case 'year':
-        //     startDate = new Date(today.getFullYear() + periodOffset.value, 0, 1)
-        //     endDate = new Date(today.getFullYear() + periodOffset.value, 11, 31)
-        //     break
+        case 'year':
+            currentStart = new Date(today.getFullYear() + periodOffset.value, 0, 1)
+            currentEnd = new Date(today.getFullYear() + periodOffset.value, 11, 31)
+
+            previousStart = new Date(today.getFullYear() + periodOffset.value - 1, 0, 1)
+            previousEnd = new Date(today.getFullYear() + periodOffset.value - 1, 11, 31)
+            break
     }
 
-    return { startDate, endDate }
+    return { currentStart, currentEnd, previousStart, previousEnd }
 }
 
 const adjustPeriod = (direction) => {
     periodOffset.value += direction
 }
 
-const transactionsFormatted = computed(() => {
-    const { startDate, endDate } = getDateRange()
-    endDate.setDate(endDate.getDate() + 1)
+const balanceTrend = computed(() => {
+    const { currentStart, currentEnd, previousStart, previousEnd } = getDateRange()
 
-    const initialData = props.transactions
-        .filter((t) => {
-            const date = new Date(t.date)
-            return date >= startDate && date <= endDate
-        })
-        .reduce((acc, t) => {
-            const date = t.date.split('T')[0]
-            if (!acc[date]) {
-                acc[date] = { positive: 0, negative: 0 }
-            }
-            if (t.amount >= 0) {
-                acc[date].positive += t.amount
-            } else {
-                acc[date].negative += t.amount
-            }
-            return acc
-        }, {})
+    const calculateBalance = (start, end) => {
+        end.setDate(end.getDate() + 1)
 
-    const result = {}
-    const currentDate = new Date(startDate)
-    currentDate.setDate(currentDate.getDate() + 1)
+        const filtered = props.transactions
+            .filter(t => {
+                const date = new Date(t.date)
+                return date >= start && date <= end
+            })
+            .sort((a, b) => new Date(a.date) - new Date(b.date))
 
-    while (currentDate <= endDate) {
-        const dateStr = currentDate.toISOString().split('T')[0]
-        result[dateStr] = initialData[dateStr] || { positive: 0, negative: 0 }
+        let balance = 0
+        const balances = {}
+        const currentDate = new Date(start)
         currentDate.setDate(currentDate.getDate() + 1)
+
+        while (currentDate <= end) {
+            const dateStr = currentDate.toISOString().split('T')[0]
+            balances[dateStr] = balance
+            const dayTransactions = filtered.filter(t => t.date.split('T')[0] === dateStr)
+
+            dayTransactions.forEach(t => {
+                balance += t.amount
+                balances[dateStr] = balance
+            })
+            currentDate.setDate(currentDate.getDate() + 1)
+        }
+
+        return balances
     }
 
-    return result
+    const currentBalances = calculateBalance(currentStart, currentEnd)
+    const previousBalances = calculateBalance(previousStart, previousEnd)
+
+    return { currentBalances, previousBalances }
 })
 
-const chartData = computed(() => ({
-    labels: Object.keys(transactionsFormatted.value),
-    datasets: [
-        {
-            data: Object.values(transactionsFormatted.value).map((t) => t.positive),
-            backgroundColor: 'oklch(76% 0.177 163.223)',
-        },
-        {
-            data: Object.values(transactionsFormatted.value).map((t) => t.negative),
-            backgroundColor: 'oklch(70% 0.191 22.216)',
-        },
-    ],
-}))
+const chartData = computed(() => {
+    const { currentBalances, previousBalances } = balanceTrend.value
+    const currentLabels = Object.keys(currentBalances)
+    const previousLabels = Object.keys(previousBalances)
+
+    return {
+        labels: currentLabels.length >= previousLabels.length ? currentLabels : previousLabels,
+        datasets: [
+            {
+                label: 'Current',
+                data: Object.values(currentBalances),
+                borderColor: 'oklch(76% 0.177 163.223)',
+                backgroundColor: 'transparent',
+                fill: false,
+                tension: 0.1,
+            },
+            {
+                label: 'Previous',
+                data: Object.values(previousBalances),
+                borderColor: 'oklch(70% 0.191 22.216)',
+                backgroundColor: 'transparent',
+                fill: false,
+                tension: 0.1,
+            },
+        ],
+    }
+})
 
 const chartOptions = {
     responsive: true,
-    scales: {
-        x: {
-            stacked: true,
-        },
-    },
     plugins: {
         legend: {
             display: false,

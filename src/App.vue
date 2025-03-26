@@ -41,21 +41,33 @@
             </div>
         </div>
 
-        <FlowByDayChart :transactions />
+        <div class="mb-4">
+            <div class="tabs tabs-box px-0">
+                <input v-model="selectedChart" type="radio" name="my_tabs_1" class="tab" aria-label="Money Flow"
+                    checked="checked" :value="markRaw(MoneyFlowChart)" />
+
+                <input v-model="selectedChart" type="radio" name="my_tabs_1" class="tab" aria-label="Balance Trend"
+                    :value="markRaw(BalanceTrendChart)" />
+            </div>
+        </div>
+
+        <component :is="selectedChart" :transactions="transactions" />
 
         <TransactionListTable :transactions @transaction-remove="transactionDelete" />
     </div>
 </template>
 
 <script setup>
-import { computed, inject, onMounted, ref } from 'vue'
-import FlowByDayChart from './charts/FlowByDayChart.vue'
+import { computed, inject, onMounted, ref, markRaw } from 'vue'
+import MoneyFlowChart from './charts/MoneyFlowChart.vue'
 import Toasts from './components/Toasts.vue'
 import TransactionAddModal from './modals/TransactionAddModal.vue'
 import { DB_Transactions_Add, DB_Transactions_All, DB_Transactions_Delete } from './services/db.js'
 import TransactionListTable from './tables/TransactionListTable.vue'
+import BalanceTrendChart from './charts/BalanceTrendChart.vue'
 
 const transactions = ref([])
+const selectedChart = ref(markRaw(MoneyFlowChart))
 const toasts = inject('toasts')
 const formatMoney = inject('formatMoney')
 
