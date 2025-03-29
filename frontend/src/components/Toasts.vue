@@ -1,11 +1,11 @@
 <template>
-    <div class="toast toast-top toast-end">
+    <div class="toast toast-top toast-center">
         <div v-for="(toast, index) in toasts" :key="toast.id" class="alert flex items-center gap-2" :class="{
-            'alert-success': !toast.type,
+            'alert-success': toast.type === 'success',
+            'alert-info': toast.type === 'info' || !toast.type,
             'alert-error': toast.type === 'error',
         }">
-            <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
-                class="icon-check-circle">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                 <path
                     d="M16.0303 10.0303C16.3232 9.73744 16.3232 9.26256 16.0303 8.96967C15.7374 8.67678 15.2626 8.67678 14.9697 8.96967L10.5 13.4393L9.03033 11.9697C8.73744 11.6768 8.26256 11.6768 7.96967 11.9697C7.67678 12.2626 7.67678 12.7374 7.96967 13.0303L9.96967 15.0303C10.2626 15.3232 10.7374 15.3232 11.0303 15.0303L16.0303 10.0303Z" />
                 <path fill-rule="evenodd" clip-rule="evenodd"

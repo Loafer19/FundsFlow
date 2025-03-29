@@ -51,17 +51,8 @@ body {
     z-index: 1000;
 }
 
-.icon-banknote-2 {
-    fill: var(--color-primary-content);
-}
-
 .icon-trash-bin {
     fill: var(--color-error);
-}
-
-.icon-bill-check,
-.icon-check-circle {
-    fill: var(--color-success-content);
 }
 
 .btn-error:hover .icon-trash-bin {
