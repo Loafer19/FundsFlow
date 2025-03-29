@@ -58,13 +58,13 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, ref, markRaw } from 'vue'
+import { computed, inject, markRaw, onMounted, ref } from 'vue'
+import BalanceTrendChart from './charts/BalanceTrendChart.vue'
 import MoneyFlowChart from './charts/MoneyFlowChart.vue'
 import Toasts from './components/Toasts.vue'
 import TransactionAddModal from './modals/TransactionAddModal.vue'
 import { DB_Transactions_Add, DB_Transactions_All, DB_Transactions_Delete } from './services/db.js'
 import TransactionListTable from './tables/TransactionListTable.vue'
-import BalanceTrendChart from './charts/BalanceTrendChart.vue'
 
 const transactions = ref([])
 const selectedChart = ref(markRaw(MoneyFlowChart))

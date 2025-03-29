@@ -9,6 +9,8 @@ Money management app
 - Add income & expenses
 - View transactions & balance
 - Filter transactions by date
-- Checkout cool chart
+- Checkout cool charts
+  - Balance Trend
+  - Money Flow
 
 ![app](./.github/screenshots/app.jpg)

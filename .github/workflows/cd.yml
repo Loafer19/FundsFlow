@@ -25,5 +25,5 @@ jobs:
             export PATH="/root/.bun/bin:$PATH"
             cd ${{ secrets.SERVER_PATH }}
             git -c core.sshCommand="ssh -i ~/.ssh/github-actions-key" pull origin main
-            bun install
+            bun i
             bun run prod

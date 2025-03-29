@@ -45,7 +45,7 @@
 </template>
 
 <script setup>
-import { LineElement, PointElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Tooltip } from 'chart.js'
+import { CategoryScale, Chart as ChartJS, Legend, LineElement, LinearScale, PointElement, Tooltip } from 'chart.js'
 import { computed, ref } from 'vue'
 import { Line as LineChart } from 'vue-chartjs'
 
@@ -112,7 +112,7 @@ const balanceTrend = computed(() => {
         end.setDate(end.getDate() + 1)
 
         const filtered = props.transactions
-            .filter(t => {
+            .filter((t) => {
                 const date = new Date(t.date)
                 return date >= start && date <= end
             })
@@ -126,9 +126,9 @@ const balanceTrend = computed(() => {
         while (currentDate <= end) {
             const dateStr = currentDate.toISOString().split('T')[0]
             balances[dateStr] = balance
-            const dayTransactions = filtered.filter(t => t.date.split('T')[0] === dateStr)
+            const dayTransactions = filtered.filter((t) => t.date.split('T')[0] === dateStr)
 
-            dayTransactions.forEach(t => {
+            dayTransactions.forEach((t) => {
                 balance += t.amount
                 balances[dateStr] = balance
             })

@@ -17,7 +17,7 @@ jobs:
           bun-version: latest
 
       - name: Install Dependencies
-        run: bun install
+        run: bun i
 
       - name: Run Biome Check
         run: bun run check
@@ -38,8 +38,6 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install Dependencies
-        run: bun install
       - name: Get current version
         id: current_version
         run: |
