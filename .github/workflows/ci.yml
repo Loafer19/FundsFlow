@@ -16,11 +16,11 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install Dependencies
-        run: bun i
-
       - name: Run Biome Check
-        run: bun run check
+        run: |
+          cd frontend
+          bun i
+          bun run check
 
   release:
     needs: check
@@ -41,7 +41,7 @@ jobs:
       - name: Get current version
         id: current_version
         run: |
-          VERSION=$(bun -e "console.log(require('./package.json').version);")
+          VERSION=$(bun -e "console.log(require('./frontend/package.json').version);")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Get latest release version

@@ -1,6 +1,6 @@
 # FundsFlow
 
-![FundsFlow](./public/logo.png)
+![FundsFlow](./frontend/public/logo.png)
 
 Money management app
 
@@ -9,8 +9,14 @@ Money management app
 - Add income & expenses
 - View transactions & balance
 - Filter transactions by date
-- Checkout cool charts
-  - Balance Trend
+- Checkout cool charts:
   - Money Flow
+  - Balance Trend
 
-![app](./.github/screenshots/app.jpg)
+![app](./.github/screenshots/app_analytics.jpg)
+
+![app](./.github/screenshots/app_money_flow.jpg)
+
+![app](./.github/screenshots/app_balance_trend.jpg)
+
+
