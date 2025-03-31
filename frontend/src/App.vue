@@ -55,7 +55,7 @@
         </div>
 
         <div class="mb-4">
-            <div class="tabs tabs-box px-0">
+            <div class="tabs tabs-box gap-2 px-0">
                 <input v-model="selectedChart" type="radio" name="tabs_main" class="tab" aria-label="Analytics"
                     checked="checked" :value="markRaw(Analytics)" />
 
@@ -69,7 +69,7 @@
 
         <component :is="selectedChart" :dateRange="getDateRange" :transactions="transactions" />
 
-        <TransactionsTable :transactions @transaction-remove="transactionDelete" />
+        <TransactionsTable :dateRange="getDateRange" :transactions @transaction-remove="transactionDelete" />
     </div>
 </template>
 
@@ -99,13 +99,18 @@ const selectedRange = ref({
 const selectedChart = ref(markRaw(Analytics))
 const transactions = ref([])
 
-onMounted(async () => {
-    authStore.checkAuth()
+onMounted(() => authStore.checkAuth())
 
-    if (authStore.isAuthenticated) {
-        await loadTransactions()
-    }
-})
+watch(
+    () => authStore.isAuthenticated,
+    (newValue) => {
+        if (newValue) {
+            loadTransactions()
+        } else {
+            transactions.value = []
+        }
+    },
+)
 
 watch(
     () => authStore.toast,
@@ -162,10 +167,10 @@ const getDateRange = computed(() => {
             const monthDate = new Date(selectedRange.value.year, selectedRange.value.month)
 
             currentStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1)
-            currentEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0)
+            currentEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59)
 
             previousStart = new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1)
-            previousEnd = new Date(monthDate.getFullYear(), monthDate.getMonth(), 0)
+            previousEnd = new Date(monthDate.getFullYear(), monthDate.getMonth(), 0, 23, 59, 59)
             break
         }
 
@@ -173,10 +178,10 @@ const getDateRange = computed(() => {
             const year = selectedRange.value
 
             currentStart = new Date(year, 0, 1)
-            currentEnd = new Date(year, 11, 31)
+            currentEnd = new Date(year, 11, 31, 23, 59, 59)
 
             previousStart = new Date(year - 1, 0, 1)
-            previousEnd = new Date(year - 1, 11, 31)
+            previousEnd = new Date(year - 1, 11, 31, 23, 59, 59)
             break
         }
     }
@@ -219,4 +224,9 @@ const transactionDelete = (id) => {
 }
 </script>
 
-<style scoped></style>
+<style scoped>
+.tab {
+    border: var(--border) solid var(--color-base-300) !important;
+    border-radius: var(--radius-field) !important;
+}
+</style>

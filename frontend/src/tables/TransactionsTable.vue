@@ -12,7 +12,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="transaction in transactions" :key="transaction.id" class="hover:bg-base-200">
+                    <tr v-for="transaction in filteredTransactions.reverse()" :key="transaction.id"
+                        class="hover:bg-base-200">
                         <td>{{ transaction.id }}</td>
                         <td>{{ formatDate(transaction.date) }}</td>
                         <td>
@@ -46,12 +47,16 @@
 </template>
 
 <script setup>
-import { inject } from 'vue'
+import { computed, inject } from 'vue'
 
 const formatMoney = inject('formatMoney')
 const formatDate = inject('formatDate')
 
-defineProps({
+const props = defineProps({
+    dateRange: {
+        type: Object,
+        required: true,
+    },
     transactions: {
         type: Array,
         required: true,
@@ -59,6 +64,13 @@ defineProps({
 })
 
 defineEmits(['transaction-remove'])
+
+const filteredTransactions = computed(() => {
+    return props.transactions.filter((t) => {
+        const date = new Date(t.date)
+        return date >= props.dateRange.currentStart && date < props.dateRange.currentEnd
+    })
+})
 </script>
 
 <style scoped>

@@ -39,16 +39,17 @@
     --noise: 0;
 }
 
+* {
+    box-shadow: none;
+    outline: none;
+}
+
 html {
     overflow-y: scroll;
 }
 
 body {
     min-height: 100vh;
-}
-
-.tabs-box {
-    box-shadow: none;
 }
 
 /* Plugins */

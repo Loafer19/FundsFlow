@@ -13,10 +13,10 @@ Money management app
   - Money Flow
   - Balance Trend
 
-![app](./.github/screenshots/app_analytics.jpg)
+![app](./.github/screenshots/app_analytics.png)
 
-![app](./.github/screenshots/app_money_flow.jpg)
+![app](./.github/screenshots/app_money_flow.png)
 
-![app](./.github/screenshots/app_balance_trend.jpg)
+![app](./.github/screenshots/app_balance_trend.png)
 
 
