@@ -39,4 +39,8 @@ watch(
 )
 </script>
 
-<style scoped></style>
+<style scoped>
+.toast {
+    z-index: 1000;
+}
+</style>

@@ -25,11 +25,14 @@
     "linter": {
         "enabled": true,
         "rules": {
+            "complexity": {
+                "noForEach": "off"
+            },
             "style": {
                 "useTemplate": "off"
             },
-            "complexity": {
-                "noForEach": "off"
+            "suspicious": {
+                "noAssignInExpressions": "off"
             }
         }
     }

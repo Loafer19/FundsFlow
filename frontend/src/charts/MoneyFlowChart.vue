@@ -16,28 +16,6 @@
                     </svg>
                     Money Flow
                 </h2>
-
-                <div class="flex items-center gap-2">
-                    <select class="select select-xs select-primary w-25 cursor-pointer" v-model="selectedRange">
-                        <option value="week">Week</option>
-                        <option value="month">Month</option>
-                        <option value="year">Year</option>
-                    </select>
-
-                    <button class="btn btn-xs btn-outline btn-primary" @click="adjustPeriod(-1)">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="m15 18-6-6 6-6" />
-                        </svg>
-                    </button>
-
-                    <button class="btn btn-xs btn-outline btn-primary" @click="adjustPeriod(1)">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="m9 18 6-6-6-6" />
-                        </svg>
-                    </button>
-                </div>
             </div>
 
             <BarChart :data="chartData" :options="chartOptions" />
@@ -53,76 +31,44 @@ import { Bar as BarChart } from 'vue-chartjs'
 ChartJS.register(Tooltip, BarElement, CategoryScale, LinearScale, Legend)
 
 const props = defineProps({
+    dateRange: {
+        type: Object,
+        required: true,
+    },
     transactions: {
         type: Array,
         required: true,
     },
 })
 
-const selectedRange = ref('week')
-const periodOffset = ref(0)
-
-const getDateRange = () => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    let startDate
-    let endDate
-
-    switch (selectedRange.value) {
-        case 'week':
-            startDate = new Date(today)
-            startDate.setDate(today.getDate() - today.getDay() + periodOffset.value * 7 + 1)
-
-            endDate = new Date(startDate)
-            endDate.setDate(startDate.getDate() + 6)
-            break
-        case 'month':
-            startDate = new Date(today.getFullYear(), today.getMonth() + periodOffset.value, 1)
-            endDate = new Date(today.getFullYear(), today.getMonth() + periodOffset.value + 1, 0)
-            break
-        case 'year':
-            startDate = new Date(today.getFullYear() + periodOffset.value, 0, 1)
-            endDate = new Date(today.getFullYear() + periodOffset.value, 11, 31)
-            break
-    }
-
-    return { startDate, endDate }
-}
-
-const adjustPeriod = (direction) => {
-    periodOffset.value += direction
-}
-
-const transactionsFormatted = computed(() => {
-    const { startDate, endDate } = getDateRange()
+const moneyFlow = computed(() => {
+    const { currentStart, currentEnd } = props.dateRange
+    const endDate = new Date(currentEnd)
     endDate.setDate(endDate.getDate() + 1)
 
-    const initialData = props.transactions
+    const toDateStr = (date) => date.toISOString().split('T')[0]
+
+    // Step 1: Filter and group transactions by date
+    const dailyTotals = props.transactions
         .filter((t) => {
             const date = new Date(t.date)
-            return date >= startDate && date <= endDate
+            return date >= currentStart && date <= endDate
         })
         .reduce((acc, t) => {
-            const date = t.date.split('T')[0]
-            if (!acc[date]) {
-                acc[date] = { positive: 0, negative: 0 }
-            }
-            if (t.amount >= 0) {
-                acc[date].positive += t.amount
-            } else {
-                acc[date].negative += t.amount
-            }
+            const dateStr = t.date.split('T')[0]
+            acc[dateStr] = acc[dateStr] || { positive: 0, negative: 0 }
+            t.amount >= 0 ? (acc[dateStr].positive += t.amount) : (acc[dateStr].negative += t.amount)
             return acc
         }, {})
 
+    // Step 2: Fill in all dates in range, even if no transactions
     const balances = {}
-    const currentDate = new Date(startDate)
+    const currentDate = new Date(currentStart)
     currentDate.setDate(currentDate.getDate() + 1)
 
     while (currentDate <= endDate) {
-        const dateStr = currentDate.toISOString().split('T')[0]
-        balances[dateStr] = initialData[dateStr] || { positive: 0, negative: 0 }
+        const dateStr = toDateStr(currentDate)
+        balances[dateStr] = dailyTotals[dateStr] || { positive: 0, negative: 0 }
         currentDate.setDate(currentDate.getDate() + 1)
     }
 
@@ -130,14 +76,14 @@ const transactionsFormatted = computed(() => {
 })
 
 const chartData = computed(() => ({
-    labels: Object.keys(transactionsFormatted.value),
+    labels: Object.keys(moneyFlow.value),
     datasets: [
         {
-            data: Object.values(transactionsFormatted.value).map((t) => t.positive),
+            data: Object.values(moneyFlow.value).map((t) => t.positive),
             backgroundColor: 'oklch(76% 0.177 163.223)',
         },
         {
-            data: Object.values(transactionsFormatted.value).map((t) => t.negative),
+            data: Object.values(moneyFlow.value).map((t) => t.negative),
             backgroundColor: 'oklch(70% 0.191 22.216)',
         },
     ],

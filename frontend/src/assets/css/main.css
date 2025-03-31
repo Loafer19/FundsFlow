@@ -47,14 +47,16 @@ body {
     min-height: 100vh;
 }
 
-.toast {
-    z-index: 1000;
+.tabs-box {
+    box-shadow: none;
 }
 
-.icon-trash-bin {
-    fill: var(--color-error);
+/* Plugins */
+.dp__input {
+    border: var(--border) solid var(--color-base-300) !important;
+    border-radius: var(--radius-field) !important;
 }
 
-.btn-error:hover .icon-trash-bin {
-    fill: var(--color-base-100);
+.dp__arrow_top {
+    display: none;
 }

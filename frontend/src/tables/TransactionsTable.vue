@@ -61,4 +61,12 @@ defineProps({
 defineEmits(['transaction-remove'])
 </script>
 
-<style scoped></style>
+<style scoped>
+.icon-trash-bin {
+    fill: var(--color-error);
+}
+
+.btn-error:hover .icon-trash-bin {
+    fill: var(--color-base-100);
+}
+</style>

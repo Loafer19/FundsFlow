@@ -10,7 +10,7 @@
                     </svg>
                     Total Transactions
                 </h2>
-                <p class="text-2xl">{{ transactions.length }}</p>
+                <p class="text-2xl">{{ filteredTransactions.length }}</p>
             </div>
         </div>
         <div class="card card-border border-base-300 bg-base-100">
@@ -29,9 +29,9 @@
                         <path fill-rule="evenodd" clip-rule="evenodd"
                             d="M19 14C19 14.5523 18.5523 15 18 15C17.4477 15 17 14.5523 17 14C17 13.4477 17.4477 13 18 13C18.5523 13 19 13.4477 19 14Z" />
                     </svg>
-                    Total Amount
+                    Balance Change
                 </h2>
-                <p class="text-2xl">{{ formatMoney(totalAmount) }}</p>
+                <p class="text-2xl">{{ formatMoney(balanceChange) }}</p>
             </div>
         </div>
 
@@ -71,46 +71,45 @@ import { computed, inject } from 'vue'
 const formatMoney = inject('formatMoney')
 
 const props = defineProps({
+    dateRange: {
+        type: Object,
+        required: true,
+    },
     transactions: {
         type: Array,
         required: true,
     },
 })
 
+const filteredTransactions = computed(() => {
+    return props.transactions.filter((t) => {
+        const date = new Date(t.date)
+        return date >= props.dateRange.currentStart && date < props.dateRange.currentEnd
+    })
+})
+
 const totals = computed(() => {
-    return (props.transactions || []).reduce(
+    return (filteredTransactions.value || []).reduce(
         (acc, t) => {
-            if (t.amount >= 0) {
-                acc.positive += t.amount
-            } else {
-                acc.negative += t.amount
-            }
+            t.amount >= 0 ? (acc.positive += t.amount) : (acc.negative += t.amount)
             return acc
         },
-        { positive: 0, negative: 0 },
+        {
+            positive: 0,
+            negative: 0,
+        },
     )
 })
 
-const dateRangeDays = computed(() => {
-    if (!props.transactions.length) return 0
+const daysDiff = computed(() => {
+    const diffTime = props.dateRange.currentEnd - props.dateRange.currentStart
 
-    const dates = props.transactions.map((t) => new Date(t.date))
-    const minDate = new Date(Math.min(...dates))
-    const maxDate = new Date(Math.max(...dates))
-    const days = []
-    const currentDate = new Date(minDate)
-
-    while (currentDate <= maxDate) {
-        days.push(new Date(currentDate))
-        currentDate.setDate(currentDate.getDate() + 1)
-    }
-
-    return days.length
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
 })
 
-const totalAmount = computed(() => totals.value.positive + totals.value.negative)
-const averageDailyExpenses = computed(() => totals.value.negative / dateRangeDays.value || 0)
-const averageDailyIncome = computed(() => totals.value.positive / dateRangeDays.value || 0)
+const balanceChange = computed(() => totals.value.positive + totals.value.negative)
+const averageDailyExpenses = computed(() => totals.value.negative / daysDiff.value || 0)
+const averageDailyIncome = computed(() => totals.value.positive / daysDiff.value || 0)
 </script>
 
 <style scoped></style>
