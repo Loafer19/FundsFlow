@@ -1,5 +1,5 @@
 <template>
-    <dialog id="transaction_add_modal" class="modal">
+    <dialog id="transactions_modal" class="modal">
         <div class="modal-box max-w-sm">
             <h2 class="card-title mb-4">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -10,7 +10,7 @@
             </h2>
 
             <form @submit.prevent="hadleSubmit">
-                <input type="date" v-model="transaction.date" class="input w-full mb-4" required />
+                <input type="date" v-model="transaction.at" class="input w-full mb-4" required />
 
                 <input type="number" v-model="transaction.amount" class="input w-full mb-4" placeholder="Amount"
                     step="0.01" required />
@@ -18,7 +18,8 @@
                 <input type="text" v-model="transaction.note" class="input w-full" placeholder="Note" />
 
                 <div class="modal-action">
-                    <button type="submit" class="btn btn-success">
+                    <button type="submit" class="btn btn-success" :disabled="transactionsStore.isLoading">
+                        <span v-if="transactionsStore.isLoading" class="loading loading-spinner"></span>
                         Save
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"
                             xmlns="http://www.w3.org/2000/svg">
@@ -36,24 +37,38 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { inject, ref, watch } from 'vue'
 
-const emit = defineEmits(['transaction-new'])
+import { useTransactionsStore } from './../services/transactions.js'
+
+const transactionsStore = useTransactionsStore()
+const toasts = inject('toasts')
 
 const transaction_default = {
-    date: new Date().toISOString().split('T')[0],
+    at: new Date().toISOString().split('T')[0],
     amount: '',
     note: '',
 }
 
 const transaction = ref({ ...transaction_default })
 
-const hadleSubmit = () => {
-    emit('transaction-new', { ...transaction.value })
+watch(
+    () => transactionsStore.toast,
+    (newValue) => {
+        if (newValue) {
+            toasts.push(newValue)
+
+            transactionsStore.toast = null
+        }
+    },
+)
+
+const hadleSubmit = async () => {
+    await transactionsStore.create(transaction.value)
 
     transaction.value = { ...transaction_default }
 
-    transaction_add_modal.close()
+    transactions_modal.close()
 }
 </script>
 

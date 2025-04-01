@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreTransactionRequest;
+use App\Http\Requests\TransactionStoreRequest;
 use App\Http\Requests\UpdateTransactionRequest;
 use App\Http\Resources\TransactionResource;
 use App\Models\Transaction;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class TransactionController extends Controller
@@ -21,7 +22,7 @@ class TransactionController extends Controller
         return TransactionResource::collection($transactions);
     }
 
-    public function store(StoreTransactionRequest $request): TransactionResource
+    public function store(TransactionStoreRequest $request): TransactionResource
     {
         $transaction = auth()
             ->user()
@@ -41,8 +42,12 @@ class TransactionController extends Controller
         //
     }
 
-    public function destroy(Transaction $transaction)
+    public function destroy(Transaction $transaction): JsonResponse
     {
-        //
+        $transaction->delete();
+
+        return response()->json([
+            'message' => 'Transaction deleted successfully!',
+        ]);
     }
 }

@@ -2,26 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Transaction extends Model
+class Tag extends Model
 {
-    use HasUlids;
-
     protected $fillable = [
-        // 'ulid',
+        // 'id',
         // 'user_id',
-        'at',
-        'amount',
-        'note',
+        'parent_id',
+        'title',
+        'emoji',
         // 'created_at',
         // 'updated_at',
-    ];
-
-    protected $casts = [
-        'at' => 'datetime',
     ];
 
     /**

@@ -32,6 +32,14 @@ class User extends Authenticatable
     ];
 
     /**
+     * @return array<Tag, User>
+     */
+    public function tags(): HasMany
+    {
+        return $this->hasMany(Tag::class);
+    }
+
+    /**
      * @return array<Transaction, User>
      */
     public function transactions(): HasMany

@@ -49,11 +49,11 @@ const balanceTrend = computed(() => {
         // Step 1: Filter and group transactions by date
         const dailyTotals = props.transactions
             .filter((t) => {
-                const date = new Date(t.date)
+                const date = new Date(t.at)
                 return date >= start && date <= endDate
             })
             .reduce((acc, t) => {
-                const dateStr = t.date.split('T')[0]
+                const dateStr = t.at.split('T')[0]
                 acc[dateStr] = (acc[dateStr] || 0) + t.amount
                 return acc
             }, {})

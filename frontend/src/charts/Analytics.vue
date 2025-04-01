@@ -83,7 +83,7 @@ const props = defineProps({
 
 const filteredTransactions = computed(() => {
     return props.transactions.filter((t) => {
-        const date = new Date(t.date)
+        const date = new Date(t.at)
         return date >= props.dateRange.currentStart && date < props.dateRange.currentEnd
     })
 })

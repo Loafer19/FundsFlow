@@ -61,3 +61,14 @@ body {
 .dp__arrow_top {
     display: none;
 }
+
+.emoji-mart {
+    width: 100% !important;
+    height: 15rem !important;
+    border: var(--border) solid var(--color-base-300) !important;
+    border-radius: var(--radius-field) !important;
+}
+
+.emoji-mart-search input {
+    border-radius: calc(var(--radius-field)) !important;
+}

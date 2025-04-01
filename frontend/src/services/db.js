@@ -1,6 +1,7 @@
 const DB_NAME = 'FundsFlowDB'
-const DB_VERSION = 1
-const STORE_NAME = 'transactions'
+const DB_VERSION = 2
+const TAGS = 'tags'
+const TRANSACTIONS = 'transactions'
 
 async function openDB() {
     return new Promise((resolve, reject) => {
@@ -17,9 +18,13 @@ async function openDB() {
         request.onupgradeneeded = (event) => {
             const db = event.target.result
 
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
-                store.createIndex('date', 'date', { unique: false })
+            if (!db.objectStoreNames.contains(TAGS)) {
+                const store = db.createObjectStore(TAGS, { keyPath: 'id' })
+            }
+
+            if (!db.objectStoreNames.contains(TRANSACTIONS)) {
+                const store = db.createObjectStore(TRANSACTIONS, { keyPath: 'id', autoIncrement: true })
+                store.createIndex('date', 'at', { unique: false })
             }
         }
     })
@@ -29,8 +34,8 @@ export async function DB_Transactions_All() {
     const db = await openDB()
 
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readonly')
-        const store = tx.objectStore(STORE_NAME)
+        const tx = db.transaction(TRANSACTIONS, 'readonly')
+        const store = tx.objectStore(TRANSACTIONS)
         const index = store.index('date')
         const request = index.getAll()
 
@@ -52,8 +57,8 @@ export async function DB_Transactions_Add(transaction) {
     const db = await openDB()
 
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite')
-        const store = tx.objectStore(STORE_NAME)
+        const tx = db.transaction(TRANSACTIONS, 'readwrite')
+        const store = tx.objectStore(TRANSACTIONS)
 
         const request = store.add(transaction)
 
@@ -75,8 +80,8 @@ export async function DB_Transactions_Delete(id) {
     const db = await openDB()
 
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite')
-        const store = tx.objectStore(STORE_NAME)
+        const tx = db.transaction(TRANSACTIONS, 'readwrite')
+        const store = tx.objectStore(TRANSACTIONS)
 
         const request = store.delete(id)
 

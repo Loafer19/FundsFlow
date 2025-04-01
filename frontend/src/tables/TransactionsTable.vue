@@ -4,7 +4,6 @@
             <table class="table w-full">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Date</th>
                         <th>Amount</th>
                         <th>Note</th>
@@ -14,8 +13,7 @@
                 <tbody>
                     <tr v-for="transaction in filteredTransactions.reverse()" :key="transaction.id"
                         class="hover:bg-base-200">
-                        <td>{{ transaction.id }}</td>
-                        <td>{{ formatDate(transaction.date) }}</td>
+                        <td>{{ formatDate(transaction.at) }}</td>
                         <td>
                             <div class="badge badge-outline"
                                 :class="[transaction.amount > 0 ? 'badge-success' : 'badge-error']">
@@ -67,7 +65,7 @@ defineEmits(['transaction-remove'])
 
 const filteredTransactions = computed(() => {
     return props.transactions.filter((t) => {
-        const date = new Date(t.date)
+        const date = new Date(t.at)
         return date >= props.dateRange.currentStart && date < props.dateRange.currentEnd
     })
 })

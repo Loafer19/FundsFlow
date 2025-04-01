@@ -6,6 +6,7 @@ export const useAuthStore = defineStore('auth', {
         user: null,
         token: null,
         isAuthenticated: false,
+        isLoading: false,
         toast: {
             type: 'success',
             message: '',
@@ -14,6 +15,8 @@ export const useAuthStore = defineStore('auth', {
 
     actions: {
         async login(credentials) {
+            this.isLoading = true
+
             try {
                 const response = await api.post('/login', credentials)
 
@@ -29,8 +32,10 @@ export const useAuthStore = defineStore('auth', {
             } catch (error) {
                 this.toast = {
                     type: 'error',
-                    message: 'Login failed: ' + error.response.data.error || error.message,
+                    message: 'Login failed: ' + error.response?.data?.error || error.message,
                 }
+            } finally {
+                this.isLoading = false
             }
         },
 
@@ -50,8 +55,10 @@ export const useAuthStore = defineStore('auth', {
             } catch (error) {
                 this.toast = {
                     type: 'error',
-                    message: 'Registration failed: ' + error.response.data.error || error.message,
+                    message: 'Registration failed: ' + error.response?.data?.error || error.message,
                 }
+            } finally {
+                this.isLoading = false
             }
         },
 
@@ -71,8 +78,10 @@ export const useAuthStore = defineStore('auth', {
             } catch (error) {
                 this.toast = {
                     type: 'error',
-                    message: 'Logout failed: ' + error.response.data.error || error.message,
+                    message: 'Logout failed: ' + error.response?.data?.error || error.message,
                 }
+            } finally {
+                this.isLoading = false
             }
         },
 

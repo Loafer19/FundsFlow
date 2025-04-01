@@ -37,8 +37,8 @@
                     required />
 
                 <div class="modal-action">
-                    <button type="submit" class="btn btn-success" :disabled="isSubmitting">
-                        <span v-if="isSubmitting" class="loading loading-spinner"></span>
+                    <button type="submit" class="btn btn-success" :disabled="authStore.isLoading">
+                        <span v-if="authStore.isLoading" class="loading loading-spinner"></span>
 
                         {{ isRegister ? 'Register' : 'Login' }}
 
@@ -62,13 +62,13 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { inject, ref, watch } from 'vue'
 import { useAuthStore } from './../services/auth.js'
 
 const authStore = useAuthStore()
+const toasts = inject('toasts')
 
 const isRegister = ref(false)
-const isSubmitting = ref(false)
 
 const credentials = ref({
     name: '',
@@ -76,16 +76,23 @@ const credentials = ref({
     password: '',
 })
 
-const handleSubmit = async () => {
-    isSubmitting.value = true
+watch(
+    () => authStore.toast,
+    (newValue) => {
+        if (newValue) {
+            toasts.push(newValue)
 
+            authStore.toast = null
+        }
+    },
+)
+
+const handleSubmit = async () => {
     if (isRegister.value) {
         await authStore.register(credentials.value)
     } else {
         await authStore.login(credentials.value)
     }
-
-    isSubmitting.value = false
 
     if (authStore.isAuthenticated) {
         credentials.value = { name: '', email: '', password: '' }
