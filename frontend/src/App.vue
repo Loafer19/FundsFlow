@@ -2,7 +2,7 @@
     <Toasts />
     <AuthModal />
     <TagsModal />
-    <TransactionsModal />
+    <TransactionsModal :tags="tagsStore.tags" />
 
     <div class="container mx-auto p-4">
         <div class="flex gap-2 justify-end mb-4">
@@ -71,10 +71,13 @@
                     checked="checked" :value="markRaw(Analytics)" />
 
                 <input v-model="selectedChart" type="radio" name="tabs_main" class="tab" aria-label="Money Flow"
-                    :value="markRaw(MoneyFlowChart)" />
+                    :value="markRaw(MoneyFlow)" />
 
                 <input v-model="selectedChart" type="radio" name="tabs_main" class="tab" aria-label="Balance Trend"
-                    :value="markRaw(BalanceTrendChart)" />
+                    :value="markRaw(BalanceTrend)" />
+
+                <input v-model="selectedChart" type="radio" name="tabs_main" class="tab" aria-label="Tag Distribution"
+                    :value="markRaw(TagDistribution)" />
             </div>
         </div>
 
@@ -88,10 +91,7 @@
 <script setup>
 import VueDatePicker from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
-import { computed, inject, markRaw, onMounted, ref, watch } from 'vue'
-import Analytics from './charts/Analytics.vue'
-import BalanceTrendChart from './charts/BalanceTrendChart.vue'
-import MoneyFlowChart from './charts/MoneyFlowChart.vue'
+import { computed, markRaw, onMounted, ref, watch } from 'vue'
 import Toasts from './components/Toasts.vue'
 import AuthModal from './modals/AuthModal.vue'
 import TagsModal from './modals/TagsModal.vue'
@@ -100,8 +100,11 @@ import { useAuthStore } from './services/auth.js'
 import { useTagsStore } from './services/tags.js'
 import { useTransactionsStore } from './services/transactions.js'
 import TransactionsTable from './tables/TransactionsTable.vue'
+import Analytics from './tabs/Analytics.vue'
+import BalanceTrend from './tabs/BalanceTrend.vue'
+import MoneyFlow from './tabs/MoneyFlow.vue'
+import TagDistribution from './tabs/TagDistribution.vue'
 
-const toasts = inject('toasts')
 const authStore = useAuthStore()
 const tagsStore = useTagsStore()
 const transactionsStore = useTransactionsStore()

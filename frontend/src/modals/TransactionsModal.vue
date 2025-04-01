@@ -15,6 +15,15 @@
                 <input type="number" v-model="transaction.amount" class="input w-full mb-4" placeholder="Amount"
                     step="0.01" required />
 
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <div v-for="tag in props.tags" :key="tag.title" @click="toggleTag(tag)"
+                        class="badge badge-info px-1 cursor-pointer"
+                        :class="{ 'badge-soft': !selectedTags.includes(tag) }">
+                        {{ tag.emoji }}
+                        {{ tag.title }}
+                    </div>
+                </div>
+
                 <input type="text" v-model="transaction.note" class="input w-full" placeholder="Note" />
 
                 <div class="modal-action">
@@ -48,9 +57,18 @@ const transaction_default = {
     at: new Date().toISOString().split('T')[0],
     amount: '',
     note: '',
+    tags: [],
 }
 
 const transaction = ref({ ...transaction_default })
+const selectedTags = ref([])
+
+const props = defineProps({
+    tags: {
+        type: Array,
+        required: true,
+    },
+})
 
 watch(
     () => transactionsStore.toast,
@@ -63,6 +81,17 @@ watch(
     },
 )
 
+const toggleTag = (tag) => {
+    const index = selectedTags.value.indexOf(tag)
+    if (index === -1) {
+        selectedTags.value.push(tag)
+    } else {
+        selectedTags.value.splice(index, 1)
+    }
+
+    transaction.value.tags = [...selectedTags.value.map((tag) => tag.id)]
+}
+
 const hadleSubmit = async () => {
     await transactionsStore.create(transaction.value)
 
@@ -72,4 +101,12 @@ const hadleSubmit = async () => {
 }
 </script>
 
-<style scoped></style>
+<style scoped>
+.badge {
+    transition: all 0.2s ease;
+}
+
+.badge:hover {
+    opacity: 0.8;
+}
+</style>

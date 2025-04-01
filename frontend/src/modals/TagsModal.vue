@@ -14,13 +14,12 @@
 
                 <div class="mb-4">
                     <div class="badge badge-soft badge-info text-xl py-4 px-2">
-                        Choose an emoji:
-
-                        <Emoji :data="emojiIndex" :emoji="tag.emoji || ':dotted_line_face:'" :size="24" />
+                        Choose an emoji: {{ tag.emoji || randomEmoji }}
                     </div>
                 </div>
 
-                <Picker :data="emojiIndex" @select="setEmoji" :show-preview="false" :show-categories="false" />
+                <Picker :data="emojiIndex" :native="true" @select="setEmoji" :show-preview="false"
+                    :show-categories="false" />
 
                 <div class="modal-action">
                     <button type="submit" class="btn btn-success" :disabled="tagsStore.isLoading">
@@ -45,12 +44,16 @@
 import data from 'emoji-mart-vue-fast/data/apple.json'
 import { inject, ref, watch } from 'vue'
 import 'emoji-mart-vue-fast/css/emoji-mart.css'
-import { Emoji, EmojiIndex, Picker } from 'emoji-mart-vue-fast/src'
+import { EmojiIndex, Picker } from 'emoji-mart-vue-fast/src'
 import { useTagsStore } from './../services/tags.js'
 
 const emojiIndex = new EmojiIndex(data, {
     exclude: ['recent', 'flags'],
 })
+
+const randomEmoji = Object.keys(emojiIndex._nativeEmojis)[
+    (Math.random() * Object.keys(emojiIndex._nativeEmojis).length) | 0
+]
 
 const tagsStore = useTagsStore()
 const toasts = inject('toasts')
@@ -64,7 +67,7 @@ const tag_default = {
 const tag = ref({ ...tag_default })
 
 const setEmoji = (emoji) => {
-    tag.value.emoji = emoji.colons
+    tag.value.emoji = emoji.native
 }
 
 watch(

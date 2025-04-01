@@ -20,6 +20,8 @@ class TransactionStoreRequest extends FormRequest
             'at' => 'required|string|date',
             'amount' => 'required|numeric',
             'note' => 'nullable|string|max:255',
+            'tags' => 'nullable|array',
+            'tags.*' => 'integer|exists:tags,id',
         ];
     }
 }

@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('transactions', function (Blueprint $table) {
-            $table->ulid('id')->primary();
+            $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->timestamp('at')->index();
             $table->bigInteger('amount')->default(0);

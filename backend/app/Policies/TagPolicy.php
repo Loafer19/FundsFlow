@@ -9,17 +9,12 @@ class TagPolicy
 {
     public function viewAny(User $user): bool
     {
-        return false;
-    }
-
-    public function view(User $user, Tag $tag): bool
-    {
-        return false;
+        return true;
     }
 
     public function create(User $user): bool
     {
-        return false;
+        return true;
     }
 
     public function update(User $user, Tag $tag): bool
@@ -28,16 +23,6 @@ class TagPolicy
     }
 
     public function delete(User $user, Tag $tag): bool
-    {
-        return false;
-    }
-
-    public function restore(User $user, Tag $tag): bool
-    {
-        return false;
-    }
-
-    public function forceDelete(User $user, Tag $tag): bool
     {
         return false;
     }

@@ -8,14 +8,18 @@ use App\Http\Resources\TransactionResource;
 use App\Models\Transaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Gate;
 
 class TransactionController extends Controller
 {
     public function index(): AnonymousResourceCollection
     {
+        Gate::authorize('viewAny', Transaction::class);
+
         $transactions = auth()
             ->user()
             ->transactions()
+            ->with('tags')
             ->latest('at')
             ->get();
 
@@ -24,10 +28,21 @@ class TransactionController extends Controller
 
     public function store(TransactionStoreRequest $request): TransactionResource
     {
+        Gate::authorize('create', Transaction::class);
+
+        $data = $request->validated();
+
+        $tags = $request->array('tags');
+        unset($data['tags']);
+
         $transaction = auth()
             ->user()
             ->transactions()
-            ->create($request->validated());
+            ->create($data);
+
+        $transaction->tags()->attach($tags);
+
+        $transaction->load('tags');
 
         return new TransactionResource($transaction);
     }
@@ -44,6 +59,8 @@ class TransactionController extends Controller
 
     public function destroy(Transaction $transaction): JsonResponse
     {
+        Gate::authorize('delete', $transaction);
+
         $transaction->delete();
 
         return response()->json([

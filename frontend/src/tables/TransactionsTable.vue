@@ -6,6 +6,7 @@
                     <tr>
                         <th>Date</th>
                         <th>Amount</th>
+                        <th>Tags</th>
                         <th>Note</th>
                         <th>Actions</th>
                     </tr>
@@ -18,6 +19,13 @@
                             <div class="badge badge-outline"
                                 :class="[transaction.amount > 0 ? 'badge-success' : 'badge-error']">
                                 {{ formatMoney(transaction.amount) }}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="flex flex-wrap gap-2">
+                                <div v-for="tag in transaction.tags" class="badge badge-soft badge-info px-1 gap-1">
+                                    <span>{{ tag.emoji }}</span><span>{{ tag.title }}</span>
+                                </div>
                             </div>
                         </td>
                         <td>{{ transaction.note || '-' }}</td>
