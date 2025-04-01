@@ -1,6 +1,6 @@
 <template>
     <div class="toast toast-top toast-center">
-        <div v-for="(toast, index) in toasts" :key="toast.id" class="alert flex items-center gap-2" :class="{
+        <div v-for="(toast) in toasts" :key="toast.id" class="alert flex items-center gap-2" :class="{
             'alert-success': toast.type === 'success',
             'alert-info': toast.type === 'info' || !toast.type,
             'alert-error': toast.type === 'error',
@@ -32,7 +32,7 @@ watch(
     () => {
         toasts.forEach((toast) => {
             if (!toast.timeoutId) {
-                toast.timeoutId = setTimeout(() => removeToast(toast.id), 2500)
+                toast.timeoutId = setTimeout(() => removeToast(toast.id), toast.type === 'error' ? 4000 : 2500)
             }
         })
     },

@@ -1,7 +1,7 @@
 <template>
     <div class="card card-border border-base-300 bg-base-100">
         <div class="overflow-x-auto">
-            <table class="table w-full">
+            <table class="table">
                 <thead>
                     <tr>
                         <th>Date</th>
@@ -31,7 +31,8 @@
                         <td>{{ transaction.note || '-' }}</td>
                         <td>
                             <button class="btn btn-error btn-outline btn-square btn-sm"
-                                @click="$emit('transaction-remove', transaction.id)">
+                                @click="transactionsStore.delete(transaction.id)"
+                                :disabled="transactionsStore.isLoading">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                                     class="icon-trash-bin">
                                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -54,9 +55,12 @@
 
 <script setup>
 import { computed, inject } from 'vue'
+import { useTransactionsStore } from '../services/transactions'
 
 const formatMoney = inject('formatMoney')
 const formatDate = inject('formatDate')
+
+const transactionsStore = useTransactionsStore()
 
 const props = defineProps({
     dateRange: {
@@ -68,8 +72,6 @@ const props = defineProps({
         required: true,
     },
 })
-
-defineEmits(['transaction-remove'])
 
 const filteredTransactions = computed(() => {
     return props.transactions.filter((t) => {

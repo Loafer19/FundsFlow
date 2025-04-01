@@ -97,6 +97,8 @@ const hadleSubmit = async () => {
 
     transaction.value = { ...transaction_default }
 
+    selectedTags.value = []
+
     transactions_modal.close()
 }
 </script>

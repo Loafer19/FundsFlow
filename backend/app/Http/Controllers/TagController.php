@@ -17,7 +17,6 @@ class TagController extends Controller
         $tags = auth()
             ->user()
             ->tags()
-            ->latest('title')
             ->get();
 
         return TagResource::collection($tags);

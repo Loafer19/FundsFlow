@@ -61,7 +61,7 @@ const toasts = inject('toasts')
 const tag_default = {
     title: '',
     parent_id: null,
-    emoji: '',
+    emoji: randomEmoji,
 }
 
 const tag = ref({ ...tag_default })

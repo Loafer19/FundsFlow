@@ -104,7 +104,7 @@ const totals = computed(() => {
 const daysDiff = computed(() => {
     const diffTime = props.dateRange.currentEnd - props.dateRange.currentStart
 
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 })
 
 const balanceChange = computed(() => totals.value.positive + totals.value.negative)

@@ -67,24 +67,24 @@
 
         <div class="mb-4">
             <div class="tabs tabs-box gap-2 px-0">
-                <input v-model="selectedChart" type="radio" name="tabs_main" class="tab" aria-label="Analytics"
+                <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" aria-label="Analytics"
                     checked="checked" :value="markRaw(Analytics)" />
 
-                <input v-model="selectedChart" type="radio" name="tabs_main" class="tab" aria-label="Money Flow"
+                <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" aria-label="Money Flow"
                     :value="markRaw(MoneyFlow)" />
 
-                <input v-model="selectedChart" type="radio" name="tabs_main" class="tab" aria-label="Balance Trend"
+                <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" aria-label="Balance Trend"
                     :value="markRaw(BalanceTrend)" />
 
-                <input v-model="selectedChart" type="radio" name="tabs_main" class="tab" aria-label="Tag Distribution"
+                <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" aria-label="Tag Distribution"
                     :value="markRaw(TagDistribution)" />
+
+                <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" aria-label="List"
+                    :value="markRaw(List)" />
             </div>
         </div>
 
-        <component :is="selectedChart" :dateRange="getDateRange" :transactions="transactionsStore.transactions" />
-
-        <TransactionsTable :dateRange="getDateRange" :transactions="transactionsStore.transactions"
-            @transaction-remove="transactionsStore.delete" />
+        <component :is="selectedTab" :dateRange="getDateRange" :transactions="transactionsStore.transactions" />
     </div>
 </template>
 
@@ -99,9 +99,9 @@ import TransactionsModal from './modals/TransactionsModal.vue'
 import { useAuthStore } from './services/auth.js'
 import { useTagsStore } from './services/tags.js'
 import { useTransactionsStore } from './services/transactions.js'
-import TransactionsTable from './tables/TransactionsTable.vue'
 import Analytics from './tabs/Analytics.vue'
 import BalanceTrend from './tabs/BalanceTrend.vue'
+import List from './tabs/List.vue'
 import MoneyFlow from './tabs/MoneyFlow.vue'
 import TagDistribution from './tabs/TagDistribution.vue'
 
@@ -116,7 +116,7 @@ const selectedRange = ref({
     month: new Date().getMonth(),
     day: new Date().getDate(),
 })
-const selectedChart = ref(markRaw(Analytics))
+const selectedTab = ref(markRaw(Analytics))
 
 onMounted(() => authStore.checkAuth())
 
