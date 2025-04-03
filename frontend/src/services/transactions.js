@@ -33,11 +33,11 @@ export const useTransactionsStore = defineStore('transactions', {
             }
         },
 
-        async create(tag) {
+        async create(raw) {
             this.isLoading = true
 
             try {
-                const response = await api.post('/transactions', tag)
+                const response = await api.post('/transactions', raw)
 
                 this.transactions.push(response.data)
 
@@ -56,7 +56,7 @@ export const useTransactionsStore = defineStore('transactions', {
         },
 
         async delete(id) {
-            this.isLoading = true
+            this.isLoading = id
 
             try {
                 await api.delete('/transactions/' + id)

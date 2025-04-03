@@ -26,7 +26,7 @@
                 </button>
 
                 <button @click="authStore.logout" class="btn btn-error btn-square tooltip tooltip-bottom"
-                    data-tip="Logout">
+                    data-tip="Logout" :disabled="authStore.isLoading">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"
                         xmlns="http://www.w3.org/2000/svg">
                         <path
@@ -70,17 +70,17 @@
                 <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" aria-label="Analytics"
                     checked="checked" :value="markRaw(Analytics)" />
 
-                <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" aria-label="Money Flow"
-                    :value="markRaw(MoneyFlow)" />
-
                 <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" aria-label="Balance Trend"
                     :value="markRaw(BalanceTrend)" />
 
+                <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" aria-label="Money Flow"
+                    :value="markRaw(MoneyFlow)" />
+
+                <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" aria-label="Table"
+                    :value="markRaw(TableTab)" />
+
                 <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" aria-label="Tag Distribution"
                     :value="markRaw(TagDistribution)" />
-
-                <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" aria-label="List"
-                    :value="markRaw(List)" />
             </div>
         </div>
 
@@ -101,8 +101,8 @@ import { useTagsStore } from './services/tags.js'
 import { useTransactionsStore } from './services/transactions.js'
 import Analytics from './tabs/Analytics.vue'
 import BalanceTrend from './tabs/BalanceTrend.vue'
-import List from './tabs/List.vue'
 import MoneyFlow from './tabs/MoneyFlow.vue'
+import TableTab from './tabs/TableTab.vue'
 import TagDistribution from './tabs/TagDistribution.vue'
 
 const authStore = useAuthStore()
@@ -111,19 +111,15 @@ const transactionsStore = useTransactionsStore()
 
 const dateSelectionType = ref('month')
 const datePicker = ref(null)
-const selectedRange = ref({
-    year: new Date().getFullYear(),
-    month: new Date().getMonth(),
-    day: new Date().getDate(),
-})
+const selectedRange = ref(getDefaultRange('month'))
 const selectedTab = ref(markRaw(Analytics))
 
 onMounted(() => authStore.checkAuth())
 
 watch(
     () => authStore.isAuthenticated,
-    (newValue) => {
-        if (newValue) {
+    (auth) => {
+        if (auth) {
             tagsStore.load()
             transactionsStore.load()
         }
@@ -132,25 +128,31 @@ watch(
 
 watch(
     () => dateSelectionType.value,
-    (newValue) => {
-        const today = new Date()
-
-        if (newValue === 'week') {
-            const start = new Date(today)
-            start.setDate(today.getDate() - today.getDay() + 1)
-            const end = new Date(start)
-            end.setDate(start.getDate() + 6)
-
-            selectedRange.value = [start, end]
-        } else if (newValue === 'month') {
-            selectedRange.value = { month: today.getMonth(), year: today.getFullYear() }
-        } else if (newValue === 'year') {
-            selectedRange.value = today.getFullYear()
-        }
-
+    (type) => {
+        selectedRange.value = getDefaultRange(type)
         datePicker.value.parseModel()
     },
 )
+
+function getDefaultRange(type) {
+    const today = new Date()
+
+    if (type === 'week') {
+        const start = new Date(today)
+        start.setDate(today.getDate() - today.getDay() + 1)
+
+        const end = new Date(start)
+        end.setDate(start.getDate() + 6)
+
+        return [start, end]
+    }
+
+    if (type === 'month') {
+        return { month: today.getMonth(), year: today.getFullYear() }
+    }
+
+    return today.getFullYear()
+}
 
 const getDateRange = computed(() => {
     let currentStart

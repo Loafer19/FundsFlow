@@ -31,10 +31,10 @@
             </div>
 
             <!-- Table View -->
-            <div v-else-if="viewMode === 'list'" class="list overflow-x-auto">
+            <div v-else-if="viewMode === 'list'" class="list gap-2 overflow-x-auto">
                 <div>
-                    <h3 class="text-lg font-medium mb-2">Income</h3>
-                    <table class="table">
+                    <h3 class="text-lg font-medium mb-0">Income</h3>
+                    <table class="table mt-2" v-if="filteredPositiveTagTree.length > 0 || positiveUntagged.count > 0">
                         <tbody>
                             <tr v-if="positiveUntagged.count > 0 || positiveUntagged.previousAmount > 0">
                                 <td>
@@ -62,7 +62,7 @@
                                 <td>
                                     <div class="flex items-center gap-2" :class="getIndentClass(tag)">
                                         <div class="badge badge-soft badge-success text-xl py-4 px-2">
-                                            {{ tag.emoji || '💰' }}
+                                            {{ tag.emoji }}
                                         </div>
                                         <span>{{ tag.title }}</span>
                                     </div>
@@ -85,8 +85,8 @@
                     </table>
                 </div>
                 <div>
-                    <h3 class="text-lg font-medium my-2">Expenses</h3>
-                    <table class="table">
+                    <h3 class="text-lg font-medium mb-0">Expenses</h3>
+                    <table class="table mt-2" v-if="filteredNegativeTagTree.length > 0 || negativeUntagged.count > 0">
                         <tbody>
                             <tr v-if="negativeUntagged.count > 0 || negativeUntagged.previousAmount > 0">
                                 <td>
@@ -114,7 +114,7 @@
                                 <td>
                                     <div class="flex items-center gap-2" :class="getIndentClass(tag)">
                                         <div class="badge badge-soft badge-error text-xl py-4 px-2">
-                                            {{ tag.emoji || '💸' }}
+                                            {{ tag.emoji }}
                                         </div>
                                         <span>{{ tag.title }}</span>
                                     </div>
@@ -203,13 +203,11 @@ const calculateTagAmounts = (start, end) => {
     return result
 }
 
-// Calculate percentage difference
 const calculatePercentageDiff = (current, previous) => {
     if (previous === 0) return current > 0 ? Number.POSITIVE_INFINITY : 0
     return ((current - previous) / previous) * 100
 }
 
-// Format percentage
 const formatPercentage = (value) => {
     if (value === Number.POSITIVE_INFINITY) return '∞'
     if (value === Number.NEGATIVE_INFINITY) return '-∞'
@@ -353,6 +351,10 @@ const negativeChartOptions = {
 </script>
 
 <style scoped>
+.list .table td:first-child {
+    padding-left: 0;
+}
+
 .list .table tr:first-child {
     border-top: var(--border) solid color-mix(in oklch, var(--color-base-content) 5%, #0000);
 }

@@ -33,11 +33,11 @@ export const useTagsStore = defineStore('tags', {
             }
         },
 
-        async create(tag) {
+        async create(raw) {
             this.isLoading = true
 
             try {
-                const response = await api.post('/tags', tag)
+                const response = await api.post('/tags', raw)
 
                 this.tags.push(response.data)
 

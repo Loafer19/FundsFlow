@@ -72,9 +72,9 @@ const setEmoji = (emoji) => {
 
 watch(
     () => tagsStore.toast,
-    (newValue) => {
-        if (newValue) {
-            toasts.push(newValue)
+    (toast) => {
+        if (toast) {
+            toasts.push(toast)
 
             tagsStore.toast = null
         }

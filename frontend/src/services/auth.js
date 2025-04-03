@@ -40,6 +40,8 @@ export const useAuthStore = defineStore('auth', {
         },
 
         async register(credentials) {
+            this.isLoading = true
+
             try {
                 const response = await api.post('/register', credentials)
 
@@ -63,6 +65,8 @@ export const useAuthStore = defineStore('auth', {
         },
 
         async logout() {
+            this.isLoading = true
+
             try {
                 await api.post('/logout')
 

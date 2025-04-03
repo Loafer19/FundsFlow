@@ -15,7 +15,7 @@
                 <input type="number" v-model="transaction.amount" class="input w-full mb-4" placeholder="Amount"
                     step="0.01" required />
 
-                <div class="flex flex-wrap gap-2 mb-4">
+                <div class="flex flex-wrap gap-2 mb-4" v-if="props.tags.length">
                     <div v-for="tag in props.tags" :key="tag.title" @click="toggleTag(tag)"
                         class="badge badge-info px-1 cursor-pointer"
                         :class="{ 'badge-soft': !selectedTags.includes(tag) }">
@@ -72,9 +72,9 @@ const props = defineProps({
 
 watch(
     () => transactionsStore.toast,
-    (newValue) => {
-        if (newValue) {
-            toasts.push(newValue)
+    (toast) => {
+        if (toast) {
+            toasts.push(toast)
 
             transactionsStore.toast = null
         }

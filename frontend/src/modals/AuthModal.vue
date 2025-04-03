@@ -78,9 +78,9 @@ const credentials = ref({
 
 watch(
     () => authStore.toast,
-    (newValue) => {
-        if (newValue) {
-            toasts.push(newValue)
+    (toast) => {
+        if (toast) {
+            toasts.push(toast)
 
             authStore.toast = null
         }
