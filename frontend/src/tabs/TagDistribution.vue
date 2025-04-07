@@ -30,8 +30,7 @@
                 </div>
             </div>
 
-            <!-- Table View -->
-            <div v-else-if="viewMode === 'list'" class="list gap-2 overflow-x-auto">
+            <div v-else-if="viewMode === 'list'" class="tags-list gap-2 overflow-x-auto">
                 <div>
                     <h3 class="text-lg font-medium mb-0">Income</h3>
                     <table class="table mt-2" v-if="filteredPositiveTagTree.length > 0 || positiveUntagged.count > 0">
@@ -350,16 +349,4 @@ const negativeChartOptions = {
 }
 </script>
 
-<style scoped>
-.list .table td:first-child {
-    padding-left: 0;
-}
-
-.list .table tr:first-child {
-    border-top: var(--border) solid color-mix(in oklch, var(--color-base-content) 5%, #0000);
-}
-
-.list .table tr:last-child {
-    border-bottom: var(--border) solid color-mix(in oklch, var(--color-base-content) 5%, #0000);
-}
-</style>
+<style scoped></style>

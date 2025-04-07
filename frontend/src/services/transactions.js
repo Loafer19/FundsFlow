@@ -19,10 +19,6 @@ export const useTransactionsStore = defineStore('transactions', {
                 const response = await api.get('/transactions')
 
                 this.transactions = response.data
-                // this.toast = {
-                //     type: 'success',
-                //     message: 'Transactions loaded successfully!',
-                // }
             } catch (error) {
                 this.toast = {
                     type: 'error',
@@ -61,7 +57,7 @@ export const useTransactionsStore = defineStore('transactions', {
             try {
                 await api.delete('/transactions/' + id)
 
-                this.transactions = this.transactions.filter((transaction) => transaction.id !== id)
+                this.transactions = this.transactions.filter((t) => t.id !== id)
 
                 this.toast = {
                     type: 'info',

@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignId('parent_id')
                 ->nullable()
                 ->constrained('tags', 'id')
-                ->cascadeOnDelete();
+                ->nullOnDelete();
             $table->string('title');
             $table->string('emoji');
             $table->timestamp('created_at')->useCurrent();

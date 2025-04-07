@@ -2,12 +2,13 @@
     <Toasts />
     <AuthModal />
     <TagsModal />
+    <TagsAddModal />
     <TransactionsModal :tags="tagsStore.tags" />
 
     <div class="container mx-auto p-4">
         <div class="flex gap-2 justify-end mb-4">
             <template v-if="authStore.isAuthenticated">
-                <button onclick="transactions_modal.showModal()" class="btn btn-primary">
+                <button onclick="transactions_add_modal.showModal()" class="btn btn-primary">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"
                         xmlns="http://www.w3.org/2000/svg">
                         <path fill-rule="evenodd" clip-rule="evenodd"
@@ -16,8 +17,8 @@
                     Add Transaction
                 </button>
 
-                <button onclick="tags_modal.showModal()" class="btn btn-info btn-square tooltip tooltip-bottom"
-                    data-tip="Tags">
+                <button onclick="tags_modal.showModal()"
+                    class="btn btn-outline btn-info btn-square tooltip tooltip-bottom" data-tip="Tags">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"
                         xmlns="http://www.w3.org/2000/svg">
                         <path fill-rule="evenodd" clip-rule="evenodd"
@@ -25,7 +26,7 @@
                     </svg>
                 </button>
 
-                <button @click="authStore.logout" class="btn btn-error btn-square tooltip tooltip-bottom"
+                <button @click="authStore.logout" class="btn btn-outline btn-error btn-square tooltip tooltip-bottom"
                     data-tip="Logout" :disabled="authStore.isLoading">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"
                         xmlns="http://www.w3.org/2000/svg">
@@ -94,6 +95,7 @@ import '@vuepic/vue-datepicker/dist/main.css'
 import { computed, markRaw, onMounted, ref, watch } from 'vue'
 import Toasts from './components/Toasts.vue'
 import AuthModal from './modals/AuthModal.vue'
+import TagsAddModal from './modals/TagsAddModal.vue'
 import TagsModal from './modals/TagsModal.vue'
 import TransactionsModal from './modals/TransactionsModal.vue'
 import { useAuthStore } from './services/auth.js'

@@ -29,12 +29,9 @@
                         </td>
                         <td>{{ transaction.note || '-' }}</td>
                         <td>
-                            <DeleteHold
-                                :id="transaction.id"
-                                :disabled="transactionsStore.isLoading"
+                            <DeleteHold :id="transaction.id" :disabled="transactionsStore.isLoading"
                                 :isLoading="transactionsStore.isLoading == transaction.id"
-                                @delete="(id) => transactionsStore.delete(id)"
-                            />
+                                @delete="(id) => transactionsStore.delete(id)" />
                         </td>
                     </tr>
                 </tbody>
@@ -74,5 +71,4 @@ const filteredTransactions = computed(() => {
 })
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

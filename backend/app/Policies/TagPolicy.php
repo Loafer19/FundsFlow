@@ -24,6 +24,6 @@ class TagPolicy
 
     public function delete(User $user, Tag $tag): bool
     {
-        return false;
+        return $tag->user_id === $user->id;
     }
 }

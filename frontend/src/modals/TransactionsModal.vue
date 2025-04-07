@@ -1,5 +1,5 @@
 <template>
-    <dialog id="transactions_modal" class="modal">
+    <dialog id="transactions_add_modal" class="modal">
         <div class="modal-box max-w-sm">
             <h2 class="card-title mb-4">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -99,7 +99,7 @@ const hadleSubmit = async () => {
 
     selectedTags.value = []
 
-    transactions_modal.close()
+    transactions_add_modal.close()
 }
 </script>
 
