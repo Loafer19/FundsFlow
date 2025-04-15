@@ -1,5 +1,5 @@
 <template>
-    <div class="card card-border border-base-300 bg-base-100 mb-4">
+    <div class="card card-border border-base-300 bg-base-100">
         <div class="card-body">
             <div class="flex justify-between items-center">
                 <h2 class="card-title">
@@ -30,7 +30,7 @@
                 </div>
             </div>
 
-            <div v-else-if="viewMode === 'list'" class="tags-list gap-2 overflow-x-auto">
+            <div v-else-if="viewMode === 'list'" class="tags-list flex flex-col gap-2 overflow-x-auto">
                 <div>
                     <h3 class="text-lg font-medium mb-0">Income</h3>
                     <table class="table mt-2" v-if="filteredPositiveTagTree.length > 0 || positiveUntagged.count > 0">
@@ -53,13 +53,18 @@
                                     </span>
                                 </td>
                                 <td class="w-15 text-right">
-                                    {{ formatPercentage(calculatePercentageDiff(positiveUntagged.amount,
-                                        positiveUntagged.previousAmount)) }}
+                                    <span :class="{
+                                        'text-success': positiveUntagged.amount > positiveUntagged.previousAmount,
+                                        'text-error': positiveUntagged.amount < positiveUntagged.previousAmount,
+                                    }">
+                                        {{ formatPercentage(calculatePercentageDiff(positiveUntagged.amount,
+                                            positiveUntagged.previousAmount)) }}
+                                    </span>
                                 </td>
                             </tr>
                             <tr v-for="tag in filteredPositiveTagTree" :key="tag.id">
                                 <td>
-                                    <div class="flex items-center gap-2" :class="getIndentClass(tag)">
+                                    <div class="flex items-center gap-2" :style="getIndent(tag)">
                                         <div class="badge badge-soft badge-success text-xl py-4 px-2">
                                             {{ tag.emoji }}
                                         </div>
@@ -77,7 +82,12 @@
                                     </span>
                                 </td>
                                 <td class="w-15 text-right">
-                                    {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
+                                    <span :class="{
+                                        'text-success': tag.amount > tag.previousAmount,
+                                        'text-error': tag.amount < tag.previousAmount,
+                                    }">
+                                        {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
+                                    </span>
                                 </td>
                             </tr>
                         </tbody>
@@ -105,13 +115,18 @@
                                     </span>
                                 </td>
                                 <td class="w-15 text-right">
-                                    {{ formatPercentage(calculatePercentageDiff(negativeUntagged.amount,
-                                        negativeUntagged.previousAmount)) }}
+                                    <span :class="{
+                                        'text-success': negativeUntagged.amount < negativeUntagged.previousAmount,
+                                        'text-error': negativeUntagged.amount > negativeUntagged.previousAmount,
+                                    }">
+                                        {{ formatPercentage(calculatePercentageDiff(negativeUntagged.amount,
+                                            negativeUntagged.previousAmount)) }}
+                                    </span>
                                 </td>
                             </tr>
                             <tr v-for="tag in filteredNegativeTagTree" :key="tag.id">
                                 <td>
-                                    <div class="flex items-center gap-2" :class="getIndentClass(tag)">
+                                    <div class="flex items-center gap-2" :style="getIndent(tag)">
                                         <div class="badge badge-soft badge-error text-xl py-4 px-2">
                                             {{ tag.emoji }}
                                         </div>
@@ -129,7 +144,12 @@
                                     </span>
                                 </td>
                                 <td class="w-15 text-right">
-                                    {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
+                                    <span :class="{
+                                        'text-success': tag.amount < tag.previousAmount,
+                                        'text-error': tag.amount > tag.previousAmount,
+                                    }">
+                                        {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
+                                    </span>
                                 </td>
                             </tr>
                         </tbody>
@@ -155,6 +175,7 @@ const props = defineProps({
 
 const tagsStore = useTagsStore()
 const formatMoney = inject('formatMoney')
+const formatPercentage = inject('formatPercentage')
 const viewMode = ref('donuts')
 
 // Normalize date to UTC midnight to avoid timezone issues
@@ -207,13 +228,6 @@ const calculatePercentageDiff = (current, previous) => {
     return ((current - previous) / previous) * 100
 }
 
-const formatPercentage = (value) => {
-    if (value === Number.POSITIVE_INFINITY) return '∞'
-    if (value === Number.NEGATIVE_INFINITY) return '-∞'
-    if (Number.isNaN(value)) return 'N/A'
-    return `${value.toFixed(1)}%`
-}
-
 // Build tag tree with separate current and previous amounts
 const buildTagTree = (currentData, previousData, isPositive) => {
     const current = isPositive ? currentData.positive : currentData.negative
@@ -258,10 +272,10 @@ const getTagDepth = (tag, tagMap, depth = 0) => {
     return parent ? getTagDepth(parent, tagMap, depth + 1) : depth
 }
 
-const getIndentClass = (tag) => {
+const getIndent = (tag) => {
     const tagMap = new Map(tagsStore.tags.map((t) => [t.id, t]))
     const depth = getTagDepth(tag, tagMap)
-    return `ml-${depth * 4}`
+    return `padding-left: ${depth * 20}px;`
 }
 
 const currentPeriod = computed(() => calculateTagAmounts(props.dateRange.currentStart, props.dateRange.currentEnd))

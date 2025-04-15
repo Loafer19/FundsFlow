@@ -2,21 +2,31 @@
 
 ![FundsFlow](./frontend/public/logo.png)
 
-Money management app
+Neat money management app
 
 ## Features
 
-- Add income & expenses
-- View transactions & balance
-- Filter transactions by date
-- Checkout cool charts:
-  - Money Flow
+- Transactions:
+  - date, amount, tags, note
+- Tags:
+  - fully customizable, with emojis 😋
+- Filter:
+  - by date: week, month, year
+  - by tags: in development
+- Helpful Insights:
+  - Analytics
   - Balance Trend
+  - Money Flow
+  - Table
+  - Tag Distribution
+    - Donuts
+    - List
 
-![app](./.github/screenshots/app_analytics.png)
+|  |  |  |
+| ---------- | ---------- | ---------- |
+| ![app](./.github/screenshots/analytics.png) | ![app](./.github/screenshots/balance_trend.png) | ![app](./.github/screenshots/money_flow.png) |
+| ![app](./.github/screenshots/table.png) | ![app](./.github/screenshots/tag_distribution_donuts.png) | ![app](./.github/screenshots/tag_distribution_list.png) |
+| ![app](./.github/screenshots/tags_add.png) | ![app](./.github/screenshots/transactions_add.png) |  |
 
-![app](./.github/screenshots/app_money_flow.png)
-
-![app](./.github/screenshots/app_balance_trend.png)
 
 

@@ -26,6 +26,8 @@ toasts.error = (message) => {
     })
 }
 
+const formatDate = (date) => new Date(date).toLocaleDateString('uk-UA')
+
 const formatMoney = (amount) =>
     new Intl.NumberFormat('uk-UA', {
         style: 'currency',
@@ -34,11 +36,17 @@ const formatMoney = (amount) =>
         maximumFractionDigits: 2,
     }).format(amount)
 
-const formatDate = (date) => new Date(date).toLocaleDateString('uk-UA')
+const formatPercentage = (value) => {
+    if (value === Number.POSITIVE_INFINITY) return '∞'
+    if (value === Number.NEGATIVE_INFINITY) return '-∞'
+    if (Number.isNaN(value)) return 'N/A'
+    return value.toFixed(1) + '%'
+}
 
 createApp(App)
     .use(createPinia())
     .provide('toasts', toasts)
-    .provide('formatMoney', formatMoney)
     .provide('formatDate', formatDate)
+    .provide('formatMoney', formatMoney)
+    .provide('formatPercentage', formatPercentage)
     .mount('body')

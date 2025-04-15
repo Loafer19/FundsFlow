@@ -1,7 +1,9 @@
 {
     "autoload": {
         "psr-4": {
-            "App\\": "app/"
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/"
         }
     },
     "config": {
@@ -16,7 +18,8 @@
         "laravel/sanctum": "4.0.8"
     },
     "require-dev": {
-        "laravel/pint": "1.21.2"
+        "fakerphp/faker": "^1.24",
+        "laravel/pint": "^1.22"
     },
     "scripts": {
         "pint": "./vendor/bin/pint -v"

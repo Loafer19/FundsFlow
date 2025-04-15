@@ -69,6 +69,14 @@ const stopHold = () => {
 </script>
 
 <style scoped>
+.btn:active:not(.btn-active) {
+    scale: 0.95;
+}
+
+.progress {
+    height: 9.5px;
+}
+
 .icon-trash-bin {
     fill: var(--color-error);
 }

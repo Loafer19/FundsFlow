@@ -66,12 +66,14 @@ body {
 
 /* Plugins */
 .dp__input {
+    color: var(--color-base-content) !important;
+    background-color: var(--color-base-100) !important;
     border: var(--border) solid var(--color-base-300) !important;
     border-radius: var(--radius-field) !important;
 }
 
 .dp__arrow_top {
-    display: none;
+    display: none !important;
 }
 
 .emoji-mart {

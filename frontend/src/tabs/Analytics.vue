@@ -1,5 +1,5 @@
 <template>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="card card-border border-base-300 bg-base-100">
             <div class="card-body">
                 <h2 class="card-title">
@@ -13,6 +13,7 @@
                 <p class="text-2xl">{{ filteredTransactions.length }}</p>
             </div>
         </div>
+
         <div class="card card-border border-base-300 bg-base-100">
             <div class="card-body">
                 <h2 class="card-title">
