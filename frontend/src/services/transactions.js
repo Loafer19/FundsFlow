@@ -4,12 +4,21 @@ import api from './api.js'
 export const useTransactionsStore = defineStore('transactions', {
     state: () => ({
         transactions: [],
+        transactionForEdit: null,
         isLoading: false,
         toast: {
             type: 'success',
             message: '',
         },
     }),
+
+    getters: {
+        filteredByDateRange: (state) => (start, end) =>
+            state.transactions.filter((t) => {
+                const date = new Date(t.at)
+                return date >= start && date < end
+            }),
+    },
 
     actions: {
         async load() {
@@ -45,6 +54,29 @@ export const useTransactionsStore = defineStore('transactions', {
                 this.toast = {
                     type: 'error',
                     message: 'Failed to create transaction: ' + (error.response?.data?.error || error.message),
+                }
+            } finally {
+                this.isLoading = false
+            }
+        },
+
+        async update(raw) {
+            this.isLoading = raw.id
+
+            try {
+                const response = await api.patch('/transactions/' + raw.id, raw)
+
+                const index = this.transactions.findIndex((t) => t.id === raw.id)
+                this.transactions[index] = response.data
+
+                this.toast = {
+                    type: 'success',
+                    message: 'Transaction updated successfully!',
+                }
+            } catch (error) {
+                this.toast = {
+                    type: 'error',
+                    message: 'Failed to update transaction: ' + (error.response?.data?.error || error.message),
                 }
             } finally {
                 this.isLoading = false

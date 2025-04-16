@@ -19,7 +19,7 @@ class TransactionPolicy
 
     public function update(User $user, Transaction $transaction): bool
     {
-        return false;
+        return $transaction->user_id === $user->id;
     }
 
     public function delete(User $user, Transaction $transaction): bool

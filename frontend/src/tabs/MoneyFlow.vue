@@ -22,7 +22,7 @@
 
 <script setup>
 import { BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Tooltip } from 'chart.js'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { Bar as BarChart } from 'vue-chartjs'
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend)

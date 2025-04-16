@@ -18,7 +18,7 @@
 
 <script setup>
 import { CategoryScale, Chart as ChartJS, Legend, LineElement, LinearScale, PointElement, Tooltip } from 'chart.js'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { Line as LineChart } from 'vue-chartjs'
 
 ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend)

@@ -3,7 +3,8 @@
     <AuthModal />
     <TagsModal />
     <TagsAddModal />
-    <TransactionsModal :tags="tagsStore.tags" />
+    <TransactionsAddModal :tags="tagsStore.tags" />
+    <TransactionsEditModal :tags="tagsStore.tags" />
 
     <div class="container mx-auto p-4">
         <div class="flex gap-2 justify-end mb-4">
@@ -97,7 +98,8 @@ import Toasts from './components/Toasts.vue'
 import AuthModal from './modals/AuthModal.vue'
 import TagsAddModal from './modals/TagsAddModal.vue'
 import TagsModal from './modals/TagsModal.vue'
-import TransactionsModal from './modals/TransactionsModal.vue'
+import TransactionsAddModal from './modals/TransactionsAddModal.vue'
+import TransactionsEditModal from './modals/TransactionsEditModal.vue'
 import { useAuthStore } from './services/auth.js'
 import { useTagsStore } from './services/tags.js'
 import { useTransactionsStore } from './services/transactions.js'
@@ -124,6 +126,9 @@ watch(
         if (auth) {
             tagsStore.load()
             transactionsStore.load()
+        } else {
+            tagsStore.tags = []
+            transactionsStore.transactions = []
         }
     },
 )

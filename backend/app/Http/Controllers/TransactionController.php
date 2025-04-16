@@ -47,14 +47,22 @@ class TransactionController extends Controller
         return new TransactionResource($transaction);
     }
 
-    public function show(Transaction $transaction)
+    public function update(TransactionStoreRequest $request, Transaction $transaction)
     {
-        //
-    }
+        Gate::authorize('update', $transaction);
 
-    public function update(UpdateTransactionRequest $request, Transaction $transaction)
-    {
-        //
+        $data = $request->validated();
+
+        $tags = $request->array('tags');
+        unset($data['tags']);
+
+        $transaction->update($data);
+
+        $transaction->tags()->sync($tags);
+
+        $transaction->load('tags');
+
+        return new TransactionResource($transaction);
     }
 
     public function destroy(Transaction $transaction): JsonResponse

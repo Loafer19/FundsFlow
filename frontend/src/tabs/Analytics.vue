@@ -10,7 +10,15 @@
                     </svg>
                     Total Transactions
                 </h2>
-                <p class="text-2xl">{{ filteredTransactions.length }}</p>
+                <div class="flex items-center space-x-2">
+                    <p class="text-2xl">{{ filteredTransactions.length }}</p>
+                    <div class="tooltip tooltip-left"
+                         :data-tip="`Previous period: ${previousTransactions.length}`">
+                        <div class="badge badge-outline badge-secondary">
+                            {{ formatPercentage(calculatePercentageDiff(filteredTransactions.length, previousTransactions.length)) }}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -32,7 +40,19 @@
                     </svg>
                     Balance Change
                 </h2>
-                <p class="text-2xl">{{ formatMoney(balanceChange) }}</p>
+                <div class="flex items-center space-x-2">
+                    <p class="text-2xl">{{ formatMoney(balanceChange) }}</p>
+                    <div class="tooltip tooltip-left"
+                         :data-tip="`Previous period: ${formatMoney(previousBalanceChange)}`">
+                        <div class="badge badge-outline"
+                             :class="{
+                                 'badge-success': balanceChange > previousBalanceChange,
+                                 'badge-error': balanceChange < previousBalanceChange,
+                             }">
+                            {{ formatPercentage(calculatePercentageDiff(balanceChange, previousBalanceChange)) }}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -46,7 +66,19 @@
                     </svg>
                     Average Daily Expenses
                 </h2>
-                <p class="text-2xl">{{ formatMoney(averageDailyExpenses) }}</p>
+                <div class="flex items-center space-x-2">
+                    <p class="text-2xl">{{ formatMoney(averageDailyExpenses) }}</p>
+                    <div class="tooltip tooltip-left"
+                         :data-tip="`Previous period: ${formatMoney(previousAverageDailyExpenses)}`">
+                        <div class="badge badge-outline"
+                             :class="{
+                                 'badge-success': averageDailyExpenses > previousAverageDailyExpenses,
+                                 'badge-error': averageDailyExpenses < previousAverageDailyExpenses,
+                             }">
+                            {{ formatPercentage(calculatePercentageDiff(averageDailyExpenses, previousAverageDailyExpenses)) }}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -60,7 +92,19 @@
                     </svg>
                     Average Daily Income
                 </h2>
-                <p class="text-2xl">{{ formatMoney(averageDailyIncome) }}</p>
+                <div class="flex items-center space-x-2">
+                    <p class="text-2xl">{{ formatMoney(averageDailyIncome) }}</p>
+                    <div class="tooltip tooltip-left"
+                         :data-tip="`Previous period: ${formatMoney(previousAverageDailyIncome)}`">
+                        <div class="badge badge-outline"
+                             :class="{
+                                 'badge-success': averageDailyIncome > previousAverageDailyIncome,
+                                 'badge-error': averageDailyIncome < previousAverageDailyIncome,
+                             }">
+                            {{ formatPercentage(calculatePercentageDiff(averageDailyIncome, previousAverageDailyIncome)) }}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -68,29 +112,26 @@
 
 <script setup>
 import { computed, inject } from 'vue'
+import { useTransactionsStore } from '../services/transactions.js'
 
+const transactionsStore = useTransactionsStore()
 const formatMoney = inject('formatMoney')
+const formatPercentage = inject('formatPercentage')
 
 const props = defineProps({
     dateRange: {
         type: Object,
         required: true,
     },
-    transactions: {
-        type: Array,
-        required: true,
-    },
 })
 
-const filteredTransactions = computed(() => {
-    return props.transactions.filter((t) => {
-        const date = new Date(t.at)
-        return date >= props.dateRange.currentStart && date < props.dateRange.currentEnd
-    })
-})
+const calculatePercentageDiff = (current, previous) => {
+    if (previous === 0) return current > 0 ? Number.POSITIVE_INFINITY : Number.POSITIVE_INFINITY
+    return ((current - previous) / previous) * 100
+}
 
-const totals = computed(() => {
-    return (filteredTransactions.value || []).reduce(
+const computeMetrics = (transactions, startDate, endDate) => {
+    const totals = (transactions || []).reduce(
         (acc, t) => {
             t.amount >= 0 ? (acc.positive += t.amount) : (acc.negative += t.amount)
             return acc
@@ -100,17 +141,40 @@ const totals = computed(() => {
             negative: 0,
         },
     )
-})
 
-const daysDiff = computed(() => {
-    const diffTime = props.dateRange.currentEnd - props.dateRange.currentStart
+    const diffTime = endDate - startDate
+    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1 // Avoid division by zero
 
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-})
+    return {
+        balanceChange: totals.positive + totals.negative,
+        averageDailyExpenses: totals.negative / days || 0,
+        averageDailyIncome: totals.positive / days || 0,
+    }
+}
 
-const balanceChange = computed(() => totals.value.positive + totals.value.negative)
-const averageDailyExpenses = computed(() => totals.value.negative / daysDiff.value || 0)
-const averageDailyIncome = computed(() => totals.value.positive / daysDiff.value || 0)
+const filteredTransactions = computed(() =>
+    transactionsStore.filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd),
+)
+
+const previousTransactions = computed(() =>
+    transactionsStore.filteredByDateRange(props.dateRange.previousStart, props.dateRange.previousEnd),
+)
+
+const currentMetrics = computed(() =>
+    computeMetrics(filteredTransactions.value, props.dateRange.currentStart, props.dateRange.currentEnd),
+)
+
+const previousMetrics = computed(() =>
+    computeMetrics(previousTransactions.value, props.dateRange.previousStart, props.dateRange.previousEnd),
+)
+
+const balanceChange = computed(() => currentMetrics.value.balanceChange)
+const averageDailyExpenses = computed(() => currentMetrics.value.averageDailyExpenses)
+const averageDailyIncome = computed(() => currentMetrics.value.averageDailyIncome)
+
+const previousBalanceChange = computed(() => previousMetrics.value.balanceChange)
+const previousAverageDailyExpenses = computed(() => previousMetrics.value.averageDailyExpenses)
+const previousAverageDailyIncome = computed(() => previousMetrics.value.averageDailyIncome)
 </script>
 
 <style scoped></style>

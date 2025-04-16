@@ -17,9 +17,13 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (Throwable $e, Request $request) {
+            if ($e instanceof \Illuminate\Auth\AuthenticationException) {
+                return response()->json(['error' => 'Unauthorized'], 401);
+            }
+
             return response()->json([
                 'error' => $e->getMessage(),
-            ], 500);
+            ], $e->getCode() ?: 500);
         });
     })
     ->withProviders([

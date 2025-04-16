@@ -16,9 +16,9 @@
                     step="0.01" required />
 
                 <div class="flex flex-wrap gap-2 mb-4" v-if="props.tags.length">
-                    <div v-for="tag in props.tags" :key="tag.title" @click="toggleTag(tag)"
+                    <div v-for="tag in props.tags" :key="tag.title" @click="toggleTag(tag.id)"
                         class="badge badge-info px-1 cursor-pointer"
-                        :class="{ 'badge-soft': !selectedTags.includes(tag) }">
+                        :class="{ 'badge-soft': !transaction.tags.includes(tag.id) }">
                         {{ tag.emoji }}
                         {{ tag.title }}
                     </div>
@@ -48,7 +48,7 @@
 <script setup>
 import { inject, ref, watch } from 'vue'
 
-import { useTransactionsStore } from './../services/transactions.js'
+import { useTransactionsStore } from '../services/transactions.js'
 
 const transactionsStore = useTransactionsStore()
 const toasts = inject('toasts')
@@ -61,7 +61,6 @@ const transaction_default = {
 }
 
 const transaction = ref({ ...transaction_default })
-const selectedTags = ref([])
 
 const props = defineProps({
     tags: {
@@ -81,23 +80,20 @@ watch(
     },
 )
 
-const toggleTag = (tag) => {
-    const index = selectedTags.value.indexOf(tag)
-    if (index === -1) {
-        selectedTags.value.push(tag)
-    } else {
-        selectedTags.value.splice(index, 1)
-    }
+const toggleTag = (id) => {
+    const index = transaction.value.tags.indexOf(id)
 
-    transaction.value.tags = [...selectedTags.value.map((tag) => tag.id)]
+    if (index === -1) {
+        transaction.value.tags.push(id)
+    } else {
+        transaction.value.tags.splice(index, 1)
+    }
 }
 
 const hadleSubmit = async () => {
     await transactionsStore.create(transaction.value)
 
     transaction.value = { ...transaction_default }
-
-    selectedTags.value = []
 
     transactions_add_modal.close()
 }

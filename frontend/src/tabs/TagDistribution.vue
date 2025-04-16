@@ -224,7 +224,7 @@ const calculateTagAmounts = (start, end) => {
 }
 
 const calculatePercentageDiff = (current, previous) => {
-    if (previous === 0) return current > 0 ? Number.POSITIVE_INFINITY : 0
+    if (previous === 0) return current > 0 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY
     return ((current - previous) / previous) * 100
 }
 
@@ -248,13 +248,21 @@ const buildTagTree = (currentData, previousData, isPositive) => {
     const tree = []
     const addTagWithChildren = (tagId, treeArray) => {
         const tag = tagMap.get(tagId)
-        if (tag && (tag.amount > 0 || tag.count > 0 || tag.previousAmount > 0)) {
-            // Include tags with previous amounts
-            treeArray.push(tag)
+        if (tag) {
+            const hasActivity = tag.amount > 0 || tag.count > 0 || tag.previousAmount > 0
             const children = Array.from(tagMap.values())
                 .filter((t) => t.parent_id === tagId)
                 .sort((a, b) => a.title.localeCompare(b.title))
-            children.forEach((child) => addTagWithChildren(child.id, treeArray))
+
+            const hasActiveChildren = children.some((child) => {
+                const childTag = tagMap.get(child.id)
+                return childTag.amount > 0 || childTag.count > 0 || childTag.previousAmount > 0
+            })
+
+            if (hasActivity || hasActiveChildren) {
+                treeArray.push(tag)
+                children.forEach((child) => addTagWithChildren(child.id, treeArray))
+            }
         }
     }
 
