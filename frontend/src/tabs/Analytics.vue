@@ -1,5 +1,5 @@
 <template>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div class="card card-border border-base-300 bg-base-100">
             <div class="card-body">
                 <h2 class="card-title">
@@ -12,10 +12,10 @@
                 </h2>
                 <div class="flex items-center space-x-2">
                     <p class="text-2xl">{{ filteredTransactions.length }}</p>
-                    <div class="tooltip tooltip-left"
-                         :data-tip="`Previous period: ${previousTransactions.length}`">
+                    <div class="tooltip tooltip-left" :data-tip="`Previous period: ${previousTransactions.length}`">
                         <div class="badge badge-outline badge-secondary">
-                            {{ formatPercentage(calculatePercentageDiff(filteredTransactions.length, previousTransactions.length)) }}
+                            {{ formatPercentage(calculatePercentageDiff(filteredTransactions.length,
+                                previousTransactions.length)) }}
                         </div>
                     </div>
                 </div>
@@ -43,12 +43,11 @@
                 <div class="flex items-center space-x-2">
                     <p class="text-2xl">{{ formatMoney(balanceChange) }}</p>
                     <div class="tooltip tooltip-left"
-                         :data-tip="`Previous period: ${formatMoney(previousBalanceChange)}`">
-                        <div class="badge badge-outline"
-                             :class="{
-                                 'badge-success': balanceChange > previousBalanceChange,
-                                 'badge-error': balanceChange < previousBalanceChange,
-                             }">
+                        :data-tip="`Previous period: ${formatMoney(previousBalanceChange)}`">
+                        <div class="badge badge-outline" :class="{
+                            'badge-success': balanceChange > previousBalanceChange,
+                            'badge-error': balanceChange < previousBalanceChange,
+                        }">
                             {{ formatPercentage(calculatePercentageDiff(balanceChange, previousBalanceChange)) }}
                         </div>
                     </div>
@@ -69,13 +68,13 @@
                 <div class="flex items-center space-x-2">
                     <p class="text-2xl">{{ formatMoney(averageDailyExpenses) }}</p>
                     <div class="tooltip tooltip-left"
-                         :data-tip="`Previous period: ${formatMoney(previousAverageDailyExpenses)}`">
-                        <div class="badge badge-outline"
-                             :class="{
-                                 'badge-success': averageDailyExpenses > previousAverageDailyExpenses,
-                                 'badge-error': averageDailyExpenses < previousAverageDailyExpenses,
-                             }">
-                            {{ formatPercentage(calculatePercentageDiff(averageDailyExpenses, previousAverageDailyExpenses)) }}
+                        :data-tip="`Previous period: ${formatMoney(previousAverageDailyExpenses)}`">
+                        <div class="badge badge-outline" :class="{
+                            'badge-success': averageDailyExpenses > previousAverageDailyExpenses,
+                            'badge-error': averageDailyExpenses < previousAverageDailyExpenses,
+                        }">
+                            {{ formatPercentage(calculatePercentageDiff(averageDailyExpenses,
+                                previousAverageDailyExpenses)) }}
                         </div>
                     </div>
                 </div>
@@ -95,13 +94,13 @@
                 <div class="flex items-center space-x-2">
                     <p class="text-2xl">{{ formatMoney(averageDailyIncome) }}</p>
                     <div class="tooltip tooltip-left"
-                         :data-tip="`Previous period: ${formatMoney(previousAverageDailyIncome)}`">
-                        <div class="badge badge-outline"
-                             :class="{
-                                 'badge-success': averageDailyIncome > previousAverageDailyIncome,
-                                 'badge-error': averageDailyIncome < previousAverageDailyIncome,
-                             }">
-                            {{ formatPercentage(calculatePercentageDiff(averageDailyIncome, previousAverageDailyIncome)) }}
+                        :data-tip="`Previous period: ${formatMoney(previousAverageDailyIncome)}`">
+                        <div class="badge badge-outline" :class="{
+                            'badge-success': averageDailyIncome > previousAverageDailyIncome,
+                            'badge-error': averageDailyIncome < previousAverageDailyIncome,
+                        }">
+                            {{ formatPercentage(calculatePercentageDiff(averageDailyIncome,
+                                previousAverageDailyIncome)) }}
                         </div>
                     </div>
                 </div>
