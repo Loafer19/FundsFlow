@@ -1,0 +1,21 @@
+FROM dunglas/frankenphp:1.5-php8.2-alpine
+
+RUN apk add --no-cache icu-dev libzip-dev unzip
+
+RUN install-php-extensions bcmath intl pcntl pdo_mysql opcache redis
+
+WORKDIR /app
+
+COPY backend /app
+
+COPY docker/Caddyfile /etc/caddy/Caddyfile
+
+COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
+
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress --no-suggest --prefer-dist
+
+RUN composer dump-autoload --optimize
+
+RUN php artisan migrate --force
+
+EXPOSE 80
