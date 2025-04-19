@@ -24,21 +24,16 @@ use Laravel\Octane\Listeners\StopWorkerIfNecessary;
 use Laravel\Octane\Octane;
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Octane Server
     |--------------------------------------------------------------------------
     |
-    | This value determines the default "server" that will be used by Octane
-    | when starting, restarting, or stopping your server via the CLI. You
-    | are free to change this to the supported server of your choosing.
-    |
     | Supported: "roadrunner", "swoole", "frankenphp"
     |
     */
 
-    'server' => env('OCTANE_SERVER', 'roadrunner'),
+    'server' => env('OCTANE_SERVER', 'frankenphp'),
 
     /*
     |--------------------------------------------------------------------------

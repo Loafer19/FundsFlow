@@ -18,12 +18,10 @@ export const useAuthStore = defineStore('auth', {
             this.isLoading = true
 
             try {
-                const response = await api.post('/login', credentials)
+                const response = await api.post('/auth/login', credentials)
 
                 this.user = response.data.user
-                this.token = response.data.token
-                this.isAuthenticated = true
-                localStorage.setItem('token', this.token)
+                this.setToken(response.data.token)
 
                 this.toast = {
                     type: 'success',
@@ -43,12 +41,10 @@ export const useAuthStore = defineStore('auth', {
             this.isLoading = true
 
             try {
-                const response = await api.post('/register', credentials)
+                const response = await api.post('/auth/register', credentials)
 
                 this.user = response.data.user
-                this.token = response.data.token
-                this.isAuthenticated = true
-                localStorage.setItem('token', this.token)
+                this.setToken(response.data.token)
 
                 this.toast = {
                     type: 'success',
@@ -68,7 +64,7 @@ export const useAuthStore = defineStore('auth', {
             this.isLoading = true
 
             try {
-                await api.post('/logout')
+                await api.post('/auth/logout')
 
                 this.user = null
                 this.token = null
@@ -93,9 +89,14 @@ export const useAuthStore = defineStore('auth', {
             const token = localStorage.getItem('token')
 
             if (token) {
-                this.token = token
-                this.isAuthenticated = true
+                this.setToken(token)
             }
+        },
+
+        setToken(token) {
+            this.token = token
+            this.isAuthenticated = true
+            localStorage.setItem('token', token)
         },
     },
 })

@@ -11,6 +11,11 @@ class User extends Authenticatable
 {
     use HasApiTokens, Notifiable;
 
+    public const AUTH_PROVIDERS = [
+        'google',
+        'github',
+    ];
+
     /**
      * @var list<string>
      */
