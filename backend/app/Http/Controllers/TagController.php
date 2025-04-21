@@ -35,9 +35,13 @@ class TagController extends Controller
         return new TagResource($tag);
     }
 
-    public function update(UpdateTagRequest $request, Tag $tag)
+    public function update(Tag $tag, TagStoreRequest $request)
     {
-        //
+        Gate::authorize('update', $tag);
+
+        $tag->update($request->validated());
+
+        return new TagResource($tag);
     }
 
     public function destroy(Tag $tag): JsonResponse

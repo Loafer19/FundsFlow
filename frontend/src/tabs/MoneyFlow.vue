@@ -10,16 +10,15 @@
 import { BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Tooltip } from 'chart.js'
 import { computed } from 'vue'
 import { Bar as BarChart } from 'vue-chartjs'
+import { useTransactionsStore } from '../services/transactions.js'
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend)
+
+const transactionsStore = useTransactionsStore()
 
 const props = defineProps({
     dateRange: {
         type: Object,
-        required: true,
-    },
-    transactions: {
-        type: Array,
         required: true,
     },
 })
@@ -32,7 +31,8 @@ const moneyFlow = computed(() => {
     const toDateStr = (date) => date.toISOString().split('T')[0]
 
     // Step 1: Filter and group transactions by date
-    const dailyTotals = props.transactions
+    const dailyTotals = transactionsStore
+        .filteredByDateRange(currentStart, currentEnd)
         .filter((t) => {
             const date = new Date(t.at)
             return date >= currentStart && date <= endDate

@@ -83,6 +83,32 @@ body {
     border-radius: var(--radius-field) !important;
 }
 
+.emoji-mart-search {
+    margin: 6px !important;
+    padding: 0 !important;
+}
+
 .emoji-mart-search input {
     border-radius: calc(var(--radius-field)) !important;
+}
+
+.emoji-mart-scroll {
+    padding: 0 !important;
+}
+
+#emoji-mart-list {
+    padding-left: 6px !important;
+}
+
+.emoji-mart-category-label h3 {
+    text-align: center !important;
+}
+
+.emoji-mart-emoji {
+    padding: 3px !important;
+}
+
+.emoji-mart-emoji,
+.emoji-mart-emoji span {
+    cursor: pointer !important;
 }

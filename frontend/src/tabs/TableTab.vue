@@ -72,7 +72,9 @@ const props = defineProps({
 })
 
 const filteredTransactions = computed(() =>
-    transactionsStore.filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd),
+    transactionsStore
+        .filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd)
+        .sort((a, b) => new Date(b.at) - new Date(a.at)),
 )
 </script>
 

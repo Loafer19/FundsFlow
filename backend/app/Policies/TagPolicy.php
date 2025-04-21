@@ -19,11 +19,11 @@ class TagPolicy
 
     public function update(User $user, Tag $tag): bool
     {
-        return false;
+        return $user->id === $tag->user_id;
     }
 
     public function delete(User $user, Tag $tag): bool
     {
-        return $tag->user_id === $user->id;
+        return $user->id === $tag->user_id;
     }
 }

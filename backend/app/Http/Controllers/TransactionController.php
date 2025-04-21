@@ -46,7 +46,7 @@ class TransactionController extends Controller
         return new TransactionResource($transaction);
     }
 
-    public function update(TransactionStoreRequest $request, Transaction $transaction)
+    public function update(Transaction $transaction, TransactionStoreRequest $request)
     {
         Gate::authorize('update', $transaction);
 

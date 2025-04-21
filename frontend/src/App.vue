@@ -3,8 +3,9 @@
     <AuthModal />
     <TagsModal />
     <TagsAddModal />
-    <TransactionsAddModal :tags="tagsStore.tags" />
-    <TransactionsEditModal :tags="tagsStore.tags" />
+    <TagsEditModal />
+    <TransactionsAddModal />
+    <TransactionsEditModal />
 
     <div class="container mx-auto p-4">
         <div class="flex gap-2 justify-end mb-4">
@@ -140,7 +141,7 @@
             </div>
         </div>
 
-        <component :is="selectedTab" :dateRange="getDateRange" :transactions="transactionsStore.transactions" />
+        <component :is="selectedTab" :dateRange="getDateRange" />
     </div>
 </template>
 
@@ -151,6 +152,7 @@ import { computed, markRaw, onMounted, ref, watch } from 'vue'
 import Toasts from './components/Toasts.vue'
 import AuthModal from './modals/AuthModal.vue'
 import TagsAddModal from './modals/TagsAddModal.vue'
+import TagsEditModal from './modals/TagsEditModal.vue'
 import TagsModal from './modals/TagsModal.vue'
 import TransactionsAddModal from './modals/TransactionsAddModal.vue'
 import TransactionsEditModal from './modals/TransactionsEditModal.vue'

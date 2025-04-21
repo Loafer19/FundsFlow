@@ -10,16 +10,15 @@
 import { CategoryScale, Chart as ChartJS, Legend, LineElement, LinearScale, PointElement, Tooltip } from 'chart.js'
 import { computed } from 'vue'
 import { Line as LineChart } from 'vue-chartjs'
+import { useTransactionsStore } from '../services/transactions.js'
 
 ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend)
+
+const transactionsStore = useTransactionsStore()
 
 const props = defineProps({
     dateRange: {
         type: Object,
-        required: true,
-    },
-    transactions: {
-        type: Array,
         required: true,
     },
 })
@@ -34,16 +33,11 @@ const balanceTrend = computed(() => {
         endDate.setDate(endDate.getDate() + 1)
 
         // Step 1: Filter and group transactions by date
-        const dailyTotals = props.transactions
-            .filter((t) => {
-                const date = new Date(t.at)
-                return date >= start && date <= endDate
-            })
-            .reduce((acc, t) => {
-                const dateStr = t.at.split('T')[0]
-                acc[dateStr] = (acc[dateStr] || 0) + t.amount
-                return acc
-            }, {})
+        const dailyTotals = transactionsStore.filteredByDateRange(start, end).reduce((acc, t) => {
+            const dateStr = t.at.split('T')[0]
+            acc[dateStr] = (acc[dateStr] || 0) + t.amount
+            return acc
+        }, {})
 
         // Step 2: Calculate running balance for each day
         let balance = 0

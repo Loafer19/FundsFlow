@@ -10,8 +10,8 @@
                     </svg>
                     Total Transactions
                 </h2>
-                <div class="flex items-center space-x-2">
-                    <p class="text-2xl">{{ filteredTransactions.length }}</p>
+                <div class="flex justify-between items-center">
+                    <span class="text-2xl">{{ filteredTransactions.length }}</span>
                     <div class="tooltip tooltip-left" :data-tip="`Previous period: ${previousTransactions.length}`">
                         <div class="badge badge-outline badge-secondary">
                             {{ formatPercentage(calculatePercentageDiff(filteredTransactions.length,
@@ -40,13 +40,17 @@
                     </svg>
                     Balance Change
                 </h2>
-                <div class="flex items-center space-x-2">
-                    <p class="text-2xl">{{ formatMoney(balanceChange) }}</p>
+                <div class="flex justify-between items-center">
+                    <span class="text-2xl tooltip tooltip-right"
+                        :data-tip="`Percentage of Income: ${formatPercentage(incomeToBalancePercentage)}`">
+                        {{ formatMoney(balanceChange) }}
+                    </span>
                     <div class="tooltip tooltip-left"
                         :data-tip="`Previous period: ${formatMoney(previousBalanceChange)}`">
                         <div class="badge badge-outline" :class="{
                             'badge-success': balanceChange > previousBalanceChange,
                             'badge-error': balanceChange < previousBalanceChange,
+                            'badge-secondary': balanceChange == previousBalanceChange,
                         }">
                             {{ formatPercentage(calculatePercentageDiff(balanceChange, previousBalanceChange)) }}
                         </div>
@@ -65,13 +69,17 @@
                     </svg>
                     Average Daily Expenses
                 </h2>
-                <div class="flex items-center space-x-2">
-                    <p class="text-2xl">{{ formatMoney(averageDailyExpenses) }}</p>
+                <div class="flex justify-between items-center">
+                    <span class="text-2xl tooltip tooltip-right"
+                        :data-tip="`Total Expenses: ${formatMoney(totalExpenses)}`">
+                        {{ formatMoney(averageDailyExpenses) }}
+                    </span>
                     <div class="tooltip tooltip-left"
                         :data-tip="`Previous period: ${formatMoney(previousAverageDailyExpenses)}`">
                         <div class="badge badge-outline" :class="{
                             'badge-success': averageDailyExpenses > previousAverageDailyExpenses,
                             'badge-error': averageDailyExpenses < previousAverageDailyExpenses,
+                            'badge-secondary': averageDailyExpenses == previousAverageDailyExpenses,
                         }">
                             {{ formatPercentage(calculatePercentageDiff(averageDailyExpenses,
                                 previousAverageDailyExpenses)) }}
@@ -91,13 +99,17 @@
                     </svg>
                     Average Daily Income
                 </h2>
-                <div class="flex items-center space-x-2">
-                    <p class="text-2xl">{{ formatMoney(averageDailyIncome) }}</p>
+                <div class="flex justify-between items-center">
+                    <span class="text-2xl tooltip tooltip-right"
+                        :data-tip="`Total Income: ${formatMoney(totalIncome)}`">
+                        {{ formatMoney(averageDailyIncome) }}
+                    </span>
                     <div class="tooltip tooltip-left"
                         :data-tip="`Previous period: ${formatMoney(previousAverageDailyIncome)}`">
                         <div class="badge badge-outline" :class="{
                             'badge-success': averageDailyIncome > previousAverageDailyIncome,
                             'badge-error': averageDailyIncome < previousAverageDailyIncome,
+                            'badge-secondary': averageDailyIncome == previousAverageDailyIncome,
                         }">
                             {{ formatPercentage(calculatePercentageDiff(averageDailyIncome,
                                 previousAverageDailyIncome)) }}
@@ -125,7 +137,7 @@ const props = defineProps({
 })
 
 const calculatePercentageDiff = (current, previous) => {
-    if (previous === 0) return current > 0 ? Number.POSITIVE_INFINITY : Number.POSITIVE_INFINITY
+    if (previous === 0) return current !== 0 ? Number.POSITIVE_INFINITY : 0
     return ((current - previous) / previous) * 100
 }
 
@@ -142,12 +154,14 @@ const computeMetrics = (transactions, startDate, endDate) => {
     )
 
     const diffTime = endDate - startDate
-    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1 // Avoid division by zero
+    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
     return {
+        totalIncome: totals.positive,
+        totalExpenses: Math.abs(totals.negative),
         balanceChange: totals.positive + totals.negative,
-        averageDailyExpenses: totals.negative / days || 0,
-        averageDailyIncome: totals.positive / days || 0,
+        averageDailyExpenses: totals.negative / days,
+        averageDailyIncome: totals.positive / days,
     }
 }
 
@@ -167,6 +181,13 @@ const previousMetrics = computed(() =>
     computeMetrics(previousTransactions.value, props.dateRange.previousStart, props.dateRange.previousEnd),
 )
 
+const incomeToBalancePercentage = computed(() => {
+    if (currentMetrics.value.totalIncome === 0) return balanceChange.value >= 0 ? 0 : Number.NEGATIVE_INFINITY
+    return (balanceChange.value / currentMetrics.value.totalIncome) * 100
+})
+
+const totalIncome = computed(() => currentMetrics.value.totalIncome)
+const totalExpenses = computed(() => currentMetrics.value.totalExpenses)
 const balanceChange = computed(() => currentMetrics.value.balanceChange)
 const averageDailyExpenses = computed(() => currentMetrics.value.averageDailyExpenses)
 const averageDailyIncome = computed(() => currentMetrics.value.averageDailyIncome)

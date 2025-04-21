@@ -53,13 +53,13 @@ const startHold = () => {
     progress.value = 0
 
     interval = setInterval(() => {
-        progress.value += 4
+        progress.value += 5
 
         if (progress.value >= 100) {
             emit('delete', props.id)
             stopHold()
         }
-    }, 20)
+    }, 10)
 }
 
 const stopHold = () => {

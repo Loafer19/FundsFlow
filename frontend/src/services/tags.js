@@ -4,6 +4,7 @@ import api from './api.js'
 export const useTagsStore = defineStore('tags', {
     state: () => ({
         tags: [],
+        tagForEdit: null,
         isLoading: false,
         toast: {
             type: 'success',
@@ -49,6 +50,29 @@ export const useTagsStore = defineStore('tags', {
                 this.toast = {
                     type: 'error',
                     message: 'Failed to create tag: ' + (error.response?.data?.error || error.message),
+                }
+            } finally {
+                this.isLoading = false
+            }
+        },
+
+        async update(raw) {
+            this.isLoading = true
+
+            try {
+                const response = await api.patch('/tags/' + raw.id, raw)
+
+                const index = this.tags.findIndex((t) => t.id === raw.id)
+                this.tags[index] = response.data
+
+                this.toast = {
+                    type: 'success',
+                    message: 'Tag updated successfully!',
+                }
+            } catch (error) {
+                this.toast = {
+                    type: 'error',
+                    message: 'Failed to update tag: ' + (error.response?.data?.error || error.message),
                 }
             } finally {
                 this.isLoading = false

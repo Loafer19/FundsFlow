@@ -15,13 +15,14 @@
                 <input type="number" v-model="transaction.amount" class="input w-full mb-4" placeholder="Amount"
                     step="0.01" required />
 
-                <div class="flex flex-wrap gap-2 mb-4" v-if="props.tags.length">
-                    <div v-for="tag in props.tags" :key="tag.title" @click="toggleTag(tag.id)"
-                        class="badge badge-info px-1 cursor-pointer"
-                        :class="{ 'badge-soft': !transaction.tags.includes(tag.id) }">
-                        {{ tag.emoji }}
-                        {{ tag.title }}
-                    </div>
+                <div class="tags-tree flex flex-col justify-start gap-1 mb-4" v-if="tagsStore.tags.length">
+                    <button v-for="tag in tagsStore.list()" :key="tag.id" type="button" @click="toggleTag(tag.id)"
+                        class="badge badge-info gap-0 px-1 text-lg cursor-pointer" :class="{
+                            'badge-soft': !transaction.tags.includes(tag.id),
+                        }" :style="{ marginLeft: `${tag.depth * 20}px` }">
+                        <span>{{ tag.emoji }}</span>
+                        <span>{{ tag.title }}</span>
+                    </button>
                 </div>
 
                 <input type="text" v-model="transaction.note" class="input w-full" placeholder="Note" />
@@ -47,9 +48,10 @@
 
 <script setup>
 import { inject, ref, watch } from 'vue'
-
+import { useTagsStore } from '../services/tags.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
+const tagsStore = useTagsStore()
 const transactionsStore = useTransactionsStore()
 const toasts = inject('toasts')
 
@@ -61,13 +63,7 @@ const transaction_default = {
 }
 
 const transaction = ref({ ...transaction_default })
-
-const props = defineProps({
-    tags: {
-        type: Array,
-        required: true,
-    },
-})
+transaction.value.tags = [...transaction_default.tags]
 
 watch(
     () => transactionsStore.toast,
@@ -94,12 +90,18 @@ const hadleSubmit = async () => {
     await transactionsStore.create(transaction.value)
 
     transaction.value = { ...transaction_default }
+    transaction.value.tags = [...transaction_default.tags]
 
     transactions_add_modal.close()
 }
 </script>
 
 <style scoped>
+.tags-tree {
+    max-height: 40vh;
+    overflow-y: auto;
+}
+
 .badge {
     transition: all 0.2s ease;
 }
