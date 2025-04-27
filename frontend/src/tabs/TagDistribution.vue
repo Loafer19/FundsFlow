@@ -1,5 +1,5 @@
 <template>
-    <select v-model="viewMode" class="select select-sm select-bordered w-30 mb-3">
+    <select v-model="viewMode" class="select select-sm w-30 border-base-300 mb-3">
         <option value="donuts">Donuts</option>
         <option value="list">List</option>
     </select>
@@ -36,7 +36,7 @@
                                     </div>
                                 </td>
                                 <td class="w-15 text-right">
-                                    <span class="text-black/50 tooltip" data-tip="Previous period">
+                                    <span class="text-gray-400 tooltip" data-tip="Previous period">
                                         {{ formatMoney(tag.previousAmount) }}
                                     </span>
                                 </td>
@@ -70,7 +70,7 @@
                                     </div>
                                 </td>
                                 <td class="w-15 text-right">
-                                    <span class="text-black/50 tooltip" data-tip="Previous period">
+                                    <span class="text-gray-400 tooltip" data-tip="Previous period">
                                         {{ formatMoney(tag.previousAmount) }}
                                     </span>
                                 </td>

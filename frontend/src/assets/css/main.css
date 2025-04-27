@@ -1,46 +1,26 @@
 @import "tailwindcss";
-@plugin "daisyui";
+
+@plugin "daisyui" {
+    /* biome-ignore lint: DaisyUI stuff */
+    themes:
+        light, dark, cupcake, bumblebee, emerald, corporate, synthwave, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy,
+        wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset, caramellatte, abyss, silk;
+}
 
 @plugin "daisyui/theme" {
     /* biome-ignore lint: DaisyUI stuff */
-    name: "bumblebee2";
-    /* biome-ignore lint: DaisyUI stuff */
-    default: true;
+    name: "bumblebee";
     /* biome-ignore lint: DaisyUI stuff */
     prefersdark: false;
     color-scheme: "light";
-    --color-base-100: oklch(100% 0 0);
-    --color-base-200: oklch(97% 0 0);
-    --color-base-300: oklch(92% 0 0);
-    --color-base-content: oklch(20% 0 0);
-    --color-primary: oklch(85% 0.199 91.936);
-    --color-primary-content: oklch(42% 0.095 57.708);
-    --color-secondary: oklch(75% 0.183 55.934);
-    --color-secondary-content: oklch(40% 0.123 38.172);
-    --color-accent: oklch(0% 0 0);
-    --color-accent-content: oklch(100% 0 0);
-    --color-neutral: oklch(37% 0.01 67.558);
-    --color-neutral-content: oklch(92% 0.003 48.717);
-    --color-info: oklch(74% 0.16 232.661);
-    --color-info-content: oklch(39% 0.09 240.876);
-    --color-success: oklch(76% 0.177 163.223);
-    --color-success-content: oklch(37% 0.077 168.94);
-    --color-warning: oklch(82% 0.189 84.429);
-    --color-warning-content: oklch(41% 0.112 45.904);
-    --color-error: oklch(70% 0.191 22.216);
-    --color-error-content: oklch(39% 0.141 25.723);
     --radius-selector: 0.5rem;
     --radius-field: 0.5rem;
     --radius-box: 0.5rem;
-    --size-selector: 0.25rem;
-    --size-field: 0.25rem;
     --border: 2px;
-    --depth: 1;
-    --noise: 0;
+    --depth: 0;
 }
 
 * {
-    box-shadow: none;
     outline: none;
 }
 
@@ -65,9 +45,31 @@ body {
 }
 
 /* Plugins */
+:root {
+    --dp-menu-padding: 0.4rem !important;
+}
+
+.dp__main,
+.dp__main > div,
+.dp__input_wrap,
 .dp__input {
-    color: var(--color-base-content) !important;
-    background-color: var(--color-base-100) !important;
+    height: 100% !important;
+}
+
+.dp__theme_light {
+    --dp-background-color: var(--color-base-100) !important;
+    --dp-text-color: var(--color-base-content) !important;
+    --dp-hover-color: var(--color-base-300) !important;
+    --dp-hover-text-color: var(--color-base-content) !important;
+    --dp-icon-color: var(--color-base-content) !important;
+    --dp-hover-icon-color: var(--color-base-content) !important;
+    --dp-primary-color: var(--color-primary) !important;
+    --dp-primary-text-color: var(--color-primary-content) !important;
+    --dp-border-color: var(--color-base-300) !important;
+    --dp-menu-border-color: var(--color-base-300) !important;
+}
+
+.dp__input {
     border: var(--border) solid var(--color-base-300) !important;
     border-radius: var(--radius-field) !important;
 }
@@ -76,11 +78,21 @@ body {
     display: none !important;
 }
 
+.dp--menu--inner-stretched {
+    padding: var(--dp-menu-padding) !important;
+}
+
+.dp__overlay_row {
+    justify-content: space-between !important;
+}
+
 .emoji-mart {
     width: 100% !important;
     height: 15rem !important;
-    border: var(--border) solid var(--color-base-300) !important;
+    border: var(--border) solid color-mix(in oklab, var(--color-base-content) 20%, #0000) !important;
     border-radius: var(--radius-field) !important;
+    color: var(--color-base-content) !important;
+    background: var(--color-base-100) !important;
 }
 
 .emoji-mart-search {
@@ -89,7 +101,8 @@ body {
 }
 
 .emoji-mart-search input {
-    border-radius: calc(var(--radius-field)) !important;
+    border: var(--border) solid color-mix(in oklab, var(--color-base-content) 20%, #0000) !important;
+    border-radius: var(--radius-field) !important;
 }
 
 .emoji-mart-scroll {
@@ -98,6 +111,10 @@ body {
 
 #emoji-mart-list {
     padding-left: 6px !important;
+}
+
+.emoji-mart-category-label {
+    background: var(--color-base-100) !important;
 }
 
 .emoji-mart-category-label h3 {
@@ -111,4 +128,8 @@ body {
 .emoji-mart-emoji,
 .emoji-mart-emoji span {
     cursor: pointer !important;
+}
+
+.emoji-mart-emoji:hover:before {
+    background: var(--color-base-300) !important;
 }

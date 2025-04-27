@@ -1,7 +1,14 @@
+import compression from 'vite-plugin-compression';
 import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-    plugins: [vue(), tailwindcss()],
+    plugins: [
+        compression({
+            algorithm: 'gzip',
+        }),
+        tailwindcss(),
+        vue()
+    ],
 })

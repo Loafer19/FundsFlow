@@ -15,7 +15,8 @@
         "@vitejs/plugin-vue": "5.2.3",
         "daisyui": "5.0.27",
         "tailwindcss": "4.1.4",
-        "vite": "6.3.2"
+        "vite": "6.3.2",
+        "vite-plugin-compression": "^0.5.1"
     },
     "scripts": {
         "check": "biome check --write .",
