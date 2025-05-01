@@ -16,6 +16,4 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progre
 
 RUN composer dump-autoload --optimize
 
-RUN php artisan migrate --force
-
 EXPOSE 80

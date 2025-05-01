@@ -85,22 +85,22 @@ const themeOptions = ref([
     'autumn',
     'bumblebee',
     'caramellatte',
-    'cmyk',
     'corporate',
     'cupcake',
+    'lofi',
+    'light',
     'cyberpunk',
+    'cmyk',
+    'winter',
     'emerald',
-    'fantasy',
     'garden',
     'lemonade',
-    'light',
-    'lofi',
+    'fantasy',
     'nord',
     'pastel',
     'retro',
     'silk',
     'valentine',
-    'winter',
     'wireframe',
     // DARK ONES
     'abyss',
@@ -150,7 +150,7 @@ const saveSettings = () => {
 
 <style scoped>
 .modal-content {
-    max-height: 65vh;
+    max-height: 58vh;
     overflow-y: auto;
 }
 </style>

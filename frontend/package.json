@@ -1,22 +1,22 @@
 {
     "dependencies": {
-        "@emoji-mart/data": "^1.2.1",
-        "@vuepic/vue-datepicker": "^11.0.2",
-        "axios": "1.8.4",
+        "@emoji-mart/data": "1.2.1",
+        "@vuepic/vue-datepicker": "11.0.2",
+        "axios": "1.9.0",
         "chart.js": "4.4.9",
-        "emoji-mart-vue-fast": "^15.0.4",
+        "emoji-mart-vue-fast": "15.0.4",
         "pinia": "3.0.2",
         "vue": "3.5.13",
         "vue-chartjs": "5.3.2"
     },
     "devDependencies": {
         "@biomejs/biome": "1.9.4",
-        "@tailwindcss/vite": "4.1.4",
+        "@tailwindcss/vite": "4.1.5",
         "@vitejs/plugin-vue": "5.2.3",
-        "daisyui": "5.0.27",
-        "tailwindcss": "4.1.4",
+        "daisyui": "5.0.35",
+        "tailwindcss": "4.1.5",
         "vite": "6.3.2",
-        "vite-plugin-compression": "^0.5.1"
+        "vite-plugin-compression": "0.5.1"
     },
     "scripts": {
         "check": "biome check --write .",
@@ -24,5 +24,5 @@
         "prod": "vite build"
     },
     "type": "module",
-    "version": "1.6.0"
+    "version": "1.7.0"
 }

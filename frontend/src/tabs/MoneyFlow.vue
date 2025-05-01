@@ -1,18 +1,15 @@
 <template>
     <div class="card card-border border-base-300 bg-base-100">
         <div class="card-body">
-            <BarChart :data="chartData" :options="chartOptions" />
+            <BarChart :balances="moneyFlow" />
         </div>
     </div>
 </template>
 
 <script setup>
-import { BarElement, CategoryScale, Chart as ChartJS, Legend, LinearScale, Tooltip } from 'chart.js'
 import { computed } from 'vue'
-import { Bar as BarChart } from 'vue-chartjs'
+import BarChart from '../components/charts/BarChart.vue'
 import { useTransactionsStore } from '../services/transactions.js'
-
-ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend)
 
 const transactionsStore = useTransactionsStore()
 
@@ -57,34 +54,6 @@ const moneyFlow = computed(() => {
 
     return balances
 })
-
-const chartData = computed(() => ({
-    labels: Object.keys(moneyFlow.value),
-    datasets: [
-        {
-            data: Object.values(moneyFlow.value).map((t) => t.positive),
-            backgroundColor: 'oklch(76% 0.177 163.223)',
-        },
-        {
-            data: Object.values(moneyFlow.value).map((t) => t.negative),
-            backgroundColor: 'oklch(70% 0.191 22.216)',
-        },
-    ],
-}))
-
-const chartOptions = {
-    responsive: true,
-    scales: {
-        x: {
-            stacked: true,
-        },
-    },
-    plugins: {
-        legend: {
-            display: false,
-        },
-    },
-}
 </script>
 
 <style scoped></style>

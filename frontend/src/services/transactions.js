@@ -116,5 +116,17 @@ export const useTransactionsStore = defineStore('transactions', {
                 this.isLoading = false
             }
         },
+
+        sort(a, b, key = 'at', dir = 'desc') {
+            if (key === 'at') {
+                return dir === 'asc' ? new Date(a.at) - new Date(b.at) : new Date(b.at) - new Date(a.at)
+            }
+
+            if (key === 'amount') {
+                return dir === 'asc' ? a.amount - b.amount : b.amount - a.amount
+            }
+
+            return 0
+        },
     },
 })

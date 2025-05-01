@@ -9,11 +9,21 @@
             <div v-if="viewMode === 'donuts'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <h3 class="text-xl font-medium mb-2">Income</h3>
-                    <DoughnutChart :data="positiveChartData" :options="positiveChartOptions" />
+                    <div v-if="positiveTagsWithAmount.length > 0">
+                        <TagDonutChart :tagsWithAmount="positiveTagsWithAmount" />
+                    </div>
+                    <div v-else>
+                        <p class="text-gray-400">No income transactions found :(</p>
+                    </div>
                 </div>
                 <div>
                     <h3 class="text-xl font-medium mb-2">Expenses</h3>
-                    <DoughnutChart :data="negativeChartData" :options="negativeChartOptions" />
+                    <div v-if="negativeTagsWithAmount.length > 0">
+                        <TagDonutChart :tagsWithAmount="negativeTagsWithAmount" />
+                    </div>
+                    <div v-else>
+                        <p class="text-gray-400">No expense transactions found :)</p>
+                    </div>
                 </div>
             </div>
 
@@ -27,7 +37,7 @@
                         </tr>
                         <tr v-for="tag in filteredPositiveTagTree" :key="tag.id || 'untagged-positive'">
                             <td>
-                                <div class="flex items-center gap-2" :style="getIndent(tag)">
+                                <div class="flex items-center gap-2" :style="{ paddingLeft: `${tag.depth * 20}px` }">
                                     <div class="badge badge-soft badge-success text-xl py-4 px-2">
                                         {{ tag.emoji }}
                                     </div>
@@ -61,7 +71,7 @@
                         </tr>
                         <tr v-for="tag in filteredNegativeTagTree" :key="tag.id || 'untagged-negative'">
                             <td>
-                                <div class="flex items-center gap-2" :style="getIndent(tag)">
+                                <div class="flex items-center gap-2" :style="{ paddingLeft: `${tag.depth * 20}px` }">
                                     <div class="badge badge-soft badge-error text-xl py-4 px-2">
                                         {{ tag.emoji }}
                                     </div>
@@ -96,13 +106,10 @@
 </template>
 
 <script setup>
-import { ArcElement, Chart as ChartJS, Legend, Tooltip } from 'chart.js'
 import { computed, inject, ref } from 'vue'
-import { Doughnut as DoughnutChart } from 'vue-chartjs'
+import TagDonutChart from '../components/charts/TagDonutChart.vue'
 import { useTagsStore } from '../services/tags'
 import { useTransactionsStore } from '../services/transactions'
-
-ChartJS.register(ArcElement, Tooltip, Legend)
 
 const props = defineProps({
     dateRange: {
@@ -151,28 +158,15 @@ const calculatePercentageDiff = (current, previous) => {
     return ((current - previous) / previous) * 100
 }
 
-// Build tag tree including untagged transactions
 const buildTagTree = (currentData, previousData, isPositive) => {
     const current = isPositive ? currentData.positive : currentData.negative
     const previous = isPositive ? previousData.positive : previousData.negative
     const untaggedCurrent = isPositive ? currentData.untaggedPositive : currentData.untaggedNegative
     const untaggedPrevious = isPositive ? previousData.untaggedPositive : previousData.untaggedNegative
 
-    const tagMap = new Map(
-        tagsStore.tags.map((tag) => [
-            tag.id,
-            {
-                ...tag,
-                amount: current[tag.id]?.amount || 0,
-                count: current[tag.id]?.count || 0,
-                previousAmount: previous[tag.id]?.amount || 0,
-            },
-        ]),
-    )
-
+    const tagList = tagsStore.list()
     const tree = []
 
-    // Add untagged as a pseudo-tag at root level
     if (untaggedCurrent.amount > 0 || untaggedCurrent.count > 0 || untaggedPrevious.amount > 0) {
         tree.push({
             id: null,
@@ -182,46 +176,35 @@ const buildTagTree = (currentData, previousData, isPositive) => {
             count: untaggedCurrent.count,
             previousAmount: untaggedPrevious.amount,
             parent_id: null,
+            depth: 0,
         })
     }
 
-    const addTagWithChildren = (tagId, treeArray) => {
-        const tag = tagMap.get(tagId)
-        if (tag) {
-            const hasActivity = tag.amount > 0 || tag.count > 0 || tag.previousAmount > 0
-            const children = Array.from(tagMap.values())
-                .filter((t) => t.parent_id === tagId)
-                .sort((a, b) => a.title.localeCompare(b.title))
-
-            const hasActiveChildren = children.some((child) => {
-                const childTag = tagMap.get(child.id)
-                return childTag.amount > 0 || childTag.count > 0 || childTag.previousAmount > 0
-            })
-
-            if (hasActivity || hasActiveChildren) {
-                treeArray.push(tag)
-                children.forEach((child) => addTagWithChildren(child.id, treeArray))
-            }
+    tagList.forEach((tag) => {
+        const tagData = {
+            ...tag,
+            amount: current[tag.id]?.amount || 0,
+            count: current[tag.id]?.count || 0,
+            previousAmount: previous[tag.id]?.amount || 0,
         }
-    }
 
-    tagsStore.tags
-        .filter((tag) => !tag.parent_id)
-        .sort((a, b) => a.title.localeCompare(b.title))
-        .forEach((tag) => addTagWithChildren(tag.id, tree))
+        const hasActivity = tagData.amount > 0 || tagData.count > 0 || tagData.previousAmount > 0
+        const hasActiveChildren = tagList.some((child) => {
+            if (child.parent_id === tag.id) {
+                const childCurrent = current[child.id]?.amount || 0
+                const childCount = current[child.id]?.count || 0
+                const childPrevious = previous[child.id]?.amount || 0
+                return childCurrent > 0 || childCount > 0 || childPrevious > 0
+            }
+            return false
+        })
+
+        if (hasActivity || hasActiveChildren) {
+            tree.push(tagData)
+        }
+    })
 
     return tree
-}
-
-const getTagDepth = (tag, tagMap, depth = 0) => {
-    if (!tag.parent_id) return depth
-    return getTagDepth(tagMap.get(tag.parent_id), tagMap, depth + 1)
-}
-
-const getIndent = (tag) => {
-    const tagMap = new Map(tagsStore.tags.map((t) => [t.id, t]))
-    const depth = getTagDepth(tag, tagMap)
-    return `padding-left: ${depth * 20}px;`
 }
 
 const currentPeriod = computed(() => calculateTagAmounts(props.dateRange.currentStart, props.dateRange.currentEnd))
@@ -237,63 +220,6 @@ const positiveTagsWithAmount = computed(() => {
 const negativeTagsWithAmount = computed(() => {
     return filteredNegativeTagTree.value.filter((tag) => tag.amount > 0)
 })
-
-const generateRandomColor = () => {
-    const lightness = Math.random() * 10 + 80
-    const chroma = Math.random() * 0.12 + 0.08
-    const hue = Math.random() * 360
-    return `oklch(${lightness}% ${chroma} ${hue})`
-}
-
-const positiveChartData = computed(() => {
-    return {
-        labels: positiveTagsWithAmount.value.map((tag) => tag.emoji + ' ' + tag.title),
-        datasets: [
-            {
-                data: positiveTagsWithAmount.value.map((tag) => tag.amount),
-                backgroundColor: positiveTagsWithAmount.value.map(() => generateRandomColor()),
-            },
-        ],
-    }
-})
-
-const negativeChartData = computed(() => {
-    return {
-        labels: negativeTagsWithAmount.value.map((tag) => tag.emoji + ' ' + tag.title),
-        datasets: [
-            {
-                data: negativeTagsWithAmount.value.map((tag) => tag.amount),
-                backgroundColor: negativeTagsWithAmount.value.map(() => generateRandomColor()),
-            },
-        ],
-    }
-})
-
-const positiveChartOptions = {
-    responsive: true,
-    plugins: {
-        legend: { position: 'bottom' },
-        tooltip: {
-            callbacks: {
-                label: (context) =>
-                    `${formatMoney(positiveChartData.value.datasets[0].data[context.dataIndex])} - ${positiveTagsWithAmount.value[context.dataIndex]?.count} txns`,
-            },
-        },
-    },
-}
-
-const negativeChartOptions = {
-    responsive: true,
-    plugins: {
-        legend: { position: 'bottom' },
-        tooltip: {
-            callbacks: {
-                label: (context) =>
-                    `${formatMoney(negativeChartData.value.datasets[0].data[context.dataIndex])} - ${negativeTagsWithAmount.value[context.dataIndex]?.count} txns`,
-            },
-        },
-    },
-}
 </script>
 
 <style scoped></style>

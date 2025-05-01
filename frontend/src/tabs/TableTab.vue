@@ -4,8 +4,18 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Amount</th>
+                        <th @click="sortBy('at')" class="cursor-pointer">
+                            Date
+                            <span v-if="sortConfig.key === 'at'">
+                                {{ sortConfig.direction === 'desc' ? '↑' : '↓' }}
+                            </span>
+                        </th>
+                        <th @click="sortBy('amount')" class="cursor-pointer">
+                            Amount
+                            <span v-if="sortConfig.key === 'amount'">
+                                {{ sortConfig.direction === 'asc' ? '↑' : '↓' }}
+                            </span>
+                        </th>
                         <th>Tags</th>
                         <th>Note</th>
                         <th>Actions</th>
@@ -54,7 +64,7 @@
 </template>
 
 <script setup>
-import { computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import { useTransactionsStore } from '../services/transactions'
 
@@ -70,10 +80,24 @@ const props = defineProps({
     },
 })
 
+const sortConfig = ref({
+    key: 'at',
+    direction: 'desc',
+})
+
+const sortBy = (key) => {
+    if (sortConfig.value.key === key) {
+        sortConfig.value.direction = sortConfig.value.direction === 'asc' ? 'desc' : 'asc'
+    } else {
+        sortConfig.value.key = key
+        sortConfig.value.direction = 'desc'
+    }
+}
+
 const filteredTransactions = computed(() =>
-    transactionsStore
-        .filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd)
-        .sort((a, b) => new Date(b.at) - new Date(a.at)),
+    transactionsStore.filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd).sort((a, b) => {
+        return transactionsStore.sort(a, b, sortConfig.value.key, sortConfig.value.direction)
+    }),
 )
 </script>
 

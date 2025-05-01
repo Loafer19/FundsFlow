@@ -27,9 +27,9 @@ Neat money management app
 
 |  |  |  |
 | ---------- | ---------- | ---------- |
-| ![app](./.github/screenshots/analytics.png) | ![app](./.github/screenshots/balance_trend.png) | ![app](./.github/screenshots/money_flow.png) |
-| ![app](./.github/screenshots/table.png) | ![app](./.github/screenshots/tag_distribution_donuts.png) | ![app](./.github/screenshots/tag_distribution_list.png) |
-| ![app](./.github/screenshots/tags_add.png) | ![app](./.github/screenshots/transactions_add.png) |  |
+| ![app](./.github/screenshots/tabs/analytics.png) | ![app](./.github/screenshots/tabs/balance_trend.png) | ![app](./.github/screenshots/tabs/money_flow.png) |
+| ![app](./.github/screenshots/tabs/table.png) | ![app](./.github/screenshots/tabs/tag_distribution_donuts.png) | ![app](./.github/screenshots/tabs/tag_distribution_list.png) |
+| ![app](./.github/screenshots/modals/tags_add.png) | ![app](./.github/screenshots/modals/transactions_add.png) |  |
 
 
 

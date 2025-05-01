@@ -1,18 +1,15 @@
 <template>
     <div class="card card-border border-base-300 bg-base-100">
         <div class="card-body">
-            <LineChart :data="chartData" :options="chartOptions" />
+            <TrendChart :balances="balanceTrend" />
         </div>
     </div>
 </template>
 
 <script setup>
-import { CategoryScale, Chart as ChartJS, Legend, LineElement, LinearScale, PointElement, Tooltip } from 'chart.js'
 import { computed } from 'vue'
-import { Line as LineChart } from 'vue-chartjs'
+import TrendChart from '../components/charts/TrendChart.vue'
 import { useTransactionsStore } from '../services/transactions.js'
-
-ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend)
 
 const transactionsStore = useTransactionsStore()
 
@@ -60,39 +57,6 @@ const balanceTrend = computed(() => {
 
     return { currentBalances, previousBalances }
 })
-
-const chartData = computed(() => {
-    const { currentBalances, previousBalances } = balanceTrend.value
-    const currentLabels = Object.keys(currentBalances)
-    const previousLabels = Object.keys(previousBalances)
-
-    return {
-        labels: currentLabels.length >= previousLabels.length ? currentLabels : previousLabels,
-        datasets: [
-            {
-                label: 'Current',
-                data: Object.values(currentBalances),
-                borderColor: 'oklch(76% 0.177 163.223)',
-                tension: 0.1,
-            },
-            {
-                label: 'Previous',
-                data: Object.values(previousBalances),
-                borderColor: 'oklch(70% 0.191 22.216)',
-                tension: 0.1,
-            },
-        ],
-    }
-})
-
-const chartOptions = {
-    responsive: true,
-    plugins: {
-        legend: {
-            display: false,
-        },
-    },
-}
 </script>
 
 <style scoped></style>

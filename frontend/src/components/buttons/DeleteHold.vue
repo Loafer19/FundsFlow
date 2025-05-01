@@ -4,8 +4,8 @@
     </button>
     <div v-else class="tooltip tooltip-left">
         <div class="tooltip-content w-30 flex flex-col">
-            <span v-show="!progress">Hold to delete</span>
-            <progress v-show="progress" class="progress progress-error my-1" :value="progress" max="100"></progress>
+            <span v-show="!isHolding">Hold to delete</span>
+            <progress v-show="isHolding" class="progress progress-error my-1" value="100"></progress>
         </div>
         <button class="btn btn-outline btn-error btn-square btn-sm" @touchstart="startHold" @touchend="stopHold"
             @touchcancel="stopHold" @mousedown="startHold" @mouseup="stopHold" @mouseleave="stopHold"
@@ -44,27 +44,24 @@ const props = defineProps({
     },
 })
 
-const progress = ref(0)
-let interval = null
+const isHolding = ref(false)
+let timeout = null
 
 const startHold = () => {
     if (props.disabled) return
 
-    progress.value = 0
+    isHolding.value = true
 
-    interval = setInterval(() => {
-        progress.value += 5
-
-        if (progress.value >= 100) {
-            emit('delete', props.id)
-            stopHold()
-        }
-    }, 10)
+    timeout = setTimeout(() => {
+        stopHold()
+        emit('delete', props.id)
+    }, 900)
 }
 
 const stopHold = () => {
-    clearInterval(interval)
-    progress.value = 0
+    isHolding.value = false
+
+    clearTimeout(timeout)
 }
 </script>
 
@@ -74,6 +71,20 @@ const stopHold = () => {
 }
 
 .progress {
+    --time: 1s;
     height: 9.5px;
+    transform-origin: left top;
+    transform: scaleX(0);
+    animation: scale var(--time) forwards;
+}
+
+@keyframes scale {
+    0% {
+        transform: scaleX(0);
+    }
+
+    100% {
+        transform: scaleX(1);
+    }
 }
 </style>

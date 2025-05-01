@@ -97,7 +97,7 @@ const hadleSubmit = async () => {
 
 <style scoped>
 .tags-tree {
-    max-height: 40vh;
+    max-height: 45vh;
     overflow-y: auto;
 }
 
