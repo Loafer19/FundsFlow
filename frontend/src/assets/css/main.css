@@ -32,6 +32,10 @@ body {
     min-height: 100vh;
 }
 
+.tags-list {
+    overflow-x: auto;
+}
+
 .tags-list .table td:first-child {
     padding-left: 0;
 }

@@ -18,7 +18,7 @@
                 </button>
             </div>
 
-            <div class="tags-list gap-2 overflow-x-auto">
+            <div class="tags-list">
                 <table class="table">
                     <tbody>
                         <tr v-for="tag in tagsStore.list()" :key="tag.id">

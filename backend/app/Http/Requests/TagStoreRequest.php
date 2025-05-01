@@ -20,6 +20,7 @@ class TagStoreRequest extends FormRequest
             'parent_id' => 'nullable|integer|exists:tags,id',
             'title' => 'required|string|max:255',
             'emoji' => 'required|string|max:255',
+            'calc_balance' => 'required|boolean',
         ];
     }
 }

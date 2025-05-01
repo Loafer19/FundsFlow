@@ -17,81 +17,79 @@
                 </div>
             </div>
 
-            <div v-else-if="viewMode === 'list'" class="tags-list flex flex-col gap-2 overflow-x-auto">
-                <div>
-                    <table class="table mt-2">
-                        <tbody>
-                            <tr>
-                                <td colspan="4">
-                                    <span class="text-2xl font-medium">Income</span>
-                                </td>
-                            </tr>
-                            <tr v-for="tag in filteredPositiveTagTree" :key="tag.id || 'untagged-positive'">
-                                <td>
-                                    <div class="flex items-center gap-2" :style="getIndent(tag)">
-                                        <div class="badge badge-soft badge-success text-xl py-4 px-2">
-                                            {{ tag.emoji }}
-                                        </div>
-                                        <span>{{ tag.title }}</span>
+            <div v-else-if="viewMode === 'list'" class="tags-list">
+                <table class="table mt-2">
+                    <tbody>
+                        <tr>
+                            <td colspan="4">
+                                <span class="text-2xl font-medium">Income</span>
+                            </td>
+                        </tr>
+                        <tr v-for="tag in filteredPositiveTagTree" :key="tag.id || 'untagged-positive'">
+                            <td>
+                                <div class="flex items-center gap-2" :style="getIndent(tag)">
+                                    <div class="badge badge-soft badge-success text-xl py-4 px-2">
+                                        {{ tag.emoji }}
                                     </div>
-                                </td>
-                                <td class="w-15 text-right">
-                                    <span class="text-gray-400 tooltip" data-tip="Previous period">
-                                        {{ formatMoney(tag.previousAmount) }}
-                                    </span>
-                                </td>
-                                <td class="w-15 font-medium text-right">
-                                    <span class="tooltip" :data-tip="tag.count + ' txns'">
-                                        {{ formatMoney(tag.amount) }}
-                                    </span>
-                                </td>
-                                <td class="w-15 text-right">
-                                    <span :class="{
-                                        'text-success': tag.amount > tag.previousAmount,
-                                        'text-error': tag.amount < tag.previousAmount,
-                                        'text-secondary': tag.amount === tag.previousAmount,
-                                    }">
-                                        {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
-                                    </span>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td colspan="4">
-                                    <span class="text-2xl font-medium">Expenses</span>
-                                </td>
-                            </tr>
-                            <tr v-for="tag in filteredNegativeTagTree" :key="tag.id || 'untagged-negative'">
-                                <td>
-                                    <div class="flex items-center gap-2" :style="getIndent(tag)">
-                                        <div class="badge badge-soft badge-error text-xl py-4 px-2">
-                                            {{ tag.emoji }}
-                                        </div>
-                                        <span>{{ tag.title }}</span>
+                                    <span>{{ tag.title }}</span>
+                                </div>
+                            </td>
+                            <td class="w-15 text-right">
+                                <span class="text-gray-400 tooltip" data-tip="Previous period">
+                                    {{ formatMoney(tag.previousAmount) }}
+                                </span>
+                            </td>
+                            <td class="w-15 font-medium text-right">
+                                <span class="tooltip" :data-tip="tag.count + ' txns'">
+                                    {{ formatMoney(tag.amount) }}
+                                </span>
+                            </td>
+                            <td class="w-15 text-right">
+                                <span :class="{
+                                    'text-success': tag.amount > tag.previousAmount,
+                                    'text-error': tag.amount < tag.previousAmount,
+                                    'text-secondary': tag.amount === tag.previousAmount,
+                                }">
+                                    {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="4">
+                                <span class="text-2xl font-medium">Expenses</span>
+                            </td>
+                        </tr>
+                        <tr v-for="tag in filteredNegativeTagTree" :key="tag.id || 'untagged-negative'">
+                            <td>
+                                <div class="flex items-center gap-2" :style="getIndent(tag)">
+                                    <div class="badge badge-soft badge-error text-xl py-4 px-2">
+                                        {{ tag.emoji }}
                                     </div>
-                                </td>
-                                <td class="w-15 text-right">
-                                    <span class="text-gray-400 tooltip" data-tip="Previous period">
-                                        {{ formatMoney(tag.previousAmount) }}
-                                    </span>
-                                </td>
-                                <td class="w-15 font-medium text-right">
-                                    <span class="tooltip" :data-tip="tag.count + ' txns'">
-                                        {{ formatMoney(tag.amount) }}
-                                    </span>
-                                </td>
-                                <td class="w-15 text-right">
-                                    <span :class="{
-                                        'text-success': tag.amount < tag.previousAmount,
-                                        'text-error': tag.amount > tag.previousAmount,
-                                        'text-secondary': tag.amount === tag.previousAmount,
-                                    }">
-                                        {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
-                                    </span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                                    <span>{{ tag.title }}</span>
+                                </div>
+                            </td>
+                            <td class="w-15 text-right">
+                                <span class="text-gray-400 tooltip" data-tip="Previous period">
+                                    {{ formatMoney(tag.previousAmount) }}
+                                </span>
+                            </td>
+                            <td class="w-15 font-medium text-right">
+                                <span class="tooltip" :data-tip="tag.count + ' txns'">
+                                    {{ formatMoney(tag.amount) }}
+                                </span>
+                            </td>
+                            <td class="w-15 text-right">
+                                <span :class="{
+                                    'text-success': tag.amount < tag.previousAmount,
+                                    'text-error': tag.amount > tag.previousAmount,
+                                    'text-secondary': tag.amount === tag.previousAmount,
+                                }">
+                                    {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

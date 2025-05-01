@@ -14,6 +14,7 @@ export const useTagsStore = defineStore('tags', {
 
     getters: {
         list: (state) => () => state.buildTagsList(state.tags),
+        forBalances: (state) => () => state.list().filter((tag) => tag.calc_balance),
     },
 
     actions: {

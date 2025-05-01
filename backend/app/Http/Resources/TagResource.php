@@ -17,6 +17,7 @@ class TagResource extends JsonResource
             'parent_id' => $this->parent_id,
             'title' => $this->title,
             'emoji' => $this->emoji,
+            'calc_balance' => $this->calc_balance,
         ];
     }
 }

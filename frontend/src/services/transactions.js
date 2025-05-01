@@ -18,6 +18,18 @@ export const useTransactionsStore = defineStore('transactions', {
                 const date = new Date(t.at)
                 return date >= start && date < end
             }),
+        groupedByTags: (state) => () =>
+            state.transactions.reduce((map, t) => {
+                let i = 0
+                do {
+                    const id = t.tags[i]?.id
+
+                    const group = map.get(id) ?? map.set(id, []).get(id)
+
+                    group.push(t)
+                } while (++i < t.tags.length)
+                return map
+            }, new Map()),
     },
 
     actions: {

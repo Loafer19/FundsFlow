@@ -13,6 +13,9 @@ Neat money management app
 - Filter:
   - by date: week, month, year
   - by tags: in development
+- Settings:
+  - money/date format
+  - 30+ themes
 - Helpful Insights:
   - Analytics
   - Balance Trend

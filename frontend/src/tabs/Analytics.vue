@@ -114,13 +114,74 @@
                 </div>
             </div>
         </div>
+
+        <div class="card card-border border-base-300 bg-base-100">
+            <div class="card-body">
+                <div class="tags-list">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <td colspan="4">
+                                    <span class="text-xl font-semibold tooltip tooltip-right"
+                                        data-tip="Calculation based on ALL transactions">Balances Per Tag</span>
+                                </td>
+                            </tr>
+                            <tr v-for="(tag, index) in balancesByTags.slice(0, balancesByTags.length / 2)" :key="index">
+                                <td>
+                                    <div class="flex items-center gap-2">
+                                        <div class="badge badge-soft badge-info text-xl py-4 px-2">
+                                            {{ tag.emoji }}
+                                        </div>
+                                        <span>{{ tag.title }}</span>
+                                    </div>
+                                </td>
+                                <td class="w-full text-right">
+                                    <span class="text-2xl tooltip tooltip-left" :data-tip="tag.txns + ' txns'">
+                                        {{ formatMoney(tag.balance) }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card card-border border-base-300 bg-base-100">
+            <div class="card-body">
+                <div class="tags-list">
+                    <table class="table">
+                        <tbody>
+                            <tr v-for="(tag, index) in balancesByTags.slice(balancesByTags.length / 2, balancesByTags.length)"
+                                :key="index">
+                                <td>
+                                    <div class="flex items-center gap-2">
+                                        <div class="badge badge-soft badge-info text-xl py-4 px-2">
+                                            {{ tag.emoji }}
+                                        </div>
+                                        <span>{{ tag.title }}</span>
+                                    </div>
+                                </td>
+                                <td class="w-full text-right">
+                                    <span class="text-2xl tooltip tooltip-left" :data-tip="tag.txns + ' txns'">
+                                        {{ formatMoney(tag.balance) }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
 import { computed, inject } from 'vue'
+import { useTagsStore } from '../services/tags.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
+const tagsStore = useTagsStore()
 const transactionsStore = useTransactionsStore()
 const formatMoney = inject('formatMoney')
 const formatPercentage = inject('formatPercentage')
@@ -160,6 +221,19 @@ const computeMetrics = (transactions, startDate, endDate) => {
         averageDailyIncome: totals.positive / days,
     }
 }
+
+const balancesByTags = computed(() => {
+    const grouped = transactionsStore.groupedByTags()
+
+    return tagsStore.forBalances().map((tag) => {
+        const transactions = grouped.get(tag.id) || []
+        return {
+            ...tag,
+            balance: transactions.reduce((acc, t) => acc + t.amount, 0),
+            txns: transactions.length,
+        }
+    })
+})
 
 const filteredTransactions = computed(() =>
     transactionsStore.filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd),

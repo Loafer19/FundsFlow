@@ -26,7 +26,12 @@
                 </div>
 
                 <Picker :data="emojiIndex" :native="true" @select="setEmoji" :show-preview="false"
-                    :show-categories="false" :emoji-tooltip="true" />
+                    :show-categories="false" :emoji-tooltip="true" class="mb-4" />
+
+                <label class="label">
+                    <input v-model="tag.calc_balance" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
+                    Calculate balance
+                </label>
 
                 <div class="modal-action">
                     <button type="submit" class="btn btn-success" :disabled="tagsStore.isLoading">
@@ -79,6 +84,7 @@ watch(
             title: for_edit.title,
             parent_id: for_edit.parent_id ?? '',
             emoji: for_edit.emoji,
+            calc_balance: for_edit.calc_balance,
         }
     },
 )

@@ -16,8 +16,13 @@ class Tag extends Model
         'parent_id',
         'title',
         'emoji',
+        'calc_balance',
         // 'created_at',
         // 'updated_at',
+    ];
+
+    protected $casts = [
+        'calc_balance' => 'boolean',
     ];
 
     /**
