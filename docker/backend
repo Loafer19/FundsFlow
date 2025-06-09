@@ -8,7 +8,7 @@ RUN echo "memory_limit = 4G" >> /usr/local/etc/php/conf.d/memory-limit.ini
 WORKDIR /app
 
 COPY backend /app
-COPY docker/Caddyfile /etc/caddy/Caddyfile
+COPY docker/Caddyfile /etc/frankenphp/Caddyfile
 
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
