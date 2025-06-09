@@ -1,19 +1,18 @@
-FROM dunglas/frankenphp:1.5-php8.2-alpine
+FROM dunglas/frankenphp:php8.4-alpine
 
-RUN apk add --no-cache icu-dev libzip-dev unzip
+RUN apk add icu-dev libzip-dev unzip && \
+    install-php-extensions bcmath intl pcntl pdo_mysql opcache redis zip
 
-RUN install-php-extensions bcmath intl pcntl pdo_mysql opcache redis
+RUN echo "memory_limit = 4G" >> /usr/local/etc/php/conf.d/memory-limit.ini
 
 WORKDIR /app
 
 COPY backend /app
-
 COPY docker/Caddyfile /etc/caddy/Caddyfile
 
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress --no-suggest --prefer-dist
-
-RUN composer dump-autoload --optimize
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress --no-suggest --prefer-dist && \
+    composer dump-autoload --optimize
 
 EXPOSE 80

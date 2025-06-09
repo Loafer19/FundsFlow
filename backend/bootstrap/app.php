@@ -9,6 +9,11 @@ use Laravel\Sanctum\SanctumServiceProvider;
 use Laravel\Socialite\SocialiteServiceProvider;
 
 return Application::configure(basePath: dirname(__DIR__))
+    ->withProviders([
+        App\Providers\AppServiceProvider::class,
+        SanctumServiceProvider::class,
+        SocialiteServiceProvider::class,
+    ])
     ->withRouting(
         api: __DIR__ . '/../routes/api.php',
     )
@@ -30,9 +35,4 @@ return Application::configure(basePath: dirname(__DIR__))
             ], 500);
         });
     })
-    ->withProviders([
-        App\Providers\AppServiceProvider::class,
-        SanctumServiceProvider::class,
-        SocialiteServiceProvider::class,
-    ])
     ->create();

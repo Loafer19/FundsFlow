@@ -60,7 +60,7 @@
         </div>
 
         <div class="flex gap-2 mb-3">
-            <select class="select w-30 border-base-300 cursor-pointer" v-model="dateSelectionType">
+            <select class="select w-30 border-base-300 focus:border-base-content cursor-pointer" v-model="dateSelectionType">
                 <option value="week">Week</option>
                 <option value="month">Month</option>
                 <option value="year">Year</option>
@@ -144,7 +144,7 @@
             </div>
         </div>
 
-        <component :is="selectedTab" :dateRange="getDateRange" />
+        <component :is="selectedTab" :dateRange="getDateRange" :dateSelectionType />
     </div>
 </template>
 
@@ -238,6 +238,7 @@ const getDateRange = computed(() => {
             previousStart.setDate(currentStart.getDate() - 7)
             previousEnd = new Date(currentStart)
             previousEnd.setDate(currentStart.getDate() - 1)
+            previousEnd.setHours(23, 59, 59, 999)
             break
         }
 
