@@ -3,7 +3,7 @@
 </template>
 
 <script setup>
-import { CategoryScale, Chart as ChartJS, Legend, LineElement, LinearScale, PointElement, Tooltip } from 'chart.js'
+import { CategoryScale, Chart as ChartJS, Legend, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import { computed, inject } from 'vue'
 import { Line as LineChart } from 'vue-chartjs'
 

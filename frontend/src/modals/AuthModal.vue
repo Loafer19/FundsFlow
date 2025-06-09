@@ -129,12 +129,6 @@ watch(
 )
 
 const handleSubmit = async () => {
-    gtag('event', 'conversion', {
-        send_to: 'AW-17037965323/oSf6CNyXrb4aEIvwqrw_',
-        value: 1.0,
-        currency: 'UAH',
-    })
-
     if (isRegister.value) {
         await authStore.register(credentials.value)
     } else {

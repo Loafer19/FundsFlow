@@ -45,7 +45,7 @@ const groupBy = ref('day')
 
 watch(
     () => props.dateSelectionType,
-    (type) => {
+    () => {
         groupBy.value = 'day'
     },
 )

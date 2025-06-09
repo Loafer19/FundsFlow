@@ -8,7 +8,7 @@
         }
     },
     "files": {
-        "ignore": ["dist"]
+        "includes": ["**", "!**/dist"]
     },
     "formatter": {
         "enabled": true,
@@ -26,13 +26,29 @@
         "enabled": true,
         "rules": {
             "complexity": {
-                "noForEach": "off"
+                "noForEach": "off",
+                "noImportantStyles": "off"
+            },
+            "correctness": {
+                "noUnusedImports": "off",
+                "noUnusedVariables": "off"
             },
             "style": {
+                "noInferrableTypes": "error",
+                "noParameterAssign": "error",
+                "noUnusedTemplateLiteral": "error",
+                "noUselessElse": "error",
+                "useAsConstAssertion": "error",
+                "useDefaultParameterLast": "error",
+                "useEnumInitializers": "error",
+                "useNumberNamespace": "error",
+                "useSelfClosingElements": "error",
+                "useSingleVarDeclarator": "error",
                 "useTemplate": "off"
             },
             "suspicious": {
-                "noAssignInExpressions": "off"
+                "noAssignInExpressions": "off",
+                "noUnknownAtRules": "off"
             }
         }
     }
