@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class TransactionStoreRequest extends FormRequest
 {
@@ -21,7 +22,10 @@ class TransactionStoreRequest extends FormRequest
             'amount' => 'required|numeric',
             'note' => 'nullable|string|max:255',
             'tags' => 'nullable|array',
-            'tags.*' => 'integer|exists:tags,id',
+            'tags.*' => [
+                'integer',
+                Rule::exists('tags', 'id')->where('user_id', $this->user()->id),
+            ],
         ];
     }
 }

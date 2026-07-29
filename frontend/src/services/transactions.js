@@ -1,15 +1,13 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
+import { apiErrorMessage } from './formatters.js'
+import toasts from './toasts.js'
 
 export const useTransactionsStore = defineStore('transactions', {
     state: () => ({
         transactions: [],
         transactionForEdit: null,
         isLoading: false,
-        toast: {
-            type: 'success',
-            message: '',
-        },
     }),
 
     getters: {
@@ -41,10 +39,7 @@ export const useTransactionsStore = defineStore('transactions', {
 
                 this.transactions = response.data
             } catch (error) {
-                this.toast = {
-                    type: 'error',
-                    message: 'Failed to load transactions: ' + (error.response?.data?.error || error.message),
-                }
+                toasts.error(apiErrorMessage(error, 'Failed to load transactions: '))
             } finally {
                 this.isLoading = false
             }
@@ -58,15 +53,13 @@ export const useTransactionsStore = defineStore('transactions', {
 
                 this.transactions.push(response.data)
 
-                this.toast = {
-                    type: 'success',
-                    message: 'Transaction created successfully!',
-                }
+                toasts.success('Transaction created successfully!')
+
+                return true
             } catch (error) {
-                this.toast = {
-                    type: 'error',
-                    message: 'Failed to create transaction: ' + (error.response?.data?.error || error.message),
-                }
+                toasts.error(apiErrorMessage(error, 'Failed to create transaction: '))
+
+                return false
             } finally {
                 this.isLoading = false
             }
@@ -81,15 +74,13 @@ export const useTransactionsStore = defineStore('transactions', {
                 const index = this.transactions.findIndex((t) => t.id === raw.id)
                 this.transactions[index] = response.data
 
-                this.toast = {
-                    type: 'success',
-                    message: 'Transaction updated successfully!',
-                }
+                toasts.success('Transaction updated successfully!')
+
+                return true
             } catch (error) {
-                this.toast = {
-                    type: 'error',
-                    message: 'Failed to update transaction: ' + (error.response?.data?.error || error.message),
-                }
+                toasts.error(apiErrorMessage(error, 'Failed to update transaction: '))
+
+                return false
             } finally {
                 this.isLoading = false
             }
@@ -103,15 +94,13 @@ export const useTransactionsStore = defineStore('transactions', {
 
                 this.transactions = this.transactions.filter((t) => t.id !== id)
 
-                this.toast = {
-                    type: 'info',
-                    message: 'Transaction deleted successfully!',
-                }
+                toasts.info('Transaction deleted successfully!')
+
+                return true
             } catch (error) {
-                this.toast = {
-                    type: 'error',
-                    message: 'Failed to delete transaction: ' + (error.response?.data?.error || error.message),
-                }
+                toasts.error(apiErrorMessage(error, 'Failed to delete transaction: '))
+
+                return false
             } finally {
                 this.isLoading = false
             }

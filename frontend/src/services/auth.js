@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
+import { apiErrorMessage } from './formatters.js'
+import toasts from './toasts.js'
 
 export const useAuthStore = defineStore('auth', {
     state: () => ({
@@ -7,10 +9,6 @@ export const useAuthStore = defineStore('auth', {
         token: null,
         isAuthenticated: false,
         isLoading: false,
-        toast: {
-            type: 'success',
-            message: '',
-        },
     }),
 
     actions: {
@@ -23,15 +21,13 @@ export const useAuthStore = defineStore('auth', {
                 this.user = response.data.user
                 this.setToken(response.data.token)
 
-                this.toast = {
-                    type: 'success',
-                    message: 'Logged in successfully!',
-                }
+                toasts.success('Logged in successfully!')
+
+                return true
             } catch (error) {
-                this.toast = {
-                    type: 'error',
-                    message: 'Login failed: ' + error.response?.data?.error || error.message,
-                }
+                toasts.error(apiErrorMessage(error, 'Login failed: '))
+
+                return false
             } finally {
                 this.isLoading = false
             }
@@ -46,15 +42,13 @@ export const useAuthStore = defineStore('auth', {
                 this.user = response.data.user
                 this.setToken(response.data.token)
 
-                this.toast = {
-                    type: 'success',
-                    message: 'Registered successfully!',
-                }
+                toasts.success('Registered successfully!')
+
+                return true
             } catch (error) {
-                this.toast = {
-                    type: 'error',
-                    message: 'Registration failed: ' + error.response?.data?.error || error.message,
-                }
+                toasts.error(apiErrorMessage(error, 'Registration failed: '))
+
+                return false
             } finally {
                 this.isLoading = false
             }
@@ -66,30 +60,39 @@ export const useAuthStore = defineStore('auth', {
             try {
                 await api.post('/auth/logout')
 
-                this.user = null
-                this.token = null
-                this.isAuthenticated = false
-                localStorage.removeItem('token')
+                this.clearSession()
 
-                this.toast = {
-                    type: 'info',
-                    message: 'Logged out successfully!',
-                }
+                toasts.info('Logged out successfully!')
             } catch (error) {
-                this.toast = {
-                    type: 'error',
-                    message: 'Logout failed: ' + error.response?.data?.error || error.message,
-                }
+                this.clearSession()
+
+                toasts.error(apiErrorMessage(error, 'Logout failed: '))
             } finally {
                 this.isLoading = false
             }
         },
 
-        checkAuth() {
+        async checkAuth() {
             const token = localStorage.getItem('token')
 
-            if (token) {
-                this.setToken(token)
+            if (!token) {
+                this.clearSession()
+                return false
+            }
+
+            this.token = token
+
+            try {
+                const response = await api.get('/auth/me')
+
+                this.user = response.data.user
+                this.isAuthenticated = true
+
+                return true
+            } catch {
+                this.clearSession()
+
+                return false
             }
         },
 
@@ -97,6 +100,13 @@ export const useAuthStore = defineStore('auth', {
             this.token = token
             this.isAuthenticated = true
             localStorage.setItem('token', token)
+        },
+
+        clearSession() {
+            this.user = null
+            this.token = null
+            this.isAuthenticated = false
+            localStorage.removeItem('token')
         },
     },
 })

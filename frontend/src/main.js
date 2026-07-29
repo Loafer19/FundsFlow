@@ -1,14 +1,9 @@
 import { createPinia } from 'pinia'
-import { createApp, reactive } from 'vue'
+import { createApp } from 'vue'
 import './assets/css/main.css'
 import App from './App.vue'
 import { formatDate, formatMoney, formatPercentage } from './services/formatters'
-
-const toasts = reactive([])
-
-toasts.success = (message) => toasts.push({ type: 'success', message })
-toasts.info = (message) => toasts.push({ type: 'info', message })
-toasts.error = (message) => toasts.push({ type: 'error', message })
+import toasts from './services/toasts'
 
 createApp(App)
     .use(createPinia())

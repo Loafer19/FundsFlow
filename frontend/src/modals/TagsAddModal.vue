@@ -89,7 +89,9 @@ const parentOptions = computed(() => {
 })
 
 const handleSubmit = async () => {
-    await tagsStore.create(tag.value)
+    const ok = await tagsStore.create(tag.value)
+
+    if (!ok) return
 
     tag.value = { ...tag_default }
 

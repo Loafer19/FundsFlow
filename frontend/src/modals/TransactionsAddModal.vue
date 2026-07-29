@@ -9,7 +9,7 @@
                 Add Transaction
             </h2>
 
-            <form @submit.prevent="hadleSubmit">
+            <form @submit.prevent="handleSubmit">
                 <input type="date" v-model="transaction.at" class="input w-full mb-4" required />
 
                 <input type="number" v-model="transaction.amount" class="input w-full mb-4" placeholder="Amount"
@@ -46,13 +46,12 @@
 </template>
 
 <script setup>
-import { inject, ref, watch } from 'vue'
+import { ref } from 'vue'
 import { useTagsStore } from '../services/tags.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
 const tagsStore = useTagsStore()
 const transactionsStore = useTransactionsStore()
-const toasts = inject('toasts')
 
 const transaction_default = {
     at: new Date().toISOString().split('T')[0],
@@ -64,17 +63,6 @@ const transaction_default = {
 const transaction = ref({ ...transaction_default })
 transaction.value.tags = [...transaction_default.tags]
 
-watch(
-    () => transactionsStore.toast,
-    (toast) => {
-        if (toast) {
-            toasts.push(toast)
-
-            transactionsStore.toast = null
-        }
-    },
-)
-
 const toggleTag = (id) => {
     const index = transaction.value.tags.indexOf(id)
 
@@ -85,8 +73,10 @@ const toggleTag = (id) => {
     }
 }
 
-const hadleSubmit = async () => {
-    await transactionsStore.create(transaction.value)
+const handleSubmit = async () => {
+    const ok = await transactionsStore.create(transaction.value)
+
+    if (!ok) return
 
     transaction.value = { ...transaction_default }
     transaction.value.tags = [...transaction_default.tags]

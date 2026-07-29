@@ -9,7 +9,7 @@
                 Edit Transaction
             </h2>
 
-            <form @submit.prevent="hadleSubmit">
+            <form @submit.prevent="handleSubmit">
                 <input type="date" v-model="transaction.at" class="input w-full mb-4" required />
 
                 <input type="number" v-model="transaction.amount" class="input w-full mb-4" placeholder="Amount"
@@ -83,8 +83,10 @@ const toggleTag = (id) => {
     }
 }
 
-const hadleSubmit = async () => {
-    await transactionsStore.update(transaction.value)
+const handleSubmit = async () => {
+    const ok = await transactionsStore.update(transaction.value)
+
+    if (!ok) return
 
     transactionsStore.transactionForEdit = null
 

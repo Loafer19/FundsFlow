@@ -58,3 +58,9 @@ export const formatPercentage = (value) => {
     if (Number.isNaN(value)) return 'N/A'
     return value.toFixed(1) + '%'
 }
+
+export const apiErrorMessage = (error, prefix = '') => {
+    const data = error.response?.data
+
+    return prefix + (data?.error || data?.message || error.message)
+}

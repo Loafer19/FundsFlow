@@ -19,7 +19,7 @@ class TransactionFactory extends Factory
     {
         return [
             'at' => $this->faker->dateTimeBetween(now()->startOfYear(), now()->endOfYear()),
-            'amount' => $this->faker->randomFloat(2, -800, 1250),
+            'amount' => round($this->faker->randomFloat(2, -800, 1250), 2),
             'note' => $this->faker->optional()->sentence(),
         ];
     }

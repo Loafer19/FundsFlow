@@ -34,9 +34,8 @@
 </template>
 
 <script setup>
-import { inject, watch } from 'vue'
-
-const toasts = inject('toasts')
+import { watch } from 'vue'
+import toasts from '../services/toasts'
 
 const removeToast = (id) => {
     const index = toasts.findIndex((t) => t.id === id)

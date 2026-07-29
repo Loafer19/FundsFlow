@@ -1,15 +1,13 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
+import { apiErrorMessage } from './formatters.js'
+import toasts from './toasts.js'
 
 export const useTagsStore = defineStore('tags', {
     state: () => ({
         tags: [],
         tagForEdit: null,
         isLoading: false,
-        toast: {
-            type: 'success',
-            message: '',
-        },
     }),
 
     getters: {
@@ -26,10 +24,7 @@ export const useTagsStore = defineStore('tags', {
 
                 this.tags = response.data
             } catch (error) {
-                this.toast = {
-                    type: 'error',
-                    message: 'Failed to load tags: ' + (error.response?.data?.error || error.message),
-                }
+                toasts.error(apiErrorMessage(error, 'Failed to load tags: '))
             } finally {
                 this.isLoading = false
             }
@@ -43,15 +38,13 @@ export const useTagsStore = defineStore('tags', {
 
                 this.tags.push(response.data)
 
-                this.toast = {
-                    type: 'success',
-                    message: 'Tag created successfully!',
-                }
+                toasts.success('Tag created successfully!')
+
+                return true
             } catch (error) {
-                this.toast = {
-                    type: 'error',
-                    message: 'Failed to create tag: ' + (error.response?.data?.error || error.message),
-                }
+                toasts.error(apiErrorMessage(error, 'Failed to create tag: '))
+
+                return false
             } finally {
                 this.isLoading = false
             }
@@ -66,15 +59,13 @@ export const useTagsStore = defineStore('tags', {
                 const index = this.tags.findIndex((t) => t.id === raw.id)
                 this.tags[index] = response.data
 
-                this.toast = {
-                    type: 'success',
-                    message: 'Tag updated successfully!',
-                }
+                toasts.success('Tag updated successfully!')
+
+                return true
             } catch (error) {
-                this.toast = {
-                    type: 'error',
-                    message: 'Failed to update tag: ' + (error.response?.data?.error || error.message),
-                }
+                toasts.error(apiErrorMessage(error, 'Failed to update tag: '))
+
+                return false
             } finally {
                 this.isLoading = false
             }
@@ -94,15 +85,13 @@ export const useTagsStore = defineStore('tags', {
                     }
                 })
 
-                this.toast = {
-                    type: 'info',
-                    message: 'Tag deleted successfully!',
-                }
+                toasts.info('Tag deleted successfully!')
+
+                return true
             } catch (error) {
-                this.toast = {
-                    type: 'error',
-                    message: 'Failed to delete tag: ' + (error.response?.data?.error || error.message),
-                }
+                toasts.error(apiErrorMessage(error, 'Failed to delete tag: '))
+
+                return false
             } finally {
                 this.isLoading = false
             }

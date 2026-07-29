@@ -10,7 +10,11 @@ api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token')
 
-        config.headers.Authorization = `Bearer ${token}`
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`
+        } else {
+            delete config.headers.Authorization
+        }
 
         return config
     },
@@ -18,12 +22,18 @@ api.interceptors.request.use(
 )
 
 api.interceptors.response.use(
-    (response) => {
-        return response
-    },
+    (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
-            localStorage.removeItem('token')
+        const hadToken = Boolean(error.config?.headers?.Authorization)
+
+        if (error.response?.status === 401 && hadToken) {
+            import('./auth.js').then(({ useAuthStore }) => {
+                const auth = useAuthStore()
+
+                if (auth.isAuthenticated || auth.token) {
+                    auth.clearSession()
+                }
+            })
         }
 
         return Promise.reject(error)

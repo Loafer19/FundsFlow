@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AlwaysJson;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -25,14 +26,10 @@ return Application::configure(basePath: dirname(__DIR__))
             ->throttleApi('60,1');
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        $exceptions->render(function (Throwable $e, Request $request) {
-            if ($e instanceof \Illuminate\Auth\AuthenticationException) {
-                return response()->json(['error' => 'Unauthorized'], 401);
-            }
+        $exceptions->shouldRenderJsonWhen(fn () => true);
 
-            return response()->json([
-                'error' => $e->getMessage(),
-            ], 500);
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            return response()->json(['error' => 'Unauthorized'], 401);
         });
     })
     ->create();

@@ -23,21 +23,25 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'google_id',
+        'github_id',
     ];
 
     /**
      * @var list<string>
      */
     protected $hidden = [
+        'google_id',
+        'github_id',
+        'email_verified_at',
         'password',
         'remember_token',
-        'email_verified_at',
         'created_at',
         'updated_at',
     ];
 
     /**
-     * @return array<Tag, User>
+     * @return HasMany<Tag, $this>
      */
     public function tags(): HasMany
     {
@@ -45,7 +49,7 @@ class User extends Authenticatable
     }
 
     /**
-     * @return array<Transaction, User>
+     * @return HasMany<Transaction, $this>
      */
     public function transactions(): HasMany
     {

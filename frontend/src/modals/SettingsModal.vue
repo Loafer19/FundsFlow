@@ -63,11 +63,10 @@
 </template>
 
 <script setup>
-import { inject, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { formatDateOptions, formatMoneyOptions } from '../services/formatters'
 import Settings from '../services/settings'
-
-const toasts = inject('toasts')
+import toasts from '../services/toasts'
 
 const tabs = ref({
     formatting: 'Formatting',

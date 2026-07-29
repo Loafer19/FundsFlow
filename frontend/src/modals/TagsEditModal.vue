@@ -97,7 +97,9 @@ const parentOptions = computed(() => {
 })
 
 const handleSubmit = async () => {
-    await tagsStore.update(tag.value)
+    const ok = await tagsStore.update(tag.value)
+
+    if (!ok) return
 
     tags_edit_modal.close()
 }

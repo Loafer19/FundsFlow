@@ -89,14 +89,14 @@
 </template>
 
 <script setup>
-import { inject, ref, watch } from 'vue'
+import { ref } from 'vue'
 import { useAuthStore } from './../services/auth.js'
+import toasts from './../services/toasts.js'
 
 const googleAuthUrl = import.meta.env.VITE_API_URL + '/auth/google'
 const githubAuthUrl = import.meta.env.VITE_API_URL + '/auth/github'
 
 const authStore = useAuthStore()
-const toasts = inject('toasts')
 
 const isRegister = ref(false)
 
@@ -106,39 +106,31 @@ const credentials = ref({
     password: '',
 })
 
-watch(
-    () => new URLSearchParams(window.location.search).get('token'),
-    async (token) => {
-        if (token) {
-            authStore.setToken(token)
-            window.history.replaceState({}, '', window.location.pathname)
-        }
-    },
-    { immediate: true },
-)
+const consumeAuthHash = async () => {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const token = params.get('token')
+    const authError = params.get('auth_error')
 
-watch(
-    () => authStore.toast,
-    (toast) => {
-        if (toast) {
-            toasts.push(toast)
+    if (token) {
+        authStore.setToken(token)
+        await authStore.checkAuth()
+        window.history.replaceState({}, '', window.location.pathname + window.location.search)
+    }
 
-            authStore.toast = null
-        }
-    },
-)
+    if (authError) {
+        toasts.error(authError)
+        window.history.replaceState({}, '', window.location.pathname + window.location.search)
+    }
+}
+
+consumeAuthHash()
 
 const handleSubmit = async () => {
-    if (isRegister.value) {
-        await authStore.register(credentials.value)
-    } else {
-        await authStore.login(credentials.value)
-    }
+    const ok = isRegister.value ? await authStore.register(credentials.value) : await authStore.login(credentials.value)
 
-    if (authStore.isAuthenticated) {
-        credentials.value = { name: '', email: '', password: '' }
+    if (!ok) return
 
-        auth_modal.close()
-    }
+    credentials.value = { name: '', email: '', password: '' }
+    auth_modal.close()
 }
 </script>

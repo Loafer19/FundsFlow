@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->timestamp('at')->index();
-            $table->bigInteger('amount')->default(0);
+            $table->decimal('amount', 15, 2)->default(0);
             $table->string('note')->nullable();
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();

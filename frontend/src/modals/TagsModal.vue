@@ -62,23 +62,10 @@
     </dialog>
 </template>
 <script setup>
-import { inject, watch } from 'vue'
 import DeleteButton from './../components/buttons/DeleteHold.vue'
 import { useTagsStore } from './../services/tags.js'
 
 const tagsStore = useTagsStore()
-const toasts = inject('toasts')
-
-watch(
-    () => tagsStore.toast,
-    (toast) => {
-        if (toast) {
-            toasts.push(toast)
-
-            tagsStore.toast = null
-        }
-    },
-)
 </script>
 
 <style scoped>

@@ -7,6 +7,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
@@ -20,7 +21,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $data['email'])->first();
 
-        if (!$user || !password_verify($data['password'], $user->password)) {
+        if (!$user || !Hash::check($data['password'], $user->password)) {
             abort(401, 'Invalid credentials');
         }
 
@@ -50,6 +51,13 @@ class AuthController extends Controller
         ], 201);
     }
 
+    public function me(Request $request): JsonResponse
+    {
+        return response()->json([
+            'user' => $request->user(),
+        ]);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
@@ -59,46 +67,51 @@ class AuthController extends Controller
         ]);
     }
 
-    public function redirectToProvider($provider): RedirectResponse
+    public function redirectToProvider(string $provider): RedirectResponse
     {
-        abort_unless(in_array($provider, User::AUTH_PROVIDERS), 404);
+        abort_unless(in_array($provider, User::AUTH_PROVIDERS, true), 404);
 
         return Socialite::driver($provider)->stateless()->redirect();
     }
 
-    public function handleProviderCallback($provider): RedirectResponse|JsonResponse
+    public function handleProviderCallback(string $provider): RedirectResponse|JsonResponse
     {
-        abort_unless(in_array($provider, User::AUTH_PROVIDERS), 404);
+        abort_unless(in_array($provider, User::AUTH_PROVIDERS, true), 404);
+
+        $frontend = rtrim((string) config('app.frontend_url'), '/');
 
         try {
             $socialUser = Socialite::driver($provider)->stateless()->user();
+            $providerField = $provider . '_id';
+            $providerId = (string) $socialUser->getId();
+            $email = $socialUser->getEmail();
 
-            $provideField = $provider . '_id';
+            if (!$email) {
+                return redirect($frontend . '#auth_error=' . urlencode('Email is required from provider'));
+            }
 
-            $user = User::firstOrCreate(
-                ['email' => $socialUser->getEmail()],
-                [
-                    'name' => $socialUser->getName(),
-                    $provideField => $socialUser->getId(),
-                    'password' => str()->random(16),
-                ]
-            );
+            $user = User::where($providerField, $providerId)->first();
 
-            if ($user->{$provideField} !== $socialUser->getId()) {
-                $user->update([
-                    $provideField => $socialUser->getId(),
+            if (!$user) {
+                if (User::where('email', $email)->exists()) {
+                    return redirect($frontend . '#auth_error=' . urlencode(
+                        'An account with this email already exists. Log in with your password instead.'
+                    ));
+                }
+
+                $user = User::create([
+                    'name' => $socialUser->getName() ?: strstr($email, '@', true),
+                    'email' => $email,
+                    'password' => str()->random(32),
+                    $providerField => $providerId,
                 ]);
             }
 
             $token = $user->createToken('auth_token')->plainTextToken;
 
-            $url = url()->query(config('app.frontend_url'), ['token' => $token]);
-
-            return redirect($url);
+            return redirect($frontend . '#token=' . urlencode($token));
         } catch (Exception $e) {
-            return response()->json([
-                'error' => 'Authentication failed: ' . $e->getMessage(),
-            ], 401);
+            return redirect($frontend . '#auth_error=' . urlencode('Authentication failed'));
         }
     }
 }
