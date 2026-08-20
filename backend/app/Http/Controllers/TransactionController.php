@@ -2,73 +2,49 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Transactions\CreateTransactionAction;
+use App\Actions\Transactions\DeleteTransactionAction;
+use App\Actions\Transactions\ListTransactionsAction;
+use App\Actions\Transactions\UpdateTransactionAction;
 use App\Http\Requests\TransactionStoreRequest;
 use App\Http\Resources\TransactionResource;
 use App\Models\Transaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\Gate;
 
 class TransactionController extends Controller
 {
+    public function __construct(
+        private readonly ListTransactionsAction $listTransactions,
+        private readonly CreateTransactionAction $createTransaction,
+        private readonly UpdateTransactionAction $updateTransaction,
+        private readonly DeleteTransactionAction $deleteTransaction,
+    ) {}
+
     public function index(): AnonymousResourceCollection
     {
-        Gate::authorize('viewAny', Transaction::class);
-
-        $transactions = auth()
-            ->user()
-            ->transactions()
-            ->with('tags')
-            ->latest('at')
-            ->get();
+        $transactions = $this->listTransactions->execute(auth()->user());
 
         return TransactionResource::collection($transactions);
     }
 
     public function store(TransactionStoreRequest $request): TransactionResource
     {
-        Gate::authorize('create', Transaction::class);
-
-        $data = $request->validated();
-
-        $tags = $request->array('tags');
-        unset($data['tags']);
-
-        $transaction = auth()
-            ->user()
-            ->transactions()
-            ->create($data);
-
-        $transaction->tags()->attach($tags);
-
-        $transaction->load('tags');
+        $transaction = $this->createTransaction->execute(auth()->user(), $request->validated());
 
         return new TransactionResource($transaction);
     }
 
-    public function update(Transaction $transaction, TransactionStoreRequest $request)
+    public function update(Transaction $transaction, TransactionStoreRequest $request): TransactionResource
     {
-        Gate::authorize('update', $transaction);
-
-        $data = $request->validated();
-
-        $tags = $request->array('tags');
-        unset($data['tags']);
-
-        $transaction->update($data);
-
-        $transaction->tags()->sync($tags);
-
-        $transaction->load('tags');
+        $transaction = $this->updateTransaction->execute(auth()->user(), $transaction, $request->validated());
 
         return new TransactionResource($transaction);
     }
 
     public function destroy(Transaction $transaction): JsonResponse
     {
-        Gate::authorize('delete', $transaction);
-
-        $transaction->delete();
+        $this->deleteTransaction->execute(auth()->user(), $transaction);
 
         return response()->json([
             'message' => 'Transaction deleted successfully!',

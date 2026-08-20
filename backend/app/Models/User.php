@@ -65,6 +65,14 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<Identity, $this>
+     */
+    public function identities(): HasMany
+    {
+        return $this->hasMany(Identity::class);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

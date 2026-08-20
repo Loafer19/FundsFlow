@@ -48,6 +48,23 @@
                         </label>
                     </fieldset>
                 </template>
+
+                <template v-else-if="tab === 'telegram'">
+                    <p class="text-sm opacity-70 mb-3">
+                        Відкрий <a :href="telegramBotUrl" target="_blank" class="link link-primary">@{{
+                            telegramBotUsername }}</a>
+                        у Telegram, напиши <code>/start</code> і введи отриманий код нижче.
+                    </p>
+
+                    <input v-model="telegramCode" type="text" inputmode="numeric" maxlength="6"
+                        placeholder="Код з Telegram" class="input w-full mb-3" />
+
+                    <button type="button" class="btn btn-primary btn-sm" @click="linkTelegram"
+                        :disabled="linkingTelegram || !telegramCode">
+                        <span v-if="linkingTelegram" class="loading loading-spinner loading-xs"></span>
+                        Привʼязати
+                    </button>
+                </template>
             </div>
 
             <div class="modal-action">
@@ -65,13 +82,15 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { formatDateOptions, formatMoneyOptions } from '../services/formatters'
+import { formatDateOptions, formatMoneyOptions, apiErrorMessage } from '../services/formatters'
+import { linkTelegram as linkTelegramRequest } from '../services/identities'
 import settings, { updateDateFormat, updateDecimals, updateMoneyFormat, updateTheme } from '../services/settings'
 import toasts from '../services/toasts'
 
 const tabs = ref({
     formatting: 'Formatting',
     theme: 'Theme',
+    telegram: 'Telegram',
 })
 const tab = ref('formatting')
 
@@ -179,6 +198,26 @@ const formatMoneyPreview = computed(() => {
         maximumFractionDigits: decimals.value ? 2 : 0,
     }).format(1234.56)
 })
+
+const telegramBotUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
+const telegramBotUrl = `https://t.me/${telegramBotUsername}`
+const telegramCode = ref('')
+const linkingTelegram = ref(false)
+
+const linkTelegram = async () => {
+    linkingTelegram.value = true
+
+    try {
+        await linkTelegramRequest(telegramCode.value.trim())
+
+        toasts.success('Telegram привʼязано успішно!')
+        telegramCode.value = ''
+    } catch (error) {
+        toasts.error(apiErrorMessage(error, 'Не вдалося привʼязати: '))
+    } finally {
+        linkingTelegram.value = false
+    }
+}
 
 const saving = ref(false)
 
