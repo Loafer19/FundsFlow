@@ -68,6 +68,14 @@ export const toLocalDateStr = (value) => {
     return `${year}-${month}-${day}`
 }
 
+export const transactionSourceInfo = {
+    web: { icon: '💻', label: 'Added from the web app' },
+    telegram: { icon: '✈️', label: 'Added via Telegram' },
+    recurring: { icon: '🔁', label: 'Created automatically (recurring)' },
+}
+
+export const getTransactionSourceInfo = (source) => transactionSourceInfo[source] ?? transactionSourceInfo.web
+
 export const apiErrorMessage = (error, prefix = '') => {
     const data = error.response?.data
     const fieldErrors = data?.errors

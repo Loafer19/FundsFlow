@@ -8,17 +8,19 @@ use App\Actions\Transactions\CreateTransactionAction;
 use App\Actions\Transactions\DeleteTransactionAction;
 use App\Actions\Transactions\ListTransactionsAction;
 use App\Actions\Transactions\UpdateTransactionAction;
+use App\Enums\TransactionSource;
 use App\Models\Identity;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 class TelegramBot
 {
-    private const MENU_BALANCE = '📊 Balance';
+    private const MENU_MONTH = '📊 Month';
 
     private const MENU_RECENT = '🕘 Recent';
 
@@ -54,12 +56,16 @@ class TelegramBot
     {
         $this->client->sendMessage(
             $chatId,
-            "✅ Linked to your FundsFlow account!\n\n"
-                . "Send a message like \"-350 groceries\" to log an expense, or \"+15000 salary\" for income.\n"
-                . "Prefix a date for a past entry: \"20.08 -350 groceries\" (DD.MM or DD.MM.YYYY).\n\n"
-                . 'Use the menu below, or /balance, /recent, /tags, /newtag.',
+            "✅ Linked to your FundsFlow account!\n\n" . $this->usageInfo(),
             $this->menuKeyboard(),
         );
+    }
+
+    private function usageInfo(): string
+    {
+        return "Send a message like \"-350 groceries\" to log an expense, or \"+15000 salary\" for income.\n"
+            . "Prefix a date for a past entry: \"20.08 -350 groceries\" (DD.MM or DD.MM.YYYY).\n\n"
+            . 'Use the menu below, or /month, /recent, /tags, /newtag.';
     }
 
     /**
@@ -85,7 +91,7 @@ class TelegramBot
         }
 
         match (true) {
-            $text === '/balance' || $text === self::MENU_BALANCE => $this->sendBalance($user, $chatId),
+            $text === '/month' || $text === self::MENU_MONTH => $this->sendMonthSummary($user, $chatId),
             $text === '/tags' || $text === self::MENU_TAGS => $this->sendTags($user, $chatId),
             $text === '/recent' || $text === self::MENU_RECENT => $this->sendRecent($user, $chatId),
             str_starts_with($text, '/newtag') => $this->handleNewTag($user, $chatId, $text),
@@ -101,7 +107,11 @@ class TelegramBot
         $chatId = $message['chat']['id'];
 
         if ($this->resolveUser($chatId)) {
-            $this->client->sendMessage($chatId, 'This chat is already linked to a FundsFlow account.');
+            $this->client->sendMessage(
+                $chatId,
+                "You're already linked to your FundsFlow account.\n\n" . $this->usageInfo(),
+                $this->menuKeyboard(),
+            );
 
             return;
         }
@@ -171,7 +181,7 @@ class TelegramBot
             'at' => $date,
             'amount' => $amount,
             'note' => $note !== '' ? $note : null,
-        ]);
+        ], TransactionSource::Telegram);
 
         $this->client->sendMessage(
             $chatId,
@@ -341,7 +351,7 @@ class TelegramBot
         }
     }
 
-    private function sendBalance(User $user, int|string $chatId): void
+    private function sendMonthSummary(User $user, int|string $chatId): void
     {
         $transactions = $this->listTransactions->execute($user)
             ->filter(fn (Transaction $transaction) => $transaction->at->isCurrentMonth());
@@ -350,7 +360,7 @@ class TelegramBot
         $expense = $transactions->filter(fn (Transaction $transaction) => $transaction->amount < 0)->sum('amount');
 
         $this->client->sendMessage($chatId, sprintf(
-            "📊 %s\nIncome: +%.2f\nExpenses: %.2f\nBalance: %.2f",
+            "📊 %s\nIncome: +%.2f\nExpenses: %.2f\nNet: %.2f",
             now()->format('m.Y'),
             $income,
             $expense,
@@ -368,7 +378,10 @@ class TelegramBot
             return;
         }
 
-        $lines = $tags->map(fn (Tag $tag) => trim($tag->emoji . ' ' . $tag->title))->all();
+        $lines = array_map(
+            fn (array $node) => $this->formatTagLabel($node['tag'], $node['depth']),
+            $this->buildTagTree($tags),
+        );
 
         $this->client->sendMessage($chatId, "🏷 Your tags\n" . implode("\n", $lines));
     }
@@ -466,16 +479,43 @@ class TelegramBot
     {
         $tags = $this->listTags->execute($user);
 
-        $buttons = $tags->map(fn (Tag $tag) => [
-            'text' => trim($tag->emoji . ' ' . $tag->title),
-            'callback_data' => "tag:{$transactionId}:{$tag->id}",
-        ])->all();
+        $rows = array_map(fn (array $node) => [[
+            'text' => $this->formatTagLabel($node['tag'], $node['depth']),
+            'callback_data' => "tag:{$transactionId}:{$node['tag']->id}",
+        ]], $this->buildTagTree($tags));
 
-        $rows = array_chunk($buttons, 2);
         $rows[] = [['text' => '— No tag —', 'callback_data' => "tag:{$transactionId}:0"]];
         $rows[] = [['text' => '🗑 Delete', 'callback_data' => "del:{$transactionId}"]];
 
         return ['inline_keyboard' => $rows];
+    }
+
+    /**
+     * @param Collection<int, Tag> $tags
+     * @return array<int, array{tag: Tag, depth: int}>
+     */
+    private function buildTagTree(Collection $tags, ?int $parentId = null, int $depth = 0): array
+    {
+        $children = $tags
+            ->filter(fn (Tag $tag) => $tag->parent_id === $parentId)
+            ->sortBy('title')
+            ->values();
+
+        $result = [];
+
+        foreach ($children as $child) {
+            $result[] = ['tag' => $child, 'depth' => $depth];
+            $result = array_merge($result, $this->buildTagTree($tags, $child->id, $depth + 1));
+        }
+
+        return $result;
+    }
+
+    private function formatTagLabel(Tag $tag, int $depth): string
+    {
+        $prefix = $depth > 0 ? str_repeat('  ', $depth) . '↳ ' : '';
+
+        return $prefix . trim($tag->emoji . ' ' . $tag->title);
     }
 
     /**
@@ -485,7 +525,7 @@ class TelegramBot
     {
         return [
             'keyboard' => [
-                [self::MENU_BALANCE, self::MENU_RECENT],
+                [self::MENU_MONTH, self::MENU_RECENT],
                 [self::MENU_TAGS],
             ],
             'resize_keyboard' => true,

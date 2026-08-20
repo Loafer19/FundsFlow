@@ -8,6 +8,7 @@
             <table class="table">
                 <thead>
                     <tr>
+                        <th></th>
                         <th @click="sortBy('at')" class="cursor-pointer">
                             Date
                             <span v-if="sortConfig.key === 'at'">
@@ -27,6 +28,11 @@
                 </thead>
                 <tbody>
                     <tr v-for="transaction in filteredTransactions" :key="transaction.id">
+                        <td>
+                            <span class="tooltip" :data-tip="sourceInfo(transaction.source).label">
+                                {{ sourceInfo(transaction.source).icon }}
+                            </span>
+                        </td>
                         <td class="min-w-18">{{ formatDate(transaction.at) }}</td>
                         <td>
                             <div class="badge badge-outline font-semibold"
@@ -68,10 +74,12 @@
 import { computed, inject, ref } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
+import { getTransactionSourceInfo } from '../services/formatters'
 import { useTransactionsStore } from '../services/transactions'
 
 const formatMoney = inject('formatMoney')
 const formatDate = inject('formatDate')
+const sourceInfo = getTransactionSourceInfo
 
 const transactionsStore = useTransactionsStore()
 

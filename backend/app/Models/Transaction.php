@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TransactionSource;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,7 @@ class Transaction extends Model
         'at',
         'amount',
         'note',
+        'source',
         // 'created_at',
         // 'updated_at',
     ];
@@ -24,6 +26,7 @@ class Transaction extends Model
     protected $casts = [
         'at' => 'datetime',
         'amount' => 'decimal:2',
+        'source' => TransactionSource::class,
     ];
 
     /**

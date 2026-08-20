@@ -6,6 +6,7 @@ use App\Actions\Transactions\CreateTransactionAction;
 use App\Actions\Transactions\DeleteTransactionAction;
 use App\Actions\Transactions\ListTransactionsAction;
 use App\Actions\Transactions\UpdateTransactionAction;
+use App\Enums\TransactionSource;
 use App\Http\Requests\TransactionStoreRequest;
 use App\Http\Resources\TransactionResource;
 use App\Models\Transaction;
@@ -30,7 +31,7 @@ class TransactionController extends Controller
 
     public function store(TransactionStoreRequest $request): TransactionResource
     {
-        $transaction = $this->createTransaction->execute(auth()->user(), $request->validated());
+        $transaction = $this->createTransaction->execute(auth()->user(), $request->validated(), TransactionSource::Web);
 
         return new TransactionResource($transaction);
     }
