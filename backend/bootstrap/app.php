@@ -21,9 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->append(AlwaysJson::class);
 
-        $middleware
-            ->statefulApi()
-            ->throttleApi('60,1');
+        $middleware->throttleApi('60,1');
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->shouldRenderJsonWhen(fn () => true);

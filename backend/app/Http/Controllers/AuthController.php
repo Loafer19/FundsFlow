@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Identity;
 use App\Models\User;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -82,7 +83,6 @@ class AuthController extends Controller
 
         try {
             $socialUser = Socialite::driver($provider)->stateless()->user();
-            $providerField = $provider . '_id';
             $providerId = (string) $socialUser->getId();
             $email = $socialUser->getEmail();
 
@@ -90,9 +90,18 @@ class AuthController extends Controller
                 return redirect($frontend . '#auth_error=' . urlencode('Email is required from provider'));
             }
 
-            $user = User::where($providerField, $providerId)->first();
+            $meta = [
+                'name' => $socialUser->getName(),
+                'nickname' => $socialUser->getNickname(),
+                'avatar' => $socialUser->getAvatar(),
+            ];
 
-            if (!$user) {
+            $identity = Identity::where('provider', $provider)->where('external_id', $providerId)->first();
+
+            if ($identity) {
+                $identity->update(['meta' => $meta]);
+                $user = $identity->user;
+            } else {
                 if (User::where('email', $email)->exists()) {
                     return redirect($frontend . '#auth_error=' . urlencode(
                         'An account with this email already exists. Log in with your password instead.'
@@ -103,7 +112,12 @@ class AuthController extends Controller
                     'name' => $socialUser->getName() ?: strstr($email, '@', true),
                     'email' => $email,
                     'password' => str()->random(32),
-                    $providerField => $providerId,
+                ]);
+
+                $user->identities()->create([
+                    'provider' => $provider,
+                    'external_id' => $providerId,
+                    'meta' => $meta,
                 ]);
             }
 

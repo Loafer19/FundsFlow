@@ -49,7 +49,24 @@
                     </fieldset>
                 </template>
 
-                <template v-else-if="tab === 'telegram'">
+                <template v-else-if="tab === 'accounts'">
+                    <div class="flex flex-col gap-2 mb-4">
+                        <div class="flex items-center justify-between p-3 rounded-box bg-base-200">
+                            <span>Google</span>
+                            <span class="badge badge-sm" :class="googleIdentity ? 'badge-success' : 'badge-ghost'">
+                                {{ googleIdentity ? 'Connected' : 'Not connected' }}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 rounded-box bg-base-200">
+                            <span>GitHub</span>
+                            <span class="badge badge-sm" :class="githubIdentity ? 'badge-success' : 'badge-ghost'">
+                                {{ githubIdentity ? 'Connected' : 'Not connected' }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="divider text-sm opacity-60">Telegram</div>
+
                     <div v-if="telegramIdentity" class="alert alert-success text-sm">
                         <span>
                             ✅ Linked to Telegram<template v-if="telegramLinkLabel"> as {{ telegramLinkLabel }}</template>
@@ -101,7 +118,7 @@ const authStore = useAuthStore()
 const tabs = ref({
     formatting: 'Formatting',
     theme: 'Theme',
-    telegram: 'Telegram',
+    accounts: 'Accounts',
 })
 const tab = ref('formatting')
 
@@ -215,9 +232,11 @@ const telegramBotUrl = `https://t.me/${telegramBotUsername}`
 const telegramCode = ref('')
 const linkingTelegram = ref(false)
 
-const telegramIdentity = computed(
-    () => authStore.user?.identities?.find((identity) => identity.provider === 'telegram') ?? null,
-)
+const identityFor = (provider) => authStore.user?.identities?.find((identity) => identity.provider === provider) ?? null
+
+const telegramIdentity = computed(() => identityFor('telegram'))
+const googleIdentity = computed(() => identityFor('google'))
+const githubIdentity = computed(() => identityFor('github'))
 
 const telegramLinkLabel = computed(() => {
     const meta = telegramIdentity.value?.meta
