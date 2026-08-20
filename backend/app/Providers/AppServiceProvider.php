@@ -23,6 +23,5 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::policy(Tag::class, TagPolicy::class);
         Gate::policy(Transaction::class, TransactionPolicy::class);
-
     }
 }

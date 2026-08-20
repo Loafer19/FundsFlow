@@ -1,75 +1,55 @@
-class Settings {
-    #defaults = {
-        dateFormat: 'short Month with Day',
-        moneyFormat: 'uk-UA',
-        decimals: true,
-        theme: 'bumblebee',
-    }
+import { reactive } from 'vue'
 
-    #settings = { ...this.#defaults }
-
-    constructor() {
-        const savedSettings = this.#getSavedSettings()
-        this.#settings = { ...this.#defaults, ...savedSettings }
-    }
-
-    #getSavedSettings() {
-        const settings = {}
-
-        const dateFormat = localStorage.getItem('format:date')
-        if (dateFormat) settings.dateFormat = dateFormat
-
-        const moneyFormat = localStorage.getItem('format:money')
-        if (moneyFormat) settings.moneyFormat = moneyFormat
-
-        const decimals = localStorage.getItem('format:money:decimals')
-        if (decimals !== null) settings.decimals = JSON.parse(decimals)
-
-        const theme = localStorage.getItem('theme')
-        if (theme) settings.theme = theme
-
-        return settings
-    }
-
-    #save(key, value) {
-        localStorage.setItem(key, typeof value === 'boolean' ? JSON.stringify(value) : value)
-    }
-
-    updateDateFormat(format) {
-        this.#settings.dateFormat = format
-        this.#save('format:date', format)
-    }
-
-    updateMoneyFormat(format) {
-        this.#settings.moneyFormat = format
-        this.#save('format:money', format)
-    }
-
-    updateDecimals(decimals) {
-        this.#settings.decimals = decimals
-        this.#save('format:money:decimals', decimals)
-    }
-
-    updateTheme(theme) {
-        this.#settings.theme = theme
-        this.#save('theme', theme)
-    }
-
-    get dateFormat() {
-        return this.#settings.dateFormat
-    }
-
-    get moneyFormat() {
-        return this.#settings.moneyFormat
-    }
-
-    get decimals() {
-        return this.#settings.decimals
-    }
-
-    get theme() {
-        return this.#settings.theme
-    }
+const defaults = {
+    dateFormat: 'short Month with Day',
+    moneyFormat: 'uk-UA',
+    decimals: true,
+    theme: 'bumblebee',
 }
 
-export default new Settings()
+function loadSaved() {
+    const settings = { ...defaults }
+
+    const dateFormat = localStorage.getItem('format:date')
+    if (dateFormat) settings.dateFormat = dateFormat
+
+    const moneyFormat = localStorage.getItem('format:money')
+    if (moneyFormat) settings.moneyFormat = moneyFormat
+
+    const decimals = localStorage.getItem('format:money:decimals')
+    if (decimals !== null) settings.decimals = JSON.parse(decimals)
+
+    const theme = localStorage.getItem('theme')
+    if (theme) settings.theme = theme
+
+    return settings
+}
+
+function save(key, value) {
+    localStorage.setItem(key, typeof value === 'boolean' ? JSON.stringify(value) : value)
+}
+
+const settings = reactive(loadSaved())
+
+export function updateDateFormat(format) {
+    settings.dateFormat = format
+    save('format:date', format)
+}
+
+export function updateMoneyFormat(format) {
+    settings.moneyFormat = format
+    save('format:money', format)
+}
+
+export function updateDecimals(decimals) {
+    settings.decimals = decimals
+    save('format:money:decimals', decimals)
+}
+
+export function updateTheme(theme) {
+    settings.theme = theme
+    save('theme', theme)
+    document.documentElement.setAttribute('data-theme', theme)
+}
+
+export default settings

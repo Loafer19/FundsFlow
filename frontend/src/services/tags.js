@@ -30,11 +30,18 @@ export const useTagsStore = defineStore('tags', {
             }
         },
 
+        normalizePayload(raw) {
+            return {
+                ...raw,
+                parent_id: raw.parent_id === '' || raw.parent_id == null ? null : raw.parent_id,
+            }
+        },
+
         async create(raw) {
             this.isLoading = true
 
             try {
-                const response = await api.post('/tags', raw)
+                const response = await api.post('/tags', this.normalizePayload(raw))
 
                 this.tags.push(response.data)
 
@@ -54,7 +61,7 @@ export const useTagsStore = defineStore('tags', {
             this.isLoading = true
 
             try {
-                const response = await api.patch('/tags/' + raw.id, raw)
+                const response = await api.patch('/tags/' + raw.id, this.normalizePayload(raw))
 
                 const index = this.tags.findIndex((t) => t.id === raw.id)
                 this.tags[index] = response.data

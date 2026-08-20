@@ -10,7 +10,8 @@
             </h2>
 
             <form @submit.prevent="handleSubmit">
-                <input type="text" v-model="tag.title" placeholder="Title" class="input w-full mb-4" required />
+                <input type="text" v-model="tag.title" placeholder="Title" class="input w-full mb-4" maxlength="255"
+                    required />
 
                 <select v-model="tag.parent_id" class="select w-full mb-4">
                     <option value="">No Parent</option>
@@ -30,7 +31,7 @@
 
                 <label class="label">
                     <input v-model="tag.calc_balance" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
-                    Calculate balance
+                    Show in Balances
                 </label>
 
                 <div class="modal-action">
@@ -90,10 +91,26 @@ watch(
 )
 
 const parentOptions = computed(() => {
-    return tagsStore.list().map((tag) => ({
-        id: tag.id,
-        title: `${'\u00A0'.repeat(tag.depth * 2)}${tag.depth > 0 ? '↳ ' : ''}${tag.title}`,
-    }))
+    const currentId = tag.value.id
+    if (!currentId) return []
+
+    const excluded = new Set([currentId])
+    const collectDescendants = (parentId) => {
+        tagsStore.tags.forEach((t) => {
+            if (t.parent_id === parentId && !excluded.has(t.id)) {
+                excluded.add(t.id)
+                collectDescendants(t.id)
+            }
+        })
+    }
+    collectDescendants(currentId)
+
+    return tagsStore.list()
+        .filter((t) => !excluded.has(t.id))
+        .map((t) => ({
+            id: t.id,
+            title: `${'\u00A0'.repeat(t.depth * 2)}${t.depth > 0 ? '↳ ' : ''}${t.title}`,
+        }))
 })
 
 const handleSubmit = async () => {

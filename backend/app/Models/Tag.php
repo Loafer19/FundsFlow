@@ -26,10 +26,18 @@ class Tag extends Model
     ];
 
     /**
-     * @return BelongsTo<User, Transaction>
+     * @return BelongsTo<User, Tag>
      */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return BelongsTo<Tag, Tag>
+     */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
     }
 }

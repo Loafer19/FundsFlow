@@ -50,7 +50,9 @@
                             </td>
                         </tr>
                         <tr v-if="!tagsStore.list().length">
-                            <td>Please create some tags</td>
+                            <td colspan="2" class="text-center py-8 text-base-content/60">
+                                No tags yet. Create a few to organize transactions.
+                            </td>
                         </tr>
                     </tbody>
                 </table>

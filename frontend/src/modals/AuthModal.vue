@@ -27,12 +27,13 @@
 
             <form @submit.prevent="handleSubmit">
                 <input v-if="isRegister" type="text" v-model="credentials.name" placeholder="Name"
-                    class="input w-full mb-4" required />
+                    class="input w-full mb-4" maxlength="255" required />
 
-                <input type="text" v-model="credentials.email" placeholder="Email" class="input w-full mb-4" required />
+                <input type="email" v-model="credentials.email" placeholder="Email" class="input w-full mb-4"
+                    maxlength="255" required />
 
                 <input type="password" v-model="credentials.password" placeholder="Password" class="input w-full"
-                    required />
+                    minlength="8" maxlength="255" required />
 
                 <div class="modal-action justify-between">
                     <div class="flex gap-2">

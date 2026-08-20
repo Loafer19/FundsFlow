@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
-import { apiErrorMessage } from './formatters.js'
+import { apiErrorMessage, toLocalDateStr } from './formatters.js'
 import toasts from './toasts.js'
 
 export const useTransactionsStore = defineStore('transactions', {
@@ -13,8 +13,8 @@ export const useTransactionsStore = defineStore('transactions', {
     getters: {
         filteredByDateRange: (state) => (start, end) =>
             state.transactions.filter((t) => {
-                const date = new Date(t.at)
-                return date >= start && date < end
+                const date = toLocalDateStr(t.at)
+                return date >= toLocalDateStr(start) && date <= toLocalDateStr(end)
             }),
         groupedByTags: (state) => () =>
             state.transactions.reduce((map, t) => {

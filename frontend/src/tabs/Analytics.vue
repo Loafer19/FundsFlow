@@ -1,5 +1,9 @@
 <template>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <EmptyState v-if="!hasPeriodData" icon="📊" title="No data for this period"
+        description="Nothing in the selected or previous period. Add a transaction or change the range."
+        action-label="Add Transaction" @action="openAdd" />
+
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div class="card card-border border-base-300 bg-base-100">
             <div class="card-body">
                 <h2 class="card-title">
@@ -103,8 +107,8 @@
                     <div class="tooltip tooltip-left"
                         :data-tip="`Previous period: ${formatMoney(previousAverageDailyExpenses)}`">
                         <div class="badge badge-outline" :class="{
-                            'badge-success': averageDailyExpenses > previousAverageDailyExpenses,
-                            'badge-error': averageDailyExpenses < previousAverageDailyExpenses,
+                            'badge-success': averageDailyExpenses < previousAverageDailyExpenses,
+                            'badge-error': averageDailyExpenses > previousAverageDailyExpenses,
                             'badge-secondary': averageDailyExpenses == previousAverageDailyExpenses,
                         }">
                             {{ formatPercentage(calculatePercentageDiff(averageDailyExpenses,
@@ -123,7 +127,7 @@
                             <tr>
                                 <td colspan="4">
                                     <span class="text-xl font-semibold tooltip tooltip-right"
-                                        data-tip="Calculation based on ALL transactions">Balances Per Tag</span>
+                                        data-tip="Based on all transactions (not just this period)">Balances Per Tag</span>
                                 </td>
                             </tr>
                             <tr v-for="(tag, index) in balancesByTags.slice(0, balancesByTags.length / 2)" :key="index">
@@ -136,7 +140,8 @@
                                     </div>
                                 </td>
                                 <td class="w-full text-right">
-                                    <span class="text-2xl tooltip tooltip-left" :data-tip="tag.txns + ' txns'">
+                                    <span class="text-2xl tooltip tooltip-left"
+                                        :data-tip="tag.txns + ' transaction' + (tag.txns === 1 ? '' : 's')">
                                         {{ formatMoney(tag.balance) }}
                                     </span>
                                 </td>
@@ -163,7 +168,8 @@
                                     </div>
                                 </td>
                                 <td class="w-full text-right">
-                                    <span class="text-2xl tooltip tooltip-left" :data-tip="tag.txns + ' txns'">
+                                    <span class="text-2xl tooltip tooltip-left"
+                                        :data-tip="tag.txns + ' transaction' + (tag.txns === 1 ? '' : 's')">
                                         {{ formatMoney(tag.balance) }}
                                     </span>
                                 </td>
@@ -178,6 +184,7 @@
 
 <script setup>
 import { computed, inject } from 'vue'
+import EmptyState from '../components/EmptyState.vue'
 import { useTagsStore } from '../services/tags.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
@@ -185,6 +192,7 @@ const tagsStore = useTagsStore()
 const transactionsStore = useTransactionsStore()
 const formatMoney = inject('formatMoney')
 const formatPercentage = inject('formatPercentage')
+const openAdd = () => transactions_add_modal.showModal()
 
 const props = defineProps({
     dateRange: {
@@ -192,6 +200,12 @@ const props = defineProps({
         required: true,
     },
 })
+
+const hasPeriodData = computed(
+    () =>
+        transactionsStore.filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd).length > 0 ||
+        transactionsStore.filteredByDateRange(props.dateRange.previousStart, props.dateRange.previousEnd).length > 0,
+)
 
 const calculatePercentageDiff = (current, previous) => {
     if (previous === 0) return current !== 0 ? Number.POSITIVE_INFINITY : 0
@@ -217,7 +231,7 @@ const computeMetrics = (transactions, startDate, endDate) => {
         totalIncome: totals.positive,
         totalExpenses: Math.abs(totals.negative),
         balanceChange: totals.positive + totals.negative,
-        averageDailyExpenses: totals.negative / days,
+        averageDailyExpenses: Math.abs(totals.negative) / days,
         averageDailyIncome: totals.positive / days,
     }
 }

@@ -1,16 +1,13 @@
 @import "tailwindcss";
 
 @plugin "daisyui" {
-    /* biome-ignore lint: DaisyUI stuff */
     themes:
         light, dark, cupcake, bumblebee, emerald, corporate, synthwave, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy,
         wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset, caramellatte, abyss, silk;
 }
 
 @plugin "daisyui/theme" {
-    /* biome-ignore lint: DaisyUI stuff */
     name: "bumblebee";
-    /* biome-ignore lint: DaisyUI stuff */
     prefersdark: false;
     color-scheme: "light";
     --radius-selector: 0.5rem;
@@ -39,6 +36,10 @@ select:focus {
 }
 
 /* Custom */
+#fab-add-transaction {
+    box-shadow: 0 10px 25px color-mix(in oklab, var(--color-primary) 35%, transparent);
+}
+
 .tags-list {
     overflow-x: auto;
 }

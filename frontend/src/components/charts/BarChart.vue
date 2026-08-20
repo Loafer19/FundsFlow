@@ -20,8 +20,10 @@ const formatDate = inject('formatDate')
 const formatMoney = inject('formatMoney')
 
 const chartData = computed(() => {
+    const dates = Object.keys(props.balances)
+
     return {
-        labels: Object.keys(props.balances).map((date) => formatDate(date)),
+        labels: dates.map((date) => formatDate(date)),
         datasets: [
             {
                 data: Object.values(props.balances).map((t) => t.positive),
@@ -29,7 +31,7 @@ const chartData = computed(() => {
                 tooltip: {
                     callbacks: {
                         label: (context) => {
-                            return `${formatDate(context.label)}: ${formatMoney(context.raw)}`
+                            return `${formatDate(dates[context.dataIndex])}: ${formatMoney(context.raw)}`
                         },
                     },
                 },
@@ -40,7 +42,7 @@ const chartData = computed(() => {
                 tooltip: {
                     callbacks: {
                         label: (context) => {
-                            return `${formatDate(context.label)}: ${formatMoney(context.raw)}`
+                            return `${formatDate(dates[context.dataIndex])}: ${formatMoney(context.raw)}`
                         },
                     },
                 },

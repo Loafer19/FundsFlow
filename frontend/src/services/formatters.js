@@ -1,4 +1,4 @@
-import Settings from './settings'
+import settings from './settings'
 
 export const formatDateOptions = {
     'Year First': ['YYYY/MM/DD'],
@@ -8,30 +8,26 @@ export const formatDateOptions = {
     'Day First (Short)': ['DD-MM', 'DD/MM', 'DD.MM'],
 }
 
+const dateFormatMap = {
+    'YYYY/MM/DD': { month: '2-digit', day: '2-digit', year: 'numeric', locale: 'zh-CN' },
+    'MM/DD/YYYY': { month: '2-digit', day: '2-digit', year: 'numeric', locale: 'en-US' },
+    'MM/DD': { month: '2-digit', day: '2-digit', locale: 'en-US' },
+    'long Month with Day & Year': { day: '2-digit', month: 'long', year: 'numeric' },
+    'short Month with Day & Year': { day: '2-digit', month: 'short', year: 'numeric' },
+    'long Month with Day': { day: '2-digit', month: 'long' },
+    'short Month with Day': { day: '2-digit', month: 'short' },
+    'DD-MM-YYYY': { day: '2-digit', month: '2-digit', year: 'numeric', locale: 'nl-NL' },
+    'DD/MM/YYYY': { day: '2-digit', month: '2-digit', year: 'numeric', locale: 'en-GB' },
+    'DD.MM.YYYY': { day: '2-digit', month: '2-digit', year: 'numeric', locale: 'uk-UA' },
+    'DD-MM': { day: '2-digit', month: '2-digit', locale: 'nl-NL' },
+    'DD/MM': { day: '2-digit', month: '2-digit', locale: 'en-GB' },
+    'DD.MM': { day: '2-digit', month: '2-digit', locale: 'uk-UA' },
+}
+
 export const formatDate = (date) => {
-    const formatMap = {
-        'YYYY/MM/DD': { month: '2-digit', day: '2-digit', year: 'numeric', locale: 'zh-CN' },
+    const config = dateFormatMap[settings.dateFormat]
 
-        'MM/DD/YYYY': { month: '2-digit', day: '2-digit', year: 'numeric', locale: 'en-US' },
-        'MM/DD': { month: '2-digit', day: '2-digit', locale: 'en-US' },
-
-        'long Month with Day & Year': { day: '2-digit', month: 'long', year: 'numeric' },
-        'short Month with Day & Year': { day: '2-digit', month: 'short', year: 'numeric' },
-        'long Month with Day': { day: '2-digit', month: 'long' },
-        'short Month with Day': { day: '2-digit', month: 'short' },
-
-        'DD-MM-YYYY': { day: '2-digit', month: '2-digit', year: 'numeric', locale: 'nl-NL' },
-        'DD/MM/YYYY': { day: '2-digit', month: '2-digit', year: 'numeric', locale: 'en-GB' },
-        'DD.MM.YYYY': { day: '2-digit', month: '2-digit', year: 'numeric', locale: 'uk-UA' },
-
-        'DD-MM': { day: '2-digit', month: '2-digit', locale: 'nl-NL' },
-        'DD/MM': { day: '2-digit', month: '2-digit', locale: 'en-GB' },
-        'DD.MM': { day: '2-digit', month: '2-digit', locale: 'uk-UA' },
-    }
-
-    return new Intl.DateTimeFormat(formatMap[Settings.dateFormat].locale, formatMap[Settings.dateFormat]).format(
-        new Date(date),
-    )
+    return new Intl.DateTimeFormat(config.locale, config).format(new Date(date))
 }
 
 export const formatMoneyOptions = {
@@ -46,10 +42,10 @@ export const formatMoney = (amount) => {
     const options = {
         style: 'decimal',
         minimumFractionDigits: 0,
-        maximumFractionDigits: Settings.decimals ? 2 : 0,
+        maximumFractionDigits: settings.decimals ? 2 : 0,
     }
 
-    return new Intl.NumberFormat(Settings.moneyFormat, options).format(amount)
+    return new Intl.NumberFormat(settings.moneyFormat, options).format(amount)
 }
 
 export const formatPercentage = (value) => {
@@ -59,8 +55,32 @@ export const formatPercentage = (value) => {
     return value.toFixed(1) + '%'
 }
 
+export const toLocalDateStr = (value) => {
+    if (typeof value === 'string') {
+        return value.split('T')[0]
+    }
+
+    const date = value instanceof Date ? value : new Date(value)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+
+    return `${year}-${month}-${day}`
+}
+
 export const apiErrorMessage = (error, prefix = '') => {
     const data = error.response?.data
+    const fieldErrors = data?.errors
+
+    if (fieldErrors && typeof fieldErrors === 'object') {
+        const messages = Object.values(fieldErrors)
+            .flat()
+            .filter(Boolean)
+
+        if (messages.length) {
+            return prefix + messages.join(' ')
+        }
+    }
 
     return prefix + (data?.error || data?.message || error.message)
 }

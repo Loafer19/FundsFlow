@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Seeders\DefaultTagsSeeder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -31,14 +32,21 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $hidden = [
-        'google_id',
-        'github_id',
-        'email_verified_at',
         'password',
         'remember_token',
+        'email_verified_at',
         'created_at',
         'updated_at',
+        'google_id',
+        'github_id',
     ];
+
+    protected static function booted(): void
+    {
+        static::created(function (User $user) {
+            (new DefaultTagsSeeder)->run($user);
+        });
+    }
 
     /**
      * @return HasMany<Tag, $this>

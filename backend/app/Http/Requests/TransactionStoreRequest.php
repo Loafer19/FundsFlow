@@ -19,7 +19,7 @@ class TransactionStoreRequest extends FormRequest
     {
         return [
             'at' => 'required|string|date',
-            'amount' => 'required|numeric',
+            'amount' => 'required|numeric|not_in:0',
             'note' => 'nullable|string|max:255',
             'tags' => 'nullable|array',
             'tags.*' => [

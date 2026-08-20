@@ -11,12 +11,17 @@
                 <div class="mx-2 inline-grid *:[grid-area:1/1]">
                     <div class="status status-error animate-ping"></div>
                     <div class="status status-error"></div>
-                </div> only transactions from this {{ dateSelectionType }} are considered, late days may be excluded
+                </div> Week totals only include full weeks inside this {{ dateSelectionType }}. Partial weeks at the edges
+                are omitted.
             </div>
         </template>
     </div>
 
-    <div class="card card-border border-base-300 bg-base-100">
+    <EmptyState v-if="!hasPeriodData" icon="💸" title="No money flow in this period"
+        description="Add transactions or change the date range." action-label="Add Transaction"
+        @action="openAdd" />
+
+    <div v-else class="card card-border border-base-300 bg-base-100">
         <div class="card-body">
             <BarChart :balances="moneyFlow" />
         </div>
@@ -26,6 +31,8 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import BarChart from '../components/charts/BarChart.vue'
+import EmptyState from '../components/EmptyState.vue'
+import { toLocalDateStr } from '../services/formatters.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
 const transactionsStore = useTransactionsStore()
@@ -42,6 +49,12 @@ const props = defineProps({
 })
 
 const groupBy = ref('day')
+const openAdd = () => transactions_add_modal.showModal()
+const hasPeriodData = computed(
+    () =>
+        transactionsStore.filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd).length > 0 ||
+        transactionsStore.filteredByDateRange(props.dateRange.previousStart, props.dateRange.previousEnd).length > 0,
+)
 
 watch(
     () => props.dateSelectionType,
@@ -50,16 +63,13 @@ watch(
     },
 )
 
-const toLocalDateStr = (date) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-
-    return `${year}-${month}-${day}`
+const parseLocalDate = (value) => {
+    const [year, month, day] = toLocalDateStr(value).split('-').map(Number)
+    return new Date(year, month - 1, day)
 }
 
-const getPeriodEnd = (utcDateStr, groupBy) => {
-    const date = new Date(utcDateStr)
+const getPeriodEnd = (dateStr, groupBy) => {
+    const date = parseLocalDate(dateStr)
 
     if (groupBy === 'day') {
         return toLocalDateStr(date)
@@ -130,10 +140,8 @@ const getPeriodEnds = (start, end, groupBy) => {
 
 const moneyFlow = computed(() => {
     const { currentStart, currentEnd } = props.dateRange
-    const endDate = new Date(currentEnd)
-    endDate.setDate(endDate.getDate() + 1)
 
-    const transactions = transactionsStore.filteredByDateRange(currentStart, endDate)
+    const transactions = transactionsStore.filteredByDateRange(currentStart, currentEnd)
 
     const groupTotals = transactions.reduce((acc, t) => {
         const periodEnd = getPeriodEnd(t.at, groupBy.value)
@@ -142,7 +150,7 @@ const moneyFlow = computed(() => {
         return acc
     }, {})
 
-    const periodEnds = getPeriodEnds(currentStart, endDate, groupBy.value)
+    const periodEnds = getPeriodEnds(currentStart, currentEnd, groupBy.value)
 
     const balances = {}
     for (const periodEnd of periodEnds) {

@@ -1,113 +1,122 @@
 <template>
-    <select v-model="viewMode" class="select select-sm w-30 border-base-300 mb-3">
-        <option value="donuts">Donuts</option>
-        <option value="list">List</option>
-    </select>
+    <EmptyState v-if="!hasPeriodData" icon="🏷️" title="No tag activity for this period"
+        description="Nothing in the selected or previous period. Add a transaction or change the range."
+        action-label="Add Transaction" @action="openAdd" />
 
-    <div class="card card-border border-base-300 bg-base-100">
-        <div class="card-body">
-            <div v-if="viewMode === 'donuts'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <h3 class="text-xl font-medium mb-2">Income</h3>
-                    <div v-if="positiveTagsWithAmount.length > 0">
-                        <TagDonutChart :tagsWithAmount="positiveTagsWithAmount" />
+    <template v-else>
+        <select v-model="viewMode" class="select select-sm w-30 border-base-300 mb-3">
+            <option value="donuts">Donuts</option>
+            <option value="list">List</option>
+        </select>
+
+        <div class="card card-border border-base-300 bg-base-100">
+            <div class="card-body">
+                <div v-if="viewMode === 'donuts'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <h3 class="text-xl font-medium mb-2">Income</h3>
+                        <div v-if="positiveTagsWithAmount.length > 0">
+                            <TagDonutChart :tagsWithAmount="positiveTagsWithAmount" />
+                        </div>
+                        <div v-else class="text-base-content/50 py-8 text-center">No income in this period</div>
                     </div>
-                    <div v-else>
-                        <p class="text-gray-400">No income transactions found :(</p>
+                    <div>
+                        <h3 class="text-xl font-medium mb-2">Expenses</h3>
+                        <div v-if="negativeTagsWithAmount.length > 0">
+                            <TagDonutChart :tagsWithAmount="negativeTagsWithAmount" />
+                        </div>
+                        <div v-else class="text-base-content/50 py-8 text-center">No expenses in this period</div>
                     </div>
                 </div>
-                <div>
-                    <h3 class="text-xl font-medium mb-2">Expenses</h3>
-                    <div v-if="negativeTagsWithAmount.length > 0">
-                        <TagDonutChart :tagsWithAmount="negativeTagsWithAmount" />
-                    </div>
-                    <div v-else>
-                        <p class="text-gray-400">No expense transactions found :)</p>
-                    </div>
-                </div>
-            </div>
 
-            <div v-else-if="viewMode === 'list'" class="tags-list">
-                <table class="table mt-2">
-                    <tbody>
-                        <tr>
-                            <td colspan="4">
-                                <span class="text-2xl font-medium">Income</span>
-                            </td>
-                        </tr>
-                        <tr v-for="tag in filteredPositiveTagTree" :key="tag.id || 'untagged-positive'">
-                            <td>
-                                <div class="flex items-center gap-2" :style="{ paddingLeft: `${tag.depth * 20}px` }">
-                                    <div class="badge badge-soft badge-success text-xl py-4 px-2">
-                                        {{ tag.emoji }}
+                <div v-else-if="viewMode === 'list'" class="tags-list">
+                    <table class="table mt-2">
+                        <tbody>
+                            <tr>
+                                <td colspan="4">
+                                    <span class="text-2xl font-medium">Income</span>
+                                </td>
+                            </tr>
+                            <tr v-if="!filteredPositiveTagTree.length">
+                                <td colspan="4" class="text-base-content/50">No income tags</td>
+                            </tr>
+                            <tr v-for="tag in filteredPositiveTagTree" :key="tag.id || 'untagged-positive'">
+                                <td>
+                                    <div class="flex items-center gap-2" :style="{ paddingLeft: `${tag.depth * 20}px` }">
+                                        <div class="badge badge-soft badge-success text-xl py-4 px-2">
+                                            {{ tag.emoji }}
+                                        </div>
+                                        <span>{{ tag.title }}</span>
                                     </div>
-                                    <span>{{ tag.title }}</span>
-                                </div>
-                            </td>
-                            <td class="w-15 text-right">
-                                <span class="text-gray-400 tooltip" data-tip="Previous period">
-                                    {{ formatMoney(tag.previousAmount) }}
-                                </span>
-                            </td>
-                            <td class="w-15 font-medium text-right">
-                                <span class="tooltip" :data-tip="tag.count + ' txns'">
-                                    {{ formatMoney(tag.amount) }}
-                                </span>
-                            </td>
-                            <td class="w-15 text-right">
-                                <span :class="{
-                                    'text-success': tag.amount > tag.previousAmount,
-                                    'text-error': tag.amount < tag.previousAmount,
-                                    'text-secondary': tag.amount === tag.previousAmount,
-                                }">
-                                    {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
-                                </span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="4">
-                                <span class="text-2xl font-medium">Expenses</span>
-                            </td>
-                        </tr>
-                        <tr v-for="tag in filteredNegativeTagTree" :key="tag.id || 'untagged-negative'">
-                            <td>
-                                <div class="flex items-center gap-2" :style="{ paddingLeft: `${tag.depth * 20}px` }">
-                                    <div class="badge badge-soft badge-error text-xl py-4 px-2">
-                                        {{ tag.emoji }}
+                                </td>
+                                <td class="w-15 text-right">
+                                    <span class="text-gray-400 tooltip" data-tip="Previous period">
+                                        {{ formatMoney(tag.previousAmount) }}
+                                    </span>
+                                </td>
+                                <td class="w-15 font-medium text-right">
+                                    <span class="tooltip" :data-tip="tag.count + ' txns'">
+                                        {{ formatMoney(tag.amount) }}
+                                    </span>
+                                </td>
+                                <td class="w-15 text-right">
+                                    <span :class="{
+                                        'text-success': tag.amount > tag.previousAmount,
+                                        'text-error': tag.amount < tag.previousAmount,
+                                        'text-secondary': tag.amount === tag.previousAmount,
+                                    }">
+                                        {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="4">
+                                    <span class="text-2xl font-medium">Expenses</span>
+                                </td>
+                            </tr>
+                            <tr v-if="!filteredNegativeTagTree.length">
+                                <td colspan="4" class="text-base-content/50">No expense tags</td>
+                            </tr>
+                            <tr v-for="tag in filteredNegativeTagTree" :key="tag.id || 'untagged-negative'">
+                                <td>
+                                    <div class="flex items-center gap-2" :style="{ paddingLeft: `${tag.depth * 20}px` }">
+                                        <div class="badge badge-soft badge-error text-xl py-4 px-2">
+                                            {{ tag.emoji }}
+                                        </div>
+                                        <span>{{ tag.title }}</span>
                                     </div>
-                                    <span>{{ tag.title }}</span>
-                                </div>
-                            </td>
-                            <td class="w-15 text-right">
-                                <span class="text-gray-400 tooltip" data-tip="Previous period">
-                                    {{ formatMoney(tag.previousAmount) }}
-                                </span>
-                            </td>
-                            <td class="w-15 font-medium text-right">
-                                <span class="tooltip" :data-tip="tag.count + ' txns'">
-                                    {{ formatMoney(tag.amount) }}
-                                </span>
-                            </td>
-                            <td class="w-15 text-right">
-                                <span :class="{
-                                    'text-success': tag.amount < tag.previousAmount,
-                                    'text-error': tag.amount > tag.previousAmount,
-                                    'text-secondary': tag.amount === tag.previousAmount,
-                                }">
-                                    {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
-                                </span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                                </td>
+                                <td class="w-15 text-right">
+                                    <span class="text-gray-400 tooltip" data-tip="Previous period">
+                                        {{ formatMoney(tag.previousAmount) }}
+                                    </span>
+                                </td>
+                                <td class="w-15 font-medium text-right">
+                                    <span class="tooltip" :data-tip="tag.count + ' txns'">
+                                        {{ formatMoney(tag.amount) }}
+                                    </span>
+                                </td>
+                                <td class="w-15 text-right">
+                                    <span :class="{
+                                        'text-success': tag.amount < tag.previousAmount,
+                                        'text-error': tag.amount > tag.previousAmount,
+                                        'text-secondary': tag.amount === tag.previousAmount,
+                                    }">
+                                        {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
+    </template>
 </template>
 
 <script setup>
 import { computed, inject, ref } from 'vue'
 import TagDonutChart from '../components/charts/TagDonutChart.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { useTagsStore } from '../services/tags'
 import { useTransactionsStore } from '../services/transactions'
 
@@ -123,8 +132,14 @@ const transactionsStore = useTransactionsStore()
 const formatMoney = inject('formatMoney')
 const formatPercentage = inject('formatPercentage')
 const viewMode = ref('donuts')
+const openAdd = () => transactions_add_modal.showModal()
 
-// Calculate tag amounts and untagged transactions for a period
+const hasPeriodData = computed(
+    () =>
+        transactionsStore.filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd).length > 0 ||
+        transactionsStore.filteredByDateRange(props.dateRange.previousStart, props.dateRange.previousEnd).length > 0,
+)
+
 const calculateTagAmounts = (start, end) => {
     const result = {
         positive: {},
@@ -221,5 +236,3 @@ const negativeTagsWithAmount = computed(() => {
     return filteredNegativeTagTree.value.filter((tag) => tag.amount > 0)
 })
 </script>
-
-<style scoped></style>
