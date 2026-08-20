@@ -219,7 +219,13 @@ class TelegramBot
         }
 
         if (preg_match('/^del:(\d+)$/', $data, $matches)) {
-            $this->handleDelete($user, $callbackId, (int) $matches[1]);
+            $this->handleDelete($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
+
+            return;
+        }
+
+        if (preg_match('/^delrow:(\d+)$/', $data, $matches)) {
+            $this->handleDeleteRow($user, $callbackId, (int) $matches[1]);
 
             return;
         }
@@ -273,7 +279,28 @@ class TelegramBot
         }
     }
 
-    private function handleDelete(User $user, string $callbackId, int $transactionId): void
+    private function handleDelete(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
+    {
+        $transaction = Transaction::find($transactionId);
+
+        if (!$transaction || $transaction->user_id !== $user->id) {
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
+
+            return;
+        }
+
+        $line = $this->formatTransactionLine($transaction);
+
+        $this->deleteTransaction->execute($user, $transaction);
+
+        $this->client->answerCallbackQuery($callbackId, 'Deleted 🗑');
+
+        if ($messageId) {
+            $this->client->editMessageText($chatId, $messageId, "🗑 Deleted\n{$line}", ['inline_keyboard' => []]);
+        }
+    }
+
+    private function handleDeleteRow(User $user, string $callbackId, int $transactionId): void
     {
         $transaction = Transaction::find($transactionId);
 
@@ -353,7 +380,7 @@ class TelegramBot
 
         $buttons = $transactions->map(fn (Transaction $transaction, int $index) => [
             'text' => '🗑 ' . ($index + 1),
-            'callback_data' => "del:{$transaction->id}",
+            'callback_data' => "delrow:{$transaction->id}",
         ])->all();
 
         $this->client->sendMessage(
