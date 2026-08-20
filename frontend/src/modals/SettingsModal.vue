@@ -50,11 +50,7 @@
                 </template>
 
                 <template v-else-if="tab === 'telegram'">
-                    <div v-if="loadingIdentity" class="flex justify-center py-4">
-                        <span class="loading loading-spinner loading-sm"></span>
-                    </div>
-
-                    <div v-else-if="telegramIdentity" class="alert alert-success text-sm">
+                    <div v-if="telegramIdentity" class="alert alert-success text-sm">
                         <span>
                             ✅ Linked to Telegram<template v-if="telegramLinkLabel"> as {{ telegramLinkLabel }}</template>
                         </span>
@@ -93,11 +89,14 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { formatDateOptions, formatMoneyOptions, apiErrorMessage } from '../services/formatters'
-import { getIdentities, linkTelegram as linkTelegramRequest } from '../services/identities'
+import { linkTelegram as linkTelegramRequest } from '../services/identities'
 import settings, { updateDateFormat, updateDecimals, updateMoneyFormat, updateTheme } from '../services/settings'
 import toasts from '../services/toasts'
+import { useAuthStore } from '../services/auth'
+
+const authStore = useAuthStore()
 
 const tabs = ref({
     formatting: 'Formatting',
@@ -176,12 +175,11 @@ const bindModalEvents = () => {
     const originalShow = modal.showModal.bind(modal)
     modal.showModal = () => {
         syncFromSettings()
-        loadTelegramIdentity()
         originalShow()
     }
 }
 
-bindModalEvents()
+onMounted(bindModalEvents)
 
 const datePreviewMap = {
     'YYYY/MM/DD': { month: '2-digit', day: '2-digit', year: 'numeric', locale: 'zh-CN' },
@@ -216,8 +214,10 @@ const telegramBotUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
 const telegramBotUrl = `https://t.me/${telegramBotUsername}`
 const telegramCode = ref('')
 const linkingTelegram = ref(false)
-const loadingIdentity = ref(false)
-const telegramIdentity = ref(null)
+
+const telegramIdentity = computed(
+    () => authStore.user?.identities?.find((identity) => identity.provider === 'telegram') ?? null,
+)
 
 const telegramLinkLabel = computed(() => {
     const meta = telegramIdentity.value?.meta
@@ -229,29 +229,19 @@ const telegramLinkLabel = computed(() => {
     return ''
 })
 
-const loadTelegramIdentity = async () => {
-    loadingIdentity.value = true
-
-    try {
-        const response = await getIdentities()
-
-        telegramIdentity.value = response.data.find((identity) => identity.provider === 'telegram') ?? null
-    } catch {
-        telegramIdentity.value = null
-    } finally {
-        loadingIdentity.value = false
-    }
-}
-
 const linkTelegram = async () => {
     linkingTelegram.value = true
 
     try {
-        await linkTelegramRequest(telegramCode.value.trim())
+        const response = await linkTelegramRequest(telegramCode.value.trim())
+
+        authStore.user.identities = [
+            ...(authStore.user.identities ?? []).filter((identity) => identity.provider !== 'telegram'),
+            response.data.identity,
+        ]
 
         toasts.success('Telegram linked successfully!')
         telegramCode.value = ''
-        await loadTelegramIdentity()
     } catch (error) {
         toasts.error(apiErrorMessage(error, 'Failed to link: '))
     } finally {

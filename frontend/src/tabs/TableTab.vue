@@ -29,7 +29,7 @@
                 <tbody>
                     <tr v-for="transaction in filteredTransactions" :key="transaction.id">
                         <td>
-                            <span class="tooltip" :data-tip="sourceInfo(transaction.source).label">
+                            <span class="tooltip tooltip-right" :data-tip="sourceInfo(transaction.source).label">
                                 {{ sourceInfo(transaction.source).icon }}
                             </span>
                         </td>

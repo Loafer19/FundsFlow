@@ -24,6 +24,5 @@ Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle']);
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::apiResource('tags', TagController::class);
     Route::apiResource('transactions', TransactionController::class);
-    Route::get('/identities', [IdentityController::class, 'index']);
     Route::post('/identities/telegram/link', [IdentityController::class, 'linkTelegram']);
 });

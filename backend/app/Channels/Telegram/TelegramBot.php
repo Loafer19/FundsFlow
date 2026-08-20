@@ -26,6 +26,8 @@ class TelegramBot
 
     private const MENU_TAGS = '🏷 Tags';
 
+    private const TAGS_PER_PAGE = 8;
+
     public function __construct(
         private readonly TelegramClient $client,
         private readonly ListTagsAction $listTags,
@@ -185,8 +187,8 @@ class TelegramBot
 
         $this->client->sendMessage(
             $chatId,
-            "✅ Saved\n" . $this->formatTransactionLine($transaction),
-            $this->tagKeyboard($user, $transaction->id),
+            "✅ Saved\n" . $this->formatTransactionLine($transaction) . "\n" . $this->formatTagList($transaction),
+            $this->tagKeyboard($user, $transaction),
         );
     }
 
@@ -217,6 +219,12 @@ class TelegramBot
         $messageId = $callbackQuery['message']['message_id'] ?? null;
         $data = $callbackQuery['data'] ?? '';
 
+        if ($data === 'noop') {
+            $this->client->answerCallbackQuery($callbackId);
+
+            return;
+        }
+
         if (!$chatId) {
             $this->client->answerCallbackQuery($callbackId);
 
@@ -231,8 +239,26 @@ class TelegramBot
             return;
         }
 
-        if (preg_match('/^tag:(\d+):(\d+)$/', $data, $matches)) {
-            $this->handleTagPick($user, $chatId, $messageId, $callbackId, (int) $matches[1], (int) $matches[2]);
+        if (preg_match('/^tagx:(\d+):(\d+):(\d+)$/', $data, $matches)) {
+            $this->handleTagToggle($user, $chatId, $messageId, $callbackId, (int) $matches[1], (int) $matches[2], (int) $matches[3]);
+
+            return;
+        }
+
+        if (preg_match('/^tagpage:(\d+):(\d+)$/', $data, $matches)) {
+            $this->handleTagPage($user, $chatId, $messageId, $callbackId, (int) $matches[1], (int) $matches[2]);
+
+            return;
+        }
+
+        if (preg_match('/^tagclear:(\d+):(\d+)$/', $data, $matches)) {
+            $this->handleTagClear($user, $chatId, $messageId, $callbackId, (int) $matches[1], (int) $matches[2]);
+
+            return;
+        }
+
+        if (preg_match('/^tagdone:(\d+)$/', $data, $matches)) {
+            $this->handleTagDone($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
 
             return;
         }
@@ -258,28 +284,73 @@ class TelegramBot
         $this->client->answerCallbackQuery($callbackId);
     }
 
-    private function handleTagPick(
+    private function handleTagToggle(
         User $user,
         int|string $chatId,
         ?int $messageId,
         string $callbackId,
         int $transactionId,
         int $tagId,
+        int $page,
     ): void {
-        $transaction = Transaction::find($transactionId);
+        $transaction = $this->findOwnTransaction($user, $transactionId);
 
-        if (!$transaction || $transaction->user_id !== $user->id) {
+        if (!$transaction) {
             $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
 
             return;
         }
 
-        $transaction = $this->updateTransaction->execute($user, $transaction, [
-            'tags' => $tagId > 0 ? [$tagId] : [],
-        ]);
+        $ids = $transaction->tags->pluck('id')->all();
+        $ids = in_array($tagId, $ids, true)
+            ? array_values(array_diff($ids, [$tagId]))
+            : [...$ids, $tagId];
 
-        $tag = $transaction->tags->first();
-        $tagLabel = $tag ? trim($tag->emoji . ' ' . $tag->title) : 'No tag';
+        $transaction = $this->updateTransaction->execute($user, $transaction, ['tags' => $ids]);
+
+        $this->client->answerCallbackQuery($callbackId);
+        $this->renderTagPicker($user, $chatId, $messageId, $transaction, $page);
+    }
+
+    private function handleTagPage(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId, int $page): void
+    {
+        $transaction = $this->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction) {
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
+
+            return;
+        }
+
+        $this->client->answerCallbackQuery($callbackId);
+        $this->renderTagPicker($user, $chatId, $messageId, $transaction, $page);
+    }
+
+    private function handleTagClear(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId, int $page): void
+    {
+        $transaction = $this->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction) {
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
+
+            return;
+        }
+
+        $transaction = $this->updateTransaction->execute($user, $transaction, ['tags' => []]);
+
+        $this->client->answerCallbackQuery($callbackId, 'Cleared');
+        $this->renderTagPicker($user, $chatId, $messageId, $transaction, $page);
+    }
+
+    private function handleTagDone(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
+    {
+        $transaction = $this->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction) {
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
+
+            return;
+        }
 
         $this->client->answerCallbackQuery($callbackId, 'Saved ✅');
 
@@ -287,10 +358,10 @@ class TelegramBot
             $this->client->editMessageText(
                 $chatId,
                 $messageId,
-                "✅ Saved\n" . $this->formatTransactionLine($transaction) . "\n🏷 {$tagLabel}",
+                "✅ Saved\n" . $this->formatTransactionLine($transaction) . "\n" . $this->formatTagList($transaction),
                 [
                     'inline_keyboard' => [[
-                        ['text' => '✏️ Change tag', 'callback_data' => "retag:{$transaction->id}"],
+                        ['text' => '✏️ Change tags', 'callback_data' => "retag:{$transaction->id}"],
                         ['text' => '🗑 Delete', 'callback_data' => "del:{$transaction->id}"],
                     ]],
                 ],
@@ -300,9 +371,9 @@ class TelegramBot
 
     private function handleDelete(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
     {
-        $transaction = Transaction::find($transactionId);
+        $transaction = $this->findOwnTransaction($user, $transactionId);
 
-        if (!$transaction || $transaction->user_id !== $user->id) {
+        if (!$transaction) {
             $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
 
             return;
@@ -321,9 +392,9 @@ class TelegramBot
 
     private function handleDeleteRow(User $user, string $callbackId, int $transactionId): void
     {
-        $transaction = Transaction::find($transactionId);
+        $transaction = $this->findOwnTransaction($user, $transactionId);
 
-        if (!$transaction || $transaction->user_id !== $user->id) {
+        if (!$transaction) {
             $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
 
             return;
@@ -336,19 +407,41 @@ class TelegramBot
 
     private function handleRetag(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
     {
-        $transaction = Transaction::find($transactionId);
+        $transaction = $this->findOwnTransaction($user, $transactionId);
 
-        if (!$transaction || $transaction->user_id !== $user->id) {
+        if (!$transaction) {
             $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
 
             return;
         }
 
         $this->client->answerCallbackQuery($callbackId);
+        $this->renderTagPicker($user, $chatId, $messageId, $transaction, 0);
+    }
 
-        if ($messageId) {
-            $this->client->editMessageReplyMarkup($chatId, $messageId, $this->tagKeyboard($user, $transaction->id));
+    private function renderTagPicker(User $user, int|string $chatId, ?int $messageId, Transaction $transaction, int $page): void
+    {
+        if (!$messageId) {
+            return;
         }
+
+        $this->client->editMessageText(
+            $chatId,
+            $messageId,
+            "✅ Saved\n" . $this->formatTransactionLine($transaction) . "\n" . $this->formatTagList($transaction),
+            $this->tagKeyboard($user, $transaction, $page),
+        );
+    }
+
+    private function findOwnTransaction(User $user, int $transactionId): ?Transaction
+    {
+        $transaction = Transaction::with('tags')->find($transactionId);
+
+        if (!$transaction || $transaction->user_id !== $user->id) {
+            return null;
+        }
+
+        return $transaction;
     }
 
     private function sendMonthSummary(User $user, int|string $chatId): void
@@ -472,20 +565,53 @@ class TelegramBot
         return sprintf('%s %.2f%s (%s)', $emoji, $transaction->amount, $note, $transaction->at->format('d.m'));
     }
 
+    private function formatTagList(Transaction $transaction): string
+    {
+        if ($transaction->tags->isEmpty()) {
+            return '🏷 No tags';
+        }
+
+        $labels = $transaction->tags->map(fn (Tag $tag) => trim($tag->emoji . ' ' . $tag->title))->all();
+
+        return '🏷 ' . implode(', ', $labels);
+    }
+
     /**
      * @return array<string, mixed>
      */
-    private function tagKeyboard(User $user, int $transactionId): array
+    private function tagKeyboard(User $user, Transaction $transaction, int $page = 0): array
     {
-        $tags = $this->listTags->execute($user);
+        $tree = $this->buildTagTree($this->listTags->execute($user));
+        $pages = array_chunk($tree, self::TAGS_PER_PAGE) ?: [[]];
+        $page = max(0, min($page, count($pages) - 1));
+        $selectedIds = $transaction->tags->pluck('id')->all();
 
         $rows = array_map(fn (array $node) => [[
-            'text' => $this->formatTagLabel($node['tag'], $node['depth']),
-            'callback_data' => "tag:{$transactionId}:{$node['tag']->id}",
-        ]], $this->buildTagTree($tags));
+            'text' => $this->formatTagLabel($node['tag'], $node['depth'], in_array($node['tag']->id, $selectedIds, true)),
+            'callback_data' => "tagx:{$transaction->id}:{$node['tag']->id}:{$page}",
+        ]], $pages[$page]);
 
-        $rows[] = [['text' => '— No tag —', 'callback_data' => "tag:{$transactionId}:0"]];
-        $rows[] = [['text' => '🗑 Delete', 'callback_data' => "del:{$transactionId}"]];
+        if (count($pages) > 1) {
+            $navRow = [];
+
+            if ($page > 0) {
+                $navRow[] = ['text' => '◀️', 'callback_data' => "tagpage:{$transaction->id}:" . ($page - 1)];
+            }
+
+            $navRow[] = ['text' => ($page + 1) . '/' . count($pages), 'callback_data' => 'noop'];
+
+            if ($page < count($pages) - 1) {
+                $navRow[] = ['text' => '▶️', 'callback_data' => "tagpage:{$transaction->id}:" . ($page + 1)];
+            }
+
+            $rows[] = $navRow;
+        }
+
+        $rows[] = [
+            ['text' => '🚫 Clear all', 'callback_data' => "tagclear:{$transaction->id}:{$page}"],
+            ['text' => '✅ Done', 'callback_data' => "tagdone:{$transaction->id}"],
+        ];
+        $rows[] = [['text' => '🗑 Delete', 'callback_data' => "del:{$transaction->id}"]];
 
         return ['inline_keyboard' => $rows];
     }
@@ -511,11 +637,12 @@ class TelegramBot
         return $result;
     }
 
-    private function formatTagLabel(Tag $tag, int $depth): string
+    private function formatTagLabel(Tag $tag, int $depth, bool $selected = false): string
     {
         $prefix = $depth > 0 ? str_repeat('  ', $depth) . '↳ ' : '';
+        $mark = $selected ? '✅ ' : '';
 
-        return $prefix . trim($tag->emoji . ' ' . $tag->title);
+        return $prefix . $mark . trim($tag->emoji . ' ' . $tag->title);
     }
 
     /**

@@ -28,7 +28,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user' => $user,
+            'user' => $user->load('identities'),
             'token' => $token,
         ]);
     }
@@ -46,7 +46,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user' => $user,
+            'user' => $user->load('identities'),
             'token' => $token,
         ], 201);
     }
@@ -54,7 +54,7 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         return response()->json([
-            'user' => $request->user(),
+            'user' => $request->user()->load('identities'),
         ]);
     }
 
