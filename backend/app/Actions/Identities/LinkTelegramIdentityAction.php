@@ -17,9 +17,18 @@ class LinkTelegramIdentityAction
             throw new RuntimeException('Код недійсний або протермінований.');
         }
 
-        return Identity::updateOrCreate(
+        // A fresh code proves ownership of the chat — reassign it if it was
+        // previously linked to a different user, instead of hitting the
+        // unique(provider, external_id) constraint.
+        Identity::query()
+            ->where('provider', 'telegram')
+            ->where('external_id', (string) $chatId)
+            ->where('user_id', '!=', $user->id)
+            ->delete();
+
+        return $user->identities()->updateOrCreate(
             ['provider' => 'telegram', 'external_id' => (string) $chatId],
-            ['user_id' => $user->id],
+            [],
         );
     }
 }
