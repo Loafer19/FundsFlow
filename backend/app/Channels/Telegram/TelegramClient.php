@@ -46,6 +46,19 @@ class TelegramClient
     }
 
     /**
+     * @param array<string, mixed>|null $replyMarkup
+     */
+    public function editMessageText(int|string $chatId, int $messageId, string $text, ?array $replyMarkup = null): void
+    {
+        Http::post($this->baseUrl . 'editMessageText', array_filter([
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'text' => $text,
+            'reply_markup' => $replyMarkup ? json_encode($replyMarkup) : null,
+        ]));
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function setWebhook(string $url, string $secretToken): array
@@ -53,6 +66,17 @@ class TelegramClient
         return Http::post($this->baseUrl . 'setWebhook', [
             'url' => $url,
             'secret_token' => $secretToken,
+        ])->json();
+    }
+
+    /**
+     * @param array<int, array{command: string, description: string}> $commands
+     * @return array<string, mixed>
+     */
+    public function setMyCommands(array $commands): array
+    {
+        return Http::post($this->baseUrl . 'setMyCommands', [
+            'commands' => json_encode($commands),
         ])->json();
     }
 }

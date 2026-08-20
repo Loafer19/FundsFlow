@@ -34,6 +34,15 @@ class TelegramSetWebhookCommand extends Command
 
         $this->info("Webhook set to {$url}");
 
+        $client->setMyCommands([
+            ['command' => 'balance', 'description' => "This month's income, expenses, and balance"],
+            ['command' => 'recent', 'description' => 'Last 10 transactions'],
+            ['command' => 'tags', 'description' => 'List your tags'],
+            ['command' => 'newtag', 'description' => 'Create a tag: /newtag 🍕 Fast Food > Food'],
+        ]);
+
+        $this->info('Bot command menu registered.');
+
         return self::SUCCESS;
     }
 }

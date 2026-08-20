@@ -51,18 +51,18 @@
 
                 <template v-else-if="tab === 'telegram'">
                     <p class="text-sm opacity-70 mb-3">
-                        Відкрий <a :href="telegramBotUrl" target="_blank" class="link link-primary">@{{
+                        Open <a :href="telegramBotUrl" target="_blank" class="link link-primary">@{{
                             telegramBotUsername }}</a>
-                        у Telegram, напиши <code>/start</code> і введи отриманий код нижче.
+                        in Telegram, send <code>/start</code>, and enter the code you get below.
                     </p>
 
                     <input v-model="telegramCode" type="text" inputmode="numeric" maxlength="6"
-                        placeholder="Код з Telegram" class="input w-full mb-3" />
+                        placeholder="Code from Telegram" class="input w-full mb-3" />
 
                     <button type="button" class="btn btn-primary btn-sm" @click="linkTelegram"
                         :disabled="linkingTelegram || !telegramCode">
                         <span v-if="linkingTelegram" class="loading loading-spinner loading-xs"></span>
-                        Привʼязати
+                        Link
                     </button>
                 </template>
             </div>
@@ -210,10 +210,10 @@ const linkTelegram = async () => {
     try {
         await linkTelegramRequest(telegramCode.value.trim())
 
-        toasts.success('Telegram привʼязано успішно!')
+        toasts.success('Telegram linked successfully!')
         telegramCode.value = ''
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Не вдалося привʼязати: '))
+        toasts.error(apiErrorMessage(error, 'Failed to link: '))
     } finally {
         linkingTelegram.value = false
     }

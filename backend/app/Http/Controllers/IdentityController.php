@@ -22,7 +22,7 @@ class IdentityController extends Controller
         }
 
         return response()->json([
-            'message' => "Telegram привʼязано успішно!",
+            'message' => 'Telegram account linked successfully!',
         ]);
     }
 }

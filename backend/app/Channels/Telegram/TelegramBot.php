@@ -2,24 +2,36 @@
 
 namespace App\Channels\Telegram;
 
+use App\Actions\Tags\CreateTagAction;
 use App\Actions\Tags\ListTagsAction;
 use App\Actions\Transactions\CreateTransactionAction;
+use App\Actions\Transactions\DeleteTransactionAction;
 use App\Actions\Transactions\ListTransactionsAction;
 use App\Actions\Transactions\UpdateTransactionAction;
 use App\Models\Identity;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Throwable;
 
 class TelegramBot
 {
+    private const MENU_BALANCE = '📊 Balance';
+
+    private const MENU_RECENT = '🕘 Recent';
+
+    private const MENU_TAGS = '🏷 Tags';
+
     public function __construct(
         private readonly TelegramClient $client,
         private readonly ListTagsAction $listTags,
         private readonly ListTransactionsAction $listTransactions,
         private readonly CreateTransactionAction $createTransaction,
         private readonly UpdateTransactionAction $updateTransaction,
+        private readonly DeleteTransactionAction $deleteTransaction,
+        private readonly CreateTagAction $createTag,
     ) {}
 
     /**
@@ -36,6 +48,18 @@ class TelegramBot
         if (isset($update['message']['text'])) {
             $this->handleMessage($update['message']);
         }
+    }
+
+    public function sendWelcome(int|string $chatId): void
+    {
+        $this->client->sendMessage(
+            $chatId,
+            "✅ Linked to your FundsFlow account!\n\n"
+                . "Send a message like \"-350 groceries\" to log an expense, or \"+15000 salary\" for income.\n"
+                . "Prefix a date for a past entry: \"20.08 -350 groceries\" (DD.MM or DD.MM.YYYY).\n\n"
+                . 'Use the menu below, or /balance, /recent, /tags, /newtag.',
+            $this->menuKeyboard(),
+        );
     }
 
     /**
@@ -55,14 +79,16 @@ class TelegramBot
         $user = $this->resolveUser($chatId);
 
         if (!$user) {
-            $this->client->sendMessage($chatId, "Акаунт ще не привʼязано. Напиши /start, щоб отримати код прив'язки.");
+            $this->client->sendMessage($chatId, "Your account isn't linked yet. Send /start to get a linking code.");
 
             return;
         }
 
-        match ($text) {
-            '/balance' => $this->sendBalance($user, $chatId),
-            '/tags' => $this->sendTags($user, $chatId),
+        match (true) {
+            $text === '/balance' || $text === self::MENU_BALANCE => $this->sendBalance($user, $chatId),
+            $text === '/tags' || $text === self::MENU_TAGS => $this->sendTags($user, $chatId),
+            $text === '/recent' || $text === self::MENU_RECENT => $this->sendRecent($user, $chatId),
+            str_starts_with($text, '/newtag') => $this->handleNewTag($user, $chatId, $text),
             default => $this->handleQuickAdd($user, $chatId, $text),
         };
     }
@@ -70,7 +96,7 @@ class TelegramBot
     private function handleStart(int|string $chatId): void
     {
         if ($this->resolveUser($chatId)) {
-            $this->client->sendMessage($chatId, 'Цей чат вже привʼязано до акаунту FundsFlow.');
+            $this->client->sendMessage($chatId, 'This chat is already linked to a FundsFlow account.');
 
             return;
         }
@@ -81,14 +107,33 @@ class TelegramBot
 
         $this->client->sendMessage(
             $chatId,
-            "Код прив'язки: {$code}\n\nВведи його в FundsFlow → Налаштування → Telegram протягом 10 хвилин.",
+            "Linking code: {$code}\n\nEnter it in FundsFlow → Settings → Telegram within 10 minutes.",
         );
     }
 
     private function handleQuickAdd(User $user, int|string $chatId, string $text): void
     {
+        $date = now()->toDateString();
+
+        if (preg_match('/^(\d{1,2}\.\d{1,2}(?:\.\d{4})?)\s+(.+)$/u', $text, $dateMatch)) {
+            $parsedDate = $this->parseDate($dateMatch[1]);
+
+            if ($parsedDate === null) {
+                $this->client->sendMessage($chatId, "Couldn't parse that date. Use DD.MM or DD.MM.YYYY.");
+
+                return;
+            }
+
+            $date = $parsedDate;
+            $text = $dateMatch[2];
+        }
+
         if (!preg_match('/^([+-]?\d+(?:[.,]\d{1,2})?)\s*(.*)$/u', $text, $matches)) {
-            $this->client->sendMessage($chatId, 'Не розпізнав. Формат: -350 продукти (мінус — витрата, плюс — дохід).');
+            $this->client->sendMessage(
+                $chatId,
+                "Didn't recognize that. Format: -350 groceries (minus is an expense, plus is income). "
+                    . 'Prefix a date like "20.08 -350 groceries" to log a past day.',
+            );
 
             return;
         }
@@ -100,7 +145,7 @@ class TelegramBot
         }
 
         if ($amount === 0.0) {
-            $this->client->sendMessage($chatId, 'Сума не може бути нулем.');
+            $this->client->sendMessage($chatId, "Amount can't be zero.");
 
             return;
         }
@@ -108,27 +153,39 @@ class TelegramBot
         $note = trim($matches[2]);
 
         if (mb_strlen($note) > 255) {
-            $this->client->sendMessage($chatId, 'Нотатка задовга (максимум 255 символів).');
+            $this->client->sendMessage($chatId, 'Note is too long (255 characters max).');
 
             return;
         }
 
         $transaction = $this->createTransaction->execute($user, [
-            'at' => now()->toDateString(),
+            'at' => $date,
             'amount' => $amount,
             'note' => $note !== '' ? $note : null,
         ]);
 
         $this->client->sendMessage(
             $chatId,
-            sprintf(
-                '%s %.2f%s',
-                $amount > 0 ? '📈' : '📉',
-                $amount,
-                $note !== '' ? " — {$note}" : '',
-            ),
+            "✅ Saved\n" . $this->formatTransactionLine($transaction),
             $this->tagKeyboard($user, $transaction->id),
         );
+    }
+
+    private function parseDate(string $raw): ?string
+    {
+        $normalized = substr_count($raw, '.') === 1 ? $raw . '.' . now()->format('Y') : $raw;
+
+        try {
+            $date = Carbon::createFromFormat('d.m.Y', $normalized);
+        } catch (Throwable) {
+            return null;
+        }
+
+        if (!$date || $date->format('d.m.Y') !== $normalized) {
+            return null;
+        }
+
+        return $date->toDateString();
     }
 
     /**
@@ -138,9 +195,10 @@ class TelegramBot
     {
         $callbackId = $callbackQuery['id'];
         $chatId = $callbackQuery['message']['chat']['id'] ?? null;
+        $messageId = $callbackQuery['message']['message_id'] ?? null;
         $data = $callbackQuery['data'] ?? '';
 
-        if (!$chatId || !preg_match('/^tag:(\d+):(\d+)$/', $data, $matches)) {
+        if (!$chatId) {
             $this->client->answerCallbackQuery($callbackId);
 
             return;
@@ -149,27 +207,102 @@ class TelegramBot
         $user = $this->resolveUser($chatId);
 
         if (!$user) {
-            $this->client->answerCallbackQuery($callbackId, "Акаунт не привʼязано.");
+            $this->client->answerCallbackQuery($callbackId, "Account isn't linked.");
 
             return;
         }
 
-        $transaction = Transaction::find((int) $matches[1]);
+        if (preg_match('/^tag:(\d+):(\d+)$/', $data, $matches)) {
+            $this->handleTagPick($user, $chatId, $messageId, $callbackId, (int) $matches[1], (int) $matches[2]);
+
+            return;
+        }
+
+        if (preg_match('/^del:(\d+)$/', $data, $matches)) {
+            $this->handleDelete($user, $callbackId, (int) $matches[1]);
+
+            return;
+        }
+
+        if (preg_match('/^retag:(\d+)$/', $data, $matches)) {
+            $this->handleRetag($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
+
+            return;
+        }
+
+        $this->client->answerCallbackQuery($callbackId);
+    }
+
+    private function handleTagPick(
+        User $user,
+        int|string $chatId,
+        ?int $messageId,
+        string $callbackId,
+        int $transactionId,
+        int $tagId,
+    ): void {
+        $transaction = Transaction::find($transactionId);
 
         if (!$transaction || $transaction->user_id !== $user->id) {
-            $this->client->answerCallbackQuery($callbackId, 'Транзакцію не знайдено.');
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
 
             return;
         }
 
-        $tagId = (int) $matches[2];
-
-        $this->updateTransaction->execute($user, $transaction, [
+        $transaction = $this->updateTransaction->execute($user, $transaction, [
             'tags' => $tagId > 0 ? [$tagId] : [],
         ]);
 
-        $this->client->answerCallbackQuery($callbackId, 'Збережено ✅');
-        $this->client->editMessageReplyMarkup($chatId, $callbackQuery['message']['message_id']);
+        $tag = $transaction->tags->first();
+        $tagLabel = $tag ? trim($tag->emoji . ' ' . $tag->title) : 'No tag';
+
+        $this->client->answerCallbackQuery($callbackId, 'Saved ✅');
+
+        if ($messageId) {
+            $this->client->editMessageText(
+                $chatId,
+                $messageId,
+                "✅ Saved\n" . $this->formatTransactionLine($transaction) . "\n🏷 {$tagLabel}",
+                [
+                    'inline_keyboard' => [[
+                        ['text' => '✏️ Change tag', 'callback_data' => "retag:{$transaction->id}"],
+                        ['text' => '🗑 Delete', 'callback_data' => "del:{$transaction->id}"],
+                    ]],
+                ],
+            );
+        }
+    }
+
+    private function handleDelete(User $user, string $callbackId, int $transactionId): void
+    {
+        $transaction = Transaction::find($transactionId);
+
+        if (!$transaction || $transaction->user_id !== $user->id) {
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
+
+            return;
+        }
+
+        $this->deleteTransaction->execute($user, $transaction);
+
+        $this->client->answerCallbackQuery($callbackId, 'Deleted 🗑');
+    }
+
+    private function handleRetag(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
+    {
+        $transaction = Transaction::find($transactionId);
+
+        if (!$transaction || $transaction->user_id !== $user->id) {
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
+
+            return;
+        }
+
+        $this->client->answerCallbackQuery($callbackId);
+
+        if ($messageId) {
+            $this->client->editMessageReplyMarkup($chatId, $messageId, $this->tagKeyboard($user, $transaction->id));
+        }
     }
 
     private function sendBalance(User $user, int|string $chatId): void
@@ -181,7 +314,7 @@ class TelegramBot
         $expense = $transactions->filter(fn (Transaction $transaction) => $transaction->amount < 0)->sum('amount');
 
         $this->client->sendMessage($chatId, sprintf(
-            "📊 %s\nДохід: +%.2f\nВитрати: %.2f\nБаланс: %.2f",
+            "📊 %s\nIncome: +%.2f\nExpenses: %.2f\nBalance: %.2f",
             now()->format('m.Y'),
             $income,
             $expense,
@@ -194,14 +327,100 @@ class TelegramBot
         $tags = $this->listTags->execute($user);
 
         if ($tags->isEmpty()) {
-            $this->client->sendMessage($chatId, 'Тегів ще немає.');
+            $this->client->sendMessage($chatId, 'No tags yet.');
 
             return;
         }
 
         $lines = $tags->map(fn (Tag $tag) => trim($tag->emoji . ' ' . $tag->title))->all();
 
-        $this->client->sendMessage($chatId, implode("\n", $lines));
+        $this->client->sendMessage($chatId, "🏷 Your tags\n" . implode("\n", $lines));
+    }
+
+    private function sendRecent(User $user, int|string $chatId): void
+    {
+        $transactions = $this->listTransactions->execute($user)->take(10)->values();
+
+        if ($transactions->isEmpty()) {
+            $this->client->sendMessage($chatId, 'No transactions yet.');
+
+            return;
+        }
+
+        $lines = $transactions->map(
+            fn (Transaction $transaction, int $index) => ($index + 1) . ') ' . $this->formatTransactionLine($transaction),
+        )->all();
+
+        $buttons = $transactions->map(fn (Transaction $transaction, int $index) => [
+            'text' => '🗑 ' . ($index + 1),
+            'callback_data' => "del:{$transaction->id}",
+        ])->all();
+
+        $this->client->sendMessage(
+            $chatId,
+            "🕘 Recent transactions\n" . implode("\n", $lines),
+            ['inline_keyboard' => array_chunk($buttons, 5)],
+        );
+    }
+
+    private function handleNewTag(User $user, int|string $chatId, string $text): void
+    {
+        $payload = trim(substr($text, strlen('/newtag')));
+
+        if ($payload === '') {
+            $this->client->sendMessage(
+                $chatId,
+                "Usage: /newtag <emoji> <title> [> <parent title>]\nExample: /newtag 🍕 Fast Food > Food",
+            );
+
+            return;
+        }
+
+        $parentTitle = null;
+
+        if (str_contains($payload, '>')) {
+            [$payload, $parentTitle] = array_map('trim', explode('>', $payload, 2));
+        }
+
+        if (!preg_match('/^(\S+)\s+(.+)$/u', $payload, $matches)) {
+            $this->client->sendMessage($chatId, 'Usage: /newtag <emoji> <title> [> <parent title>]');
+
+            return;
+        }
+
+        $emoji = $matches[1];
+        $title = trim($matches[2]);
+        $parentId = null;
+
+        if ($parentTitle !== null) {
+            $parent = $this->listTags->execute($user)
+                ->first(fn (Tag $tag) => mb_strtolower($tag->title) === mb_strtolower($parentTitle));
+
+            if (!$parent) {
+                $this->client->sendMessage($chatId, "Parent tag \"{$parentTitle}\" not found.");
+
+                return;
+            }
+
+            $parentId = $parent->id;
+        }
+
+        $tag = $this->createTag->execute($user, [
+            'title' => $title,
+            'emoji' => $emoji,
+            'parent_id' => $parentId,
+            'calc_balance' => true,
+        ]);
+
+        $this->client->sendMessage($chatId, "✅ Tag created: {$tag->emoji} {$tag->title}");
+    }
+
+    private function formatTransactionLine(Transaction $transaction): string
+    {
+        $emoji = $transaction->amount > 0 ? '📈' : '📉';
+        $note = $transaction->note ? " — {$transaction->note}" : '';
+
+        return sprintf('%s %.2f%s (%s)', $emoji, $transaction->amount, $note, $transaction->at->format('d.m'));
     }
 
     /**
@@ -217,9 +436,24 @@ class TelegramBot
         ])->all();
 
         $rows = array_chunk($buttons, 2);
-        $rows[] = [['text' => '— Без тегу —', 'callback_data' => "tag:{$transactionId}:0"]];
+        $rows[] = [['text' => '— No tag —', 'callback_data' => "tag:{$transactionId}:0"]];
+        $rows[] = [['text' => '🗑 Delete', 'callback_data' => "del:{$transactionId}"]];
 
         return ['inline_keyboard' => $rows];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function menuKeyboard(): array
+    {
+        return [
+            'keyboard' => [
+                [self::MENU_BALANCE, self::MENU_RECENT],
+                [self::MENU_TAGS],
+            ],
+            'resize_keyboard' => true,
+        ];
     }
 
     private function resolveUser(int|string $chatId): ?User
