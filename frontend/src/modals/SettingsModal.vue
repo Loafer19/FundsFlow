@@ -50,20 +50,32 @@
                 </template>
 
                 <template v-else-if="tab === 'telegram'">
-                    <p class="text-sm opacity-70 mb-3">
-                        Open <a :href="telegramBotUrl" target="_blank" class="link link-primary">@{{
-                            telegramBotUsername }}</a>
-                        in Telegram, send <code>/start</code>, and enter the code you get below.
-                    </p>
+                    <div v-if="loadingIdentity" class="flex justify-center py-4">
+                        <span class="loading loading-spinner loading-sm"></span>
+                    </div>
 
-                    <input v-model="telegramCode" type="text" inputmode="numeric" maxlength="6"
-                        placeholder="Code from Telegram" class="input w-full mb-3" />
+                    <div v-else-if="telegramIdentity" class="alert alert-success text-sm">
+                        <span>
+                            ✅ Linked to Telegram<template v-if="telegramLinkLabel"> as {{ telegramLinkLabel }}</template>
+                        </span>
+                    </div>
 
-                    <button type="button" class="btn btn-primary btn-sm" @click="linkTelegram"
-                        :disabled="linkingTelegram || !telegramCode">
-                        <span v-if="linkingTelegram" class="loading loading-spinner loading-xs"></span>
-                        Link
-                    </button>
+                    <template v-else>
+                        <p class="text-sm opacity-70 mb-3">
+                            Open <a :href="telegramBotUrl" target="_blank" class="link link-primary">@{{
+                                telegramBotUsername }}</a>
+                            in Telegram, send <code>/start</code>, and enter the code you get below.
+                        </p>
+
+                        <input v-model="telegramCode" type="text" inputmode="numeric" maxlength="6"
+                            placeholder="Code from Telegram" class="input w-full mb-3" />
+
+                        <button type="button" class="btn btn-primary btn-sm" @click="linkTelegram"
+                            :disabled="linkingTelegram || !telegramCode">
+                            <span v-if="linkingTelegram" class="loading loading-spinner loading-xs"></span>
+                            Link
+                        </button>
+                    </template>
                 </template>
             </div>
 
@@ -83,7 +95,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { formatDateOptions, formatMoneyOptions, apiErrorMessage } from '../services/formatters'
-import { linkTelegram as linkTelegramRequest } from '../services/identities'
+import { getIdentities, linkTelegram as linkTelegramRequest } from '../services/identities'
 import settings, { updateDateFormat, updateDecimals, updateMoneyFormat, updateTheme } from '../services/settings'
 import toasts from '../services/toasts'
 
@@ -164,6 +176,7 @@ const bindModalEvents = () => {
     const originalShow = modal.showModal.bind(modal)
     modal.showModal = () => {
         syncFromSettings()
+        loadTelegramIdentity()
         originalShow()
     }
 }
@@ -203,6 +216,32 @@ const telegramBotUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
 const telegramBotUrl = `https://t.me/${telegramBotUsername}`
 const telegramCode = ref('')
 const linkingTelegram = ref(false)
+const loadingIdentity = ref(false)
+const telegramIdentity = ref(null)
+
+const telegramLinkLabel = computed(() => {
+    const meta = telegramIdentity.value?.meta
+
+    if (!meta) return ''
+    if (meta.username) return `@${meta.username}`
+    if (meta.first_name) return meta.first_name
+
+    return ''
+})
+
+const loadTelegramIdentity = async () => {
+    loadingIdentity.value = true
+
+    try {
+        const response = await getIdentities()
+
+        telegramIdentity.value = response.data.find((identity) => identity.provider === 'telegram') ?? null
+    } catch {
+        telegramIdentity.value = null
+    } finally {
+        loadingIdentity.value = false
+    }
+}
 
 const linkTelegram = async () => {
     linkingTelegram.value = true
@@ -212,6 +251,7 @@ const linkTelegram = async () => {
 
         toasts.success('Telegram linked successfully!')
         telegramCode.value = ''
+        await loadTelegramIdentity()
     } catch (error) {
         toasts.error(apiErrorMessage(error, 'Failed to link: '))
     } finally {

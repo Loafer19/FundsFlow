@@ -14,11 +14,13 @@ class LinkTelegramIdentityAction
 
     public function execute(User $user, string $code): Identity
     {
-        $chatId = Cache::pull("telegram_link:{$code}");
+        $payload = Cache::pull("telegram_link:{$code}");
 
-        if ($chatId === null) {
+        if ($payload === null) {
             throw new RuntimeException('This code is invalid or has expired.');
         }
+
+        $chatId = $payload['chat_id'];
 
         // A fresh code proves ownership of the chat — reassign it if it was
         // previously linked to a different user, instead of hitting the
@@ -31,7 +33,10 @@ class LinkTelegramIdentityAction
 
         $identity = $user->identities()->updateOrCreate(
             ['provider' => 'telegram', 'external_id' => (string) $chatId],
-            [],
+            ['meta' => [
+                'username' => $payload['username'] ?? null,
+                'first_name' => $payload['first_name'] ?? null,
+            ]],
         );
 
         $this->bot->sendWelcome($chatId);

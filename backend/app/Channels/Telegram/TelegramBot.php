@@ -71,7 +71,7 @@ class TelegramBot
         $text = trim($message['text']);
 
         if (str_starts_with($text, '/start')) {
-            $this->handleStart($chatId);
+            $this->handleStart($message);
 
             return;
         }
@@ -93,8 +93,13 @@ class TelegramBot
         };
     }
 
-    private function handleStart(int|string $chatId): void
+    /**
+     * @param array<string, mixed> $message
+     */
+    private function handleStart(array $message): void
     {
+        $chatId = $message['chat']['id'];
+
         if ($this->resolveUser($chatId)) {
             $this->client->sendMessage($chatId, 'This chat is already linked to a FundsFlow account.');
 
@@ -103,7 +108,11 @@ class TelegramBot
 
         $code = (string) random_int(100000, 999999);
 
-        Cache::put("telegram_link:{$code}", $chatId, now()->addMinutes(10));
+        Cache::put("telegram_link:{$code}", [
+            'chat_id' => $chatId,
+            'username' => $message['from']['username'] ?? null,
+            'first_name' => $message['from']['first_name'] ?? null,
+        ], now()->addMinutes(10));
 
         $this->client->sendMessage(
             $chatId,
