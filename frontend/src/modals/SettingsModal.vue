@@ -53,27 +53,31 @@
                     <div class="flex flex-col gap-2 mb-4">
                         <div class="flex items-center justify-between p-3 rounded-box bg-base-200">
                             <span>Google</span>
-                            <span class="badge badge-sm" :class="googleIdentity ? 'badge-success' : 'badge-ghost'">
-                                {{ googleIdentity ? 'Connected' : 'Not connected' }}
+                            <span class="tooltip tooltip-left" :data-tip="statusTooltip(googleIdentity, googleLabel)">
+                                <CircleCheck v-if="googleIdentity" :size="20" class="text-success" />
+                                <Circle v-else :size="20" class="text-base-content/30" />
                             </span>
                         </div>
                         <div class="flex items-center justify-between p-3 rounded-box bg-base-200">
                             <span>GitHub</span>
-                            <span class="badge badge-sm" :class="githubIdentity ? 'badge-success' : 'badge-ghost'">
-                                {{ githubIdentity ? 'Connected' : 'Not connected' }}
+                            <span class="tooltip tooltip-left" :data-tip="statusTooltip(githubIdentity, githubLabel)">
+                                <CircleCheck v-if="githubIdentity" :size="20" class="text-success" />
+                                <Circle v-else :size="20" class="text-base-content/30" />
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 rounded-box bg-base-200">
+                            <span>Telegram</span>
+                            <span class="tooltip tooltip-left"
+                                :data-tip="statusTooltip(telegramIdentity, telegramLinkLabel)">
+                                <CircleCheck v-if="telegramIdentity" :size="20" class="text-success" />
+                                <Circle v-else :size="20" class="text-base-content/30" />
                             </span>
                         </div>
                     </div>
 
-                    <div class="divider text-sm opacity-60">Telegram</div>
+                    <template v-if="!telegramIdentity">
+                        <div class="divider text-sm opacity-60">Link Telegram</div>
 
-                    <div v-if="telegramIdentity" class="alert alert-success text-sm">
-                        <span>
-                            ✅ Linked to Telegram<template v-if="telegramLinkLabel"> as {{ telegramLinkLabel }}</template>
-                        </span>
-                    </div>
-
-                    <template v-else>
                         <p class="text-sm opacity-70 mb-3">
                             Open <a :href="telegramBotUrl" target="_blank" class="link link-primary">@{{
                                 telegramBotUsername }}</a>
@@ -106,6 +110,7 @@
 </template>
 
 <script setup>
+import { Circle, CircleCheck } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import { formatDateOptions, formatMoneyOptions, apiErrorMessage } from '../services/formatters'
 import { linkTelegram as linkTelegramRequest } from '../services/identities'
@@ -247,6 +252,15 @@ const telegramLinkLabel = computed(() => {
 
     return ''
 })
+
+const googleLabel = computed(() => googleIdentity.value?.meta?.name || googleIdentity.value?.meta?.nickname || '')
+const githubLabel = computed(() => githubIdentity.value?.meta?.name || githubIdentity.value?.meta?.nickname || '')
+
+const statusTooltip = (identity, label) => {
+    if (!identity) return 'Not connected'
+
+    return label ? `Linked to ${label}` : 'Linked'
+}
 
 const linkTelegram = async () => {
     linkingTelegram.value = true

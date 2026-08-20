@@ -29,8 +29,8 @@
                 <tbody>
                     <tr v-for="transaction in filteredTransactions" :key="transaction.id">
                         <td>
-                            <span class="tooltip tooltip-right" :data-tip="sourceInfo(transaction.source).label">
-                                {{ sourceInfo(transaction.source).icon }}
+                            <span class="tooltip tooltip-right" :data-tip="sourceLabel(transaction.source)">
+                                <component :is="sourceIcon(transaction.source)" :size="18" />
                             </span>
                         </td>
                         <td class="min-w-18">{{ formatDate(transaction.at) }}</td>
@@ -56,7 +56,7 @@
                             </button>
                             <button v-else type="button" class="btn btn-outline btn-secondary btn-square btn-sm"
                                 @click="editTransaction(transaction)" :disabled="transactionsStore.isLoading">
-                                ✎
+                                <Pencil :size="24" />
                             </button>
 
                             <DeleteHold :id="transaction.id" :disabled="transactionsStore.isLoading"
@@ -71,15 +71,19 @@
 </template>
 
 <script setup>
+import { Laptop, Pencil, Repeat, Send } from 'lucide-vue-next'
 import { computed, inject, ref } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { getTransactionSourceInfo } from '../services/formatters'
+import { getTransactionSourceLabel } from '../services/formatters'
 import { useTransactionsStore } from '../services/transactions'
 
 const formatMoney = inject('formatMoney')
 const formatDate = inject('formatDate')
-const sourceInfo = getTransactionSourceInfo
+const sourceLabel = getTransactionSourceLabel
+
+const sourceIcons = { web: Laptop, telegram: Send, recurring: Repeat }
+const sourceIcon = (source) => sourceIcons[source] ?? sourceIcons.web
 
 const transactionsStore = useTransactionsStore()
 

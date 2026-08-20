@@ -102,17 +102,18 @@ class AuthController extends Controller
                 $identity->update(['meta' => $meta]);
                 $user = $identity->user;
             } else {
-                if (User::where('email', $email)->exists()) {
-                    return redirect($frontend . '#auth_error=' . urlencode(
-                        'An account with this email already exists. Log in with your password instead.'
-                    ));
-                }
+                // The provider vouches for control of this email, so an
+                // existing account with the same email is linked rather
+                // than blocked.
+                $user = User::where('email', $email)->first();
 
-                $user = User::create([
-                    'name' => $socialUser->getName() ?: strstr($email, '@', true),
-                    'email' => $email,
-                    'password' => str()->random(32),
-                ]);
+                if (!$user) {
+                    $user = User::create([
+                        'name' => $socialUser->getName() ?: strstr($email, '@', true),
+                        'email' => $email,
+                        'password' => str()->random(32),
+                    ]);
+                }
 
                 $user->identities()->create([
                     'provider' => $provider,
