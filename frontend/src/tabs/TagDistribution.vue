@@ -17,14 +17,14 @@
                         <div v-if="positiveTagsWithAmount.length > 0">
                             <TagDonutChart :tagsWithAmount="positiveTagsWithAmount" />
                         </div>
-                        <div v-else class="text-base-content/50 py-8 text-center">No income in this period</div>
+                        <div v-else class="text-base-content/60 py-8 text-center">No income in this period</div>
                     </div>
                     <div>
                         <h3 class="text-xl font-medium mb-2">Expenses</h3>
                         <div v-if="negativeTagsWithAmount.length > 0">
                             <TagDonutChart :tagsWithAmount="negativeTagsWithAmount" />
                         </div>
-                        <div v-else class="text-base-content/50 py-8 text-center">No expenses in this period</div>
+                        <div v-else class="text-base-content/60 py-8 text-center">No expenses in this period</div>
                     </div>
                 </div>
 
@@ -37,7 +37,7 @@
                                 </td>
                             </tr>
                             <tr v-if="!filteredPositiveTagTree.length">
-                                <td colspan="4" class="text-base-content/50">No income tags</td>
+                                <td colspan="4" class="text-base-content/60">No income tags</td>
                             </tr>
                             <tr v-for="tag in filteredPositiveTagTree" :key="tag.id || 'untagged-positive'">
                                 <td>
@@ -49,7 +49,7 @@
                                     </div>
                                 </td>
                                 <td class="w-15 text-right">
-                                    <span class="text-gray-400 tooltip" data-tip="Previous period">
+                                    <span class="text-base-content/60 tooltip" data-tip="Previous period">
                                         {{ formatMoney(tag.previousAmount) }}
                                     </span>
                                 </td>
@@ -74,7 +74,7 @@
                                 </td>
                             </tr>
                             <tr v-if="!filteredNegativeTagTree.length">
-                                <td colspan="4" class="text-base-content/50">No expense tags</td>
+                                <td colspan="4" class="text-base-content/60">No expense tags</td>
                             </tr>
                             <tr v-for="tag in filteredNegativeTagTree" :key="tag.id || 'untagged-negative'">
                                 <td>
@@ -86,7 +86,7 @@
                                     </div>
                                 </td>
                                 <td class="w-15 text-right">
-                                    <span class="text-gray-400 tooltip" data-tip="Previous period">
+                                    <span class="text-base-content/60 tooltip" data-tip="Previous period">
                                         {{ formatMoney(tag.previousAmount) }}
                                     </span>
                                 </td>

@@ -118,8 +118,8 @@
         <component :is="selectedTab" :dateRange="getDateRange" :dateSelectionType />
     </div>
 
-    <button v-if="authStore.isAuthenticated" type="button" id="fab-add-transaction"
-        class="btn btn-primary btn-circle btn-lg fixed bottom-6 right-6 z-50 shadow-lg"
+    <button v-if="authStore.isAuthenticated" type="button"
+        class="btn btn-primary btn-circle btn-lg fixed bottom-6 right-6 z-50"
         onclick="transactions_add_modal.showModal()" aria-label="Add Transaction">
         <Plus :size="28" />
     </button>

@@ -33,7 +33,7 @@
                     </label>
 
                     <div class="mt-4 p-3 rounded-box bg-base-200 text-sm">
-                        <div class="opacity-60 mb-1">Preview</div>
+                        <div class="text-base-content/60 mb-1">Preview</div>
                         <div>{{ formatDatePreview }} · {{ formatMoneyPreview }}</div>
                     </div>
                 </template>
@@ -55,14 +55,14 @@
                             <span>Google</span>
                             <span class="tooltip tooltip-left" :data-tip="statusTooltip(googleIdentity, googleLabel)">
                                 <CircleCheck v-if="googleIdentity" :size="20" class="text-success" />
-                                <Circle v-else :size="20" class="text-base-content/30" />
+                                <Circle v-else :size="20" class="text-base-content/40" />
                             </span>
                         </div>
                         <div class="flex items-center justify-between p-3 rounded-box bg-base-200">
                             <span>GitHub</span>
                             <span class="tooltip tooltip-left" :data-tip="statusTooltip(githubIdentity, githubLabel)">
                                 <CircleCheck v-if="githubIdentity" :size="20" class="text-success" />
-                                <Circle v-else :size="20" class="text-base-content/30" />
+                                <Circle v-else :size="20" class="text-base-content/40" />
                             </span>
                         </div>
                         <div class="flex items-center justify-between p-3 rounded-box bg-base-200">
@@ -70,15 +70,15 @@
                             <span class="tooltip tooltip-left"
                                 :data-tip="statusTooltip(telegramIdentity, telegramLinkLabel)">
                                 <CircleCheck v-if="telegramIdentity" :size="20" class="text-success" />
-                                <Circle v-else :size="20" class="text-base-content/30" />
+                                <Circle v-else :size="20" class="text-base-content/40" />
                             </span>
                         </div>
                     </div>
 
                     <template v-if="!telegramIdentity">
-                        <div class="divider text-sm opacity-60">Link Telegram</div>
+                        <div class="divider text-sm text-base-content/60">Link Telegram</div>
 
-                        <p class="text-sm opacity-70 mb-3">
+                        <p class="text-sm text-base-content/60 mb-3">
                             Open <a :href="telegramBotUrl" target="_blank" class="link link-primary">@{{
                                 telegramBotUsername }}</a>
                             in Telegram, send <code>/start</code>, and enter the code you get below.
@@ -90,6 +90,7 @@
                         <button type="button" class="btn btn-primary btn-sm" @click="linkTelegram"
                             :disabled="linkingTelegram || !telegramCode">
                             <span v-if="linkingTelegram" class="loading loading-spinner loading-xs"></span>
+                            <Link v-else :size="16" />
                             Link
                         </button>
                     </template>
@@ -110,7 +111,7 @@
 </template>
 
 <script setup>
-import { Circle, CircleCheck } from 'lucide-vue-next'
+import { Circle, CircleCheck, Link } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import { formatDateOptions, formatMoneyOptions, apiErrorMessage } from '../services/formatters'
 import { linkTelegram as linkTelegramRequest } from '../services/identities'

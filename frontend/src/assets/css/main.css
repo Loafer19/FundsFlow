@@ -36,10 +36,6 @@ select:focus {
 }
 
 /* Custom */
-#fab-add-transaction {
-    box-shadow: 0 10px 25px color-mix(in oklab, var(--color-primary) 35%, transparent);
-}
-
 .tags-list {
     overflow-x: auto;
 }

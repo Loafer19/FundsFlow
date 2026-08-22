@@ -1,31 +1,35 @@
 <template>
-    <div class="flex mb-3">
-        <select v-model="groupBy" class="select select-sm w-30 border-base-300 focus:border-base-content cursor-pointer">
-            <option value="day">Day</option>
-            <option value="week" :hidden="dateSelectionType == 'week'">Week</option>
-            <option value="month" :hidden="dateSelectionType == 'week' || dateSelectionType == 'month'">Month</option>
-        </select>
-
-        <template v-if="groupBy == 'week'">
-            <div class="flex items-center text-sm text-error">
-                <div class="mx-2 inline-grid *:[grid-area:1/1]">
-                    <div class="status status-error animate-ping"></div>
-                    <div class="status status-error"></div>
-                </div> Week totals only include full weeks inside this {{ dateSelectionType }}. Partial weeks at the edges
-                are omitted.
-            </div>
-        </template>
-    </div>
-
     <EmptyState v-if="!hasPeriodData" icon="💸" title="No money flow in this period"
         description="Add transactions or change the date range." action-label="Add Transaction"
         @action="openAdd" />
 
-    <div v-else class="card card-border border-base-300 bg-base-100">
-        <div class="card-body">
-            <BarChart :balances="moneyFlow" />
+    <template v-else>
+        <div class="flex mb-3">
+            <select v-model="groupBy"
+                class="select select-sm w-30 border-base-300 focus:border-base-content cursor-pointer">
+                <option value="day">Day</option>
+                <option value="week" :hidden="dateSelectionType == 'week'">Week</option>
+                <option value="month" :hidden="dateSelectionType == 'week' || dateSelectionType == 'month'">Month
+                </option>
+            </select>
+
+            <template v-if="groupBy == 'week'">
+                <div class="flex items-center text-sm text-error">
+                    <div class="mx-2 inline-grid *:[grid-area:1/1]">
+                        <div class="status status-error animate-ping"></div>
+                        <div class="status status-error"></div>
+                    </div> Week totals only include full weeks inside this {{ dateSelectionType }}. Partial weeks at
+                    the edges are omitted.
+                </div>
+            </template>
         </div>
-    </div>
+
+        <div class="card card-border border-base-300 bg-base-100">
+            <div class="card-body">
+                <BarChart :balances="moneyFlow" />
+            </div>
+        </div>
+    </template>
 </template>
 
 <script setup>

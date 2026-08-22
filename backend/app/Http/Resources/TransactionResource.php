@@ -15,7 +15,7 @@ class TransactionResource extends JsonResource
         return [
             'id' => $this->id,
             'at' => $this->at,
-            'amount' => $this->amount,
+            'amount' => (float) $this->amount,
             'note' => $this->note,
             'source' => $this->source,
             'tags' => TagResource::collection($this->whenLoaded('tags')),
