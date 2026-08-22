@@ -54,6 +54,27 @@ export const useAuthStore = defineStore('auth', {
             }
         },
 
+        async loginWithTelegramCode(code) {
+            this.isLoading = true
+
+            try {
+                const response = await api.post('/auth/telegram-code', { code })
+
+                this.user = response.data.user
+                this.setToken(response.data.token)
+
+                toasts.success('Logged in successfully!')
+
+                return true
+            } catch (error) {
+                toasts.error(apiErrorMessage(error, 'Login failed: '))
+
+                return false
+            } finally {
+                this.isLoading = false
+            }
+        },
+
         async logout() {
             this.isLoading = true
 

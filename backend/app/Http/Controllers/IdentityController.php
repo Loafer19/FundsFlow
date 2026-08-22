@@ -2,28 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Actions\Identities\LinkTelegramIdentityAction;
+use App\Actions\Identities\GenerateTelegramLinkCodeAction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use RuntimeException;
 
 class IdentityController extends Controller
 {
-    public function linkTelegram(Request $request, LinkTelegramIdentityAction $action): JsonResponse
+    public function telegramLinkCode(Request $request, GenerateTelegramLinkCodeAction $action): JsonResponse
     {
-        $data = $request->validate([
-            'code' => 'required|string',
-        ]);
-
-        try {
-            $identity = $action->execute($request->user(), $data['code']);
-        } catch (RuntimeException $e) {
-            return response()->json(['error' => $e->getMessage()], 422);
-        }
+        $code = $action->execute($request->user());
 
         return response()->json([
-            'message' => 'Telegram account linked successfully!',
-            'identity' => $identity,
+            'code' => $code,
         ]);
     }
 }

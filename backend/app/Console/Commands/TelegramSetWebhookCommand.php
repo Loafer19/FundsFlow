@@ -39,6 +39,7 @@ class TelegramSetWebhookCommand extends Command
             ['command' => 'recent', 'description' => 'Last 10 transactions'],
             ['command' => 'tags', 'description' => 'List your tags'],
             ['command' => 'newtag', 'description' => 'Create a tag: /newtag 🍕 Fast Food > Food'],
+            ['command' => 'website', 'description' => 'Get a one-time code to log in on the website'],
         ]);
 
         $this->info('Bot command menu registered.');

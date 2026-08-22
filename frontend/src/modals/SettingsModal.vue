@@ -79,21 +79,35 @@
                         <div class="divider text-sm text-base-content/60">Link Telegram</div>
 
                         <p class="text-sm text-base-content/60 mb-3">
-                            Open <a :href="telegramBotUrl" target="_blank" class="link link-primary">@{{
-                                telegramBotUsername }}</a>
-                            in Telegram, send <code>/start</code>, and enter the code you get below.
+                            Link your Telegram account to add transactions from chat.
                         </p>
 
-                        <input v-model="telegramCode" type="text" inputmode="numeric" maxlength="6"
-                            placeholder="Code from Telegram" class="input w-full mb-3" />
-
-                        <button type="button" class="btn btn-primary btn-sm" @click="linkTelegram"
-                            :disabled="linkingTelegram || !telegramCode">
-                            <span v-if="linkingTelegram" class="loading loading-spinner loading-xs"></span>
-                            <Link v-else :size="16" />
-                            Link
+                        <button type="button" class="btn btn-primary btn-sm" @click="openTelegramLink"
+                            :disabled="generatingTelegramLink">
+                            <span v-if="generatingTelegramLink" class="loading loading-spinner loading-xs"></span>
+                            <Send v-else :size="16" />
+                            Open Telegram to link
                         </button>
                     </template>
+
+                    <div class="divider text-sm text-base-content/60">Email &amp; Password</div>
+
+                    <p class="text-sm text-base-content/60 mb-3">
+                        Set an email and password to log in without Telegram or Google/GitHub.
+                    </p>
+
+                    <input v-model="credentialsForm.email" type="email" placeholder="Email" class="input w-full mb-3"
+                        maxlength="255" />
+
+                    <input v-model="credentialsForm.password" type="password" placeholder="New password"
+                        class="input w-full mb-3" minlength="8" maxlength="255" />
+
+                    <button type="button" class="btn btn-primary btn-sm" @click="saveCredentials"
+                        :disabled="savingCredentials">
+                        <span v-if="savingCredentials" class="loading loading-spinner loading-xs"></span>
+                        <KeyRound v-else :size="16" />
+                        Save
+                    </button>
                 </template>
             </div>
 
@@ -111,10 +125,11 @@
 </template>
 
 <script setup>
-import { Circle, CircleCheck, Link } from 'lucide-vue-next'
+import { Circle, CircleCheck, KeyRound, Send } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
+import { updateCredentials } from '../services/account'
 import { formatDateOptions, formatMoneyOptions, apiErrorMessage } from '../services/formatters'
-import { linkTelegram as linkTelegramRequest } from '../services/identities'
+import { getTelegramLinkCode } from '../services/identities'
 import settings, { updateDateFormat, updateDecimals, updateMoneyFormat, updateTheme } from '../services/settings'
 import toasts from '../services/toasts'
 import { useAuthStore } from '../services/auth'
@@ -234,9 +249,7 @@ const formatMoneyPreview = computed(() => {
 })
 
 const telegramBotUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
-const telegramBotUrl = `https://t.me/${telegramBotUsername}`
-const telegramCode = ref('')
-const linkingTelegram = ref(false)
+const generatingTelegramLink = ref(false)
 
 const identityFor = (provider) => authStore.user?.identities?.find((identity) => identity.provider === provider) ?? null
 
@@ -263,23 +276,37 @@ const statusTooltip = (identity, label) => {
     return label ? `Linked to ${label}` : 'Linked'
 }
 
-const linkTelegram = async () => {
-    linkingTelegram.value = true
+const openTelegramLink = async () => {
+    generatingTelegramLink.value = true
 
     try {
-        const response = await linkTelegramRequest(telegramCode.value.trim())
+        const response = await getTelegramLinkCode()
 
-        authStore.user.identities = [
-            ...(authStore.user.identities ?? []).filter((identity) => identity.provider !== 'telegram'),
-            response.data.identity,
-        ]
-
-        toasts.success('Telegram linked successfully!')
-        telegramCode.value = ''
+        window.open(`https://t.me/${telegramBotUsername}?start=${response.data.code}`, '_blank')
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Failed to link: '))
+        toasts.error(apiErrorMessage(error, 'Failed to generate link: '))
     } finally {
-        linkingTelegram.value = false
+        generatingTelegramLink.value = false
+    }
+}
+
+const credentialsForm = ref({ email: '', password: '' })
+const savingCredentials = ref(false)
+
+const saveCredentials = async () => {
+    savingCredentials.value = true
+
+    try {
+        const response = await updateCredentials(credentialsForm.value)
+
+        authStore.user.email = response.data.user.email
+
+        toasts.success('Email and password saved!')
+        credentialsForm.value = { email: '', password: '' }
+    } catch (error) {
+        toasts.error(apiErrorMessage(error, 'Failed to save: '))
+    } finally {
+        savingCredentials.value = false
     }
 }
 

@@ -8,6 +8,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -50,6 +51,28 @@ class AuthController extends Controller
             'user' => $user->load('identities'),
             'token' => $token,
         ], 201);
+    }
+
+    public function loginWithTelegramCode(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'code' => 'required|string',
+        ]);
+
+        $userId = Cache::pull("telegram_login:{$data['code']}");
+
+        if (!$userId) {
+            abort(422, 'This code is invalid or has expired.');
+        }
+
+        $user = User::findOrFail($userId);
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'user' => $user->load('identities'),
+            'token' => $token,
+        ]);
     }
 
     public function me(Request $request): JsonResponse

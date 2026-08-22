@@ -54,11 +54,11 @@ class TelegramBot
         }
     }
 
-    public function sendWelcome(int|string $chatId): void
+    private function sendWelcome(int|string $chatId, string $headline): void
     {
         $this->client->sendMessage(
             $chatId,
-            "✅ Linked to your FundsFlow account!\n\n" . $this->usageInfo(),
+            "{$headline}\n\n" . $this->usageInfo(),
             $this->menuKeyboard(),
         );
     }
@@ -67,7 +67,19 @@ class TelegramBot
     {
         return "Send a message like \"-350 groceries\" to log an expense, or \"+15000 salary\" for income.\n"
             . "Prefix a date for a past entry: \"20.08 -350 groceries\" (DD.MM or DD.MM.YYYY).\n\n"
-            . 'Use the menu below, or /month, /recent, /tags, /newtag.';
+            . 'Use the menu below, or /month, /recent, /tags, /newtag, /website.';
+    }
+
+    private function sendWebsiteLoginCode(User $user, int|string $chatId): void
+    {
+        $code = (string) random_int(100000, 999999);
+
+        Cache::put("telegram_login:{$code}", $user->id, now()->addMinutes(10));
+
+        $this->client->sendMessage(
+            $chatId,
+            "Web login code: {$code}\n\nEnter it on the FundsFlow login screen within 10 minutes. No password needed.",
+        );
     }
 
     /**
@@ -87,7 +99,7 @@ class TelegramBot
         $user = $this->resolveUser($chatId);
 
         if (!$user) {
-            $this->client->sendMessage($chatId, "Your account isn't linked yet. Send /start to get a linking code.");
+            $this->client->sendMessage($chatId, "Your account isn't linked yet. Send /start to get started.");
 
             return;
         }
@@ -96,6 +108,7 @@ class TelegramBot
             $text === '/month' || $text === self::MENU_MONTH => $this->sendMonthSummary($user, $chatId),
             $text === '/tags' || $text === self::MENU_TAGS => $this->sendTags($user, $chatId),
             $text === '/recent' || $text === self::MENU_RECENT => $this->sendRecent($user, $chatId),
+            $text === '/website' => $this->sendWebsiteLoginCode($user, $chatId),
             str_starts_with($text, '/newtag') => $this->handleNewTag($user, $chatId, $text),
             default => $this->handleQuickAdd($user, $chatId, $text),
         };
@@ -107,29 +120,80 @@ class TelegramBot
     private function handleStart(array $message): void
     {
         $chatId = $message['chat']['id'];
+        $payload = trim(substr(trim($message['text']), strlen('/start')));
 
         if ($this->resolveUser($chatId)) {
+            $this->sendWelcome($chatId, "You're already linked to your FundsFlow account.");
+
+            return;
+        }
+
+        $meta = [
+            'username' => $message['from']['username'] ?? null,
+            'first_name' => $message['from']['first_name'] ?? null,
+        ];
+
+        if ($payload !== '') {
+            $this->linkToExistingAccount($chatId, $payload, $meta);
+
+            return;
+        }
+
+        $this->registerNewAccount($chatId, $meta);
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    private function linkToExistingAccount(int|string $chatId, string $code, array $meta): void
+    {
+        $userId = Cache::pull("telegram_deeplink:{$code}");
+
+        if (!$userId) {
             $this->client->sendMessage(
                 $chatId,
-                "You're already linked to your FundsFlow account.\n\n" . $this->usageInfo(),
-                $this->menuKeyboard(),
+                "This link has expired. Get a new one from FundsFlow → Settings → Accounts, "
+                    . 'or send /start with no link to create a new account.',
             );
 
             return;
         }
 
-        $code = (string) random_int(100000, 999999);
+        $user = User::find($userId);
 
-        Cache::put("telegram_link:{$code}", [
-            'chat_id' => $chatId,
-            'username' => $message['from']['username'] ?? null,
-            'first_name' => $message['from']['first_name'] ?? null,
-        ], now()->addMinutes(10));
+        if (!$user) {
+            $this->client->sendMessage($chatId, 'That account no longer exists. Send /start to create a new one.');
 
-        $this->client->sendMessage(
-            $chatId,
-            "Linking code: {$code}\n\nEnter it in FundsFlow → Settings → Telegram within 10 minutes.",
-        );
+            return;
+        }
+
+        $user->identities()->create([
+            'provider' => 'telegram',
+            'external_id' => (string) $chatId,
+            'meta' => $meta,
+        ]);
+
+        $this->sendWelcome($chatId, '✅ Linked to your FundsFlow account!');
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    private function registerNewAccount(int|string $chatId, array $meta): void
+    {
+        $user = User::create([
+            'name' => $meta['first_name'] ?: 'Telegram User',
+            'email' => "telegram-{$chatId}@fundsflow.invalid",
+            'password' => str()->random(32),
+        ]);
+
+        $user->identities()->create([
+            'provider' => 'telegram',
+            'external_id' => (string) $chatId,
+            'meta' => $meta,
+        ]);
+
+        $this->sendWelcome($chatId, '✅ Account created!');
     }
 
     private function handleQuickAdd(User $user, int|string $chatId, string $text): void
