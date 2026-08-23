@@ -66,6 +66,48 @@ export const useBudgetsStore = defineStore('budgets', {
             }
         },
 
+        async pause(id) {
+            this.isLoading = id
+
+            try {
+                const response = await api.post('/budgets/' + id + '/pause')
+
+                const index = this.budgets.findIndex((b) => b.id === id)
+                this.budgets[index] = response.data
+
+                toasts.info('Budget paused.')
+
+                return true
+            } catch (error) {
+                toasts.error(apiErrorMessage(error, 'Failed to pause budget: '))
+
+                return false
+            } finally {
+                this.isLoading = false
+            }
+        },
+
+        async resume(id) {
+            this.isLoading = id
+
+            try {
+                const response = await api.post('/budgets/' + id + '/resume')
+
+                const index = this.budgets.findIndex((b) => b.id === id)
+                this.budgets[index] = response.data
+
+                toasts.success('Budget resumed.')
+
+                return true
+            } catch (error) {
+                toasts.error(apiErrorMessage(error, 'Failed to resume budget: '))
+
+                return false
+            } finally {
+                this.isLoading = false
+            }
+        },
+
         async delete(id) {
             this.isLoading = id
 

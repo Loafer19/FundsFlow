@@ -28,6 +28,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::apiResource('tags', TagController::class);
     Route::apiResource('transactions', TransactionController::class);
     Route::apiResource('budgets', BudgetController::class)->except(['show']);
+    Route::post('/budgets/{budget}/pause', [BudgetController::class, 'pause']);
+    Route::post('/budgets/{budget}/resume', [BudgetController::class, 'resume']);
     Route::post('/identities/telegram/link-code', [IdentityController::class, 'telegramLinkCode']);
     Route::put('/account/credentials', [AccountController::class, 'updateCredentials']);
 });

@@ -84,6 +84,15 @@
 
                 <label class="tab gap-1 text-lg font-medium hover:text-info">
                     <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
+                        :value="markRaw(Budgets)" />
+
+                    <PiggyBank :size="24" />
+
+                    Budgets
+                </label>
+
+                <label class="tab gap-1 text-lg font-medium hover:text-info">
+                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
                         :value="markRaw(BalanceTrend)" />
 
                     <TrendingUp :size="24" />
@@ -115,15 +124,6 @@
                     <Tags :size="24" />
 
                     Tags
-                </label>
-
-                <label class="tab gap-1 text-lg font-medium hover:text-info">
-                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                        :value="markRaw(Budgets)" />
-
-                    <PiggyBank :size="24" />
-
-                    Budgets
                 </label>
 
             </div>

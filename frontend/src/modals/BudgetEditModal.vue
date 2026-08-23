@@ -52,7 +52,9 @@ watch(
     (budget) => {
         if (!budget) return
 
-        const current = budget.periods.find((period) => period.active)
+        // Fall back to the most recent period when paused (no active one) —
+        // periods are ordered newest-first, so [0] is still the right prefill.
+        const current = budget.periods.find((period) => period.active) ?? budget.periods[0]
 
         if (!current) return
 

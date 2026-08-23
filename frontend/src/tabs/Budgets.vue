@@ -26,6 +26,17 @@
                         </h3>
 
                         <div class="flex gap-1 shrink-0">
+                            <button v-if="currentPeriod(budget)" type="button"
+                                class="btn btn-outline btn-warning btn-square btn-sm" aria-label="Pause"
+                                :disabled="budgetsStore.isLoading === budget.id" @click="budgetsStore.pause(budget.id)">
+                                <Pause :size="20" />
+                            </button>
+                            <button v-else type="button" class="btn btn-outline btn-success btn-square btn-sm"
+                                aria-label="Resume" :disabled="budgetsStore.isLoading === budget.id"
+                                @click="budgetsStore.resume(budget.id)">
+                                <Play :size="20" />
+                            </button>
+
                             <button type="button" class="btn btn-outline btn-secondary btn-square btn-sm"
                                 aria-label="Edit" @click="openEdit(budget)">
                                 <Pencil :size="20" />
@@ -38,26 +49,48 @@
                     </div>
 
                     <template v-if="currentPeriod(budget)">
-                        <div class="flex justify-between text-sm text-base-content/60 mb-1">
-                            <span>{{ formatMoney(spentForActive(currentPeriod(budget))) }} /
-                                {{ formatMoney(currentPeriod(budget).amount) }}</span>
-                            <span>{{ lengthLabel(currentPeriod(budget).length) }}</span>
+                        <div class="flex items-center gap-1 mb-1">
+                            <span v-for="tag in currentPeriod(budget).tags" :key="tag.id" class="tooltip"
+                                :data-tip="tag.title">{{ tag.emoji }}</span>
+                            <span class="text-sm text-base-content/60 ml-auto tooltip"
+                                :data-tip="percentTooltip(spentForActive(currentPeriod(budget)), currentPeriod(budget).amount)">
+                                {{ formatMoney(spentForActive(currentPeriod(budget))) }} /
+                                {{ formatMoney(currentPeriod(budget).amount) }} ·
+                                {{ lengthLabel(currentPeriod(budget).length) }}
+                            </span>
                         </div>
-                        <div class="tooltip w-full" :data-tip="percentTooltip(currentPeriod(budget))">
+                        <div class="tooltip w-full"
+                            :data-tip="percentTooltip(spentForActive(currentPeriod(budget)), currentPeriod(budget).amount)">
                             <progress class="progress w-full" :class="progressClass(currentPeriod(budget))"
                                 :value="spentForActive(currentPeriod(budget))" :max="currentPeriod(budget).amount"></progress>
                         </div>
                     </template>
+                    <div v-else class="flex items-center gap-1 mb-1">
+                        <span v-for="tag in currentTags(budget)" :key="tag.id" class="tooltip"
+                            :data-tip="tag.title">{{ tag.emoji }}</span>
+                        <span class="text-sm text-base-content/60 ml-auto italic">Paused</span>
+                    </div>
 
                     <template v-if="historyFor(budget).length">
                         <div class="divider text-xs text-base-content/60 my-2">History</div>
 
                         <template v-for="period in historyFor(budget)" :key="period.id">
+                            <div class="flex items-center gap-1 mt-2">
+                                <span v-for="tag in period.tags" :key="tag.id" class="tooltip"
+                                    :data-tip="tag.title">{{ tag.emoji }}</span>
+                                <span class="text-xs text-base-content/60 ml-auto">
+                                    {{ formatMoney(period.amount) }} {{ lengthLabel(period.length) }}
+                                </span>
+                            </div>
+
                             <div v-for="bucket in historyBuckets(period)" :key="bucket.start"
                                 class="flex justify-between text-sm text-base-content/60">
                                 <span>{{ formatDate(bucket.start) }} – {{ formatDate(bucket.end) }}</span>
-                                <span>{{ formatMoney(spentBetween(bucket.start, bucket.end, period.tags)) }} /
-                                    {{ formatMoney(period.amount) }}</span>
+                                <span class="tooltip"
+                                    :data-tip="percentTooltip(spentBetween(bucket.start, bucket.end, period.tags), period.amount)">
+                                    {{ formatMoney(spentBetween(bucket.start, bucket.end, period.tags)) }} /
+                                    {{ formatMoney(period.amount) }}
+                                </span>
                             </div>
                         </template>
                     </template>
@@ -68,7 +101,7 @@
 </template>
 
 <script setup>
-import { Pencil, Plus } from 'lucide-vue-next'
+import { Pause, Pencil, Play, Plus } from 'lucide-vue-next'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { formatDate, formatMoney, toLocalDateStr } from '../services/formatters.js'
@@ -157,12 +190,12 @@ const spentBetween = (start, end, tags) => {
 // bucket so far. Closed periods go through historyBuckets() instead.
 const spentForActive = (period) => spentBetween(currentBucketStart(period), toLocalDateStr(new Date()), period.tags)
 
-const currentTags = (budget) => currentPeriod(budget)?.tags ?? []
+const currentTags = (budget) => (currentPeriod(budget) ?? budget.periods[0])?.tags ?? []
 
-const percentTooltip = (period) => {
-    if (period.amount <= 0) return '0%'
+const percentTooltip = (spent, amount) => {
+    if (amount <= 0) return '0%'
 
-    return Math.round((spentForActive(period) / period.amount) * 100) + '%'
+    return Math.round((spent / amount) * 100) + '%'
 }
 
 const progressClass = (period) => {
