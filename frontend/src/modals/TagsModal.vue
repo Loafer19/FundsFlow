@@ -7,8 +7,8 @@
                     Manage Tags
                 </h2>
                 <button onclick="tags_add_modal.showModal()" class="btn btn-outline btn-info btn-sm">
-                    <Plus :size="24" />
                     Add Tag
+                    <Plus :size="24" />
                 </button>
             </div>
 
@@ -30,12 +30,12 @@
                                     <span class="loading loading-spinner text-error"></span>
                                 </button>
                                 <button v-else type="button" class="btn btn-outline btn-secondary btn-square btn-sm"
-                                    @click="tagsStore.tagForEdit = tag" onclick="tags_edit_modal.showModal()"
-                                    :disabled="tagsStore.isLoading">
+                                    aria-label="Edit" @click="tagsStore.tagForEdit = tag"
+                                    onclick="tags_edit_modal.showModal()" :disabled="tagsStore.isLoading">
                                     <Pencil :size="24" />
                                 </button>
 
-                                <DeleteButton :id="tag.id" :disabled="tagsStore.isLoading"
+                                <DeleteHold :id="tag.id" :disabled="tagsStore.isLoading"
                                     :isLoading="tagsStore.isLoading === tag.id"
                                     @delete="(id) => tagsStore.delete(id)" />
                             </td>
@@ -56,7 +56,7 @@
 </template>
 <script setup>
 import { Pencil, Plus, Tag } from 'lucide-vue-next'
-import DeleteButton from './../components/buttons/DeleteHold.vue'
+import DeleteHold from './../components/buttons/DeleteHold.vue'
 import { useTagsStore } from './../services/tags.js'
 
 const tagsStore = useTagsStore()

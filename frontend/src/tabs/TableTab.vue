@@ -65,7 +65,8 @@
                                     <span class="loading loading-spinner text-error"></span>
                                 </button>
                                 <button v-else type="button" class="btn btn-outline btn-secondary btn-square btn-sm"
-                                    @click="editTransaction(transaction)" :disabled="transactionsStore.isLoading">
+                                    aria-label="Edit" @click="editTransaction(transaction)"
+                                    :disabled="transactionsStore.isLoading">
                                     <Pencil :size="24" />
                                 </button>
 

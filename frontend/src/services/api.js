@@ -1,4 +1,5 @@
 import axios from 'axios'
+import toasts from './toasts.js'
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
@@ -31,6 +32,7 @@ api.interceptors.response.use(
 
                 if (auth.isAuthenticated || auth.token) {
                     auth.clearSession()
+                    toasts.info('Session expired, please log in again.')
                 }
             })
         }

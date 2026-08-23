@@ -24,6 +24,7 @@
                     <button type="submit" class="btn btn-success" :disabled="transactionsStore.isLoading">
                         <span v-if="transactionsStore.isLoading" class="loading loading-spinner"></span>
                         Save
+                        <Save :size="20" />
                     </button>
                 </div>
             </form>
@@ -35,6 +36,7 @@
 </template>
 
 <script setup>
+import { Save } from 'lucide-vue-next'
 import { ref } from 'vue'
 import AmountField from '../components/AmountField.vue'
 import { toLocalDateStr } from '../services/formatters.js'

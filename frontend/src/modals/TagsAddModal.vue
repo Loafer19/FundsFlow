@@ -8,7 +8,7 @@
 
             <form @submit.prevent="handleSubmit">
                 <input type="text" v-model="tag.title" placeholder="Title" class="input w-full mb-4" maxlength="255"
-                    required />
+                    required autofocus />
 
                 <select v-model="tag.parent_id" class="select w-full mb-4">
                     <option value="">No Parent</option>

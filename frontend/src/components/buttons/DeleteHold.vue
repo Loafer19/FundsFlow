@@ -7,8 +7,10 @@
             <span v-show="!isHolding">Hold to delete</span>
             <progress v-show="isHolding" class="progress progress-error my-1" value="100"></progress>
         </div>
-        <button class="btn btn-outline btn-error btn-square btn-sm" @touchstart="startHold" @touchend="stopHold"
-            @touchcancel="stopHold" @mousedown="startHold" @mouseup="stopHold" @mouseleave="stopHold"
+        <button class="btn btn-outline btn-error btn-square btn-sm" aria-label="Hold to delete"
+            @touchstart="startHold" @touchend="stopHold" @touchcancel="stopHold" @mousedown="startHold"
+            @mouseup="stopHold" @mouseleave="stopHold" @keydown.enter.prevent="startHold"
+            @keydown.space.prevent="startHold" @keyup.enter="stopHold" @keyup.space="stopHold"
             :disabled="disabled">
             <Trash2 :size="24" />
         </button>
@@ -40,7 +42,7 @@ const isHolding = ref(false)
 let timeout = null
 
 const startHold = () => {
-    if (props.disabled) return
+    if (props.disabled || isHolding.value) return
 
     isHolding.value = true
 

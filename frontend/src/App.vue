@@ -17,18 +17,21 @@
                 </button>
 
                 <button onclick="tags_modal.showModal()"
-                    class="btn btn-outline btn-info btn-square tooltip tooltip-bottom" data-tip="Tags">
+                    class="btn btn-outline btn-info btn-square tooltip tooltip-bottom" data-tip="Tags"
+                    aria-label="Tags">
                     <Tag :size="24" />
                 </button>
 
                 <button onclick="settings_modal.showModal()"
-                    class="btn btn-outline btn-warning btn-square tooltip tooltip-bottom" data-tip="Settings">
+                    class="btn btn-outline btn-warning btn-square tooltip tooltip-bottom" data-tip="Settings"
+                    aria-label="Settings">
                     <Settings :size="24" />
                 </button>
 
                 <button @click="authStore.logout" class="btn btn-outline btn-error btn-square tooltip tooltip-bottom"
-                    data-tip="Logout" :disabled="authStore.isLoading">
-                    <LogOut :size="24" />
+                    data-tip="Logout" aria-label="Logout" :disabled="authStore.isLoading">
+                    <span v-if="authStore.isLoading" class="loading loading-spinner"></span>
+                    <LogOut v-else :size="24" />
                 </button>
             </template>
 

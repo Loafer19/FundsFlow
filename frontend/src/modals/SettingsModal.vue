@@ -84,9 +84,9 @@
 
                         <button type="button" class="btn btn-primary btn-sm" @click="openTelegramLink"
                             :disabled="generatingTelegramLink">
+                            Open Telegram to link
                             <span v-if="generatingTelegramLink" class="loading loading-spinner loading-xs"></span>
                             <Send v-else :size="16" />
-                            Open Telegram to link
                         </button>
                     </template>
 
@@ -96,25 +96,27 @@
                         Set an email and password to log in without Telegram or Google/GitHub.
                     </p>
 
-                    <input v-model="credentialsForm.email" type="email" placeholder="Email" class="input w-full mb-3"
-                        maxlength="255" />
+                    <form @submit.prevent="saveCredentials">
+                        <input v-model="credentialsForm.email" type="email" placeholder="Email"
+                            class="input w-full mb-3" maxlength="255" autofocus required />
 
-                    <input v-model="credentialsForm.password" type="password" placeholder="New password"
-                        class="input w-full mb-3" minlength="8" maxlength="255" />
+                        <input v-model="credentialsForm.password" type="password" placeholder="New password"
+                            class="input w-full mb-3" minlength="8" maxlength="255" required />
 
-                    <button type="button" class="btn btn-primary btn-sm" @click="saveCredentials"
-                        :disabled="savingCredentials">
-                        <span v-if="savingCredentials" class="loading loading-spinner loading-xs"></span>
-                        <KeyRound v-else :size="16" />
-                        Save
-                    </button>
+                        <button type="submit" class="btn btn-primary btn-sm" :disabled="savingCredentials">
+                            Save
+                            <span v-if="savingCredentials" class="loading loading-spinner loading-xs"></span>
+                            <KeyRound v-else :size="16" />
+                        </button>
+                    </form>
                 </template>
             </div>
 
-            <div class="modal-action">
+            <div class="modal-action" v-if="tab !== 'accounts'">
                 <button type="submit" class="btn btn-success" @click="saveSettings">
                     <span class="loading loading-spinner" v-if="saving"></span>
                     Save
+                    <Save :size="20" />
                 </button>
             </div>
         </div>
@@ -125,7 +127,7 @@
 </template>
 
 <script setup>
-import { Circle, CircleCheck, KeyRound, Send } from 'lucide-vue-next'
+import { Circle, CircleCheck, KeyRound, Save, Send } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import { updateCredentials } from '../services/account'
 import { formatDateOptions, formatMoneyOptions, apiErrorMessage } from '../services/formatters'
@@ -196,6 +198,7 @@ const syncFromSettings = () => {
     formatMoney.value = settings.moneyFormat
     decimals.value = settings.decimals
     themeSelected.value = settings.theme
+    credentialsForm.value.email = authStore.user?.email ?? ''
 }
 
 const onModalClose = () => {
@@ -301,8 +304,8 @@ const saveCredentials = async () => {
 
         authStore.user.email = response.data.user.email
 
-        toasts.success('Email and password saved!')
-        credentialsForm.value = { email: '', password: '' }
+        toasts.success('Saved!')
+        credentialsForm.value = { email: response.data.user.email, password: '' }
     } catch (error) {
         toasts.error(apiErrorMessage(error, 'Failed to save: '))
     } finally {

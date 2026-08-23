@@ -11,7 +11,7 @@
             </button>
         </div>
 
-        <input type="number" step="0.01" min="0.01" required placeholder="Amount" :value="display"
+        <input type="number" step="0.01" min="0.01" required placeholder="Amount" :value="display" autofocus
             class="input w-full font-semibold" :class="isIncome ? 'input-success text-success' : 'input-error text-error'"
             @input="onInput" />
     </div>
