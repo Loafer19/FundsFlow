@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\Budget;
 use App\Models\Tag;
 use App\Models\Transaction;
+use App\Policies\BudgetPolicy;
 use App\Policies\TagPolicy;
 use App\Policies\TransactionPolicy;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -23,5 +25,6 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::policy(Tag::class, TagPolicy::class);
         Gate::policy(Transaction::class, TransactionPolicy::class);
+        Gate::policy(Budget::class, BudgetPolicy::class);
     }
 }

@@ -6,6 +6,8 @@
     <TagsEditModal />
     <TransactionsAddModal />
     <TransactionsEditModal />
+    <BudgetAddModal />
+    <BudgetEditModal />
     <SettingsModal />
 
     <div class="container mx-auto p-4">
@@ -115,6 +117,15 @@
                     Tags
                 </label>
 
+                <label class="tab gap-1 text-lg font-medium hover:text-info">
+                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
+                        :value="markRaw(Budgets)" />
+
+                    <PiggyBank :size="24" />
+
+                    Budgets
+                </label>
+
             </div>
         </div>
 
@@ -131,10 +142,12 @@
 <script setup>
 import VueDatePicker from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
-import { ArrowLeftRight, ChevronLeft, ChevronRight, LogIn, LogOut, Plus, Presentation, Settings, Table, Tag, Tags, TrendingUp } from 'lucide-vue-next'
+import { ArrowLeftRight, ChevronLeft, ChevronRight, LogIn, LogOut, PiggyBank, Plus, Presentation, Settings, Table, Tag, Tags, TrendingUp } from 'lucide-vue-next'
 import { computed, markRaw, onMounted, ref, watch } from 'vue'
 import Toasts from './components/Toasts.vue'
 import AuthModal from './modals/AuthModal.vue'
+import BudgetAddModal from './modals/BudgetAddModal.vue'
+import BudgetEditModal from './modals/BudgetEditModal.vue'
 import SettingsModal from './modals/SettingsModal.vue'
 import TagsAddModal from './modals/TagsAddModal.vue'
 import TagsEditModal from './modals/TagsEditModal.vue'
@@ -142,10 +155,12 @@ import TagsModal from './modals/TagsModal.vue'
 import TransactionsAddModal from './modals/TransactionsAddModal.vue'
 import TransactionsEditModal from './modals/TransactionsEditModal.vue'
 import { useAuthStore } from './services/auth.js'
+import { useBudgetsStore } from './services/budgets.js'
 import { useTagsStore } from './services/tags.js'
 import { useTransactionsStore } from './services/transactions.js'
 import Analytics from './tabs/Analytics.vue'
 import BalanceTrend from './tabs/BalanceTrend.vue'
+import Budgets from './tabs/Budgets.vue'
 import MoneyFlow from './tabs/MoneyFlow.vue'
 import TableTab from './tabs/TableTab.vue'
 import TagDistribution from './tabs/TagDistribution.vue'
@@ -153,6 +168,7 @@ import TagDistribution from './tabs/TagDistribution.vue'
 const authStore = useAuthStore()
 const tagsStore = useTagsStore()
 const transactionsStore = useTransactionsStore()
+const budgetsStore = useBudgetsStore()
 
 const dateSelectionType = ref('month')
 const datePicker = ref(null)
@@ -167,9 +183,11 @@ watch(
         if (auth) {
             tagsStore.load()
             transactionsStore.load()
+            budgetsStore.load()
         } else {
             tagsStore.tags = []
             transactionsStore.transactions = []
+            budgetsStore.budgets = []
         }
     },
 )
