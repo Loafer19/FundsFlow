@@ -12,6 +12,15 @@ class DeleteTagAction
     {
         Gate::forUser($user)->authorize('delete', $tag);
 
+        $this->deleteWithChildren($tag);
+    }
+
+    private function deleteWithChildren(Tag $tag): void
+    {
+        foreach ($tag->children as $child) {
+            $this->deleteWithChildren($child);
+        }
+
         $tag->delete();
     }
 }

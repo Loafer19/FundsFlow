@@ -24,7 +24,7 @@ class TagStoreRequest extends FormRequest
         $parentIdRules = [
             'nullable',
             'integer',
-            Rule::exists('tags', 'id')->where('user_id', $this->user()->id),
+            Rule::exists('tags', 'id')->where('user_id', $this->user()->id)->whereNull('deleted_at'),
         ];
 
         if ($tag instanceof Tag) {

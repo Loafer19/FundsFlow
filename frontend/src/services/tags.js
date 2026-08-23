@@ -84,13 +84,20 @@ export const useTagsStore = defineStore('tags', {
             try {
                 await api.delete('/tags/' + id)
 
-                this.tags = this.tags.filter((t) => t.id !== id)
+                const toRemove = new Set([id])
 
-                this.tags.forEach((t) => {
-                    if (t.parent_id === id) {
-                        t.parent_id = null
-                    }
-                })
+                for (let added = true; added; ) {
+                    added = false
+
+                    this.tags.forEach((t) => {
+                        if (toRemove.has(t.parent_id) && !toRemove.has(t.id)) {
+                            toRemove.add(t.id)
+                            added = true
+                        }
+                    })
+                }
+
+                this.tags = this.tags.filter((t) => !toRemove.has(t.id))
 
                 toasts.info('Tag deleted successfully!')
 
