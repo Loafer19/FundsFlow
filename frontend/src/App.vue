@@ -8,6 +8,9 @@
     <TransactionsEditModal />
     <BudgetAddModal />
     <BudgetEditModal />
+    <RecurringModal />
+    <RecurringAddModal />
+    <RecurringEditModal />
     <SettingsModal />
 
     <div class="container mx-auto p-4">
@@ -22,6 +25,12 @@
                     class="btn btn-outline btn-info btn-square tooltip tooltip-bottom" data-tip="Tags"
                     aria-label="Tags">
                     <Tag :size="24" />
+                </button>
+
+                <button onclick="recurring_modal.showModal()"
+                    class="btn btn-outline btn-accent btn-square tooltip tooltip-bottom" data-tip="Recurring"
+                    aria-label="Recurring">
+                    <Repeat :size="24" />
                 </button>
 
                 <button onclick="settings_modal.showModal()"
@@ -142,12 +151,15 @@
 <script setup>
 import VueDatePicker from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
-import { ArrowLeftRight, ChevronLeft, ChevronRight, LogIn, LogOut, PiggyBank, Plus, Presentation, Settings, Table, Tag, Tags, TrendingUp } from 'lucide-vue-next'
+import { ArrowLeftRight, ChevronLeft, ChevronRight, LogIn, LogOut, PiggyBank, Plus, Presentation, Repeat, Settings, Table, Tag, Tags, TrendingUp } from 'lucide-vue-next'
 import { computed, markRaw, onMounted, ref, watch } from 'vue'
 import Toasts from './components/Toasts.vue'
 import AuthModal from './modals/AuthModal.vue'
 import BudgetAddModal from './modals/BudgetAddModal.vue'
 import BudgetEditModal from './modals/BudgetEditModal.vue'
+import RecurringAddModal from './modals/RecurringAddModal.vue'
+import RecurringEditModal from './modals/RecurringEditModal.vue'
+import RecurringModal from './modals/RecurringModal.vue'
 import SettingsModal from './modals/SettingsModal.vue'
 import TagsAddModal from './modals/TagsAddModal.vue'
 import TagsEditModal from './modals/TagsEditModal.vue'
@@ -156,6 +168,7 @@ import TransactionsAddModal from './modals/TransactionsAddModal.vue'
 import TransactionsEditModal from './modals/TransactionsEditModal.vue'
 import { useAuthStore } from './services/auth.js'
 import { useBudgetsStore } from './services/budgets.js'
+import { useRecurringTransactionsStore } from './services/recurringTransactions.js'
 import { useTagsStore } from './services/tags.js'
 import { useTransactionsStore } from './services/transactions.js'
 import Analytics from './tabs/Analytics.vue'
@@ -168,6 +181,7 @@ import TagDistribution from './tabs/TagDistribution.vue'
 const authStore = useAuthStore()
 const tagsStore = useTagsStore()
 const transactionsStore = useTransactionsStore()
+const recurringTransactionsStore = useRecurringTransactionsStore()
 const budgetsStore = useBudgetsStore()
 
 const dateSelectionType = ref('month')
@@ -184,10 +198,12 @@ watch(
             tagsStore.load()
             transactionsStore.load()
             budgetsStore.load()
+            recurringTransactionsStore.load()
         } else {
             tagsStore.tags = []
             transactionsStore.transactions = []
             budgetsStore.budgets = []
+            recurringTransactionsStore.rules = []
         }
     },
 )

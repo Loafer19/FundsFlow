@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\IdentityController;
+use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\Telegram\TelegramWebhookController;
 use App\Http\Controllers\TransactionController;
@@ -30,6 +31,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::apiResource('budgets', BudgetController::class)->except(['show']);
     Route::post('/budgets/{budget}/pause', [BudgetController::class, 'pause']);
     Route::post('/budgets/{budget}/resume', [BudgetController::class, 'resume']);
+    Route::apiResource('recurring-transactions', RecurringTransactionController::class)
+        ->except(['show'])
+        ->parameters(['recurring-transactions' => 'recurringTransaction']);
     Route::post('/identities/telegram/link-code', [IdentityController::class, 'telegramLinkCode']);
     Route::put('/account/credentials', [AccountController::class, 'updateCredentials']);
 });
