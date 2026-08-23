@@ -99,7 +99,7 @@ class TelegramBot
         $user = $this->resolveUser($chatId);
 
         if (!$user) {
-            $this->client->sendMessage($chatId, "Your account isn't linked yet. Send /start to get started.");
+            $this->client->sendMessage($chatId, "Your account isn't linked yet. Send /start to get started");
 
             return;
         }
@@ -125,7 +125,7 @@ class TelegramBot
         $payload = trim(substr(trim($message['text']), strlen('/start')));
 
         if ($this->resolveUser($chatId)) {
-            $this->sendWelcome($chatId, "You're already linked to your FundsFlow account.");
+            $this->sendWelcome($chatId, "You're already linked to your FundsFlow account");
 
             return;
         }
@@ -164,7 +164,7 @@ class TelegramBot
         $user = User::find($userId);
 
         if (!$user) {
-            $this->client->sendMessage($chatId, 'That account no longer exists. Send /start to create a new one.');
+            $this->client->sendMessage($chatId, 'That account no longer exists. Send /start to create a new one');
 
             return;
         }
@@ -175,7 +175,7 @@ class TelegramBot
             'meta' => $meta,
         ]);
 
-        $this->sendWelcome($chatId, '✅ Linked to your FundsFlow account!');
+        $this->sendWelcome($chatId, '✅ Linked to your FundsFlow account');
     }
 
     /**
@@ -195,7 +195,7 @@ class TelegramBot
             'meta' => $meta,
         ]);
 
-        $this->sendWelcome($chatId, '✅ Account created!');
+        $this->sendWelcome($chatId, '✅ Account created');
     }
 
     private function handleQuickAdd(User $user, int|string $chatId, string $text): void
@@ -206,7 +206,7 @@ class TelegramBot
             $parsedDate = $this->parseDate($dateMatch[1]);
 
             if ($parsedDate === null) {
-                $this->client->sendMessage($chatId, "Couldn't parse that date. Use DD.MM or DD.MM.YYYY.");
+                $this->client->sendMessage($chatId, "Couldn't parse that date. Use DD.MM or DD.MM.YYYY");
 
                 return;
             }
@@ -232,7 +232,7 @@ class TelegramBot
         }
 
         if ($amount === 0.0) {
-            $this->client->sendMessage($chatId, "Amount can't be zero.");
+            $this->client->sendMessage($chatId, "Amount can't be zero");
 
             return;
         }
@@ -240,7 +240,7 @@ class TelegramBot
         $note = trim($matches[2]);
 
         if (mb_strlen($note) > 255) {
-            $this->client->sendMessage($chatId, 'Note is too long (255 characters max).');
+            $this->client->sendMessage($chatId, 'Note is too long (255 characters max)');
 
             return;
         }
@@ -362,7 +362,7 @@ class TelegramBot
         $transaction = $this->findOwnTransaction($user, $transactionId);
 
         if (!$transaction) {
-            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found');
 
             return;
         }
@@ -383,7 +383,7 @@ class TelegramBot
         $transaction = $this->findOwnTransaction($user, $transactionId);
 
         if (!$transaction) {
-            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found');
 
             return;
         }
@@ -397,7 +397,7 @@ class TelegramBot
         $transaction = $this->findOwnTransaction($user, $transactionId);
 
         if (!$transaction) {
-            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found');
 
             return;
         }
@@ -413,7 +413,7 @@ class TelegramBot
         $transaction = $this->findOwnTransaction($user, $transactionId);
 
         if (!$transaction) {
-            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found');
 
             return;
         }
@@ -440,7 +440,7 @@ class TelegramBot
         $transaction = $this->findOwnTransaction($user, $transactionId);
 
         if (!$transaction) {
-            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found');
 
             return;
         }
@@ -461,7 +461,7 @@ class TelegramBot
         $transaction = $this->findOwnTransaction($user, $transactionId);
 
         if (!$transaction) {
-            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found');
 
             return;
         }
@@ -476,7 +476,7 @@ class TelegramBot
         $transaction = $this->findOwnTransaction($user, $transactionId);
 
         if (!$transaction) {
-            $this->client->answerCallbackQuery($callbackId, 'Transaction not found.');
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found');
 
             return;
         }
@@ -532,7 +532,7 @@ class TelegramBot
         $tags = $this->listTags->execute($user);
 
         if ($tags->isEmpty()) {
-            $this->client->sendMessage($chatId, 'No tags yet.');
+            $this->client->sendMessage($chatId, 'No tags yet');
 
             return;
         }
@@ -550,7 +550,7 @@ class TelegramBot
         $transactions = $this->listTransactions->execute($user)->take(10)->values();
 
         if ($transactions->isEmpty()) {
-            $this->client->sendMessage($chatId, 'No transactions yet.');
+            $this->client->sendMessage($chatId, 'No transactions yet');
 
             return;
         }
@@ -605,7 +605,7 @@ class TelegramBot
                 ->first(fn (Tag $tag) => mb_strtolower($tag->title) === mb_strtolower($parentTitle));
 
             if (!$parent) {
-                $this->client->sendMessage($chatId, "Parent tag \"{$parentTitle}\" not found.");
+                $this->client->sendMessage($chatId, "Parent tag \"{$parentTitle}\" not found");
 
                 return;
             }
@@ -745,7 +745,7 @@ class TelegramBot
         $identity->update(['meta' => [...$identity->meta, 'muted' => $muted]]);
 
         $this->client->sendMessage($chatId, $muted
-            ? '🔕 Notifications muted. Use /unmute to turn budget alerts and weekly reports back on.'
-            : '🔔 Notifications unmuted.');
+            ? '🔕 Notifications muted. Use /unmute to turn budget alerts and weekly reports back on'
+            : '🔔 Notifications unmuted');
     }
 }

@@ -1,7 +1,7 @@
 <template>
     <EmptyState v-if="!dateRangeTransactions.length" icon="📋" title="No transactions in this period"
-        description="Add a transaction or pick another date range." action-label="Add Transaction"
-        @action="openAdd" />
+        description="Nothing in this period. Add a transaction or pick another date range"
+        action-label="Add Transaction" @action="openAdd" />
 
     <template v-else>
         <label class="input input-sm w-full max-w-xs mb-3">
@@ -10,7 +10,7 @@
         </label>
 
         <div v-if="!filteredTransactions.length" class="text-center py-8 text-base-content/60">
-            No transactions match "{{ searchQuery }}".
+            No transactions match "{{ searchQuery }}"
         </div>
 
         <div v-else class="card card-border border-base-300 bg-base-100">

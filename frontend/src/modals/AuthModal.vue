@@ -85,7 +85,7 @@
 
                 <p class="text-sm text-base-content/60 mb-4">
                     Open <a :href="telegramBotUrl" target="_blank" class="link link-primary">the bot</a>, send
-                    <code>/website</code>, and enter the code you get below.
+                    <code>/website</code>, and enter the code you get below
                 </p>
 
                 <form @submit.prevent="submitTelegramCode">

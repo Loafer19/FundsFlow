@@ -1,6 +1,6 @@
 <template>
     <EmptyState v-if="!hasPeriodData" icon="🏷️" title="No tag activity for this period"
-        description="Nothing in the selected or previous period. Add a transaction or change the range."
+        description="Nothing in the selected or previous period. Add a transaction or change the range"
         action-label="Add Transaction" @action="openAdd" />
 
     <template v-else>

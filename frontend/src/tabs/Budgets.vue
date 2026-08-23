@@ -1,6 +1,6 @@
 <template>
     <EmptyState v-if="!budgetsStore.budgets.length" icon="🐷" title="No budgets yet"
-        description="Set a limit on a few tags to keep spending in check." action-label="Add Budget"
+        description="Set a limit on a few tags to keep spending in check" action-label="Add Budget"
         @action="openAdd" />
 
     <template v-else>

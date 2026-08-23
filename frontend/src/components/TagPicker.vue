@@ -8,6 +8,7 @@
             <span>{{ tag.title }}</span>
         </button>
     </div>
+    <div v-else class="text-sm text-base-content/60 mb-4">No tags yet — create one first</div>
 </template>
 
 <script setup>

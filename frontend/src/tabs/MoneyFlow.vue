@@ -1,7 +1,7 @@
 <template>
     <EmptyState v-if="!hasPeriodData" icon="💸" title="No money flow in this period"
-        description="Add transactions or change the date range." action-label="Add Transaction"
-        @action="openAdd" />
+        description="Nothing in the selected or previous period. Add a transaction or change the range"
+        action-label="Add Transaction" @action="openAdd" />
 
     <template v-else>
         <div class="flex mb-3">

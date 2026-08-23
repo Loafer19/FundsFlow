@@ -2,7 +2,7 @@
 
 ![FundsFlow](./frontend/public/logo.png)
 
-Neat money management app
+Personal finance tracker
 
 ## Features
 

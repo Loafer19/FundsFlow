@@ -79,7 +79,7 @@
                         <div class="divider text-sm text-base-content/60">Link Telegram</div>
 
                         <p class="text-sm text-base-content/60 mb-3">
-                            Link your Telegram account to add transactions from chat.
+                            Link your Telegram account to add transactions from chat
                         </p>
 
                         <button type="button" class="btn btn-primary btn-sm" @click="openTelegramLink"
@@ -93,7 +93,7 @@
                     <div class="divider text-sm text-base-content/60">Email &amp; Password</div>
 
                     <p class="text-sm text-base-content/60 mb-3">
-                        Set an email and password to log in without Telegram or Google/GitHub.
+                        Set an email and password to log in without Telegram or Google/GitHub
                     </p>
 
                     <form @submit.prevent="saveCredentials">

@@ -57,7 +57,7 @@
                         </tr>
                         <tr v-if="!recurringStore.rules.length">
                             <td colspan="2" class="text-center py-8 text-base-content/60">
-                                No recurring transactions yet. Add rent, salary, or a subscription.
+                                No recurring transactions yet. Add rent, salary, or a subscription
                             </td>
                         </tr>
                     </tbody>
