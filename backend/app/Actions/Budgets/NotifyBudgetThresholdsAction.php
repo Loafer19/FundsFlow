@@ -5,10 +5,10 @@ namespace App\Actions\Budgets;
 use App\Channels\Telegram\TelegramClient;
 use App\Enums\BudgetLength;
 use App\Models\Budget;
-use App\Models\BudgetNotification;
 use App\Models\BudgetPeriod;
 use App\Models\Transaction;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class NotifyBudgetThresholdsAction
 {
@@ -44,22 +44,16 @@ class NotifyBudgetThresholdsAction
             }
 
             $bucketStart = $this->currentBucketStart($period)->toDateString();
+            $cacheKey = "budget_notified:{$period->id}:{$bucketStart}:{$threshold}";
 
-            $alreadySent = BudgetNotification::query()
-                ->where('budget_period_id', $period->id)
-                ->where('bucket_start', $bucketStart)
-                ->where('threshold', $threshold)
-                ->exists();
-
-            if ($alreadySent) {
+            if (Cache::has($cacheKey)) {
                 continue;
             }
 
-            BudgetNotification::create([
-                'budget_period_id' => $period->id,
-                'threshold' => $threshold,
-                'bucket_start' => $bucketStart,
-            ]);
+            // Long TTL just needs to outlast the bucket it's keyed to (up to
+            // a year for length=year) — losing this early only risks a
+            // repeat alert, not lost data, so Redis eviction is fine.
+            Cache::put($cacheKey, true, now()->addDays(400));
 
             $identity = $budget->user->identities->firstWhere('provider', 'telegram');
 
