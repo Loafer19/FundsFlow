@@ -19,7 +19,6 @@ class BudgetPeriodResource extends JsonResource
             'starts_at' => $this->starts_at->toDateString(),
             'ends_at' => $this->ends_at?->toDateString(),
             'active' => $this->isActive(),
-            'spent' => $this->spent(),
             'tags' => TagResource::collection($this->whenLoaded('tags')),
         ];
     }
