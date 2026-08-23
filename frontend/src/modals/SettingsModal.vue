@@ -12,7 +12,7 @@
             <div class="modal-content">
                 <template v-if="tab === 'formatting'">
                     <label for="formatDate">Date</label>
-                    <select v-model="formatDate" class="select w-full mb-3" id="formatDate">
+                    <select v-model="formatDate" class="select w-full mb-4" id="formatDate">
                         <optgroup v-for="(options, key) in formatDateOptions" :label="key">
                             <option v-for="option in options" :value="option">
                                 {{ option }}
@@ -21,7 +21,7 @@
                     </select>
 
                     <label for="formatMoney">Money</label>
-                    <select v-model="formatMoney" class="select w-full mb-3" id="formatMoney">
+                    <select v-model="formatMoney" class="select w-full mb-4" id="formatMoney">
                         <option v-for="(value, title) in formatMoneyOptions" :value="value">
                             {{ title }}
                         </option>
@@ -86,7 +86,7 @@
                             :disabled="generatingTelegramLink">
                             Open Telegram to link
                             <span v-if="generatingTelegramLink" class="loading loading-spinner loading-xs"></span>
-                            <Send v-else :size="16" />
+                            <Send v-else :size="20" />
                         </button>
                     </template>
 
@@ -98,15 +98,15 @@
 
                     <form @submit.prevent="saveCredentials">
                         <input v-model="credentialsForm.email" type="email" placeholder="Email"
-                            class="input w-full mb-3" maxlength="255" autofocus required />
+                            class="input w-full mb-4" maxlength="255" autofocus required />
 
                         <input v-model="credentialsForm.password" type="password" placeholder="New password"
-                            class="input w-full mb-3" minlength="8" maxlength="255" required />
+                            class="input w-full mb-4" minlength="8" maxlength="255" required />
 
                         <button type="submit" class="btn btn-primary btn-sm" :disabled="savingCredentials">
                             Save
                             <span v-if="savingCredentials" class="loading loading-spinner loading-xs"></span>
-                            <KeyRound v-else :size="16" />
+                            <KeyRound v-else :size="20" />
                         </button>
                     </form>
                 </template>

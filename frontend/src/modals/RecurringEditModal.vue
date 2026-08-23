@@ -12,7 +12,7 @@
                 <input type="text" v-model="form.note" placeholder="Note (optional)" class="input w-full mb-4"
                     maxlength="255" />
 
-                <select v-model="form.frequency" class="select w-full mb-4">
+                <select v-model="form.frequency" class="select w-full mb-4" required>
                     <option value="daily">Daily</option>
                     <option value="weekly">Weekly</option>
                     <option value="monthly">Monthly</option>

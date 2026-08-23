@@ -8,7 +8,7 @@
                 </h2>
                 <button onclick="tags_add_modal.showModal()" class="btn btn-outline btn-info btn-sm">
                     Add Tag
-                    <Plus :size="24" />
+                    <Plus :size="20" />
                 </button>
             </div>
 
@@ -32,7 +32,7 @@
                                 <button v-else type="button" class="btn btn-outline btn-secondary btn-square btn-sm"
                                     aria-label="Edit" @click="tagsStore.tagForEdit = tag"
                                     onclick="tags_edit_modal.showModal()" :disabled="tagsStore.isLoading">
-                                    <Pencil :size="24" />
+                                    <Pencil :size="20" />
                                 </button>
 
                                 <DeleteHold :id="tag.id" :disabled="tagsStore.isLoading"

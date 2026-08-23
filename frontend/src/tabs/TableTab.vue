@@ -67,7 +67,7 @@
                                 <button v-else type="button" class="btn btn-outline btn-secondary btn-square btn-sm"
                                     aria-label="Edit" @click="editTransaction(transaction)"
                                     :disabled="transactionsStore.isLoading">
-                                    <Pencil :size="24" />
+                                    <Pencil :size="20" />
                                 </button>
 
                                 <DeleteHold :id="transaction.id" :disabled="transactionsStore.isLoading"

@@ -27,18 +27,24 @@
 
                         <div class="flex gap-1 shrink-0">
                             <button v-if="currentPeriod(budget)" type="button"
-                                class="btn btn-outline btn-warning btn-square btn-sm" aria-label="Pause"
-                                :disabled="budgetsStore.isLoading === budget.id" @click="budgetsStore.pause(budget.id)">
-                                <Pause :size="20" />
+                                class="btn btn-outline btn-warning btn-square btn-sm tooltip" data-tip="Pause"
+                                aria-label="Pause" :disabled="budgetsStore.isLoading === budget.id"
+                                @click="budgetsStore.pause(budget.id)">
+                                <span v-if="budgetsStore.isLoading === budget.id"
+                                    class="loading loading-spinner loading-xs"></span>
+                                <Pause v-else :size="20" />
                             </button>
-                            <button v-else type="button" class="btn btn-outline btn-success btn-square btn-sm"
-                                aria-label="Resume" :disabled="budgetsStore.isLoading === budget.id"
+                            <button v-else type="button" class="btn btn-outline btn-success btn-square btn-sm tooltip"
+                                data-tip="Resume" aria-label="Resume" :disabled="budgetsStore.isLoading === budget.id"
                                 @click="budgetsStore.resume(budget.id)">
-                                <Play :size="20" />
+                                <span v-if="budgetsStore.isLoading === budget.id"
+                                    class="loading loading-spinner loading-xs"></span>
+                                <Play v-else :size="20" />
                             </button>
 
-                            <button type="button" class="btn btn-outline btn-secondary btn-square btn-sm"
-                                aria-label="Edit" @click="openEdit(budget)">
+                            <button type="button" class="btn btn-outline btn-secondary btn-square btn-sm tooltip"
+                                data-tip="Edit" aria-label="Edit" :disabled="budgetsStore.isLoading"
+                                @click="openEdit(budget)">
                                 <Pencil :size="20" />
                             </button>
 
@@ -72,10 +78,10 @@
                     </div>
 
                     <template v-if="historyFor(budget).length">
-                        <div class="divider text-xs text-base-content/60 my-2">History</div>
+                        <div class="divider text-sm text-base-content/60">History</div>
 
                         <template v-for="period in historyFor(budget)" :key="period.id">
-                            <div class="flex items-center gap-1 mt-2">
+                            <div class="flex items-center gap-1 mt-1">
                                 <span v-for="tag in period.tags" :key="tag.id" class="tooltip"
                                     :data-tip="tag.title">{{ tag.emoji }}</span>
                                 <span class="text-xs text-base-content/60 ml-auto">
@@ -104,7 +110,7 @@
 import { Pause, Pencil, Play, Plus } from 'lucide-vue-next'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { formatDate, formatMoney, toLocalDateStr } from '../services/formatters.js'
+import { formatDate, formatMoney, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { useBudgetsStore } from '../services/budgets.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
@@ -115,15 +121,6 @@ const currentPeriod = (budget) => budget.periods.find((period) => period.active)
 const historyFor = (budget) => budget.periods.filter((period) => !period.active)
 
 const lengthLabel = (length) => ({ week: 'per week', month: 'per month', year: 'per year' })[length]
-
-// "2026-01-16" as a wall-clock Date — new Date(dateOnlyString) parses as UTC
-// midnight and can land on the wrong local day, which is exactly what
-// toLocalDateStr()/filteredByDateRange() elsewhere are built to avoid.
-const parseLocalDate = (dateStr) => {
-    const [year, month, day] = dateStr.split('-').map(Number)
-
-    return new Date(year, month - 1, day)
-}
 
 const bucketStartFor = (date, length) => {
     const d = new Date(date)

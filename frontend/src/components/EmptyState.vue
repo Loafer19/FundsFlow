@@ -5,7 +5,7 @@
             <h3 class="text-lg font-semibold">{{ title }}</h3>
             <p v-if="description" class="text-base-content/60 max-w-sm">{{ description }}</p>
             <button v-if="actionLabel" type="button" class="btn btn-primary btn-sm mt-2" @click="$emit('action')">
-                <Plus :size="16" />
+                <Plus :size="20" />
                 {{ actionLabel }}
             </button>
         </div>

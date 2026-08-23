@@ -12,7 +12,7 @@
             @mouseup="stopHold" @mouseleave="stopHold" @keydown.enter.prevent="startHold"
             @keydown.space.prevent="startHold" @keyup.enter="stopHold" @keyup.space="stopHold"
             :disabled="disabled">
-            <Trash2 :size="24" />
+            <Trash2 :size="20" />
         </button>
     </div>
 </template>

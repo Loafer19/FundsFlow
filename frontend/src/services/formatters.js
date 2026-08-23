@@ -68,6 +68,14 @@ export const toLocalDateStr = (value) => {
     return `${year}-${month}-${day}`
 }
 
+// "2026-01-16" as a wall-clock Date — new Date(dateOnlyString) parses as UTC
+// midnight and can land on the wrong local day. Pair for toLocalDateStr().
+export const parseLocalDate = (dateStr) => {
+    const [year, month, day] = dateStr.split('-').map(Number)
+
+    return new Date(year, month - 1, day)
+}
+
 export const transactionSourceLabels = {
     web: 'Added from the web app',
     telegram: 'Added via Telegram',

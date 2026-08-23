@@ -8,7 +8,7 @@
                 </h2>
                 <button onclick="recurring_add_modal.showModal()" class="btn btn-outline btn-info btn-sm">
                     Add Recurring
-                    <Plus :size="24" />
+                    <Plus :size="20" />
                 </button>
             </div>
 
@@ -26,7 +26,7 @@
                                 <div class="flex items-center gap-1 text-xs text-base-content/60 mt-1">
                                     <span v-for="tag in rule.tags" :key="tag.id" class="tooltip"
                                         :data-tip="tag.title">{{ tag.emoji }}</span>
-                                    <span>{{ frequencyLabel(rule.frequency) }} · next {{ formatDate(rule.next_run_at) }}</span>
+                                    <span>{{ rule.frequency }} · next {{ formatDate(rule.next_run_at) }}</span>
                                 </div>
                             </td>
                             <td class="text-right">
@@ -35,16 +35,17 @@
                                     <span class="loading loading-spinner text-error"></span>
                                 </button>
                                 <div v-else class="flex justify-end gap-1">
-                                    <button type="button" class="btn btn-outline btn-square btn-sm"
+                                    <button type="button" class="btn btn-outline btn-square btn-sm tooltip"
                                         :class="rule.active ? 'btn-warning' : 'btn-success'"
+                                        :data-tip="rule.active ? 'Pause' : 'Resume'"
                                         :aria-label="rule.active ? 'Pause' : 'Resume'"
                                         @click="recurringStore.toggleActive(rule)">
                                         <Pause v-if="rule.active" :size="20" />
                                         <Play v-else :size="20" />
                                     </button>
 
-                                    <button type="button" class="btn btn-outline btn-secondary btn-square btn-sm"
-                                        aria-label="Edit" @click="openEdit(rule)">
+                                    <button type="button" class="btn btn-outline btn-secondary btn-square btn-sm tooltip"
+                                        data-tip="Edit" aria-label="Edit" @click="openEdit(rule)">
                                         <Pencil :size="20" />
                                     </button>
 
@@ -76,8 +77,6 @@ import { formatDate, formatMoney } from './../services/formatters.js'
 import { useRecurringTransactionsStore } from './../services/recurringTransactions.js'
 
 const recurringStore = useRecurringTransactionsStore()
-
-const frequencyLabel = (frequency) => ({ daily: 'daily', weekly: 'weekly', monthly: 'monthly', yearly: 'yearly' })[frequency]
 
 const openEdit = (rule) => {
     recurringStore.ruleForEdit = rule
