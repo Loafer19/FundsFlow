@@ -21,16 +21,16 @@
                     Add Transaction
                 </button>
 
-                <button onclick="tags_modal.showModal()"
-                    class="btn btn-outline btn-info btn-square tooltip tooltip-bottom" data-tip="Tags"
-                    aria-label="Tags">
-                    <Tag :size="24" />
-                </button>
-
                 <button onclick="recurring_modal.showModal()"
                     class="btn btn-outline btn-accent btn-square tooltip tooltip-bottom" data-tip="Recurring"
                     aria-label="Recurring">
                     <Repeat :size="24" />
+                </button>
+
+                <button onclick="tags_modal.showModal()"
+                    class="btn btn-outline btn-info btn-square tooltip tooltip-bottom" data-tip="Tags"
+                    aria-label="Tags">
+                    <Tag :size="24" />
                 </button>
 
                 <button onclick="settings_modal.showModal()"

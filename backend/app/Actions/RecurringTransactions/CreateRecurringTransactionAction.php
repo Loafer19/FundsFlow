@@ -19,6 +19,10 @@ class CreateRecurringTransactionAction
         unset($data['tags']);
 
         $data['next_run_at'] = $data['starts_at'];
+        // A new rule is always active — set explicitly so the in-memory
+        // model reflects it immediately (the DB column default doesn't
+        // populate back into this instance until it's re-fetched).
+        $data['active'] = true;
 
         $rule = $user->recurringTransactions()->create($data);
         $rule->tags()->sync($tagIds);
