@@ -32,7 +32,7 @@ api.interceptors.response.use(
 
                 if (auth.isAuthenticated || auth.token) {
                     auth.clearSession()
-                    toasts.info('Session expired, please log in again.')
+                    toasts.info('Session expired, please log in again')
                 }
             })
         }

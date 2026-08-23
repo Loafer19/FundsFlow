@@ -75,7 +75,7 @@ export const useBudgetsStore = defineStore('budgets', {
                 const index = this.budgets.findIndex((b) => b.id === id)
                 this.budgets[index] = response.data
 
-                toasts.info('Budget paused.')
+                toasts.info('Budget paused')
 
                 return true
             } catch (error) {
@@ -96,7 +96,7 @@ export const useBudgetsStore = defineStore('budgets', {
                 const index = this.budgets.findIndex((b) => b.id === id)
                 this.budgets[index] = response.data
 
-                toasts.success('Budget resumed.')
+                toasts.success('Budget resumed')
 
                 return true
             } catch (error) {

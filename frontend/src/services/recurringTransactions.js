@@ -83,7 +83,7 @@ export const useRecurringTransactionsStore = defineStore('recurringTransactions'
                 const index = this.rules.findIndex((r) => r.id === rule.id)
                 this.rules[index] = response.data
 
-                toasts.info(response.data.active ? 'Resumed.' : 'Paused.')
+                toasts.info(response.data.active ? 'Resumed' : 'Paused')
 
                 return true
             } catch (error) {
