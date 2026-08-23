@@ -9,7 +9,7 @@ use App\Http\Controllers\Telegram\TelegramWebhookController;
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('auth')->group(function () {
+Route::prefix('auth')->middleware('throttle:5,1')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/telegram-code', [AuthController::class, 'loginWithTelegramCode']);

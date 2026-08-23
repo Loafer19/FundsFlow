@@ -109,6 +109,8 @@ class TelegramBot
             $text === '/tags' || $text === self::MENU_TAGS => $this->sendTags($user, $chatId),
             $text === '/recent' || $text === self::MENU_RECENT => $this->sendRecent($user, $chatId),
             $text === '/website' => $this->sendWebsiteLoginCode($user, $chatId),
+            $text === '/mute' => $this->handleMute($chatId, true),
+            $text === '/unmute' => $this->handleMute($chatId, false),
             str_starts_with($text, '/newtag') => $this->handleNewTag($user, $chatId, $text),
             default => $this->handleQuickAdd($user, $chatId, $text),
         };
@@ -725,10 +727,25 @@ class TelegramBot
 
     private function resolveUser(int|string $chatId): ?User
     {
+        return $this->resolveIdentity($chatId)?->user;
+    }
+
+    private function resolveIdentity(int|string $chatId): ?Identity
+    {
         return Identity::query()
             ->where('provider', 'telegram')
             ->where('external_id', (string) $chatId)
-            ->first()
-            ?->user;
+            ->first();
+    }
+
+    private function handleMute(int|string $chatId, bool $muted): void
+    {
+        $identity = $this->resolveIdentity($chatId);
+
+        $identity->update(['meta' => [...$identity->meta, 'muted' => $muted]]);
+
+        $this->client->sendMessage($chatId, $muted
+            ? '🔕 Notifications muted. Use /unmute to turn budget alerts and weekly reports back on.'
+            : '🔔 Notifications unmuted.');
     }
 }

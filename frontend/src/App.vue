@@ -93,11 +93,11 @@
 
                 <label class="tab gap-1 text-lg font-medium hover:text-info">
                     <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                        :value="markRaw(BalanceTrend)" />
+                        :value="markRaw(TagDistribution)" />
 
-                    <TrendingUp :size="24" />
+                    <Tags :size="24" />
 
-                    Trend
+                    Tags
                 </label>
 
                 <label class="tab gap-1 text-lg font-medium hover:text-info">
@@ -110,20 +110,20 @@
                 </label>
 
                 <label class="tab gap-1 text-lg font-medium hover:text-info">
+                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
+                        :value="markRaw(BalanceTrend)" />
+
+                    <TrendingUp :size="24" />
+
+                    Trend
+                </label>
+
+                <label class="tab gap-1 text-lg font-medium hover:text-info">
                     <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" :value="markRaw(TableTab)" />
 
                     <Table :size="24" />
 
                     List
-                </label>
-
-                <label class="tab gap-1 text-lg font-medium hover:text-info">
-                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                        :value="markRaw(TagDistribution)" />
-
-                    <Tags :size="24" />
-
-                    Tags
                 </label>
 
             </div>
