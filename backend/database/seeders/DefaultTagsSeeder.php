@@ -27,10 +27,10 @@ class DefaultTagsSeeder extends Seeder
                 'emoji' => '🍔',
                 'calc_balance' => true,
                 'children' => [
-                    ['title' => 'Groceries', 'emoji' => '🛒', 'calc_balance' => true],
-                    ['title' => 'Restaurants', 'emoji' => '🍽️', 'calc_balance' => true],
-                    ['title' => 'Coffee', 'emoji' => '☕', 'calc_balance' => true],
-                    ['title' => 'Delivery', 'emoji' => '🛵', 'calc_balance' => true],
+                    ['title' => 'Groceries', 'emoji' => '🛒', 'calc_balance' => false],
+                    ['title' => 'Restaurants', 'emoji' => '🍽️', 'calc_balance' => false],
+                    ['title' => 'Coffee', 'emoji' => '☕', 'calc_balance' => false],
+                    ['title' => 'Delivery', 'emoji' => '🛵', 'calc_balance' => false],
                 ],
             ],
             [
@@ -38,10 +38,10 @@ class DefaultTagsSeeder extends Seeder
                 'emoji' => '🏠',
                 'calc_balance' => true,
                 'children' => [
-                    ['title' => 'Rent / mortgage', 'emoji' => '🔑', 'calc_balance' => true],
-                    ['title' => 'Utilities', 'emoji' => '💡', 'calc_balance' => true],
-                    ['title' => 'Internet', 'emoji' => '🌐', 'calc_balance' => true],
-                    ['title' => 'Home maintenance', 'emoji' => '🔧', 'calc_balance' => true],
+                    ['title' => 'Rent / mortgage', 'emoji' => '🔑', 'calc_balance' => false],
+                    ['title' => 'Utilities', 'emoji' => '💡', 'calc_balance' => false],
+                    ['title' => 'Internet', 'emoji' => '🌐', 'calc_balance' => false],
+                    ['title' => 'Home maintenance', 'emoji' => '🔧', 'calc_balance' => false],
                 ],
             ],
             [
@@ -49,10 +49,10 @@ class DefaultTagsSeeder extends Seeder
                 'emoji' => '🚗',
                 'calc_balance' => true,
                 'children' => [
-                    ['title' => 'Fuel', 'emoji' => '⛽', 'calc_balance' => true],
-                    ['title' => 'Public transit', 'emoji' => '🚌', 'calc_balance' => true],
-                    ['title' => 'Taxi / ride-hail', 'emoji' => '🚕', 'calc_balance' => true],
-                    ['title' => 'Parking', 'emoji' => '🅿️', 'calc_balance' => true],
+                    ['title' => 'Fuel', 'emoji' => '⛽', 'calc_balance' => false],
+                    ['title' => 'Public transit', 'emoji' => '🚌', 'calc_balance' => false],
+                    ['title' => 'Taxi / ride-hail', 'emoji' => '🚕', 'calc_balance' => false],
+                    ['title' => 'Parking', 'emoji' => '🅿️', 'calc_balance' => false],
                 ],
             ],
             [
@@ -60,9 +60,9 @@ class DefaultTagsSeeder extends Seeder
                 'emoji' => '🛍️',
                 'calc_balance' => true,
                 'children' => [
-                    ['title' => 'Clothes', 'emoji' => '👕', 'calc_balance' => true],
-                    ['title' => 'Electronics', 'emoji' => '📱', 'calc_balance' => true],
-                    ['title' => 'Household', 'emoji' => '🧴', 'calc_balance' => true],
+                    ['title' => 'Clothes', 'emoji' => '👕', 'calc_balance' => false],
+                    ['title' => 'Electronics', 'emoji' => '📱', 'calc_balance' => false],
+                    ['title' => 'Household', 'emoji' => '🧴', 'calc_balance' => false],
                 ],
             ],
             [
@@ -70,10 +70,10 @@ class DefaultTagsSeeder extends Seeder
                 'emoji' => '🧾',
                 'calc_balance' => true,
                 'children' => [
-                    ['title' => 'Phone', 'emoji' => '📞', 'calc_balance' => true],
-                    ['title' => 'Streaming', 'emoji' => '📺', 'calc_balance' => true],
-                    ['title' => 'Software', 'emoji' => '💻', 'calc_balance' => true],
-                    ['title' => 'Insurance', 'emoji' => '🛡️', 'calc_balance' => true],
+                    ['title' => 'Phone', 'emoji' => '📞', 'calc_balance' => false],
+                    ['title' => 'Streaming', 'emoji' => '📺', 'calc_balance' => false],
+                    ['title' => 'Software', 'emoji' => '💻', 'calc_balance' => false],
+                    ['title' => 'Insurance', 'emoji' => '🛡️', 'calc_balance' => false],
                 ],
             ],
             [
@@ -81,9 +81,9 @@ class DefaultTagsSeeder extends Seeder
                 'emoji' => '🎉',
                 'calc_balance' => true,
                 'children' => [
-                    ['title' => 'Movies & events', 'emoji' => '🎬', 'calc_balance' => true],
-                    ['title' => 'Games', 'emoji' => '🎮', 'calc_balance' => true],
-                    ['title' => 'Hobbies', 'emoji' => '🎨', 'calc_balance' => true],
+                    ['title' => 'Movies & events', 'emoji' => '🎬', 'calc_balance' => false],
+                    ['title' => 'Games', 'emoji' => '🎮', 'calc_balance' => false],
+                    ['title' => 'Hobbies', 'emoji' => '🎨', 'calc_balance' => false],
                 ],
             ],
             [
@@ -91,9 +91,9 @@ class DefaultTagsSeeder extends Seeder
                 'emoji' => '❤️',
                 'calc_balance' => true,
                 'children' => [
-                    ['title' => 'Pharmacy', 'emoji' => '💊', 'calc_balance' => true],
-                    ['title' => 'Doctor', 'emoji' => '🩺', 'calc_balance' => true],
-                    ['title' => 'Fitness', 'emoji' => '🏋️', 'calc_balance' => true],
+                    ['title' => 'Pharmacy', 'emoji' => '💊', 'calc_balance' => false],
+                    ['title' => 'Doctor', 'emoji' => '🩺', 'calc_balance' => false],
+                    ['title' => 'Fitness', 'emoji' => '🏋️', 'calc_balance' => false],
                 ],
             ],
             [
@@ -101,9 +101,9 @@ class DefaultTagsSeeder extends Seeder
                 'emoji' => '👤',
                 'calc_balance' => true,
                 'children' => [
-                    ['title' => 'Education', 'emoji' => '📚', 'calc_balance' => true],
-                    ['title' => 'Care', 'emoji' => '💇', 'calc_balance' => true],
-                    ['title' => 'Pets', 'emoji' => '🐾', 'calc_balance' => true],
+                    ['title' => 'Education', 'emoji' => '📚', 'calc_balance' => false],
+                    ['title' => 'Care', 'emoji' => '💇', 'calc_balance' => false],
+                    ['title' => 'Pets', 'emoji' => '🐾', 'calc_balance' => false],
                 ],
             ],
             [
@@ -111,9 +111,9 @@ class DefaultTagsSeeder extends Seeder
                 'emoji' => '✈️',
                 'calc_balance' => true,
                 'children' => [
-                    ['title' => 'Flights', 'emoji' => '🛫', 'calc_balance' => true],
-                    ['title' => 'Hotels', 'emoji' => '🏨', 'calc_balance' => true],
-                    ['title' => 'Local transport', 'emoji' => '🗺️', 'calc_balance' => true],
+                    ['title' => 'Flights', 'emoji' => '🛫', 'calc_balance' => false],
+                    ['title' => 'Hotels', 'emoji' => '🏨', 'calc_balance' => false],
+                    ['title' => 'Local transport', 'emoji' => '🗺️', 'calc_balance' => false],
                 ],
             ],
             [
