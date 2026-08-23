@@ -16,7 +16,14 @@
                 class="card card-border border-base-300 bg-base-100">
                 <div class="card-body">
                     <div class="flex justify-between items-start gap-2">
-                        <h3 class="card-title">{{ titleFor(budget) }}</h3>
+                        <h3 class="card-title">
+                            <template v-if="budget.title">{{ budget.title }}</template>
+                            <template v-else-if="currentTags(budget).length">
+                                <span v-for="tag in currentTags(budget)" :key="tag.id" class="tooltip"
+                                    :data-tip="tag.title">{{ tag.emoji }}</span>
+                            </template>
+                            <template v-else>Budget</template>
+                        </h3>
 
                         <div class="flex gap-1 shrink-0">
                             <button type="button" class="btn btn-outline btn-secondary btn-square btn-sm"
@@ -32,22 +39,27 @@
 
                     <template v-if="currentPeriod(budget)">
                         <div class="flex justify-between text-sm text-base-content/60 mb-1">
-                            <span>{{ formatMoney(spentFor(currentPeriod(budget))) }} /
+                            <span>{{ formatMoney(spentForActive(currentPeriod(budget))) }} /
                                 {{ formatMoney(currentPeriod(budget).amount) }}</span>
                             <span>{{ lengthLabel(currentPeriod(budget).length) }}</span>
                         </div>
-                        <progress class="progress w-full" :class="progressClass(currentPeriod(budget))"
-                            :value="spentFor(currentPeriod(budget))" :max="currentPeriod(budget).amount"></progress>
+                        <div class="tooltip w-full" :data-tip="percentTooltip(currentPeriod(budget))">
+                            <progress class="progress w-full" :class="progressClass(currentPeriod(budget))"
+                                :value="spentForActive(currentPeriod(budget))" :max="currentPeriod(budget).amount"></progress>
+                        </div>
                     </template>
 
                     <template v-if="historyFor(budget).length">
                         <div class="divider text-xs text-base-content/60 my-2">History</div>
 
-                        <div v-for="period in historyFor(budget)" :key="period.id"
-                            class="flex justify-between text-sm text-base-content/60">
-                            <span>{{ formatDate(period.starts_at) }} – {{ formatDate(period.ends_at) }}</span>
-                            <span>{{ formatMoney(spentFor(period)) }} / {{ formatMoney(period.amount) }}</span>
-                        </div>
+                        <template v-for="period in historyFor(budget)" :key="period.id">
+                            <div v-for="bucket in historyBuckets(period)" :key="bucket.start"
+                                class="flex justify-between text-sm text-base-content/60">
+                                <span>{{ formatDate(bucket.start) }} – {{ formatDate(bucket.end) }}</span>
+                                <span>{{ formatMoney(spentBetween(bucket.start, bucket.end, period.tags)) }} /
+                                    {{ formatMoney(period.amount) }}</span>
+                            </div>
+                        </template>
                     </template>
                 </div>
             </div>
@@ -71,30 +83,69 @@ const historyFor = (budget) => budget.periods.filter((period) => !period.active)
 
 const lengthLabel = (length) => ({ week: 'per week', month: 'per month', year: 'per year' })[length]
 
-const currentBucketStart = (period) => {
-    const now = new Date()
-    let boundary
+// "2026-01-16" as a wall-clock Date — new Date(dateOnlyString) parses as UTC
+// midnight and can land on the wrong local day, which is exactly what
+// toLocalDateStr()/filteredByDateRange() elsewhere are built to avoid.
+const parseLocalDate = (dateStr) => {
+    const [year, month, day] = dateStr.split('-').map(Number)
 
-    if (period.length === 'week') {
-        boundary = new Date(now)
-        boundary.setDate(boundary.getDate() - ((boundary.getDay() + 6) % 7))
-    } else if (period.length === 'month') {
-        boundary = new Date(now.getFullYear(), now.getMonth(), 1)
-    } else {
-        boundary = new Date(now.getFullYear(), 0, 1)
-    }
-
-    const boundaryStr = toLocalDateStr(boundary)
-
-    return boundaryStr > period.starts_at ? boundaryStr : period.starts_at
+    return new Date(year, month - 1, day)
 }
 
-// Active periods track the current week/month/year bucket so far; closed
-// periods report spend over their whole historical range.
-const spentFor = (period) => {
-    const start = period.active ? currentBucketStart(period) : period.starts_at
-    const end = period.active ? toLocalDateStr(new Date()) : period.ends_at
-    const tagIds = new Set(period.tags.map((tag) => tag.id))
+const bucketStartFor = (date, length) => {
+    const d = new Date(date)
+
+    if (length === 'week') d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+    else if (length === 'month') d.setDate(1)
+    else d.setMonth(0, 1)
+
+    return d
+}
+
+const nextBucketStart = (date, length) => {
+    const d = new Date(date)
+
+    if (length === 'week') d.setDate(d.getDate() + 7)
+    else if (length === 'month') d.setMonth(d.getMonth() + 1)
+    else d.setFullYear(d.getFullYear() + 1)
+
+    return d
+}
+
+const dayBefore = (dateStr) => {
+    const d = parseLocalDate(dateStr)
+    d.setDate(d.getDate() - 1)
+
+    return toLocalDateStr(d)
+}
+
+const currentBucketStart = (period) => {
+    const boundary = toLocalDateStr(bucketStartFor(new Date(), period.length))
+
+    return boundary > period.starts_at ? boundary : period.starts_at
+}
+
+// Slices a closed period's whole [starts_at, ends_at] range into
+// calendar-aligned week/month/year buckets, clamped at both ends, so a
+// budget that ran unedited for months shows one comparable row per bucket
+// instead of one misleading total against a per-bucket amount.
+const historyBuckets = (period) => {
+    const buckets = []
+    let cursor = period.starts_at
+
+    while (cursor <= period.ends_at) {
+        const nextStr = toLocalDateStr(nextBucketStart(bucketStartFor(parseLocalDate(cursor), period.length), period.length))
+        const end = nextStr <= period.ends_at ? dayBefore(nextStr) : period.ends_at
+
+        buckets.push({ start: cursor, end })
+        cursor = nextStr
+    }
+
+    return buckets
+}
+
+const spentBetween = (start, end, tags) => {
+    const tagIds = new Set(tags.map((tag) => tag.id))
 
     return transactionsStore
         .filteredByDateRange(start, end)
@@ -102,16 +153,20 @@ const spentFor = (period) => {
         .reduce((sum, t) => sum - t.amount, 0)
 }
 
-const titleFor = (budget) => {
-    if (budget.title) return budget.title
+// Only ever called with the active period — its current week/month/year
+// bucket so far. Closed periods go through historyBuckets() instead.
+const spentForActive = (period) => spentBetween(currentBucketStart(period), toLocalDateStr(new Date()), period.tags)
 
-    const current = currentPeriod(budget)
+const currentTags = (budget) => currentPeriod(budget)?.tags ?? []
 
-    return current ? current.tags.map((tag) => tag.emoji).join(' ') : 'Budget'
+const percentTooltip = (period) => {
+    if (period.amount <= 0) return '0%'
+
+    return Math.round((spentForActive(period) / period.amount) * 100) + '%'
 }
 
 const progressClass = (period) => {
-    const ratio = period.amount > 0 ? spentFor(period) / period.amount : 0
+    const ratio = period.amount > 0 ? spentForActive(period) / period.amount : 0
 
     if (ratio >= 1) return 'progress-error'
     if (ratio >= 0.8) return 'progress-warning'
