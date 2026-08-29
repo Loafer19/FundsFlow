@@ -2,21 +2,21 @@
     "dependencies": {
         "@emoji-mart/data": "1.2.1",
         "@vuepic/vue-datepicker": "11.0.2",
-        "axios": "^1.19.0",
+        "axios": "^1.20.0",
         "chart.js": "^4.5.1",
         "emoji-mart-vue-fast": "15.0.5",
         "lucide-vue-next": "^1.0.0",
         "pinia": "3",
-        "vue": "^3.5.40",
+        "vue": "^3.5.42",
         "vue-chartjs": "^5.3.4"
     },
     "devDependencies": {
-        "@biomejs/biome": "^2.5.6",
+        "@biomejs/biome": "^2.5.11",
         "@tailwindcss/vite": "^4.3.3",
         "@vitejs/plugin-vue": "^6.0.8",
-        "daisyui": "^5.7.7",
+        "daisyui": "^5.7.22",
         "tailwindcss": "^4.3.3",
-        "vite": "^7",
+        "vite": "^7.3.6",
         "vite-plugin-compression": "0.5.1"
     },
     "scripts": {

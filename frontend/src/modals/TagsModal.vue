@@ -6,13 +6,17 @@
                     <Tag :size="24" />
                     Manage Tags
                 </h2>
-                <button onclick="tags_add_modal.showModal()" class="btn btn-outline btn-info btn-sm">
+                <button @click="showModal('tags_add_modal')" class="btn btn-outline btn-info btn-sm">
                     Add Tag
                     <Plus :size="20" />
                 </button>
             </div>
 
-            <div class="tags-list">
+            <EmptyState v-if="!tagsStore.list().length" icon="🏷️" title="No tags yet"
+                description="Create a few to organize transactions" action-label="Add Tag"
+                @action="showModal('tags_add_modal')" />
+
+            <div v-else class="tags-list">
                 <table class="table">
                     <tbody>
                         <tr v-for="tag in tagsStore.list()" :key="tag.id">
@@ -30,19 +34,15 @@
                                     <span class="loading loading-spinner text-error"></span>
                                 </button>
                                 <button v-else type="button" class="btn btn-outline btn-secondary btn-square btn-sm"
-                                    aria-label="Edit" @click="tagsStore.tagForEdit = tag"
-                                    onclick="tags_edit_modal.showModal()" :disabled="tagsStore.isLoading">
+                                    aria-label="Edit"
+                                    @click="tagsStore.tagForEdit = tag; showModal('tags_edit_modal')"
+                                    :disabled="tagsStore.isLoading">
                                     <Pencil :size="20" />
                                 </button>
 
                                 <DeleteHold :id="tag.id" :disabled="tagsStore.isLoading"
                                     :isLoading="tagsStore.isLoading === tag.id"
                                     @delete="(id) => tagsStore.delete(id)" />
-                            </td>
-                        </tr>
-                        <tr v-if="!tagsStore.list().length">
-                            <td colspan="2" class="text-center py-8 text-base-content/60">
-                                No tags yet. Create a few to organize transactions
                             </td>
                         </tr>
                     </tbody>
@@ -57,6 +57,8 @@
 <script setup>
 import { Pencil, Plus, Tag } from 'lucide-vue-next'
 import DeleteHold from './../components/buttons/DeleteHold.vue'
+import EmptyState from './../components/EmptyState.vue'
+import { showModal } from './../services/modal.js'
 import { useTagsStore } from './../services/tags.js'
 
 const tagsStore = useTagsStore()

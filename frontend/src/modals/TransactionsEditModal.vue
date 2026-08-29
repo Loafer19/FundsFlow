@@ -8,15 +8,7 @@
 
                 <AmountField v-model="transaction.amount" />
 
-                <div class="tags-tree flex flex-col justify-start gap-1 mb-4" v-if="tagsStore.tags.length">
-                    <button v-for="tag in tagsStore.list()" :key="tag.id" type="button" @click="toggleTag(tag.id)"
-                        class="badge badge-info gap-0 px-1 text-lg cursor-pointer" :class="{
-                            'badge-soft': !transaction.tags.includes(tag.id),
-                        }" :style="{ marginLeft: `${tag.depth * 20}px` }">
-                        <span>{{ tag.emoji }}</span>
-                        <span>{{ tag.title }}</span>
-                    </button>
-                </div>
+                <TagPicker v-model="transaction.tags" />
 
                 <input type="text" v-model="transaction.note" class="input w-full" placeholder="Note" maxlength="255" />
 
@@ -43,11 +35,10 @@ import { Save } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
 import AmountField from '../components/AmountField.vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
+import TagPicker from '../components/TagPicker.vue'
 import { toLocalDateStr } from '../services/formatters.js'
-import { useTagsStore } from '../services/tags.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
-const tagsStore = useTagsStore()
 const transactionsStore = useTransactionsStore()
 
 const transaction = ref({
@@ -69,16 +60,6 @@ watch(
     },
 )
 
-const toggleTag = (id) => {
-    const index = transaction.value.tags.indexOf(id)
-
-    if (index === -1) {
-        transaction.value.tags.push(id)
-    } else {
-        transaction.value.tags.splice(index, 1)
-    }
-}
-
 const handleSubmit = async () => {
     const ok = await transactionsStore.update(transaction.value)
 
@@ -98,17 +79,4 @@ const handleDelete = async (id) => {
 }
 </script>
 
-<style scoped>
-.tags-tree {
-    max-height: 40vh;
-    overflow-y: auto;
-}
-
-.badge {
-    transition: all 0.2s ease;
-}
-
-.badge:hover {
-    opacity: 0.8;
-}
-</style>
+<style scoped></style>

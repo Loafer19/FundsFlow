@@ -16,24 +16,24 @@
     <div class="container mx-auto p-4">
         <div class="flex gap-2 justify-end mb-4">
             <template v-if="authStore.isAuthenticated">
-                <button type="button" onclick="transactions_add_modal.showModal()" class="btn btn-primary">
+                <button type="button" @click="showModal('transactions_add_modal')" class="btn btn-primary">
                     <Plus :size="20" />
                     Add Transaction
                 </button>
 
-                <button onclick="recurring_modal.showModal()"
+                <button @click="showModal('recurring_modal')"
                     class="btn btn-outline btn-accent btn-square tooltip tooltip-bottom" data-tip="Recurring"
                     aria-label="Recurring">
                     <Repeat :size="24" />
                 </button>
 
-                <button onclick="tags_modal.showModal()"
+                <button @click="showModal('tags_modal')"
                     class="btn btn-outline btn-info btn-square tooltip tooltip-bottom" data-tip="Tags"
                     aria-label="Tags">
                     <Tag :size="24" />
                 </button>
 
-                <button onclick="settings_modal.showModal()"
+                <button @click="showModal('settings_modal')"
                     class="btn btn-outline btn-warning btn-square tooltip tooltip-bottom" data-tip="Settings"
                     aria-label="Settings">
                     <Settings :size="24" />
@@ -46,7 +46,7 @@
                 </button>
             </template>
 
-            <button v-else onclick="auth_modal.showModal()" class="btn btn-secondary">
+            <button v-else @click="showModal('auth_modal')" class="btn btn-secondary">
                 <LogIn :size="24" />
                 Login
             </button>
@@ -93,6 +93,15 @@
 
                 <label class="tab gap-1 text-lg font-medium hover:text-info">
                     <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
+                        :value="markRaw(CalendarTab)" />
+
+                    <CalendarDays :size="24" />
+
+                    Calendar
+                </label>
+
+                <label class="tab gap-1 text-lg font-medium hover:text-info">
+                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
                         :value="markRaw(Budgets)" />
 
                     <PiggyBank :size="24" />
@@ -135,15 +144,6 @@
                     List
                 </label>
 
-                <label class="tab gap-1 text-lg font-medium hover:text-info">
-                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                        :value="markRaw(CalendarTab)" />
-
-                    <CalendarDays :size="24" />
-
-                    Calendar
-                </label>
-
             </div>
         </div>
 
@@ -153,7 +153,7 @@
 
     <button v-if="authStore.isAuthenticated" type="button"
         class="btn btn-primary btn-circle btn-lg fixed bottom-6 right-6 z-50"
-        onclick="transactions_add_modal.showModal()" aria-label="Add Transaction">
+        @click="showModal('transactions_add_modal')" aria-label="Add Transaction">
         <Plus :size="28" />
     </button>
 </template>
@@ -194,6 +194,7 @@ import TransactionsAddModal from './modals/TransactionsAddModal.vue'
 import TransactionsEditModal from './modals/TransactionsEditModal.vue'
 import { useAuthStore } from './services/auth.js'
 import { useBudgetsStore } from './services/budgets.js'
+import { showModal } from './services/modal.js'
 import { useRecurringTransactionsStore } from './services/recurringTransactions.js'
 import { useTagsStore } from './services/tags.js'
 import { useTransactionsStore } from './services/transactions.js'

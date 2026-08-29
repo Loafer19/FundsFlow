@@ -6,13 +6,17 @@
                     <Repeat :size="24" />
                     Recurring
                 </h2>
-                <button onclick="recurring_add_modal.showModal()" class="btn btn-outline btn-info btn-sm">
+                <button @click="showModal('recurring_add_modal')" class="btn btn-outline btn-info btn-sm">
                     Add Recurring
                     <Plus :size="20" />
                 </button>
             </div>
 
-            <div class="recurring-list">
+            <EmptyState v-if="!recurringStore.rules.length" icon="🔁" title="No recurring transactions yet"
+                description="Add rent, salary, or a subscription" action-label="Add Recurring"
+                @action="showModal('recurring_add_modal')" />
+
+            <div v-else class="recurring-list">
                 <table class="table">
                     <tbody>
                         <tr v-for="rule in recurringStore.rules" :key="rule.id">
@@ -55,11 +59,6 @@
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="!recurringStore.rules.length">
-                            <td colspan="2" class="text-center py-8 text-base-content/60">
-                                No recurring transactions yet. Add rent, salary, or a subscription
-                            </td>
-                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -73,7 +72,9 @@
 <script setup>
 import { Pause, Pencil, Play, Plus, Repeat } from 'lucide-vue-next'
 import DeleteHold from './../components/buttons/DeleteHold.vue'
+import EmptyState from './../components/EmptyState.vue'
 import { formatDate, formatMoney } from './../services/formatters.js'
+import { showModal } from './../services/modal.js'
 import { useRecurringTransactionsStore } from './../services/recurringTransactions.js'
 
 const recurringStore = useRecurringTransactionsStore()

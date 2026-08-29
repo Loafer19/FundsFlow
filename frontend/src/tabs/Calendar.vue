@@ -104,9 +104,9 @@
                 <div>
                     <h3 class="font-semibold text-base mb-2">Upcoming</h3>
 
-                    <div v-if="!upcoming.length" class="text-sm text-base-content/60">
-                        No upcoming recurring payments in the next 30 days
-                    </div>
+                    <EmptyState v-if="!upcoming.length" icon="🔁" title="Nothing upcoming"
+                        description="No recurring payments due in the next 30 days" action-label="Add Recurring"
+                        @action="showModal('recurring_add_modal')" />
 
                     <div v-else class="flex flex-col gap-2">
                         <button v-for="item in upcoming" :key="item.key" type="button"
@@ -143,6 +143,7 @@ import { Plus } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import EmptyState from '../components/EmptyState.vue'
 import { formatDate, formatMoney, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
+import { showModal } from '../services/modal.js'
 import { projectOccurrences } from '../services/recurringSchedule.js'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 import { useTransactionsStore } from '../services/transactions.js'
