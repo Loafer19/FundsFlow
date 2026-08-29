@@ -2,6 +2,7 @@
 
 namespace App\Actions\Budgets;
 
+use App\Enums\BudgetLength;
 use App\Models\Budget;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
@@ -19,10 +20,13 @@ class CreateBudgetAction
             'title' => $data['title'] ?? null,
         ]);
 
+        $length = BudgetLength::from($data['length']);
+        $startsAt = ($data['align_to_calendar'] ?? false) ? $length->calendarStart() : now();
+
         $period = $budget->periods()->create([
             'amount' => $data['amount'],
             'length' => $data['length'],
-            'starts_at' => now()->toDateString(),
+            'starts_at' => $startsAt->toDateString(),
             'ends_at' => null,
         ]);
 

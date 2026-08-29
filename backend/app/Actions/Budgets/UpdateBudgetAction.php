@@ -2,6 +2,7 @@
 
 namespace App\Actions\Budgets;
 
+use App\Enums\BudgetLength;
 use App\Models\Budget;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
@@ -21,6 +22,8 @@ class UpdateBudgetAction
 
         $current = $budget->currentPeriod;
         $newTagIds = collect($data['tag_ids'])->map(fn ($id) => (int) $id)->sort()->values();
+        $length = BudgetLength::from($data['length']);
+        $startsAt = ($data['align_to_calendar'] ?? false) ? $length->calendarStart() : now();
 
         if ($current) {
             $currentTagIds = $current->tags->pluck('id')->sort()->values();
@@ -39,6 +42,7 @@ class UpdateBudgetAction
                 $current->update([
                     'amount' => $data['amount'],
                     'length' => $data['length'],
+                    'starts_at' => $startsAt->toDateString(),
                 ]);
                 $current->tags()->sync($newTagIds);
 
@@ -51,7 +55,7 @@ class UpdateBudgetAction
         $period = $budget->periods()->create([
             'amount' => $data['amount'],
             'length' => $data['length'],
-            'starts_at' => now()->toDateString(),
+            'starts_at' => $startsAt->toDateString(),
             'ends_at' => null,
         ]);
 

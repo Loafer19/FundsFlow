@@ -3,7 +3,6 @@
 namespace App\Actions\Budgets;
 
 use App\Channels\Telegram\TelegramClient;
-use App\Enums\BudgetLength;
 use App\Models\Budget;
 use App\Models\BudgetPeriod;
 use App\Models\Transaction;
@@ -81,11 +80,7 @@ class NotifyBudgetThresholdsAction
 
     private function currentBucketStart(BudgetPeriod $period): Carbon
     {
-        $boundary = match ($period->length) {
-            BudgetLength::Week => now()->startOfWeek(),
-            BudgetLength::Month => now()->startOfMonth(),
-            BudgetLength::Year => now()->startOfYear(),
-        };
+        $boundary = $period->length->calendarStart();
 
         return $boundary->greaterThan($period->starts_at) ? $boundary : $period->starts_at->copy();
     }

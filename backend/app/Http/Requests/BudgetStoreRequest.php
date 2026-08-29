@@ -22,6 +22,7 @@ class BudgetStoreRequest extends FormRequest
             'title' => 'nullable|string|max:255',
             'amount' => 'required|numeric|min:0.01',
             'length' => ['required', Rule::in(array_column(BudgetLength::cases(), 'value'))],
+            'align_to_calendar' => 'sometimes|boolean',
             'tag_ids' => 'required|array|min:1',
             'tag_ids.*' => [
                 'integer',

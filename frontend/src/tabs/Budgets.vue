@@ -15,7 +15,7 @@
             <div v-for="budget in budgetsStore.budgets" :key="budget.id"
                 class="card card-border border-base-300 bg-base-100">
                 <div class="card-body">
-                    <div class="flex justify-between items-start gap-2">
+                    <div class="flex justify-between items-start gap-2 mb-2">
                         <h3 class="card-title">
                             <template v-if="budget.title">{{ budget.title }}</template>
                             <template v-else-if="currentTags(budget).length">
@@ -55,21 +55,34 @@
                     </div>
 
                     <template v-if="currentPeriod(budget)">
-                        <div class="flex items-center gap-1 mb-1">
+                        <div class="flex items-center gap-1">
                             <button v-for="tag in currentPeriod(budget).tags" :key="tag.id" type="button"
                                 class="tooltip cursor-pointer" :data-tip="tag.title"
                                 @click="viewTransactions(currentPeriod(budget).tags)">{{ tag.emoji }}</button>
-                            <span class="text-sm text-base-content/60 ml-auto tooltip"
-                                :data-tip="percentTooltip(spentForActive(currentPeriod(budget)), currentPeriod(budget).amount)">
+                            <div class="badge badge-outline ml-auto" :class="badgeToneClass(currentPeriod(budget))">
                                 {{ formatMoney(spentForActive(currentPeriod(budget))) }} /
-                                {{ formatMoney(currentPeriod(budget).amount) }} ·
-                                {{ lengthLabel(currentPeriod(budget).length) }}
-                            </span>
+                                {{ formatMoney(currentPeriod(budget).amount) }}
+                            </div>
                         </div>
                         <div class="tooltip w-full"
                             :data-tip="percentTooltip(spentForActive(currentPeriod(budget)), currentPeriod(budget).amount)">
                             <progress class="progress w-full" :class="progressClass(currentPeriod(budget))"
                                 :value="spentForActive(currentPeriod(budget))" :max="currentPeriod(budget).amount"></progress>
+                        </div>
+
+                        <div class="flex items-center gap-1 mt-1">
+                            <span class="text-xs text-base-content/60">
+                                {{ formatDate(currentBucketStart(currentPeriod(budget))) }} –
+                                {{ formatDate(currentBucketEnd(currentPeriod(budget))) }}
+                            </span>
+                            <div class="badge badge-outline badge-neutral text-xs ml-auto">
+                                {{ frequencyLabel(currentPeriod(budget).length) }}
+                            </div>
+                        </div>
+                        <div class="tooltip w-full"
+                            :data-tip="percentTooltip(bucketProgress(currentPeriod(budget)).elapsed, bucketProgress(currentPeriod(budget)).total)">
+                            <progress class="progress w-full" :value="bucketProgress(currentPeriod(budget)).elapsed"
+                                :max="bucketProgress(currentPeriod(budget)).total"></progress>
                         </div>
                     </template>
                     <div v-else class="flex items-center gap-1 mb-1">
@@ -86,9 +99,6 @@
                             <div class="flex items-center gap-1 mt-1">
                                 <span v-for="tag in period.tags" :key="tag.id" class="tooltip"
                                     :data-tip="tag.title">{{ tag.emoji }}</span>
-                                <span class="text-xs text-base-content/60 ml-auto">
-                                    {{ formatMoney(period.amount) }} {{ lengthLabel(period.length) }}
-                                </span>
                             </div>
 
                             <div v-for="bucket in historyBuckets(period)" :key="bucket.start"
@@ -124,7 +134,7 @@ const emit = defineEmits(['jump-to-list'])
 const currentPeriod = (budget) => budget.periods.find((period) => period.active) ?? null
 const historyFor = (budget) => budget.periods.filter((period) => !period.active)
 
-const lengthLabel = (length) => ({ week: 'per week', month: 'per month', year: 'per year' })[length]
+const frequencyLabel = (length) => ({ week: 'Weekly', month: 'Monthly', year: 'Yearly' })[length]
 
 const bucketStartFor = (date, length) => {
     const d = new Date(date)
@@ -157,6 +167,22 @@ const currentBucketStart = (period) => {
     const boundary = toLocalDateStr(bucketStartFor(new Date(), period.length))
 
     return boundary > period.starts_at ? boundary : period.starts_at
+}
+
+const currentBucketEnd = (period) => {
+    const nextStart = toLocalDateStr(nextBucketStart(bucketStartFor(new Date(), period.length), period.length))
+
+    return dayBefore(nextStart)
+}
+
+const daysBetween = (start, end) => Math.round((parseLocalDate(end) - parseLocalDate(start)) / 86400000)
+
+const bucketProgress = (period) => {
+    const start = currentBucketStart(period)
+    const end = currentBucketEnd(period)
+    const total = daysBetween(start, end) + 1
+
+    return { elapsed: Math.min(daysBetween(start, toLocalDateStr(new Date())) + 1, total), total }
 }
 
 // Slices a closed period's whole [starts_at, ends_at] range into
@@ -209,6 +235,8 @@ const progressClass = (period) => {
 
     return 'progress-success'
 }
+
+const badgeToneClass = (period) => progressClass(period).replace('progress-', 'badge-')
 
 const viewTransactions = (tags) => {
     transactionsStore.tagFilterDraft = tags.map((tag) => tag.id)
