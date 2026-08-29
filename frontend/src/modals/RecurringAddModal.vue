@@ -72,7 +72,8 @@ import { Repeat, Save } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import AmountField from '../components/AmountField.vue'
 import TagPicker from '../components/TagPicker.vue'
-import { formatDate, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
+import { formatDate, toLocalDateStr } from '../services/formatters.js'
+import { advanceDateStr } from '../services/recurringSchedule.js'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 
 const recurringStore = useRecurringTransactionsStore()
@@ -89,40 +90,6 @@ const createDefault = () => ({
 const form = ref(createDefault())
 const endMode = ref('none')
 const occurrences = ref('')
-
-// Mirrors the backend's day/week/addMonthsNoOverflow/addYearsNoOverflow
-// stepping (GenerateRecurringTransactionsAction) so the preview here
-// matches what actually gets generated.
-const addMonthsNoOverflow = (date, months) => {
-    const day = date.getDate()
-    const d = new Date(date)
-    d.setDate(1)
-    d.setMonth(d.getMonth() + months)
-    d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()))
-
-    return d
-}
-
-const addYearsNoOverflow = (date, years) => {
-    const day = date.getDate()
-    const d = new Date(date)
-    d.setDate(1)
-    d.setFullYear(d.getFullYear() + years)
-    d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()))
-
-    return d
-}
-
-const advanceDateStr = (dateStr, frequency, steps) => {
-    const d = parseLocalDate(dateStr)
-
-    if (frequency === 'daily') d.setDate(d.getDate() + steps)
-    else if (frequency === 'weekly') d.setDate(d.getDate() + steps * 7)
-    else if (frequency === 'monthly') return toLocalDateStr(addMonthsNoOverflow(d, steps))
-    else return toLocalDateStr(addYearsNoOverflow(d, steps))
-
-    return toLocalDateStr(d)
-}
 
 // "N times" is UI sugar over ends_at: the Nth occurrence's own date, so
 // it still fires (backend deactivates once next_run_at exceeds ends_at).
@@ -153,7 +120,8 @@ const estimatedOccurrences = computed(() => {
 })
 
 const handleSubmit = async () => {
-    const endsAt = endMode.value === 'count' ? computedEndsAt.value : endMode.value === 'date' ? form.value.ends_at || null : null
+    const endsAt =
+        endMode.value === 'count' ? computedEndsAt.value : endMode.value === 'date' ? form.value.ends_at || null : null
 
     const ok = await recurringStore.create({ ...form.value, ends_at: endsAt })
 

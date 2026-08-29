@@ -135,10 +135,19 @@
                     List
                 </label>
 
+                <label class="tab gap-1 text-lg font-medium hover:text-info">
+                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
+                        :value="markRaw(CalendarTab)" />
+
+                    <CalendarDays :size="24" />
+
+                    Calendar
+                </label>
+
             </div>
         </div>
 
-        <component :is="selectedTab" :dateRange="getDateRange" :dateSelectionType />
+        <component :is="selectedTab" :dateRange="getDateRange" :dateSelectionType @jump-to-month="handleJumpToMonth" />
     </div>
 
     <button v-if="authStore.isAuthenticated" type="button"
@@ -151,7 +160,23 @@
 <script setup>
 import VueDatePicker from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
-import { ArrowLeftRight, ChevronLeft, ChevronRight, LogIn, LogOut, PiggyBank, Plus, Presentation, Repeat, Settings, Table, Tag, Tags, TrendingUp } from 'lucide-vue-next'
+import {
+    ArrowLeftRight,
+    CalendarDays,
+    ChevronLeft,
+    ChevronRight,
+    LogIn,
+    LogOut,
+    PiggyBank,
+    Plus,
+    Presentation,
+    Repeat,
+    Settings,
+    Table,
+    Tag,
+    Tags,
+    TrendingUp,
+} from 'lucide-vue-next'
 import { computed, markRaw, onMounted, ref, watch } from 'vue'
 import Toasts from './components/Toasts.vue'
 import AuthModal from './modals/AuthModal.vue'
@@ -174,6 +199,7 @@ import { useTransactionsStore } from './services/transactions.js'
 import Analytics from './tabs/Analytics.vue'
 import BalanceTrend from './tabs/BalanceTrend.vue'
 import Budgets from './tabs/Budgets.vue'
+import CalendarTab from './tabs/Calendar.vue'
 import MoneyFlow from './tabs/MoneyFlow.vue'
 import TableTab from './tabs/TableTab.vue'
 import TagDistribution from './tabs/TagDistribution.vue'
@@ -232,6 +258,12 @@ function shiftPeriod(delta) {
 
     datePicker.value?.parseModel()
 }
+function handleJumpToMonth(date) {
+    dateSelectionType.value = 'month'
+    selectedRange.value = { month: date.getMonth(), year: date.getFullYear() }
+    datePicker.value?.parseModel()
+}
+
 function getDefaultRange(type) {
     const today = new Date()
 
