@@ -56,8 +56,9 @@
 
                     <template v-if="currentPeriod(budget)">
                         <div class="flex items-center gap-1 mb-1">
-                            <span v-for="tag in currentPeriod(budget).tags" :key="tag.id" class="tooltip"
-                                :data-tip="tag.title">{{ tag.emoji }}</span>
+                            <button v-for="tag in currentPeriod(budget).tags" :key="tag.id" type="button"
+                                class="tooltip cursor-pointer" :data-tip="tag.title"
+                                @click="viewTransactions(currentPeriod(budget).tags)">{{ tag.emoji }}</button>
                             <span class="text-sm text-base-content/60 ml-auto tooltip"
                                 :data-tip="percentTooltip(spentForActive(currentPeriod(budget)), currentPeriod(budget).amount)">
                                 {{ formatMoney(spentForActive(currentPeriod(budget))) }} /
@@ -72,8 +73,9 @@
                         </div>
                     </template>
                     <div v-else class="flex items-center gap-1 mb-1">
-                        <span v-for="tag in currentTags(budget)" :key="tag.id" class="tooltip"
-                            :data-tip="tag.title">{{ tag.emoji }}</span>
+                        <button v-for="tag in currentTags(budget)" :key="tag.id" type="button"
+                            class="tooltip cursor-pointer" :data-tip="tag.title"
+                            @click="viewTransactions(currentTags(budget))">{{ tag.emoji }}</button>
                         <span class="text-sm text-base-content/60 ml-auto italic">Paused</span>
                     </div>
 
@@ -110,12 +112,14 @@
 import { Pause, Pencil, Play, Plus } from 'lucide-vue-next'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { formatDate, formatMoney, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { useBudgetsStore } from '../services/budgets.js'
+import { formatDate, formatMoney, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
 const budgetsStore = useBudgetsStore()
 const transactionsStore = useTransactionsStore()
+
+const emit = defineEmits(['jump-to-list'])
 
 const currentPeriod = (budget) => budget.periods.find((period) => period.active) ?? null
 const historyFor = (budget) => budget.periods.filter((period) => !period.active)
@@ -164,7 +168,9 @@ const historyBuckets = (period) => {
     let cursor = period.starts_at
 
     while (cursor <= period.ends_at) {
-        const nextStr = toLocalDateStr(nextBucketStart(bucketStartFor(parseLocalDate(cursor), period.length), period.length))
+        const nextStr = toLocalDateStr(
+            nextBucketStart(bucketStartFor(parseLocalDate(cursor), period.length), period.length),
+        )
         const end = nextStr <= period.ends_at ? dayBefore(nextStr) : period.ends_at
 
         buckets.push({ start: cursor, end })
@@ -202,6 +208,11 @@ const progressClass = (period) => {
     if (ratio >= 0.8) return 'progress-warning'
 
     return 'progress-success'
+}
+
+const viewTransactions = (tags) => {
+    transactionsStore.tagFilterDraft = tags.map((tag) => tag.id)
+    emit('jump-to-list')
 }
 
 const openAdd = () => budgets_add_modal.showModal()

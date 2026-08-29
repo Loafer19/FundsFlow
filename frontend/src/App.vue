@@ -147,7 +147,8 @@
             </div>
         </div>
 
-        <component :is="selectedTab" :dateRange="getDateRange" :dateSelectionType @jump-to-month="handleJumpToMonth" />
+        <component :is="selectedTab" :dateRange="getDateRange" :dateSelectionType @jump-to-month="handleJumpToMonth"
+            @jump-to-list="selectedTab = markRaw(TableTab)" />
     </div>
 
     <button v-if="authStore.isAuthenticated" type="button"

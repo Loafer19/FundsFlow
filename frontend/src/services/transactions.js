@@ -8,6 +8,7 @@ export const useTransactionsStore = defineStore('transactions', {
         transactions: [],
         transactionForEdit: null,
         transactionDraftAt: null,
+        tagFilterDraft: null,
         isLoading: false,
     }),
 

@@ -4,14 +4,32 @@
         action-label="Add Transaction" @action="openAdd" />
 
     <template v-else>
-        <label class="input input-sm w-full max-w-xs mb-3">
-            <Search :size="16" class="text-base-content/60" />
-            <input v-model="searchQuery" type="text" placeholder="Search notes" />
-        </label>
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+            <div class="dropdown">
+                <div tabindex="0" role="button"
+                    class="btn btn-sm bg-base-100 border-base-300 text-base-content/60 text-sm">
+                    <Tag :size="16" />
+                    Filter tags
+                    <span v-if="selectedTagIds.length" class="badge badge-outline badge-sm">{{ selectedTagIds.length }}</span>
+                </div>
+                <div tabindex="0"
+                    class="dropdown-content menu bg-base-100 rounded-box z-1 w-64 p-3 shadow border border-base-300">
+                    <TagPicker v-model="selectedTagIds" />
+                    <button v-if="selectedTagIds.length" type="button" class="btn btn-ghost btn-xs"
+                        @click="selectedTagIds = []">
+                        Clear
+                    </button>
+                </div>
+            </div>
 
-        <div v-if="!filteredTransactions.length" class="text-center py-8 text-base-content/60">
-            No transactions match "{{ searchQuery }}"
+            <label class="input input-sm w-full max-w-xs border-base-300 text-sm">
+                <Search :size="16" class="text-base-content/60" />
+                <input v-model="searchQuery" type="text" placeholder="Search notes" />
+            </label>
         </div>
+
+        <EmptyState v-if="!filteredTransactions.length" icon="🔍" title="No transactions match the current filters"
+            description="Try a different search term or clear the tag filter" />
 
         <div v-else class="card card-border border-base-300 bg-base-100">
             <div class="overflow-x-auto">
@@ -83,10 +101,11 @@
 </template>
 
 <script setup>
-import { Laptop, Pencil, Repeat, Search, Send } from 'lucide-vue-next'
-import { computed, inject, ref } from 'vue'
+import { Laptop, Pencil, Repeat, Search, Send, Tag } from 'lucide-vue-next'
+import { computed, inject, ref, watch } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
+import TagPicker from '../components/TagPicker.vue'
 import { getTransactionSourceLabel } from '../services/formatters'
 import { useTransactionsStore } from '../services/transactions'
 
@@ -112,6 +131,18 @@ const sortConfig = ref({
 })
 
 const searchQuery = ref('')
+const selectedTagIds = ref([])
+
+watch(
+    () => transactionsStore.tagFilterDraft,
+    (ids) => {
+        if (!ids) return
+
+        selectedTagIds.value = ids
+        transactionsStore.tagFilterDraft = null
+    },
+    { immediate: true },
+)
 
 const sortBy = (key) => {
     if (sortConfig.value.key === key) {
@@ -128,9 +159,11 @@ const dateRangeTransactions = computed(() =>
 
 const filteredTransactions = computed(() => {
     const query = searchQuery.value.trim().toLowerCase()
+    const tagIds = selectedTagIds.value
 
     return dateRangeTransactions.value
         .filter((transaction) => !query || transaction.note?.toLowerCase().includes(query))
+        .filter((transaction) => !tagIds.length || transaction.tags.some((tag) => tagIds.includes(tag.id)))
         .sort((a, b) => transactionsStore.sort(a, b, sortConfig.value.key, sortConfig.value.direction))
 })
 
