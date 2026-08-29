@@ -37,7 +37,7 @@
 
 <script setup>
 import { Save } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import AmountField from '../components/AmountField.vue'
 import { toLocalDateStr } from '../services/formatters.js'
 import { useTagsStore } from '../services/tags.js'
@@ -54,6 +54,16 @@ const createDefault = () => ({
 })
 
 const transaction = ref(createDefault())
+
+watch(
+    () => transactionsStore.transactionDraftAt,
+    (date) => {
+        if (!date) return
+
+        transaction.value.at = date
+        transactionsStore.transactionDraftAt = null
+    },
+)
 
 const toggleTag = (id) => {
     const index = transaction.value.tags.indexOf(id)

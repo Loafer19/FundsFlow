@@ -74,11 +74,9 @@
                 <div>
                     <h3 class="font-semibold text-base mb-2">{{ formatDate(selectedDate) }}</h3>
 
-                    <div v-if="!selectedItems.length"
-                        class="card border-2 border-dashed border-base-300 p-6 text-center text-base-content/60">
-                        <div class="text-2xl mb-1">📭</div>
-                        <div class="text-sm">Nothing this day</div>
-                    </div>
+                    <EmptyState v-if="!selectedItems.length" icon="📭" title="Nothing this day"
+                        description="No transactions or upcoming payments on this date" action-label="Add Transaction"
+                        @action="addForSelectedDate" />
 
                     <div v-else class="grid grid-cols-2 gap-2">
                         <button v-for="item in selectedItems" :key="item.key" type="button"
@@ -92,6 +90,13 @@
                             <div class="badge w-full justify-center" :class="badgeClass(item)">
                                 {{ item.amount > 0 ? '+' : '' }}{{ formatMoney(item.amount) }}
                             </div>
+                        </button>
+
+                        <button type="button"
+                            class="card border-2 border-dashed border-base-300 p-2 items-center justify-center text-base-content/60 cursor-pointer hover:border-primary hover:text-primary"
+                            @click="addForSelectedDate">
+                            <Plus :size="20" />
+                            <span class="text-xs mt-1">Add</span>
                         </button>
                     </div>
                 </div>
@@ -134,6 +139,7 @@
 </template>
 
 <script setup>
+import { Plus } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import EmptyState from '../components/EmptyState.vue'
 import { formatDate, formatMoney, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
@@ -164,6 +170,11 @@ const selectedDate = ref(todayStr)
 const hasAnyData = computed(() => transactionsStore.transactions.length > 0 || recurringStore.rules.length > 0)
 
 const openAdd = () => transactions_add_modal.showModal()
+
+const addForSelectedDate = () => {
+    transactionsStore.transactionDraftAt = selectedDate.value
+    transactions_add_modal.showModal()
+}
 
 const itemsInRange = (start, end) => {
     const actual = transactionsStore.filteredByDateRange(start, end).map((t) => ({

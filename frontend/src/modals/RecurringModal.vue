@@ -17,16 +17,16 @@
                     <tbody>
                         <tr v-for="rule in recurringStore.rules" :key="rule.id">
                             <td>
-                                <div class="flex items-center gap-2">
-                                    <span :class="rule.amount > 0 ? 'text-success' : 'text-error'">
-                                        {{ formatMoney(rule.amount) }}
-                                    </span>
-                                    <span v-if="rule.note" class="text-base-content/60">{{ rule.note }}</span>
-                                </div>
-                                <div class="flex items-center gap-1 text-xs text-base-content/60 mt-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <div class="badge badge-outline badge-neutral text-xs">{{ rule.frequency }}</div>
+                                    <div class="badge badge-outline" :class="rule.amount > 0 ? 'badge-success' : 'badge-error'">
+                                        {{ rule.amount > 0 ? '+' : '' }}{{ formatMoney(rule.amount) }}
+                                    </div>
                                     <span v-for="tag in rule.tags" :key="tag.id" class="tooltip"
                                         :data-tip="tag.title">{{ tag.emoji }}</span>
-                                    <span>{{ rule.frequency }} · next {{ formatDate(rule.next_run_at) }}</span>
+                                </div>
+                                <div class="text-sm mt-1">
+                                    {{ formatDate(rule.next_run_at) }}<template v-if="rule.note"> · {{ rule.note }}</template>
                                 </div>
                             </td>
                             <td class="text-right">

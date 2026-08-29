@@ -21,7 +21,10 @@
                 <input type="text" v-model="transaction.note" class="input w-full" placeholder="Note" maxlength="255" />
 
                 <div class="modal-action">
-                    <button type="submit" class="btn btn-success" :disabled="transactionsStore.isLoading">
+                    <DeleteHold :id="transaction.id" :disabled="transactionsStore.isLoading"
+                        :isLoading="transactionsStore.isLoading === transaction.id" @delete="handleDelete" />
+
+                    <button type="submit" class="btn btn-success btn-sm" :disabled="transactionsStore.isLoading">
                         <span v-if="transactionsStore.isLoading" class="loading loading-spinner"></span>
                         Update
                         <Save :size="20" />
@@ -39,6 +42,7 @@
 import { Save } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
 import AmountField from '../components/AmountField.vue'
+import DeleteHold from '../components/buttons/DeleteHold.vue'
 import { toLocalDateStr } from '../services/formatters.js'
 import { useTagsStore } from '../services/tags.js'
 import { useTransactionsStore } from '../services/transactions.js'
@@ -77,6 +81,15 @@ const toggleTag = (id) => {
 
 const handleSubmit = async () => {
     const ok = await transactionsStore.update(transaction.value)
+
+    if (!ok) return
+
+    transactionsStore.transactionForEdit = null
+    transactions_edit_modal.close()
+}
+
+const handleDelete = async (id) => {
+    const ok = await transactionsStore.delete(id)
 
     if (!ok) return
 

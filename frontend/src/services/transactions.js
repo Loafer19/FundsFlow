@@ -7,6 +7,7 @@ export const useTransactionsStore = defineStore('transactions', {
     state: () => ({
         transactions: [],
         transactionForEdit: null,
+        transactionDraftAt: null,
         isLoading: false,
     }),
 

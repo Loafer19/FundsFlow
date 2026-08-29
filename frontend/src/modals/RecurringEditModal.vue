@@ -25,7 +25,10 @@
                 <TagPicker v-model="form.tags" />
 
                 <div class="modal-action">
-                    <button type="submit" class="btn btn-success" :disabled="recurringStore.isLoading">
+                    <DeleteHold :id="form.id" :disabled="recurringStore.isLoading"
+                        :isLoading="recurringStore.isLoading === form.id" @delete="handleDelete" />
+
+                    <button type="submit" class="btn btn-success btn-sm" :disabled="recurringStore.isLoading">
                         <span v-if="recurringStore.isLoading" class="loading loading-spinner"></span>
                         Update
                         <Save :size="24" />
@@ -43,6 +46,7 @@
 import { Repeat, Save } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
 import AmountField from '../components/AmountField.vue'
+import DeleteHold from '../components/buttons/DeleteHold.vue'
 import TagPicker from '../components/TagPicker.vue'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 
@@ -70,6 +74,15 @@ watch(
 
 const handleSubmit = async () => {
     const ok = await recurringStore.update(form.value.id, { ...form.value, ends_at: form.value.ends_at || null })
+
+    if (!ok) return
+
+    recurringStore.ruleForEdit = null
+    recurring_edit_modal.close()
+}
+
+const handleDelete = async (id) => {
+    const ok = await recurringStore.delete(id)
 
     if (!ok) return
 
