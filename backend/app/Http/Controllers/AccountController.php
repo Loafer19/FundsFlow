@@ -14,7 +14,7 @@ class AccountController extends Controller
 
         $data = $request->validate([
             'email' => [
-                'required', 'string', 'max:255', 'email:dns,rfs',
+                'required', 'string', 'max:255', 'email:dns,rfc',
                 Rule::unique('users', 'email')->ignore($user->id),
             ],
             'password' => 'required|string|min:8',

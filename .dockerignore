@@ -1,0 +1,14 @@
+.git
+.github
+
+backend/vendor
+
+frontend/node_modules
+frontend/dist
+
+.env
+.env.*
+**/.env
+**/.env.*
+
+README.md

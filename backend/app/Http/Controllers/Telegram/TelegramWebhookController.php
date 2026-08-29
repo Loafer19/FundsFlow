@@ -12,9 +12,12 @@ class TelegramWebhookController extends Controller
 {
     public function handle(Request $request, TelegramBot $bot): Response
     {
+        $expected = (string) config('services.telegram.webhook_secret');
         $secret = (string) $request->header('X-Telegram-Bot-Api-Secret-Token');
 
-        if (!hash_equals((string) config('services.telegram.webhook_secret'), $secret)) {
+        abort_if($expected === '', 500);
+
+        if (!hash_equals($expected, $secret)) {
             abort(403);
         }
 
