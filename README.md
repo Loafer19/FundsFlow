@@ -23,7 +23,11 @@ Personal finance tracker
   - budget and digest alerts, mute/unmute
 - Filter:
   - by date: week, month, year
-  - by tags: in development
+  - by tags (List tab + from Budgets)
+  - search notes (List tab)
+- Calendar:
+  - month / week / year views
+  - actual transactions + upcoming recurring
 - Settings:
   - money/date format
   - 30+ themes

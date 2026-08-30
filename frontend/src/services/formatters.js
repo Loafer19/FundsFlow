@@ -89,9 +89,7 @@ export const apiErrorMessage = (error, prefix = '') => {
     const fieldErrors = data?.errors
 
     if (fieldErrors && typeof fieldErrors === 'object') {
-        const messages = Object.values(fieldErrors)
-            .flat()
-            .filter(Boolean)
+        const messages = Object.values(fieldErrors).flat().filter(Boolean)
 
         if (messages.length) {
             return prefix + messages.join(' ')

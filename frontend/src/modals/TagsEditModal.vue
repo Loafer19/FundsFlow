@@ -100,7 +100,8 @@ const parentOptions = computed(() => {
     }
     collectDescendants(currentId)
 
-    return tagsStore.list()
+    return tagsStore
+        .list()
         .filter((t) => !excluded.has(t.id))
         .map((t) => ({
             id: t.id,

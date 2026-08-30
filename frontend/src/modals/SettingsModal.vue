@@ -130,11 +130,11 @@
 import { Circle, CircleCheck, KeyRound, Save, Send } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import { updateCredentials } from '../services/account'
-import { formatDateOptions, formatMoneyOptions, apiErrorMessage } from '../services/formatters'
+import { useAuthStore } from '../services/auth'
+import { apiErrorMessage, formatDateOptions, formatMoneyOptions } from '../services/formatters'
 import { getTelegramLinkCode } from '../services/identities'
 import settings, { updateDateFormat, updateDecimals, updateMoneyFormat, updateTheme } from '../services/settings'
 import toasts from '../services/toasts'
-import { useAuthStore } from '../services/auth'
 
 const authStore = useAuthStore()
 
