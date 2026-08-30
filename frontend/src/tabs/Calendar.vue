@@ -4,18 +4,21 @@
         @action="openAdd" />
 
     <template v-else>
-        <div class="grid grid-cols-3 gap-3 mb-3">
-            <div class="card card-border border-base-300 bg-base-100 p-3">
-                <div class="text-xs text-base-content/60">Income</div>
-                <div class="text-lg font-semibold text-success">{{ formatMoney(periodTotals.income) }}</div>
+        <div class="grid grid-cols-3 gap-2 sm:gap-3 mb-3">
+            <div class="card card-border border-base-300 bg-base-100 p-2 sm:p-3 min-w-0">
+                <div class="text-[10px] sm:text-xs text-base-content/60">Income</div>
+                <div class="text-sm sm:text-lg font-semibold text-success truncate">{{ formatMoney(periodTotals.income) }}
+                </div>
             </div>
-            <div class="card card-border border-base-300 bg-base-100 p-3">
-                <div class="text-xs text-base-content/60">Expenses</div>
-                <div class="text-lg font-semibold text-error">{{ formatMoney(periodTotals.expense) }}</div>
+            <div class="card card-border border-base-300 bg-base-100 p-2 sm:p-3 min-w-0">
+                <div class="text-[10px] sm:text-xs text-base-content/60">Expenses</div>
+                <div class="text-sm sm:text-lg font-semibold text-error truncate">{{ formatMoney(periodTotals.expense) }}
+                </div>
             </div>
-            <div class="card card-border border-base-300 bg-base-100 p-3">
-                <div class="text-xs text-base-content/60">Total</div>
-                <div class="text-lg font-semibold" :class="periodTotals.total >= 0 ? 'text-success' : 'text-error'">
+            <div class="card card-border border-base-300 bg-base-100 p-2 sm:p-3 min-w-0">
+                <div class="text-[10px] sm:text-xs text-base-content/60">Total</div>
+                <div class="text-sm sm:text-lg font-semibold truncate"
+                    :class="periodTotals.total >= 0 ? 'text-success' : 'text-error'">
                     {{ formatMoney(periodTotals.total) }}
                 </div>
             </div>
@@ -23,7 +26,7 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-3 items-start">
             <div class="card card-border border-base-300 bg-base-100">
-                <div class="card-body">
+                <div class="card-body p-3 sm:p-6">
                     <div v-if="dateSelectionType === 'year'" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                         <button v-for="m in yearMonths" :key="m.month" type="button"
                             class="card card-border border-base-300 text-left p-3 hover:border-primary"
@@ -41,20 +44,32 @@
                     </div>
 
                     <template v-else>
-                        <div class="grid grid-cols-7 gap-1 mb-1 text-xs font-medium text-base-content/60 text-center">
-                            <span v-for="w in weekdayLabels" :key="w">{{ w }}</span>
+                        <div class="grid grid-cols-7 gap-0.5 sm:gap-1 mb-1 text-[10px] sm:text-xs font-medium text-base-content/60 text-center">
+                            <span v-for="w in weekdayLabels" :key="w.full">
+                                <span class="sm:hidden">{{ w.short }}</span>
+                                <span class="hidden sm:inline">{{ w.full }}</span>
+                            </span>
                         </div>
 
-                        <div class="grid grid-cols-7 gap-1">
+                        <div class="grid grid-cols-7 gap-0.5 sm:gap-1">
                             <button v-for="cell in gridCells" :key="cell.date" type="button" class="day-cell"
                                 :class="{
                                     'opacity-40': !cell.inRange,
                                     'border-primary!': cell.date === selectedDate,
                                     'text-primary font-bold': cell.date === todayStr,
                                 }" @click="selectedDate = cell.date">
-                                <span class="text-xs">{{ cell.day }}</span>
+                                <span class="text-[11px] sm:text-xs leading-none">{{ cell.day }}</span>
 
-                                <div class="flex flex-col gap-0.5 mt-auto w-full">
+                                <!-- Mobile: colored dots (amounts don't fit ~42px cells) -->
+                                <div v-if="cell.items.length" class="flex flex-wrap gap-0.5 mt-auto sm:hidden">
+                                    <span v-for="item in cell.items.slice(0, 3)" :key="item.key" class="day-dot"
+                                        :class="[item.amount > 0 ? 'bg-success' : 'bg-error', !item.actual && 'opacity-50']"></span>
+                                    <span v-if="cell.items.length > 3"
+                                        class="text-[9px] leading-none text-base-content/60">+{{ cell.items.length - 3 }}</span>
+                                </div>
+
+                                <!-- sm+: amount badges -->
+                                <div class="hidden sm:flex flex-col gap-0.5 mt-auto w-full min-w-0">
                                     <div v-for="item in cell.items.slice(0, 2)" :key="item.key"
                                         class="badge badge-xs w-full justify-start truncate px-1"
                                         :class="badgeClass(item)">
@@ -164,7 +179,15 @@ const props = defineProps({
 
 const emit = defineEmits(['jump-to-month'])
 
-const weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const weekdayLabels = [
+    { short: 'M', full: 'Mon' },
+    { short: 'T', full: 'Tue' },
+    { short: 'W', full: 'Wed' },
+    { short: 'T', full: 'Thu' },
+    { short: 'F', full: 'Fri' },
+    { short: 'S', full: 'Sat' },
+    { short: 'S', full: 'Sun' },
+]
 const todayStr = toLocalDateStr(new Date())
 const selectedDate = ref(todayStr)
 
@@ -355,15 +378,31 @@ watch(
 .day-cell {
     border: var(--border) solid var(--color-base-300);
     border-radius: var(--radius-field);
-    min-height: 5rem;
-    padding: 0.375rem;
+    min-height: 2.75rem;
+    padding: 0.25rem;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     text-align: left;
+    min-width: 0;
+    overflow: hidden;
+}
+
+@media (min-width: 640px) {
+    .day-cell {
+        min-height: 5rem;
+        padding: 0.375rem;
+    }
 }
 
 .day-cell:hover {
     border-color: var(--color-primary);
+}
+
+.day-dot {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 999px;
+    flex-shrink: 0;
 }
 </style>

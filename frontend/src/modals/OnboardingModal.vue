@@ -3,7 +3,7 @@
         <div class="modal-box max-w-md">
             <template v-if="step === 'welcome'">
                 <div class="flex items-center gap-3 mb-3">
-                    <img src="/logo-hires.png" alt="FundsFlow" class="w-14 h-14 rounded-2xl shadow-sm" />
+                    <img src="/logo-hires.png" alt="FundsFlow" class="w-14 h-14 rounded-2xl" />
                     <h2 class="card-title mb-0">
                         Welcome to FundsFlow
                     </h2>

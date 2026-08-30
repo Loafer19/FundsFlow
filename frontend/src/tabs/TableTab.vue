@@ -13,7 +13,7 @@
                     <span v-if="selectedTagIds.length" class="badge badge-outline badge-sm">{{ selectedTagIds.length }}</span>
                 </div>
                 <div tabindex="0"
-                    class="dropdown-content menu bg-base-100 rounded-box z-1 w-64 p-3 shadow border border-base-300">
+                    class="dropdown-content menu bg-base-100 rounded-box z-1 w-64 p-3 border border-base-300">
                     <TagPicker v-model="selectedTagIds" />
                     <button v-if="selectedTagIds.length" type="button" class="btn btn-ghost btn-xs"
                         @click="selectedTagIds = []">

@@ -15,11 +15,12 @@
     <OnboardingModal />
 
     <div class="container mx-auto p-4">
-        <div class="flex gap-2 justify-end mb-4">
+        <div class="flex gap-2 justify-end mb-4 flex-wrap">
             <template v-if="authStore.isAuthenticated">
-                <button type="button" @click="showModal('transactions_add_modal')" class="btn btn-primary">
+                <button type="button" @click="showModal('transactions_add_modal')"
+                    class="btn btn-primary max-sm:btn-square" aria-label="Add Transaction">
                     <Plus :size="20" />
-                    Add Transaction
+                    <span class="hidden sm:inline">Add Transaction</span>
                 </button>
 
                 <button @click="showModal('recurring_modal')"
@@ -54,7 +55,7 @@
         </div>
 
         <div class="flex gap-2 mb-3 items-stretch">
-            <select class="select w-30 border-base-300 focus:border-base-content cursor-pointer"
+            <select class="select w-24 sm:w-30 border-base-300 focus:border-base-content cursor-pointer"
                 v-model="dateSelectionType">
                 <option value="week">Week</option>
                 <option value="month">Month</option>
@@ -66,7 +67,7 @@
                 <ChevronLeft :size="20" />
             </button>
 
-            <div class="w-40">
+            <div class="w-32 sm:w-40 min-w-0 flex-1 sm:flex-none">
                 <VueDatePicker v-model="selectedRange" hide-offset-dates :enable-time-picker="false" auto-apply
                     :transitions="false" :week-picker="dateSelectionType === 'week'"
                     :month-picker="dateSelectionType === 'month'" :year-picker="dateSelectionType === 'year'"
@@ -81,66 +82,66 @@
             </button>
         </div>
 
-        <div class="mb-4">
-            <div class="tabs tabs-box gap-2 p-0">
-                <label class="tab gap-1 text-lg font-medium hover:text-info">
+        <div class="mb-4 -mx-4 px-4 overflow-x-auto">
+            <div class="tabs tabs-box gap-2 p-0 w-max min-w-full sm:w-auto sm:min-w-0">
+                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                     <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" checked="checked"
                         :value="markRaw(Analytics)" />
 
-                    <Presentation :size="24" />
+                    <Presentation :size="22" />
 
                     Analytics
                 </label>
 
-                <label class="tab gap-1 text-lg font-medium hover:text-info">
+                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                     <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
                         :value="markRaw(CalendarTab)" />
 
-                    <CalendarDays :size="24" />
+                    <CalendarDays :size="22" />
 
                     Calendar
                 </label>
 
-                <label class="tab gap-1 text-lg font-medium hover:text-info">
+                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                     <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
                         :value="markRaw(Budgets)" />
 
-                    <PiggyBank :size="24" />
+                    <PiggyBank :size="22" />
 
                     Budgets
                 </label>
 
-                <label class="tab gap-1 text-lg font-medium hover:text-info">
+                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                     <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
                         :value="markRaw(TagDistribution)" />
 
-                    <Tags :size="24" />
+                    <Tags :size="22" />
 
                     Tags
                 </label>
 
-                <label class="tab gap-1 text-lg font-medium hover:text-info">
+                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                     <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
                         :value="markRaw(MoneyFlow)" />
 
-                    <ArrowLeftRight :size="24" />
+                    <ArrowLeftRight :size="22" />
 
                     Flow
                 </label>
 
-                <label class="tab gap-1 text-lg font-medium hover:text-info">
+                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                     <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
                         :value="markRaw(BalanceTrend)" />
 
-                    <TrendingUp :size="24" />
+                    <TrendingUp :size="22" />
 
                     Trend
                 </label>
 
-                <label class="tab gap-1 text-lg font-medium hover:text-info">
+                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                     <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" :value="markRaw(TableTab)" />
 
-                    <Table :size="24" />
+                    <Table :size="22" />
 
                     List
                 </label>
