@@ -2,10 +2,17 @@
     <dialog id="onboarding_modal" class="modal" @close="onDialogClose">
         <div class="modal-box max-w-md">
             <template v-if="step === 'welcome'">
-                <h2 class="card-title mb-2">
-                    <Sparkles :size="24" />
-                    Welcome to FundsFlow
-                </h2>
+                <div class="flex items-center gap-3 mb-3">
+                    <img src="/logo-hires.png" alt="FundsFlow" class="w-14 h-14 rounded-2xl shadow-sm" />
+                    <h2 class="card-title mb-0">
+                        Welcome to FundsFlow
+                    </h2>
+                </div>
+
+                <p class="text-sm text-base-content/70 mb-3">
+                    FundsFlow is a personal finance tracker for tagging spending, setting budgets, planning recurring
+                    payments, and logging expenses from Telegram — with charts for balance, flow, and tags.
+                </p>
 
                 <p class="text-sm text-base-content/70 mb-4">
                     Starter tags are ready so you can categorize right away. Add a first transaction to see Analytics
@@ -74,7 +81,7 @@
 </template>
 
 <script setup>
-import { Plus, Send, Sparkles, Tag } from 'lucide-vue-next'
+import { Plus, Send, Tag } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { apiErrorMessage } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'

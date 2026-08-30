@@ -1,6 +1,6 @@
 # FundsFlow
 
-![FundsFlow](./frontend/public/logo.png)
+![FundsFlow](./frontend/public/logo-hires.png)
 
 Personal finance tracker
 

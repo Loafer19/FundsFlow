@@ -8,60 +8,113 @@
             width: 1200px;
             height: 630px;
             overflow: hidden;
-            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-            background: linear-gradient(135deg, #1a1625 0%, #2d2438 45%, #3d2f1f 100%);
-            color: #fff8f0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            font-family: "Segoe UI", ui-sans-serif, system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+            background: #f7ecd7;
+            color: #3a2a18;
+            position: relative;
         }
-        .card {
-            width: 1080px;
-            height: 510px;
-            border-radius: 28px;
-            background: linear-gradient(160deg, rgba(255, 244, 230, 0.12), rgba(255, 200, 120, 0.08));
-            border: 1px solid rgba(255, 220, 170, 0.28);
-            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+        .glow {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(60px);
+            pointer-events: none;
+        }
+        .glow-a {
+            width: 420px;
+            height: 420px;
+            background: rgba(232, 176, 74, 0.35);
+            top: -120px;
+            right: -80px;
+        }
+        .glow-b {
+            width: 360px;
+            height: 360px;
+            background: rgba(255, 220, 140, 0.45);
+            bottom: -140px;
+            left: -100px;
+        }
+        .frame {
+            position: relative;
+            z-index: 1;
+            width: 1200px;
+            height: 630px;
             display: flex;
             align-items: center;
-            gap: 48px;
-            padding: 56px 64px;
+            padding: 0 88px;
+            gap: 56px;
+            background:
+                radial-gradient(circle at 88% 18%, rgba(240, 190, 90, 0.28), transparent 42%),
+                linear-gradient(180deg, #fbf3e4 0%, #f3e2c4 100%);
+            border-bottom: 10px solid #e0a93a;
+        }
+        .logo-wrap {
+            flex-shrink: 0;
+            padding: 12px;
+            border-radius: 56px;
+            background: #fff8ea;
+            box-shadow: 0 16px 36px rgba(120, 70, 10, 0.16);
         }
         .logo {
-            width: 220px;
-            height: 220px;
-            border-radius: 40px;
-            flex-shrink: 0;
-            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+            width: 236px;
+            height: 236px;
+            display: block;
         }
-        .copy { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+        .copy {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 16px;
+            min-width: 0;
+            padding-top: 8px;
+        }
+        .eyebrow {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: #b07a20;
+        }
         h1 {
-            font-size: 92px;
-            line-height: 1;
-            letter-spacing: -0.03em;
+            font-size: 96px;
+            line-height: 0.95;
+            letter-spacing: -0.035em;
             font-weight: 800;
-            color: #ffe6c2;
+            color: #2b1d10;
         }
         p {
-            font-size: 34px;
+            font-size: 30px;
             line-height: 1.35;
-            color: rgba(255, 248, 240, 0.82);
-            max-width: 640px;
+            color: #5c4630;
+            max-width: 620px;
+            font-weight: 500;
         }
         .url {
-            margin-top: 8px;
-            font-size: 26px;
-            color: rgba(255, 210, 140, 0.9);
-            font-weight: 600;
+            margin-top: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            align-self: flex-start;
+            padding: 12px 20px;
+            border-radius: 999px;
+            background: #fff8ea;
+            border: 1px solid rgba(176, 122, 32, 0.28);
+            color: #8a5c12;
+            font-size: 24px;
+            font-weight: 700;
         }
     </style>
 </head>
 <body>
-    <div class="card">
-        <img class="logo" src="../public/logo.png" alt="FundsFlow">
+    <div class="glow glow-a"></div>
+    <div class="glow glow-b"></div>
+    <div class="frame">
+        <div class="logo-wrap">
+            <img class="logo" src="./logo-hires.png" alt="FundsFlow">
+        </div>
         <div class="copy">
+            <div class="eyebrow">Personal finance</div>
             <h1>FundsFlow</h1>
-            <p>Personal finance tracker — tags, budgets, recurring payments, Telegram bot</p>
+            <p>Tags, budgets, recurring payments, and a Telegram bot — in one place</p>
             <div class="url">fundsflow.fun</div>
         </div>
     </div>
