@@ -31,9 +31,6 @@ Personal finance tracker
 - Onboarding:
   - welcome modal with starter tags preview
   - optional Telegram bot link
-- SEO:
-  - meta / Open Graph / JSON-LD
-  - robots.txt + sitemap
 - Settings:
   - money/date format
   - 30+ themes
