@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
 import { apiErrorMessage, toLocalDateStr } from './formatters.js'
+import { isOnboardingDone, markOnboardingDone } from './onboarding.js'
 import toasts from './toasts.js'
 
 export const useTransactionsStore = defineStore('transactions', {
@@ -54,6 +55,10 @@ export const useTransactionsStore = defineStore('transactions', {
                 const response = await api.post('/transactions', raw)
 
                 this.transactions.push(response.data)
+
+                if (!isOnboardingDone()) {
+                    markOnboardingDone()
+                }
 
                 toasts.success('Transaction created successfully!')
 

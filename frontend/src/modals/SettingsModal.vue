@@ -132,7 +132,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { updateCredentials } from '../services/account'
 import { useAuthStore } from '../services/auth'
 import { apiErrorMessage, formatDateOptions, formatMoneyOptions } from '../services/formatters'
-import { getTelegramLinkCode } from '../services/identities'
+import { openTelegramLinkBot } from '../services/identities'
 import settings, { updateDateFormat, updateDecimals, updateMoneyFormat, updateTheme } from '../services/settings'
 import toasts from '../services/toasts'
 
@@ -251,7 +251,6 @@ const formatMoneyPreview = computed(() => {
     }).format(1234.56)
 })
 
-const telegramBotUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
 const generatingTelegramLink = ref(false)
 
 const identityFor = (provider) => authStore.user?.identities?.find((identity) => identity.provider === provider) ?? null
@@ -283,9 +282,7 @@ const openTelegramLink = async () => {
     generatingTelegramLink.value = true
 
     try {
-        const response = await getTelegramLinkCode()
-
-        window.open(`https://t.me/${telegramBotUsername}?start=${response.data.code}`, '_blank')
+        await openTelegramLinkBot()
     } catch (error) {
         toasts.error(apiErrorMessage(error, 'Failed to generate link: '))
     } finally {

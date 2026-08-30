@@ -28,6 +28,9 @@ Personal finance tracker
 - Calendar:
   - month / week / year views
   - actual transactions + upcoming recurring
+- Onboarding:
+  - welcome modal with starter tags preview
+  - optional Telegram bot link
 - Settings:
   - money/date format
   - 30+ themes

@@ -12,6 +12,7 @@
     <RecurringAddModal />
     <RecurringEditModal />
     <SettingsModal />
+    <OnboardingModal />
 
     <div class="container mx-auto p-4">
         <div class="flex gap-2 justify-end mb-4">
@@ -149,6 +150,13 @@
 
         <component :is="selectedTab" :dateRange="getDateRange" :dateSelectionType @jump-to-month="handleJumpToMonth"
             @jump-to-list="selectedTab = markRaw(TableTab)" />
+
+        <footer class="mt-10 pt-4 border-t border-base-300 text-center text-sm text-base-content/50">
+            Feedback
+            <a href="https://t.me/Loafer19" target="_blank" rel="noopener noreferrer" class="link link-hover">
+                @Loafer19
+            </a>
+        </footer>
     </div>
 
     <button v-if="authStore.isAuthenticated" type="button"
@@ -183,6 +191,7 @@ import Toasts from './components/Toasts.vue'
 import AuthModal from './modals/AuthModal.vue'
 import BudgetAddModal from './modals/BudgetAddModal.vue'
 import BudgetEditModal from './modals/BudgetEditModal.vue'
+import OnboardingModal from './modals/OnboardingModal.vue'
 import RecurringAddModal from './modals/RecurringAddModal.vue'
 import RecurringEditModal from './modals/RecurringEditModal.vue'
 import RecurringModal from './modals/RecurringModal.vue'
@@ -195,6 +204,7 @@ import TransactionsEditModal from './modals/TransactionsEditModal.vue'
 import { useAuthStore } from './services/auth.js'
 import { useBudgetsStore } from './services/budgets.js'
 import { showModal } from './services/modal.js'
+import { shouldShowOnboarding } from './services/onboarding.js'
 import { useRecurringTransactionsStore } from './services/recurringTransactions.js'
 import { useTagsStore } from './services/tags.js'
 import { useTransactionsStore } from './services/transactions.js'
@@ -221,12 +231,18 @@ onMounted(() => authStore.checkAuth())
 
 watch(
     () => authStore.isAuthenticated,
-    (auth) => {
+    async (auth) => {
         if (auth) {
-            tagsStore.load()
-            transactionsStore.load()
-            budgetsStore.load()
-            recurringTransactionsStore.load()
+            await Promise.all([
+                tagsStore.load(),
+                transactionsStore.load(),
+                budgetsStore.load(),
+                recurringTransactionsStore.load(),
+            ])
+
+            if (shouldShowOnboarding(transactionsStore.transactions.length)) {
+                showModal('onboarding_modal')
+            }
         } else {
             tagsStore.tags = []
             transactionsStore.transactions = []
