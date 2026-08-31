@@ -13,86 +13,124 @@
 
             <div class="modal-content">
                 <template v-if="tab === 'formatting'">
-                    <label for="formatDate">Date</label>
-                    <select v-model="formatDate" class="select w-full mb-4" id="formatDate">
-                        <optgroup v-for="(options, key) in formatDateOptions" :label="key">
-                            <option v-for="option in options" :value="option">
-                                {{ option }}
-                            </option>
-                        </optgroup>
-                    </select>
+                    <div class="p-3 rounded-box bg-base-200 mb-3">
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <label for="formatDate" class="font-medium text-sm">Date</label>
+                            <span class="text-xs text-base-content/60 font-mono shrink-0">{{ formatDatePreview }}</span>
+                        </div>
+                        <select v-model="formatDate" class="select select-sm w-full" id="formatDate">
+                            <optgroup v-for="(options, key) in formatDateOptions" :label="key">
+                                <option v-for="option in options" :value="option">
+                                    {{ option }}
+                                </option>
+                            </optgroup>
+                        </select>
+                    </div>
 
-                    <label for="formatMoney">Money</label>
-                    <select v-model="formatMoney" class="select w-full mb-4" id="formatMoney">
-                        <option v-for="(value, title) in formatMoneyOptions" :value="value">
-                            {{ title }}
-                        </option>
-                    </select>
-
-                    <label class="label">
-                        <input v-model="decimals" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
-                        Show decimals
-                    </label>
-
-                    <div class="mt-4 p-3 rounded-box bg-base-200 text-sm">
-                        <div class="text-base-content/60 mb-1">Preview</div>
-                        <div>{{ formatDatePreview }} · {{ formatMoneyPreview }}</div>
+                    <div class="p-3 rounded-box bg-base-200 mb-3">
+                        <div class="font-medium text-sm mb-2">Money</div>
+                        <div class="flex flex-wrap gap-1.5 mb-3" role="group" aria-label="Money format">
+                            <button v-for="(value, title) in formatMoneyOptions" :key="value" type="button"
+                                class="btn btn-sm"
+                                :class="formatMoney === value ? 'btn-primary' : 'btn-outline'"
+                                :aria-pressed="formatMoney === value" @click="formatMoney = value">
+                                {{ title }}
+                            </button>
+                        </div>
+                        <label class="label cursor-pointer justify-start gap-2 py-0">
+                            <input v-model="decimals" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
+                            <span class="label-text text-sm">Show decimals</span>
+                        </label>
                     </div>
                 </template>
 
                 <template v-else-if="tab === 'theme'">
-                    <fieldset class="fieldset">
-                        <label class="flex gap-2 cursor-pointer items-center" v-for="theme in themeOptions"
-                            :key="theme">
-                            <input type="radio" name="theme-radios" class="radio radio-sm theme-controller"
-                                :value="theme" v-model="themeSelected" />
-                            {{ theme.charAt(0).toUpperCase() + theme.slice(1) }}
-                        </label>
-                    </fieldset>
+                    <template v-if="favoriteThemes.length">
+                        <div class="text-xs text-base-content/60 mb-2">Favorites</div>
+                        <div class="grid grid-cols-2 gap-2 mb-3">
+                            <button v-for="theme in favoriteThemes" :key="'fav-' + theme" type="button"
+                                class="theme-swatch btn btn-ghost h-auto min-h-0 p-3 gap-2 justify-start border w-full"
+                                :class="themeSelected === theme ? 'border-primary' : 'border-base-300'"
+                                :aria-label="themeLabel(theme)" :aria-pressed="themeSelected === theme"
+                                @click="themeSelected = theme">
+                                <span class="theme-chips flex gap-0.5 shrink-0" :data-theme="theme">
+                                    <span class="chip bg-primary"></span>
+                                    <span class="chip bg-secondary"></span>
+                                    <span class="chip bg-accent"></span>
+                                    <span class="chip bg-base-100 border border-base-300"></span>
+                                </span>
+                                <span class="text-sm truncate flex-1 text-left">{{ themeLabel(theme) }}</span>
+                                <span class="text-sm shrink-0" role="button" tabindex="0"
+                                    :aria-label="'Unfavorite ' + theme"
+                                    @click.stop="toggleFavorite(theme)"
+                                    @keydown.enter.stop.prevent="toggleFavorite(theme)">★</span>
+                            </button>
+                        </div>
+                        <hr class="border-base-300 mb-3" />
+                    </template>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <button v-for="theme in otherThemes" :key="theme" type="button"
+                            class="theme-swatch btn btn-ghost h-auto min-h-0 p-3 gap-2 justify-start border w-full"
+                            :class="themeSelected === theme ? 'border-primary' : 'border-base-300'"
+                            :aria-label="themeLabel(theme)" :aria-pressed="themeSelected === theme"
+                            @click="themeSelected = theme">
+                            <span class="theme-chips flex gap-0.5 shrink-0" :data-theme="theme">
+                                <span class="chip bg-primary"></span>
+                                <span class="chip bg-secondary"></span>
+                                <span class="chip bg-accent"></span>
+                                <span class="chip bg-base-100 border border-base-300"></span>
+                            </span>
+                            <span class="text-sm truncate flex-1 text-left">{{ themeLabel(theme) }}</span>
+                            <span class="text-sm shrink-0 opacity-50" role="button" tabindex="0"
+                                :aria-label="'Favorite ' + theme"
+                                @click.stop="toggleFavorite(theme)"
+                                @keydown.enter.stop.prevent="toggleFavorite(theme)">☆</span>
+                        </button>
+                    </div>
                 </template>
 
                 <template v-else-if="tab === 'accounts'">
                     <div class="flex flex-col gap-2 mb-4">
-                        <div class="flex items-center justify-between p-3 rounded-box bg-base-200">
-                            <span>Google</span>
-                            <span class="tooltip tooltip-left" :data-tip="statusTooltip(googleIdentity, googleLabel)">
-                                <CircleCheck v-if="googleIdentity" :size="20" class="text-success" />
-                                <Circle v-else :size="20" class="text-base-content/40" />
-                            </span>
+                        <div class="flex items-center gap-2 p-3 rounded-box bg-base-200">
+                            <span class="font-medium w-24 shrink-0">Google</span>
+                            <span v-if="googleIdentity" class="badge badge-success badge-sm">Linked</span>
+                            <span v-else class="badge badge-ghost badge-sm">Not linked</span>
+                            <span v-if="googleLabel" class="ml-auto text-xs text-base-content/50 truncate max-w-[40%]"
+                                :title="googleLabel">{{ googleLabel }}</span>
                         </div>
-                        <div class="flex items-center justify-between p-3 rounded-box bg-base-200">
-                            <span>GitHub</span>
-                            <span class="tooltip tooltip-left" :data-tip="statusTooltip(githubIdentity, githubLabel)">
-                                <CircleCheck v-if="githubIdentity" :size="20" class="text-success" />
-                                <Circle v-else :size="20" class="text-base-content/40" />
-                            </span>
+
+                        <div class="flex items-center gap-2 p-3 rounded-box bg-base-200">
+                            <span class="font-medium w-24 shrink-0">GitHub</span>
+                            <span v-if="githubIdentity" class="badge badge-success badge-sm">Linked</span>
+                            <span v-else class="badge badge-ghost badge-sm">Not linked</span>
+                            <span v-if="githubLabel" class="ml-auto text-xs text-base-content/50 truncate max-w-[40%]"
+                                :title="githubLabel">{{ githubLabel }}</span>
                         </div>
-                        <div class="flex items-center justify-between p-3 rounded-box bg-base-200">
-                            <span>Telegram</span>
-                            <span class="tooltip tooltip-left"
-                                :data-tip="statusTooltip(telegramIdentity, telegramLinkLabel)">
-                                <CircleCheck v-if="telegramIdentity" :size="20" class="text-success" />
-                                <Circle v-else :size="20" class="text-base-content/40" />
-                            </span>
+
+                        <div class="flex items-center gap-2 p-3 rounded-box bg-base-200">
+                            <span class="font-medium w-24 shrink-0">Telegram</span>
+                            <template v-if="telegramIdentity">
+                                <span class="badge badge-success badge-sm">Linked</span>
+                                <span v-if="telegramLinkLabel"
+                                    class="ml-auto text-xs text-base-content/50 truncate max-w-[40%]"
+                                    :title="telegramLinkLabel">{{ telegramLinkLabel }}</span>
+                            </template>
+                            <template v-else>
+                                <span class="badge badge-ghost badge-sm">Not linked</span>
+                                <button type="button" class="btn btn-primary btn-xs ml-auto"
+                                    @click="openTelegramLink" :disabled="generatingTelegramLink"
+                                    title="Link Telegram to add transactions from chat">
+                                    Open Bot
+                                    <span v-if="generatingTelegramLink"
+                                        class="loading loading-spinner loading-xs"></span>
+                                    <Send v-else :size="14" />
+                                </button>
+                            </template>
                         </div>
                     </div>
 
-                    <template v-if="!telegramIdentity">
-                        <div class="divider text-sm text-base-content/60">Link Telegram</div>
-
-                        <p class="text-sm text-base-content/60 mb-3">
-                            Link your Telegram account to add transactions from chat
-                        </p>
-
-                        <button type="button" class="btn btn-primary btn-sm" @click="openTelegramLink"
-                            :disabled="generatingTelegramLink">
-                            Open Telegram to link
-                            <span v-if="generatingTelegramLink" class="loading loading-spinner loading-xs"></span>
-                            <Send v-else :size="20" />
-                        </button>
-                    </template>
-
-                    <div class="divider text-sm text-base-content/60">Email &amp; Password</div>
+                    <div class="divider text-sm text-base-content/60">Login credentials</div>
 
                     <p class="text-sm text-base-content/60 mb-3">
                         Set an email and password to log in without Telegram or Google/GitHub
@@ -106,11 +144,13 @@
                             aria-label="New password" class="input w-full mb-4" minlength="8" maxlength="255"
                             required />
 
-                        <button type="submit" class="btn btn-primary btn-sm" :disabled="savingCredentials">
-                            Save
-                            <span v-if="savingCredentials" class="loading loading-spinner loading-xs"></span>
-                            <KeyRound v-else :size="20" />
-                        </button>
+                        <div class="flex justify-end">
+                            <button type="submit" class="btn btn-primary btn-sm" :disabled="savingCredentials">
+                                Save
+                                <span v-if="savingCredentials" class="loading loading-spinner loading-xs"></span>
+                                <KeyRound v-else :size="20" />
+                            </button>
+                        </div>
                     </form>
                 </template>
 
@@ -128,11 +168,13 @@ transactions,
 budgets,
 recurring_transactions</pre>
 
-                    <button type="button" class="btn btn-primary btn-sm" :disabled="exporting" @click="exportData">
-                        <span v-if="exporting" class="loading loading-spinner loading-xs"></span>
-                        <Download v-else :size="20" />
-                        Download JSON
-                    </button>
+                    <div class="flex justify-end">
+                        <button type="button" class="btn btn-primary btn-sm" :disabled="exporting" @click="exportData">
+                            <span v-if="exporting" class="loading loading-spinner loading-xs"></span>
+                            <Download v-else :size="20" />
+                            Download JSON
+                        </button>
+                    </div>
                 </template>
             </div>
 
@@ -151,7 +193,7 @@ recurring_transactions</pre>
 </template>
 
 <script setup>
-import { Circle, CircleCheck, Download, KeyRound, Save, Send } from 'lucide-vue-next'
+import { Download, KeyRound, Save, Send } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import { downloadAccountExport, updateCredentials, updatePreferences } from '../services/account'
 import { useAuthStore } from '../services/auth'
@@ -175,7 +217,7 @@ const formatDate = ref(settings.dateFormat)
 const formatMoney = ref(settings.moneyFormat)
 const decimals = ref(settings.decimals)
 
-const themeOptions = ref([
+const themeOptions = [
     'acid',
     'autumn',
     'bumblebee',
@@ -211,9 +253,22 @@ const themeOptions = ref([
     'night',
     'sunset',
     'synthwave',
-])
+]
 
 const themeSelected = ref(settings.theme)
+const favoriteThemes = ref(JSON.parse(localStorage.getItem('theme:favorites') || '[]'))
+
+const themeLabel = (theme) => theme.charAt(0).toUpperCase() + theme.slice(1)
+
+const otherThemes = computed(() => themeOptions.filter((theme) => !favoriteThemes.value.includes(theme)))
+
+const toggleFavorite = (theme) => {
+    const next = favoriteThemes.value.includes(theme)
+        ? favoriteThemes.value.filter((t) => t !== theme)
+        : [...favoriteThemes.value, theme]
+    favoriteThemes.value = next
+    localStorage.setItem('theme:favorites', JSON.stringify(next))
+}
 
 watch(themeSelected, (newTheme) => {
     document.documentElement.setAttribute('data-theme', newTheme)
@@ -269,14 +324,6 @@ const formatDatePreview = computed(() => {
     return new Intl.DateTimeFormat(config.locale, config).format(new Date())
 })
 
-const formatMoneyPreview = computed(() => {
-    return new Intl.NumberFormat(formatMoney.value, {
-        style: 'decimal',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: decimals.value ? 2 : 0,
-    }).format(1234.56)
-})
-
 const generatingTelegramLink = ref(false)
 
 const identityFor = (provider) => authStore.user?.identities?.find((identity) => identity.provider === provider) ?? null
@@ -297,12 +344,6 @@ const telegramLinkLabel = computed(() => {
 
 const googleLabel = computed(() => googleIdentity.value?.meta?.name || googleIdentity.value?.meta?.nickname || '')
 const githubLabel = computed(() => githubIdentity.value?.meta?.name || githubIdentity.value?.meta?.nickname || '')
-
-const statusTooltip = (identity, label) => {
-    if (!identity) return 'Not connected'
-
-    return label ? `Linked to ${label}` : 'Linked'
-}
 
 const openTelegramLink = async () => {
     generatingTelegramLink.value = true
@@ -385,5 +426,19 @@ const saveSettings = async () => {
 .modal-content {
     max-height: 58vh;
     overflow-y: auto;
+}
+
+.theme-chips {
+    border-radius: 0.35rem;
+    overflow: hidden;
+    padding: 0.2rem;
+    background: var(--color-base-200);
+}
+
+.chip {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 999px;
+    display: inline-block;
 }
 </style>
