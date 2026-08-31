@@ -204,6 +204,7 @@ import TransactionsAddModal from './modals/TransactionsAddModal.vue'
 import TransactionsEditModal from './modals/TransactionsEditModal.vue'
 import { useAuthStore } from './services/auth.js'
 import { useBudgetsStore } from './services/budgets.js'
+import { resetCachedNotice } from './services/cache.js'
 import { showModal } from './services/modal.js'
 import { shouldShowOnboarding } from './services/onboarding.js'
 import { useRecurringTransactionsStore } from './services/recurringTransactions.js'
@@ -234,6 +235,8 @@ watch(
     () => authStore.isAuthenticated,
     async (auth) => {
         if (auth) {
+            resetCachedNotice()
+
             await Promise.all([
                 tagsStore.load(),
                 transactionsStore.load(),

@@ -1,7 +1,12 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
+import { useAuthStore } from './auth.js'
+import { noticeCachedData, readCache, writeCache } from './cache.js'
 import { apiErrorMessage } from './formatters.js'
 import toasts from './toasts.js'
+
+const CACHE = 'tags'
+const userId = () => useAuthStore().user?.id
 
 export const useTagsStore = defineStore('tags', {
     state: () => ({
@@ -16,15 +21,24 @@ export const useTagsStore = defineStore('tags', {
     },
 
     actions: {
+        persist() {
+            writeCache(userId(), CACHE, this.tags)
+        },
+
         async load() {
+            const cached = readCache(userId(), CACHE)
+            if (cached) this.tags = cached
+
             this.isLoading = true
 
             try {
                 const response = await api.get('/tags')
 
                 this.tags = response.data
+                this.persist()
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to load tags: '))
+                if (cached) noticeCachedData()
+                else toasts.error(apiErrorMessage(error, 'Failed to load tags: '))
             } finally {
                 this.isLoading = false
             }
@@ -44,6 +58,7 @@ export const useTagsStore = defineStore('tags', {
                 const response = await api.post('/tags', this.normalizePayload(raw))
 
                 this.tags.push(response.data)
+                this.persist()
 
                 toasts.success('Tag created successfully!')
 
@@ -65,6 +80,7 @@ export const useTagsStore = defineStore('tags', {
 
                 const index = this.tags.findIndex((t) => t.id === raw.id)
                 this.tags[index] = response.data
+                this.persist()
 
                 toasts.success('Tag updated successfully!')
 
@@ -98,6 +114,7 @@ export const useTagsStore = defineStore('tags', {
                 }
 
                 this.tags = this.tags.filter((t) => !toRemove.has(t.id))
+                this.persist()
 
                 toasts.info('Tag deleted successfully!')
 

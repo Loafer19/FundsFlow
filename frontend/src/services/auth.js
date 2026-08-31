@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
+import { clearUserCache } from './cache.js'
 import { apiErrorMessage } from './formatters.js'
 import toasts from './toasts.js'
 
@@ -124,10 +125,13 @@ export const useAuthStore = defineStore('auth', {
         },
 
         clearSession() {
+            const userId = this.user?.id
+
             this.user = null
             this.token = null
             this.isAuthenticated = false
             localStorage.removeItem('token')
+            clearUserCache(userId)
         },
     },
 })

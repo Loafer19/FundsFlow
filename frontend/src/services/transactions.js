@@ -1,8 +1,13 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
+import { useAuthStore } from './auth.js'
+import { noticeCachedData, readCache, writeCache } from './cache.js'
 import { apiErrorMessage, toLocalDateStr } from './formatters.js'
 import { isOnboardingDone, markOnboardingDone } from './onboarding.js'
 import toasts from './toasts.js'
+
+const CACHE = 'transactions'
+const userId = () => useAuthStore().user?.id
 
 export const useTransactionsStore = defineStore('transactions', {
     state: () => ({
@@ -34,15 +39,24 @@ export const useTransactionsStore = defineStore('transactions', {
     },
 
     actions: {
+        persist() {
+            writeCache(userId(), CACHE, this.transactions)
+        },
+
         async load() {
+            const cached = readCache(userId(), CACHE)
+            if (cached) this.transactions = cached
+
             this.isLoading = true
 
             try {
                 const response = await api.get('/transactions')
 
                 this.transactions = response.data
+                this.persist()
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to load transactions: '))
+                if (cached) noticeCachedData()
+                else toasts.error(apiErrorMessage(error, 'Failed to load transactions: '))
             } finally {
                 this.isLoading = false
             }
@@ -55,6 +69,7 @@ export const useTransactionsStore = defineStore('transactions', {
                 const response = await api.post('/transactions', raw)
 
                 this.transactions.push(response.data)
+                this.persist()
 
                 if (!isOnboardingDone()) {
                     markOnboardingDone()
@@ -80,6 +95,7 @@ export const useTransactionsStore = defineStore('transactions', {
 
                 const index = this.transactions.findIndex((t) => t.id === raw.id)
                 this.transactions[index] = response.data
+                this.persist()
 
                 toasts.success('Transaction updated successfully!')
 
@@ -100,6 +116,7 @@ export const useTransactionsStore = defineStore('transactions', {
                 await api.delete('/transactions/' + id)
 
                 this.transactions = this.transactions.filter((t) => t.id !== id)
+                this.persist()
 
                 toasts.info('Transaction deleted successfully!')
 

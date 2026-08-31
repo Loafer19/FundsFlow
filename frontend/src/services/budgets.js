@@ -1,7 +1,12 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
+import { useAuthStore } from './auth.js'
+import { noticeCachedData, readCache, writeCache } from './cache.js'
 import { apiErrorMessage } from './formatters.js'
 import toasts from './toasts.js'
+
+const CACHE = 'budgets'
+const userId = () => useAuthStore().user?.id
 
 export const useBudgetsStore = defineStore('budgets', {
     state: () => ({
@@ -11,15 +16,24 @@ export const useBudgetsStore = defineStore('budgets', {
     }),
 
     actions: {
+        persist() {
+            writeCache(userId(), CACHE, this.budgets)
+        },
+
         async load() {
+            const cached = readCache(userId(), CACHE)
+            if (cached) this.budgets = cached
+
             this.isLoading = true
 
             try {
                 const response = await api.get('/budgets')
 
                 this.budgets = response.data
+                this.persist()
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to load budgets: '))
+                if (cached) noticeCachedData()
+                else toasts.error(apiErrorMessage(error, 'Failed to load budgets: '))
             } finally {
                 this.isLoading = false
             }
@@ -32,6 +46,7 @@ export const useBudgetsStore = defineStore('budgets', {
                 const response = await api.post('/budgets', payload)
 
                 this.budgets.push(response.data)
+                this.persist()
 
                 toasts.success('Budget created successfully!')
 
@@ -53,6 +68,7 @@ export const useBudgetsStore = defineStore('budgets', {
 
                 const index = this.budgets.findIndex((b) => b.id === id)
                 this.budgets[index] = response.data
+                this.persist()
 
                 toasts.success('Budget updated successfully!')
 
@@ -74,6 +90,7 @@ export const useBudgetsStore = defineStore('budgets', {
 
                 const index = this.budgets.findIndex((b) => b.id === id)
                 this.budgets[index] = response.data
+                this.persist()
 
                 toasts.info('Budget paused')
 
@@ -95,6 +112,7 @@ export const useBudgetsStore = defineStore('budgets', {
 
                 const index = this.budgets.findIndex((b) => b.id === id)
                 this.budgets[index] = response.data
+                this.persist()
 
                 toasts.success('Budget resumed')
 
@@ -115,6 +133,7 @@ export const useBudgetsStore = defineStore('budgets', {
                 await api.delete('/budgets/' + id)
 
                 this.budgets = this.budgets.filter((b) => b.id !== id)
+                this.persist()
 
                 toasts.info('Budget deleted successfully!')
 
