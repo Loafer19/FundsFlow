@@ -56,7 +56,7 @@
 
         <div class="flex gap-2 mb-3 items-stretch">
             <select class="select w-24 sm:w-30 border-base-300 focus:border-base-content cursor-pointer"
-                v-model="dateSelectionType">
+                v-model="dateSelectionType" aria-label="Date range type">
                 <option value="week">Week</option>
                 <option value="month">Month</option>
                 <option value="year">Year</option>

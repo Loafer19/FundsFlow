@@ -13,7 +13,7 @@
                 <input type="number" step="0.01" min="0.01" v-model="form.amount" placeholder="Amount"
                     class="input w-full mb-4" required />
 
-                <select v-model="form.length" class="select w-full mb-4" required>
+                <select v-model="form.length" class="select w-full mb-4" required aria-label="Budget length">
                     <option value="week">Weekly</option>
                     <option value="month">Monthly</option>
                     <option value="year">Yearly</option>

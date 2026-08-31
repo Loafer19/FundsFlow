@@ -4,7 +4,7 @@
         action-label="Add Transaction" @action="openAdd" />
 
     <template v-else>
-        <select v-model="viewMode" class="select select-sm w-30 border-base-300 mb-3">
+        <select v-model="viewMode" class="select select-sm w-30 border-base-300 mb-3" aria-label="Tag distribution view">
             <option value="donuts">Donuts</option>
             <option value="list">List</option>
         </select>

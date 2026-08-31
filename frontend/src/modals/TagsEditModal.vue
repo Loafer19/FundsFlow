@@ -10,7 +10,7 @@
                 <input type="text" v-model="tag.title" placeholder="Title" class="input w-full mb-4" maxlength="255"
                     required autofocus />
 
-                <select v-model="tag.parent_id" class="select w-full mb-4">
+                <select v-model="tag.parent_id" class="select w-full mb-4" aria-label="Parent tag">
                     <option value="">No Parent</option>
                     <option v-for="parent in parentOptions" :key="parent.id" :value="parent.id">
                         {{ parent.title }}

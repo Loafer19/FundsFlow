@@ -5,7 +5,7 @@
 
     <template v-else>
         <div class="flex mb-3">
-            <select v-model="groupBy"
+            <select v-model="groupBy" aria-label="Group money flow by"
                 class="select select-sm w-30 border-base-300 focus:border-base-content cursor-pointer">
                 <option value="day">Day</option>
                 <option value="week" :hidden="dateSelectionType == 'week'">Week</option>
