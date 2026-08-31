@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BootstrapController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\IdentityController;
 use App\Http\Controllers\RecurringTransactionController;
@@ -34,6 +35,8 @@ Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle'])
     ->middleware('throttle:60,1');
 
 Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/bootstrap', BootstrapController::class);
+
     Route::apiResource('tags', TagController::class)->except(['show']);
     Route::apiResource('transactions', TransactionController::class)->except(['show']);
     Route::apiResource('budgets', BudgetController::class)->except(['show']);

@@ -203,6 +203,7 @@ import TagsModal from './modals/TagsModal.vue'
 import TransactionsAddModal from './modals/TransactionsAddModal.vue'
 import TransactionsEditModal from './modals/TransactionsEditModal.vue'
 import { useAuthStore } from './services/auth.js'
+import { bootstrapStores } from './services/bootstrap.js'
 import { useBudgetsStore } from './services/budgets.js'
 import { resetCachedNotice } from './services/cache.js'
 import { showModal } from './services/modal.js'
@@ -236,13 +237,7 @@ watch(
     async (auth) => {
         if (auth) {
             resetCachedNotice()
-
-            await Promise.all([
-                tagsStore.load(),
-                transactionsStore.load(),
-                budgetsStore.load(),
-                recurringTransactionsStore.load(),
-            ])
+            await bootstrapStores()
 
             if (shouldShowOnboarding(transactionsStore.transactions.length)) {
                 showModal('onboarding_modal')
