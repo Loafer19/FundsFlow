@@ -110,9 +110,30 @@
                         </button>
                     </form>
                 </template>
+
+                <template v-else-if="tab === 'data'">
+                    <p class="text-sm text-base-content/60 mb-4">
+                        Download all your FundsFlow data as one JSON file
+                    </p>
+
+                    <pre
+                        class="p-3 rounded-box bg-base-200 text-xs text-base-content/60 mb-4 font-mono leading-relaxed whitespace-pre-wrap">version,
+exported_at,
+account,
+tags,
+transactions,
+budgets,
+recurring_transactions</pre>
+
+                    <button type="button" class="btn btn-primary btn-sm" :disabled="exporting" @click="exportData">
+                        <span v-if="exporting" class="loading loading-spinner loading-xs"></span>
+                        <Download v-else :size="20" />
+                        Download JSON
+                    </button>
+                </template>
             </div>
 
-            <div class="modal-action" v-if="tab !== 'accounts'">
+            <div class="modal-action" v-if="tab === 'formatting' || tab === 'theme'">
                 <button type="submit" class="btn btn-success" @click="saveSettings">
                     <span class="loading loading-spinner" v-if="saving"></span>
                     Save
@@ -127,9 +148,9 @@
 </template>
 
 <script setup>
-import { Circle, CircleCheck, KeyRound, Save, Send } from 'lucide-vue-next'
+import { Circle, CircleCheck, Download, KeyRound, Save, Send } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
-import { updateCredentials } from '../services/account'
+import { downloadAccountExport, updateCredentials } from '../services/account'
 import { useAuthStore } from '../services/auth'
 import { apiErrorMessage, formatDateOptions, formatMoneyOptions } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
@@ -142,8 +163,10 @@ const tabs = ref({
     formatting: 'Formatting',
     theme: 'Theme',
     accounts: 'Accounts',
+    data: 'Data',
 })
 const tab = ref('formatting')
+const exporting = ref(false)
 
 const formatDate = ref(settings.dateFormat)
 const formatMoney = ref(settings.moneyFormat)
@@ -307,6 +330,19 @@ const saveCredentials = async () => {
         toasts.error(apiErrorMessage(error, 'Failed to save: '))
     } finally {
         savingCredentials.value = false
+    }
+}
+
+const exportData = async () => {
+    exporting.value = true
+
+    try {
+        await downloadAccountExport()
+        toasts.success('Export downloaded')
+    } catch (error) {
+        toasts.error(apiErrorMessage(error, 'Export failed: '))
+    } finally {
+        exporting.value = false
     }
 }
 

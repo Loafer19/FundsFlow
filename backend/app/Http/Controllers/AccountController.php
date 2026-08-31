@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Account\ExportAccountDataAction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class AccountController extends Controller
 {
+    public function __construct(
+        private readonly ExportAccountDataAction $exportAccountData,
+    ) {}
+
     public function updateCredentials(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -26,5 +31,16 @@ class AccountController extends Controller
             'user' => $user->load('identities'),
             'message' => 'Email and password saved successfully!',
         ]);
+    }
+
+    public function export(Request $request): JsonResponse
+    {
+        // Compact JSON (no pretty-print) — faster and smaller with large transaction sets.
+        return response()->json(
+            $this->exportAccountData->execute($request->user()),
+            200,
+            [],
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+        );
     }
 }
