@@ -5,6 +5,7 @@ namespace App\Actions\Notifications;
 use App\Channels\Telegram\TelegramClient;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\UserFormatter;
 use Carbon\Carbon;
 
 class SendWeeklyDigestAction
@@ -35,7 +36,7 @@ class SendWeeklyDigestAction
 
             $previous = $this->summarize($user, $previousStart, $previousEnd);
 
-            $this->client->sendMessage($identity->external_id, $this->formatMessage($start, $end, $current, $previous));
+            $this->client->sendMessage($identity->external_id, $this->formatMessage($user, $start, $end, $current, $previous));
         }
     }
 
@@ -74,20 +75,35 @@ class SendWeeklyDigestAction
      * @param array{count: int, income: float, expenses: float, top: ?array{tag: object, amount: float}} $current
      * @param array{count: int, income: float, expenses: float, top: ?array{tag: object, amount: float}} $previous
      */
-    private function formatMessage(Carbon $start, Carbon $end, array $current, array $previous): string
+    private function formatMessage(User $user, Carbon $start, Carbon $end, array $current, array $previous): string
     {
         $net = $current['income'] - $current['expenses'];
+        $netFormatted = UserFormatter::formatMoney($user, abs($net));
+        $netSigned = ($net >= 0 ? '+' : '-') . $netFormatted;
 
         $lines = [
-            sprintf('📊 Weekly report (%s–%s)', $start->format('d.m'), $end->format('d.m')),
+            sprintf(
+                '📊 Weekly report (%s–%s)',
+                UserFormatter::formatDate($user, $start),
+                UserFormatter::formatDate($user, $end),
+            ),
             "{$current['count']} transactions",
-            sprintf('Income: +%.2f · Expenses: -%.2f', $current['income'], $current['expenses']),
-            sprintf('Net: %+.2f', $net),
+            sprintf(
+                'Income: +%s · Expenses: -%s',
+                UserFormatter::formatMoney($user, $current['income']),
+                UserFormatter::formatMoney($user, $current['expenses']),
+            ),
+            "Net: {$netSigned}",
         ];
 
         if ($current['top']) {
             $tag = $current['top']['tag'];
-            $lines[] = sprintf('Top category: %s %s (-%.2f)', $tag->emoji, $tag->title, $current['top']['amount']);
+            $lines[] = sprintf(
+                'Top category: %s %s (-%s)',
+                $tag->emoji,
+                $tag->title,
+                UserFormatter::formatMoney($user, $current['top']['amount']),
+            );
         }
 
         if ($previous['expenses'] > 0) {

@@ -2,6 +2,8 @@ import api from './api.js'
 
 export const updateCredentials = (data) => api.put('/account/credentials', data)
 
+export const updatePreferences = (data) => api.patch('/account/preferences', data)
+
 export const downloadAccountExport = async () => {
     // blob: save server bytes as-is — no JSON.parse / stringify on the client
     const response = await api.get('/account/export', {

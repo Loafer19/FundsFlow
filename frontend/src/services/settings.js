@@ -52,4 +52,12 @@ export function updateTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme)
 }
 
+export function applyUserPreferences(preferences) {
+    if (!preferences || typeof preferences !== 'object') return
+
+    if (preferences.dateFormat) updateDateFormat(preferences.dateFormat)
+    if (preferences.moneyFormat) updateMoneyFormat(preferences.moneyFormat)
+    if (typeof preferences.decimals === 'boolean') updateDecimals(preferences.decimals)
+}
+
 export default settings

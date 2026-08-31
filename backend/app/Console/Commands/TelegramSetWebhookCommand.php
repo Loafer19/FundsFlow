@@ -35,13 +35,18 @@ class TelegramSetWebhookCommand extends Command
         $this->info("Webhook set to {$url}");
 
         $client->setMyCommands([
-            ['command' => 'month', 'description' => "This month's income, expenses, and net change"],
+            ['command' => 'month', 'description' => "This month's income, expenses, net, and top tags"],
+            ['command' => 'analytics', 'description' => 'Same as /month'],
             ['command' => 'recent', 'description' => 'Last 10 transactions'],
             ['command' => 'tags', 'description' => 'List your tags'],
             ['command' => 'newtag', 'description' => 'Create a tag: /newtag 🍕 Fast Food > Food'],
+            ['command' => 'budgets', 'description' => 'Active budgets: spent vs limit'],
+            ['command' => 'recurring', 'description' => 'List recurring transaction rules'],
             ['command' => 'website', 'description' => 'Get a one-time code to log in on the website'],
-            ['command' => 'mute', 'description' => 'Turn off budget alerts and weekly reports'],
-            ['command' => 'unmute', 'description' => 'Turn budget alerts and weekly reports back on'],
+            ['command' => 'mute', 'description' => 'Mute budget alerts, weekly digest, and recurring notifications'],
+            ['command' => 'unmute', 'description' => 'Turn budget alerts, weekly digest, and recurring notifications back on'],
+            ['command' => 'unlink', 'description' => 'Unlink Telegram; account stays on the website'],
+            ['command' => 'help', 'description' => 'List commands and quick-add format'],
         ]);
 
         $this->info('Bot command menu registered.');

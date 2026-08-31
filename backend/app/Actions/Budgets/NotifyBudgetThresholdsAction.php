@@ -6,6 +6,7 @@ use App\Channels\Telegram\TelegramClient;
 use App\Models\Budget;
 use App\Models\BudgetPeriod;
 use App\Models\Transaction;
+use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 
@@ -62,13 +63,14 @@ class NotifyBudgetThresholdsAction
 
             $label = $budget->title ?: $period->tags->map(fn ($tag) => $tag->emoji)->implode(' ');
             $emoji = $threshold >= 100 ? '🚨' : '⚠️';
+            $user = $budget->user;
 
             $messagesByChat[$identity->external_id][] = sprintf(
-                '%s %s: %.2f / %.2f (%d%%)',
+                '%s %s: %s / %s (%d%%)',
                 $emoji,
                 $label,
-                $spent,
-                (float) $period->amount,
+                UserFormatter::formatMoney($user, $spent),
+                UserFormatter::formatMoney($user, (float) $period->amount),
                 (int) round($ratio * 100),
             );
         }

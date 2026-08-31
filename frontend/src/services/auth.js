@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import api from './api.js'
 import { clearUserCache } from './cache.js'
 import { apiErrorMessage } from './formatters.js'
+import { applyUserPreferences } from './settings.js'
 import toasts from './toasts.js'
 
 export const useAuthStore = defineStore('auth', {
@@ -21,6 +22,7 @@ export const useAuthStore = defineStore('auth', {
 
                 this.user = response.data.user
                 this.setToken(response.data.token)
+                applyUserPreferences(this.user?.preferences)
 
                 toasts.success('Logged in successfully!')
 
@@ -42,6 +44,7 @@ export const useAuthStore = defineStore('auth', {
 
                 this.user = response.data.user
                 this.setToken(response.data.token)
+                applyUserPreferences(this.user?.preferences)
 
                 toasts.success('Registered successfully!')
 
@@ -63,6 +66,7 @@ export const useAuthStore = defineStore('auth', {
 
                 this.user = response.data.user
                 this.setToken(response.data.token)
+                applyUserPreferences(this.user?.preferences)
 
                 toasts.success('Logged in successfully!')
 
@@ -109,6 +113,7 @@ export const useAuthStore = defineStore('auth', {
 
                 this.user = response.data.user
                 this.isAuthenticated = true
+                applyUserPreferences(this.user?.preferences)
 
                 return true
             } catch {

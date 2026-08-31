@@ -8,6 +8,7 @@ use App\Enums\RecurringFrequency;
 use App\Enums\TransactionSource;
 use App\Models\RecurringTransaction;
 use App\Models\Transaction;
+use App\Support\UserFormatter;
 use Carbon\CarbonInterface;
 
 class GenerateRecurringTransactionsAction
@@ -77,13 +78,14 @@ class GenerateRecurringTransactionsAction
 
         $emoji = $transaction->amount > 0 ? '📈' : '📉';
         $note = $transaction->note ? " — {$transaction->note}" : '';
+        $user = $rule->user;
 
         $this->messagesByChat[$identity->external_id][] = sprintf(
-            '%s %.2f%s (%s)',
+            '%s %s%s (%s)',
             $emoji,
-            $transaction->amount,
+            UserFormatter::formatMoney($user, $transaction->amount),
             $note,
-            $transaction->at->format('d.m'),
+            UserFormatter::formatDate($user, $transaction->at),
         );
     }
 

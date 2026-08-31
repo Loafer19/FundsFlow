@@ -153,7 +153,7 @@ recurring_transactions</pre>
 <script setup>
 import { Circle, CircleCheck, Download, KeyRound, Save, Send } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
-import { downloadAccountExport, updateCredentials } from '../services/account'
+import { downloadAccountExport, updateCredentials, updatePreferences } from '../services/account'
 import { useAuthStore } from '../services/auth'
 import { apiErrorMessage, formatDateOptions, formatMoneyOptions } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
@@ -351,7 +351,7 @@ const exportData = async () => {
 
 const saving = ref(false)
 
-const saveSettings = () => {
+const saveSettings = async () => {
     saving.value = true
 
     updateDateFormat(formatDate.value)
@@ -359,11 +359,25 @@ const saveSettings = () => {
     updateDecimals(decimals.value)
     updateTheme(themeSelected.value)
 
-    setTimeout(() => {
-        saving.value = false
-        toasts.success('Settings saved successfully!')
-        settings_modal.close()
-    }, 150)
+    if (authStore.isAuthenticated) {
+        try {
+            const response = await updatePreferences({
+                moneyFormat: formatMoney.value,
+                dateFormat: formatDate.value,
+                decimals: decimals.value,
+            })
+
+            if (response.data?.user) {
+                authStore.user = response.data.user
+            }
+        } catch {
+            toasts.info('Saved locally; could not sync formatting preferences')
+        }
+    }
+
+    saving.value = false
+    toasts.success('Settings saved successfully!')
+    settings_modal.close()
 }
 </script>
 

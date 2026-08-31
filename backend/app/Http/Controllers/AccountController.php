@@ -33,6 +33,28 @@ class AccountController extends Controller
         ]);
     }
 
+    public function updatePreferences(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $data = $request->validate([
+            'moneyFormat' => 'required|string|max:32',
+            'dateFormat' => 'required|string|max:64',
+            'decimals' => 'required|boolean',
+        ]);
+
+        $user->preferences = array_merge($user->preferences ?? [], [
+            'moneyFormat' => $data['moneyFormat'],
+            'dateFormat' => $data['dateFormat'],
+            'decimals' => $data['decimals'],
+        ]);
+        $user->save();
+
+        return response()->json([
+            'user' => $user->load('identities'),
+        ]);
+    }
+
     public function export(Request $request): JsonResponse
     {
         // Compact JSON (no pretty-print) — faster and smaller with large transaction sets.

@@ -47,6 +47,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->parameters(['recurring-transactions' => 'recurringTransaction']);
     Route::post('/identities/telegram/link-code', [IdentityController::class, 'telegramLinkCode']);
     Route::put('/account/credentials', [AccountController::class, 'updateCredentials']);
+    Route::patch('/account/preferences', [AccountController::class, 'updatePreferences']);
     Route::get('/account/export', [AccountController::class, 'export'])
         ->middleware('throttle:10,1');
 });

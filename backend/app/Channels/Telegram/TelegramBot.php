@@ -2,6 +2,8 @@
 
 namespace App\Channels\Telegram;
 
+use App\Actions\Budgets\ListBudgetsAction;
+use App\Actions\RecurringTransactions\ListRecurringTransactionsAction;
 use App\Actions\Tags\CreateTagAction;
 use App\Actions\Tags\ListTagsAction;
 use App\Actions\Transactions\CreateTransactionAction;
@@ -9,10 +11,13 @@ use App\Actions\Transactions\DeleteTransactionAction;
 use App\Actions\Transactions\ListTransactionsAction;
 use App\Actions\Transactions\UpdateTransactionAction;
 use App\Enums\TransactionSource;
+use App\Models\BudgetPeriod;
 use App\Models\Identity;
+use App\Models\RecurringTransaction;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -26,6 +31,8 @@ class TelegramBot
 
     private const MENU_TAGS = '🏷 Tags';
 
+    private const MENU_BUDGETS = '💰 Budgets';
+
     private const TAGS_PER_PAGE = 8;
 
     public function __construct(
@@ -36,6 +43,8 @@ class TelegramBot
         private readonly UpdateTransactionAction $updateTransaction,
         private readonly DeleteTransactionAction $deleteTransaction,
         private readonly CreateTagAction $createTag,
+        private readonly ListBudgetsAction $listBudgets,
+        private readonly ListRecurringTransactionsAction $listRecurring,
     ) {}
 
     /**
@@ -67,7 +76,32 @@ class TelegramBot
     {
         return "Send a message like \"-350 groceries\" to log an expense, or \"+15000 salary\" for income.\n"
             . "Prefix a date for a past entry: \"20.08 -350 groceries\" (DD.MM or DD.MM.YYYY).\n\n"
-            . 'Use the menu below, or /month, /recent, /tags, /newtag, /website.';
+            . 'Use the menu below, or /help for all commands.';
+    }
+
+    private function sendHelp(int|string $chatId): void
+    {
+        $this->client->sendMessage(
+            $chatId,
+            "Commands\n"
+            . "/month — this month's income, expenses, net, top tags\n"
+            . "/analytics — same as /month\n"
+            . "/recent — last 10 transactions\n"
+            . "/tags — list your tags\n"
+            . "/newtag — create a tag: /newtag 🍕 Fast Food > Food\n"
+            . "/budgets — active budgets for the current period\n"
+            . "/recurring — recurring rules\n"
+            . "/website — one-time web login code\n"
+            . "/mute — mute budget alerts, weekly digest, recurring notifications\n"
+            . "/unmute — turn notifications back on\n"
+            . "/unlink — unlink Telegram (account stays on the website)\n"
+            . "/help — this list\n\n"
+            . "Quick-add\n"
+            . "-350 groceries\n"
+            . "+15000 salary\n"
+            . '20.08 -350 groceries',
+            $this->menuKeyboard(),
+        );
     }
 
     private function sendWebsiteLoginCode(User $user, int|string $chatId): void
@@ -96,23 +130,40 @@ class TelegramBot
             return;
         }
 
+        if ($text === '/help') {
+            $this->sendHelp($chatId);
+
+            return;
+        }
+
         $user = $this->resolveUser($chatId);
 
         if (!$user) {
+            if ($text === '/unlink') {
+                $this->client->sendMessage($chatId, "This chat isn't linked to a FundsFlow account");
+
+                return;
+            }
+
             $this->client->sendMessage($chatId, "Your account isn't linked yet. Send /start to get started");
 
             return;
         }
 
         match (true) {
-            $text === '/month' || $text === self::MENU_MONTH => $this->sendMonthSummary($user, $chatId),
+            $text === '/month' || $text === '/analytics' || $text === self::MENU_MONTH => $this->sendMonthSummary($user, $chatId),
             $text === '/tags' || $text === self::MENU_TAGS => $this->sendTags($user, $chatId),
             $text === '/recent' || $text === self::MENU_RECENT => $this->sendRecent($user, $chatId),
+            $text === '/budgets' || $text === self::MENU_BUDGETS => $this->sendBudgets($user, $chatId),
+            $text === '/recurring' => $this->sendRecurring($user, $chatId),
             $text === '/website' => $this->sendWebsiteLoginCode($user, $chatId),
             $text === '/mute' => $this->handleMute($chatId, true),
             $text === '/unmute' => $this->handleMute($chatId, false),
+            $text === '/unlink' => $this->handleUnlink($chatId),
             str_starts_with($text, '/newtag') => $this->handleNewTag($user, $chatId, $text),
-            default => $this->handleQuickAdd($user, $chatId, $text),
+            default => Cache::has("telegram_edit_amount:{$chatId}")
+                ? $this->handleEditAmountReply($user, $chatId, $text)
+                : $this->handleQuickAdd($user, $chatId, $text),
         };
     }
 
@@ -253,8 +304,54 @@ class TelegramBot
 
         $this->client->sendMessage(
             $chatId,
-            "✅ Saved\n" . $this->formatTransactionLine($transaction) . "\n" . $this->formatTagList($transaction),
+            "✅ Saved\n" . $this->formatTransactionLine($user, $transaction) . "\n" . $this->formatTagList($transaction),
             $this->tagKeyboard($user, $transaction),
+        );
+    }
+
+    private function handleEditAmountReply(User $user, int|string $chatId, string $text): void
+    {
+        $cacheKey = "telegram_edit_amount:{$chatId}";
+        $transactionId = (int) Cache::get($cacheKey);
+
+        if (!preg_match('/^([+-]?\d+(?:[.,]\d{1,2})?)$/u', trim($text), $matches)) {
+            $this->client->sendMessage($chatId, 'Send the new amount like +120 or -50.5');
+
+            return;
+        }
+
+        $amount = (float) str_replace(',', '.', $matches[1]);
+
+        if (!str_starts_with($matches[1], '+') && !str_starts_with($matches[1], '-')) {
+            $amount = -abs($amount);
+        }
+
+        if ($amount === 0.0) {
+            $this->client->sendMessage($chatId, "Amount can't be zero");
+
+            return;
+        }
+
+        $transaction = $this->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction) {
+            Cache::forget($cacheKey);
+            $this->client->sendMessage($chatId, 'Transaction not found');
+
+            return;
+        }
+
+        $transaction = $this->updateTransaction->execute($user, $transaction, [
+            'amount' => $amount,
+            'tags' => $transaction->tags->pluck('id')->all(),
+        ]);
+
+        Cache::forget($cacheKey);
+
+        $this->client->sendMessage(
+            $chatId,
+            "✅ Amount updated\n" . $this->formatTransactionLine($user, $transaction) . "\n" . $this->formatTagList($transaction),
+            $this->postSaveKeyboard($transaction),
         );
     }
 
@@ -336,13 +433,19 @@ class TelegramBot
         }
 
         if (preg_match('/^delrow:(\d+)$/', $data, $matches)) {
-            $this->handleDeleteRow($user, $callbackId, (int) $matches[1]);
+            $this->handleDeleteRow($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
 
             return;
         }
 
         if (preg_match('/^retag:(\d+)$/', $data, $matches)) {
             $this->handleRetag($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
+
+            return;
+        }
+
+        if (preg_match('/^editamt:(\d+)$/', $data, $matches)) {
+            $this->handleEditAmountPrompt($user, $chatId, $callbackId, (int) $matches[1]);
 
             return;
         }
@@ -424,13 +527,8 @@ class TelegramBot
             $this->client->editMessageText(
                 $chatId,
                 $messageId,
-                "✅ Saved\n" . $this->formatTransactionLine($transaction) . "\n" . $this->formatTagList($transaction),
-                [
-                    'inline_keyboard' => [[
-                        ['text' => '✏️ Change tags', 'callback_data' => "retag:{$transaction->id}"],
-                        ['text' => '🗑 Delete', 'callback_data' => "del:{$transaction->id}"],
-                    ]],
-                ],
+                "✅ Saved\n" . $this->formatTransactionLine($user, $transaction) . "\n" . $this->formatTagList($transaction),
+                $this->postSaveKeyboard($transaction),
             );
         }
     }
@@ -445,7 +543,7 @@ class TelegramBot
             return;
         }
 
-        $line = $this->formatTransactionLine($transaction);
+        $line = $this->formatTransactionLine($user, $transaction);
 
         $this->deleteTransaction->execute($user, $transaction);
 
@@ -456,7 +554,7 @@ class TelegramBot
         }
     }
 
-    private function handleDeleteRow(User $user, string $callbackId, int $transactionId): void
+    private function handleDeleteRow(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
     {
         $transaction = $this->findOwnTransaction($user, $transactionId);
 
@@ -469,6 +567,20 @@ class TelegramBot
         $this->deleteTransaction->execute($user, $transaction);
 
         $this->client->answerCallbackQuery($callbackId, 'Deleted 🗑');
+
+        if (!$messageId) {
+            return;
+        }
+
+        $payload = $this->recentListPayload($user);
+
+        if ($payload === null) {
+            $this->client->editMessageText($chatId, $messageId, 'No transactions yet', ['inline_keyboard' => []]);
+
+            return;
+        }
+
+        $this->client->editMessageText($chatId, $messageId, $payload['text'], $payload['reply_markup']);
     }
 
     private function handleRetag(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
@@ -485,6 +597,22 @@ class TelegramBot
         $this->renderTagPicker($user, $chatId, $messageId, $transaction, 0);
     }
 
+    private function handleEditAmountPrompt(User $user, int|string $chatId, string $callbackId, int $transactionId): void
+    {
+        $transaction = $this->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction) {
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found');
+
+            return;
+        }
+
+        Cache::put("telegram_edit_amount:{$chatId}", $transaction->id, now()->addMinutes(10));
+
+        $this->client->answerCallbackQuery($callbackId);
+        $this->client->sendMessage($chatId, 'Send the new amount like +120 or -50.5');
+    }
+
     private function renderTagPicker(User $user, int|string $chatId, ?int $messageId, Transaction $transaction, int $page): void
     {
         if (!$messageId) {
@@ -494,7 +622,7 @@ class TelegramBot
         $this->client->editMessageText(
             $chatId,
             $messageId,
-            "✅ Saved\n" . $this->formatTransactionLine($transaction) . "\n" . $this->formatTagList($transaction),
+            "✅ Saved\n" . $this->formatTransactionLine($user, $transaction) . "\n" . $this->formatTagList($transaction),
             $this->tagKeyboard($user, $transaction, $page),
         );
     }
@@ -515,16 +643,40 @@ class TelegramBot
         $transactions = $this->listTransactions->execute($user)
             ->filter(fn (Transaction $transaction) => $transaction->at->isCurrentMonth());
 
-        $income = $transactions->filter(fn (Transaction $transaction) => $transaction->amount > 0)->sum('amount');
-        $expense = $transactions->filter(fn (Transaction $transaction) => $transaction->amount < 0)->sum('amount');
+        $income = (float) $transactions->filter(fn (Transaction $transaction) => $transaction->amount > 0)->sum('amount');
+        $expense = (float) $transactions->filter(fn (Transaction $transaction) => $transaction->amount < 0)->sum('amount');
 
-        $this->client->sendMessage($chatId, sprintf(
-            "📊 %s\nIncome: +%.2f\nExpenses: %.2f\nNet: %.2f",
-            now()->format('m.Y'),
-            $income,
-            $expense,
-            $income + $expense,
-        ));
+        $lines = [
+            '📊 ' . now()->format('m.Y'),
+            'Income: +' . UserFormatter::formatMoney($user, $income),
+            'Expenses: ' . UserFormatter::formatMoney($user, $expense),
+            'Net: ' . UserFormatter::formatMoney($user, $income + $expense),
+        ];
+
+        $byTag = [];
+
+        foreach ($transactions->filter(fn (Transaction $transaction) => $transaction->amount < 0) as $transaction) {
+            foreach ($transaction->tags as $tag) {
+                $byTag[$tag->id] ??= ['tag' => $tag, 'amount' => 0.0];
+                $byTag[$tag->id]['amount'] += abs((float) $transaction->amount);
+            }
+        }
+
+        $top = collect($byTag)->sortByDesc('amount')->take(3)->values();
+
+        if ($top->isNotEmpty()) {
+            $lines[] = '';
+            $lines[] = 'Top expense tags';
+
+            foreach ($top as $index => $row) {
+                /** @var Tag $tag */
+                $tag = $row['tag'];
+                $lines[] = ($index + 1) . ') ' . trim($tag->emoji . ' ' . $tag->title)
+                    . ' — ' . UserFormatter::formatMoney($user, -1 * $row['amount']);
+            }
+        }
+
+        $this->client->sendMessage($chatId, implode("\n", $lines));
     }
 
     private function sendTags(User $user, int|string $chatId): void
@@ -547,16 +699,30 @@ class TelegramBot
 
     private function sendRecent(User $user, int|string $chatId): void
     {
-        $transactions = $this->listTransactions->execute($user)->take(10)->values();
+        $payload = $this->recentListPayload($user);
 
-        if ($transactions->isEmpty()) {
+        if ($payload === null) {
             $this->client->sendMessage($chatId, 'No transactions yet');
 
             return;
         }
 
+        $this->client->sendMessage($chatId, $payload['text'], $payload['reply_markup']);
+    }
+
+    /**
+     * @return array{text: string, reply_markup: array<string, mixed>}|null
+     */
+    private function recentListPayload(User $user): ?array
+    {
+        $transactions = $this->listTransactions->execute($user)->take(10)->values();
+
+        if ($transactions->isEmpty()) {
+            return null;
+        }
+
         $lines = $transactions->map(
-            fn (Transaction $transaction, int $index) => ($index + 1) . ') ' . $this->formatTransactionLine($transaction),
+            fn (Transaction $transaction, int $index) => ($index + 1) . ') ' . $this->formatTransactionLine($user, $transaction),
         )->all();
 
         $buttons = $transactions->map(fn (Transaction $transaction, int $index) => [
@@ -564,11 +730,94 @@ class TelegramBot
             'callback_data' => "delrow:{$transaction->id}",
         ])->all();
 
-        $this->client->sendMessage(
-            $chatId,
-            "🕘 Recent transactions\n" . implode("\n", $lines),
-            ['inline_keyboard' => array_chunk($buttons, 5)],
-        );
+        return [
+            'text' => "🕘 Recent transactions\n" . implode("\n", $lines),
+            'reply_markup' => ['inline_keyboard' => array_chunk($buttons, 5)],
+        ];
+    }
+
+    private function sendBudgets(User $user, int|string $chatId): void
+    {
+        $budgets = $this->listBudgets->execute($user);
+        $lines = [];
+
+        foreach ($budgets as $budget) {
+            $period = $budget->periods->first(fn (BudgetPeriod $period) => $period->ends_at === null);
+
+            if (!$period) {
+                continue;
+            }
+
+            $label = $budget->title
+                ?: $period->tags->map(fn (Tag $tag) => trim($tag->emoji . ' ' . $tag->title))->filter()->implode(', ')
+                ?: 'Budget #' . $budget->id;
+
+            $spent = $this->budgetSpent($period, $user->id);
+            $limit = (float) $period->amount;
+
+            $lines[] = sprintf(
+                '%s: %s / %s',
+                $label,
+                UserFormatter::formatMoney($user, $spent),
+                UserFormatter::formatMoney($user, $limit),
+            );
+        }
+
+        if ($lines === []) {
+            $this->client->sendMessage($chatId, 'No active budgets');
+
+            return;
+        }
+
+        $this->client->sendMessage($chatId, "💰 Budgets\n" . implode("\n", $lines));
+    }
+
+    private function budgetSpent(BudgetPeriod $period, int $userId): float
+    {
+        $tagIds = $period->tags->pluck('id');
+
+        if ($tagIds->isEmpty()) {
+            return 0.0;
+        }
+
+        $boundary = $period->length->calendarStart();
+        $start = $boundary->greaterThan($period->starts_at) ? $boundary : $period->starts_at->copy();
+
+        $sum = Transaction::query()
+            ->where('user_id', $userId)
+            ->whereBetween('at', [$start, now()])
+            ->where('amount', '<', 0)
+            ->whereHas('tags', fn ($query) => $query->whereIn('tags.id', $tagIds))
+            ->sum('amount');
+
+        return (float) $sum * -1;
+    }
+
+    private function sendRecurring(User $user, int|string $chatId): void
+    {
+        $rules = $this->listRecurring->execute($user);
+
+        if ($rules->isEmpty()) {
+            $this->client->sendMessage($chatId, 'No recurring rules');
+
+            return;
+        }
+
+        $lines = $rules->map(function (RecurringTransaction $rule) use ($user) {
+            $note = $rule->note ? " — {$rule->note}" : '';
+            $active = $rule->active ? 'yes' : 'no';
+
+            return sprintf(
+                '%s · %s · next %s · active %s%s',
+                UserFormatter::formatMoney($user, $rule->amount),
+                $rule->frequency->value,
+                UserFormatter::formatDate($user, $rule->next_run_at),
+                $active,
+                $note,
+            );
+        })->all();
+
+        $this->client->sendMessage($chatId, "🔁 Recurring\n" . implode("\n", $lines));
     }
 
     private function handleNewTag(User $user, int|string $chatId, string $text): void
@@ -623,12 +872,18 @@ class TelegramBot
         $this->client->sendMessage($chatId, "✅ Tag created: {$tag->emoji} {$tag->title}");
     }
 
-    private function formatTransactionLine(Transaction $transaction): string
+    private function formatTransactionLine(User $user, Transaction $transaction): string
     {
         $emoji = $transaction->amount > 0 ? '📈' : '📉';
         $note = $transaction->note ? " — {$transaction->note}" : '';
 
-        return sprintf('%s %.2f%s (%s)', $emoji, $transaction->amount, $note, $transaction->at->format('d.m'));
+        return sprintf(
+            '%s %s%s (%s)',
+            $emoji,
+            UserFormatter::formatMoney($user, $transaction->amount),
+            $note,
+            UserFormatter::formatDate($user, $transaction->at),
+        );
     }
 
     private function formatTagList(Transaction $transaction): string
@@ -640,6 +895,20 @@ class TelegramBot
         $labels = $transaction->tags->map(fn (Tag $tag) => trim($tag->emoji . ' ' . $tag->title))->all();
 
         return '🏷 ' . implode(', ', $labels);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function postSaveKeyboard(Transaction $transaction): array
+    {
+        return [
+            'inline_keyboard' => [[
+                ['text' => '✏️ Change tags', 'callback_data' => "retag:{$transaction->id}"],
+                ['text' => '💰 Edit amount', 'callback_data' => "editamt:{$transaction->id}"],
+                ['text' => '🗑 Delete', 'callback_data' => "del:{$transaction->id}"],
+            ]],
+        ];
     }
 
     /**
@@ -719,7 +988,7 @@ class TelegramBot
         return [
             'keyboard' => [
                 [self::MENU_MONTH, self::MENU_RECENT],
-                [self::MENU_TAGS],
+                [self::MENU_TAGS, self::MENU_BUDGETS],
             ],
             'resize_keyboard' => true,
         ];
@@ -738,6 +1007,24 @@ class TelegramBot
             ->first();
     }
 
+    private function handleUnlink(int|string $chatId): void
+    {
+        $identity = $this->resolveIdentity($chatId);
+
+        if (!$identity) {
+            $this->client->sendMessage($chatId, "This chat isn't linked to a FundsFlow account");
+
+            return;
+        }
+
+        $identity->delete();
+
+        $this->client->sendMessage(
+            $chatId,
+            '🔓 Unlinked. Your FundsFlow account remains on the website, but this chat is no longer connected',
+        );
+    }
+
     private function handleMute(int|string $chatId, bool $muted): void
     {
         $identity = $this->resolveIdentity($chatId);
@@ -745,7 +1032,7 @@ class TelegramBot
         $identity->update(['meta' => [...$identity->meta, 'muted' => $muted]]);
 
         $this->client->sendMessage($chatId, $muted
-            ? '🔕 Notifications muted. Use /unmute to turn budget alerts and weekly reports back on'
-            : '🔔 Notifications unmuted');
+            ? '🔕 Notifications muted. Use /unmute to turn budget alerts, weekly digest, and recurring auto-add notifications back on'
+            : '🔔 Notifications unmuted — budget alerts, weekly digest, and recurring auto-add notifications are on');
     }
 }

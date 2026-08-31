@@ -32,6 +32,7 @@ class ExportAccountDataAction
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'preferences' => $user->resolvedPreferences(),
                 'identities' => $user->identities->map(fn ($identity) => [
                     'provider' => $identity->provider,
                     'external_id' => $identity->external_id,
