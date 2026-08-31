@@ -3,7 +3,9 @@
         <button v-for="tag in tagsStore.list()" :key="tag.id" type="button" @click="toggle(tag.id)"
             class="badge badge-info gap-0 px-1 text-lg cursor-pointer" :class="{
                 'badge-soft': !modelValue.includes(tag.id),
-            }" :style="{ marginLeft: `${tag.depth * 20}px` }">
+            }" :style="{ marginLeft: `${tag.depth * 20}px` }"
+            :aria-label="[tag.emoji, tag.title].filter(Boolean).join(' ')"
+            :aria-pressed="modelValue.includes(tag.id)">
             <span>{{ tag.emoji }}</span>
             <span>{{ tag.title }}</span>
         </button>

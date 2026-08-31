@@ -1,5 +1,5 @@
 <template>
-    <dialog id="auth_modal" class="modal">
+    <dialog id="auth_modal" class="modal" aria-labelledby="auth_modal_title">
         <div class="modal-box max-w-sm">
             <template v-if="!showTelegramLogin">
                 <div class="tabs tabs-box justify-center mb-4">
@@ -9,7 +9,7 @@
                         @click="isRegister = true">Register</a>
                 </div>
 
-                <h2 class="card-title mb-4">
+                <h2 id="auth_modal_title" class="card-title mb-4">
                     <UserPlus v-if="isRegister" :size="24" />
                     <User v-else :size="24" />
                     {{ isRegister ? 'Register' : 'Login' }}
@@ -17,13 +17,13 @@
 
                 <form @submit.prevent="handleSubmit">
                     <input v-if="isRegister" type="text" v-model="credentials.name" placeholder="Name"
-                        class="input w-full mb-4" maxlength="255" required />
+                        aria-label="Name" class="input w-full mb-4" maxlength="255" required />
 
-                    <input type="email" v-model="credentials.email" placeholder="Email" class="input w-full mb-4"
-                        maxlength="255" required autofocus />
+                    <input type="email" v-model="credentials.email" placeholder="Email" aria-label="Email"
+                        class="input w-full mb-4" maxlength="255" required autofocus />
 
-                    <input type="password" v-model="credentials.password" placeholder="Password" class="input w-full"
-                        minlength="8" maxlength="255" required />
+                    <input type="password" v-model="credentials.password" placeholder="Password" aria-label="Password"
+                        class="input w-full" minlength="8" maxlength="255" required />
 
                     <div class="modal-action justify-between">
                         <div class="flex gap-2">
@@ -78,7 +78,7 @@
             </template>
 
             <template v-else>
-                <h2 class="card-title mb-4">
+                <h2 id="auth_modal_title" class="card-title mb-4">
                     <Send :size="24" />
                     Log in with Telegram
                 </h2>
@@ -90,7 +90,8 @@
 
                 <form @submit.prevent="submitTelegramCode">
                     <input v-model="telegramCode" type="text" inputmode="numeric" maxlength="6"
-                        placeholder="Code from the bot" class="input w-full mb-4" autofocus />
+                        placeholder="Code from the bot" aria-label="Code from the bot" class="input w-full mb-4"
+                        autofocus />
 
                     <div class="modal-action justify-between">
                         <button type="button" class="btn btn-ghost" @click="showTelegramLogin = false">

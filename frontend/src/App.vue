@@ -15,7 +15,7 @@
     <OnboardingModal />
 
     <div class="container mx-auto p-4">
-        <div class="flex gap-2 justify-end mb-4 flex-wrap">
+        <header class="flex gap-2 justify-end mb-4 flex-wrap">
             <template v-if="authStore.isAuthenticated">
                 <button type="button" @click="showModal('transactions_add_modal')"
                     class="btn btn-primary max-sm:btn-square" aria-label="Add Transaction">
@@ -52,105 +52,115 @@
                 <LogIn :size="24" />
                 Login
             </button>
-        </div>
+        </header>
 
-        <div class="flex gap-2 mb-3 items-stretch">
-            <select class="select w-24 sm:w-30 border-base-300 focus:border-base-content cursor-pointer"
-                v-model="dateSelectionType" aria-label="Date range type">
-                <option value="week">Week</option>
-                <option value="month">Month</option>
-                <option value="year">Year</option>
-            </select>
+        <main>
+            <div class="flex gap-2 mb-3 items-stretch">
+                <select class="select w-24 sm:w-30 border-base-300 focus:border-base-content cursor-pointer"
+                    v-model="dateSelectionType" aria-label="Date range type">
+                    <option value="week">Week</option>
+                    <option value="month">Month</option>
+                    <option value="year">Year</option>
+                </select>
 
-            <button type="button" class="btn btn-square border-base-300" @click="shiftPeriod(-1)"
-                aria-label="Previous period">
-                <ChevronLeft :size="20" />
-            </button>
+                <button type="button" class="btn btn-square border-base-300" @click="shiftPeriod(-1)"
+                    aria-label="Previous period">
+                    <ChevronLeft :size="20" />
+                </button>
 
-            <div class="w-32 sm:w-40 min-w-0 flex-1 sm:flex-none">
-                <VueDatePicker v-model="selectedRange" hide-offset-dates :enable-time-picker="false" auto-apply
-                    :transitions="false" :week-picker="dateSelectionType === 'week'"
-                    :month-picker="dateSelectionType === 'month'" :year-picker="dateSelectionType === 'year'"
-                    :week-numbers="{ type: 'local' }" :min-date="new Date('2000-01-05')" :clearable="false"
-                    prevent-min-max-navigation :year-range="[2020, 2040]" :hide-input-icon="true" ref="datePicker">
-                </VueDatePicker>
+                <div class="w-32 sm:w-40 min-w-0 flex-1 sm:flex-none" aria-label="Selected period">
+                    <VueDatePicker v-model="selectedRange" hide-offset-dates :enable-time-picker="false" auto-apply
+                        :transitions="false" :week-picker="dateSelectionType === 'week'"
+                        :month-picker="dateSelectionType === 'month'" :year-picker="dateSelectionType === 'year'"
+                        :week-numbers="{ type: 'local' }" :min-date="new Date('2000-01-05')" :clearable="false"
+                        prevent-min-max-navigation :year-range="[2020, 2040]" :hide-input-icon="true" ref="datePicker">
+                    </VueDatePicker>
+                </div>
+
+                <button type="button" class="btn btn-square border-base-300" @click="shiftPeriod(1)"
+                    aria-label="Next period">
+                    <ChevronRight :size="20" />
+                </button>
             </div>
 
-            <button type="button" class="btn btn-square border-base-300" @click="shiftPeriod(1)"
-                aria-label="Next period">
-                <ChevronRight :size="20" />
-            </button>
-        </div>
+            <div class="mb-4 -mx-4 px-4 overflow-x-auto">
+                <div class="tabs tabs-box gap-2 p-0 w-max min-w-full sm:w-auto sm:min-w-0" role="tablist"
+                    aria-label="Main views">
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
+                        :aria-selected="selectedTab === markRaw(Analytics)">
+                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" checked="checked"
+                            :value="markRaw(Analytics)" aria-hidden="true" />
 
-        <div class="mb-4 -mx-4 px-4 overflow-x-auto">
-            <div class="tabs tabs-box gap-2 p-0 w-max min-w-full sm:w-auto sm:min-w-0">
-                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" checked="checked"
-                        :value="markRaw(Analytics)" />
+                        <Presentation :size="22" />
 
-                    <Presentation :size="22" />
+                        Analytics
+                    </label>
 
-                    Analytics
-                </label>
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
+                        :aria-selected="selectedTab === markRaw(CalendarTab)">
+                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
+                            :value="markRaw(CalendarTab)" aria-hidden="true" />
 
-                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                        :value="markRaw(CalendarTab)" />
+                        <CalendarDays :size="22" />
 
-                    <CalendarDays :size="22" />
+                        Calendar
+                    </label>
 
-                    Calendar
-                </label>
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
+                        :aria-selected="selectedTab === markRaw(Budgets)">
+                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
+                            :value="markRaw(Budgets)" aria-hidden="true" />
 
-                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                        :value="markRaw(Budgets)" />
+                        <PiggyBank :size="22" />
 
-                    <PiggyBank :size="22" />
+                        Budgets
+                    </label>
 
-                    Budgets
-                </label>
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
+                        :aria-selected="selectedTab === markRaw(TagDistribution)">
+                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
+                            :value="markRaw(TagDistribution)" aria-hidden="true" />
 
-                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                        :value="markRaw(TagDistribution)" />
+                        <Tags :size="22" />
 
-                    <Tags :size="22" />
+                        Tags
+                    </label>
 
-                    Tags
-                </label>
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
+                        :aria-selected="selectedTab === markRaw(MoneyFlow)">
+                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
+                            :value="markRaw(MoneyFlow)" aria-hidden="true" />
 
-                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                        :value="markRaw(MoneyFlow)" />
+                        <ArrowLeftRight :size="22" />
 
-                    <ArrowLeftRight :size="22" />
+                        Flow
+                    </label>
 
-                    Flow
-                </label>
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
+                        :aria-selected="selectedTab === markRaw(BalanceTrend)">
+                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
+                            :value="markRaw(BalanceTrend)" aria-hidden="true" />
 
-                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                        :value="markRaw(BalanceTrend)" />
+                        <TrendingUp :size="22" />
 
-                    <TrendingUp :size="22" />
+                        Trend
+                    </label>
 
-                    Trend
-                </label>
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
+                        :aria-selected="selectedTab === markRaw(TableTab)">
+                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
+                            :value="markRaw(TableTab)" aria-hidden="true" />
 
-                <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                    <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" :value="markRaw(TableTab)" />
+                        <Table :size="22" />
 
-                    <Table :size="22" />
-
-                    List
-                </label>
-
+                        List
+                    </label>
+                </div>
             </div>
-        </div>
 
-        <component :is="selectedTab" :dateRange="getDateRange" :dateSelectionType @jump-to-month="handleJumpToMonth"
-            @jump-to-list="selectedTab = markRaw(TableTab)" />
+            <component :is="selectedTab" :dateRange="getDateRange" :dateSelectionType
+                @jump-to-month="handleJumpToMonth" @jump-to-list="selectedTab = markRaw(TableTab)" />
+        </main>
 
         <footer class="mt-10 pt-4 border-t border-base-300 text-center text-sm text-base-content/50">
             Feedback

@@ -30,7 +30,7 @@
                     <div v-if="dateSelectionType === 'year'" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                         <button v-for="m in yearMonths" :key="m.month" type="button"
                             class="card card-border border-base-300 text-left p-3 hover:border-primary"
-                            @click="jumpToMonth(m)">
+                            :aria-label="monthName(m.start)" @click="jumpToMonth(m)">
                             <div class="font-semibold mb-1">{{ monthName(m.start) }}</div>
                             <div v-if="m.income || m.expense" class="text-sm">
                                 <span v-if="m.income" class="text-success">+{{ formatMoney(m.income) }}</span>
@@ -57,7 +57,9 @@
                                     'opacity-40': !cell.inRange,
                                     'border-primary!': cell.date === selectedDate,
                                     'text-primary font-bold': cell.date === todayStr,
-                                }" @click="selectedDate = cell.date">
+                                }"
+                                :aria-label="`${formatDate(cell.date)}, ${cell.items.length} transaction${cell.items.length === 1 ? '' : 's'}`"
+                                @click="selectedDate = cell.date">
                                 <span class="text-[11px] sm:text-xs leading-none">{{ cell.day }}</span>
 
                                 <!-- Mobile: colored dots (amounts don't fit ~42px cells) -->
@@ -96,7 +98,7 @@
                     <div v-else class="grid grid-cols-2 gap-2">
                         <button v-for="item in selectedItems" :key="item.key" type="button"
                             class="card card-border border-base-300 bg-base-100 p-2 justify-between text-center cursor-pointer hover:border-primary"
-                            @click="openItem(item)">
+                            :aria-label="itemAriaLabel(item)" @click="openItem(item)">
                             <div class="flex flex-wrap justify-center gap-1 mb-1">
                                 <span v-for="tag in item.tags" :key="tag.id" class="text-lg tooltip"
                                     :data-tip="tag.title">{{ tag.emoji }}</span>
@@ -126,7 +128,7 @@
                     <div v-else class="flex flex-col gap-2">
                         <button v-for="item in upcoming" :key="item.key" type="button"
                             class="card card-border border-base-300 bg-base-100 flex-row items-center gap-2 p-2 text-left cursor-pointer hover:border-primary"
-                            @click="openItem(item)">
+                            :aria-label="itemAriaLabel(item)" @click="openItem(item)">
                             <div class="radial-progress shrink-0 text-[10px]" :class="ringClass(item)"
                                 :style="{ '--value': ringValue(item), '--size': '2.5rem', '--thickness': '3px' }">
                                 {{ item.daysAway === 0 ? 'now' : item.daysAway + 'd' }}
@@ -343,6 +345,13 @@ const yearMonths = computed(() => {
 })
 
 const monthName = (date) => date.toLocaleDateString('en-US', { month: 'long' })
+
+const itemAriaLabel = (item) => {
+    const amount = `${item.amount > 0 ? '+' : ''}${formatMoney(item.amount)}`
+    const detail = item.note?.trim() || item.tags?.map((tag) => tag.title).filter(Boolean).join(', ')
+
+    return detail ? `${amount}, ${detail}` : amount
+}
 
 const jumpToMonth = (m) => emit('jump-to-month', m.start)
 

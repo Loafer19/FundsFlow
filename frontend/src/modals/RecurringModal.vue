@@ -1,8 +1,8 @@
 <template>
-    <dialog id="recurring_modal" class="modal">
+    <dialog id="recurring_modal" class="modal" aria-labelledby="recurring_modal_title">
         <div class="modal-box max-w-lg">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="card-title">
+                <h2 id="recurring_modal_title" class="card-title">
                     <Repeat :size="24" />
                     Recurring
                 </h2>

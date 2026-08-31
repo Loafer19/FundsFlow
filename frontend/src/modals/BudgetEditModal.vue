@@ -1,17 +1,17 @@
 <template>
-    <dialog id="budgets_edit_modal" class="modal">
+    <dialog id="budgets_edit_modal" class="modal" aria-labelledby="budgets_edit_modal_title">
         <div class="modal-box max-w-sm">
-            <h2 class="card-title mb-4">
+            <h2 id="budgets_edit_modal_title" class="card-title mb-4">
                 <PiggyBank :size="24" />
                 Edit Budget
             </h2>
 
             <form @submit.prevent="handleSubmit">
-                <input type="text" v-model="form.title" placeholder="Title (optional)" class="input w-full mb-4"
-                    maxlength="255" autofocus />
+                <input type="text" v-model="form.title" placeholder="Title (optional)" aria-label="Title"
+                    class="input w-full mb-4" maxlength="255" autofocus />
 
                 <input type="number" step="0.01" min="0.01" v-model="form.amount" placeholder="Amount"
-                    class="input w-full mb-4" required />
+                    aria-label="Amount" class="input w-full mb-4" required />
 
                 <select v-model="form.length" class="select w-full mb-4" required aria-label="Budget length">
                     <option value="week">Weekly</option>

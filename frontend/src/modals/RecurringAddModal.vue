@@ -1,7 +1,7 @@
 <template>
-    <dialog id="recurring_add_modal" class="modal">
+    <dialog id="recurring_add_modal" class="modal" aria-labelledby="recurring_add_modal_title">
         <div class="modal-box max-w-sm">
-            <h2 class="card-title mb-4">
+            <h2 id="recurring_add_modal_title" class="card-title mb-4">
                 <Repeat :size="24" />
                 Add Recurring
             </h2>
@@ -9,8 +9,8 @@
             <form @submit.prevent="handleSubmit">
                 <AmountField v-model="form.amount" />
 
-                <input type="text" v-model="form.note" placeholder="Note (optional)" class="input w-full mb-4"
-                    maxlength="255" />
+                <input type="text" v-model="form.note" placeholder="Note (optional)" aria-label="Note"
+                    class="input w-full mb-4" maxlength="255" />
 
                 <select v-model="form.frequency" class="select w-full mb-4" required aria-label="Recurring frequency">
                     <option value="daily">Daily</option>
@@ -34,7 +34,7 @@
 
                 <template v-if="endMode === 'count'">
                     <input type="number" min="1" v-model="occurrences" placeholder="Number of times"
-                        class="input w-full" />
+                        aria-label="Number of times" class="input w-full" />
                     <div class="text-sm text-base-content/60 mb-4 mt-1">
                         <template v-if="computedEndsAt">Ends around {{ formatDate(computedEndsAt) }}</template>
                     </div>

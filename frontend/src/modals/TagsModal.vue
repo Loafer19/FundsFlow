@@ -1,8 +1,8 @@
 <template>
-    <dialog id="tags_modal" class="modal">
+    <dialog id="tags_modal" class="modal" aria-labelledby="tags_modal_title">
         <div class="modal-box max-w-lg">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="card-title">
+                <h2 id="tags_modal_title" class="card-title">
                     <Tag :size="24" />
                     Manage Tags
                 </h2>

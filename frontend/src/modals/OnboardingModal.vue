@@ -1,10 +1,10 @@
 <template>
-    <dialog id="onboarding_modal" class="modal" @close="onDialogClose">
+    <dialog id="onboarding_modal" class="modal" aria-labelledby="onboarding_modal_title" @close="onDialogClose">
         <div class="modal-box max-w-md">
             <template v-if="step === 'welcome'">
                 <div class="flex items-center gap-3 mb-3">
                     <img src="/logo.png" alt="FundsFlow" class="w-14 h-14 rounded-2xl" />
-                    <h2 class="card-title mb-0">
+                    <h2 id="onboarding_modal_title" class="card-title mb-0">
                         Welcome to FundsFlow
                     </h2>
                 </div>
@@ -44,7 +44,7 @@
             </template>
 
             <template v-else>
-                <h2 class="card-title mb-2">
+                <h2 id="onboarding_modal_title" class="card-title mb-2">
                     <Send :size="24" />
                     Add from Telegram
                 </h2>

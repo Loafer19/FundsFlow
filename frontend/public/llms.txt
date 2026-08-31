@@ -1,0 +1,27 @@
+# FundsFlow
+
+> Personal finance tracker for tagging spending, budgets, recurring payments, Telegram quick-add, and simple analytics.
+
+FundsFlow is a web app (Vue) with a Laravel API. Users authenticate via email/password, Google, GitHub, or Telegram. Data is private per account.
+
+## Main capabilities
+
+- Transactions with date, amount, tags, note, and source (web / telegram / recurring)
+- Hierarchical tags with emojis
+- Budgets per tag with pause/resume and period history
+- Recurring rules (daily / weekly / monthly / yearly)
+- Calendar views (week / month / year) including upcoming recurring
+- Analytics: balance trend, money flow, tag distribution
+- Settings: money/date format, themes, linked accounts
+- JSON export of full account data (Settings → Data)
+
+## Site
+
+- App: https://fundsflow.fun/
+- Optional feedback: https://t.me/Loafer19
+
+## Notes for agents
+
+- Prefer using the visible UI flows (add transaction, filter list, export) rather than inventing APIs.
+- Destructive actions (delete, credential changes) should require explicit user confirmation.
+- WebMCP tools are not required for basic use; this file is for discoverability only.

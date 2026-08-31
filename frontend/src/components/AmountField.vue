@@ -2,18 +2,18 @@
     <div class="flex flex-col gap-2 mb-4">
         <div class="join w-full">
             <button type="button" class="btn join-item" :class="isIncome ? 'btn-success' : 'btn-ghost'"
-                @click="setType(true)">
+                aria-label="Income" :aria-pressed="isIncome" @click="setType(true)">
                 Income
             </button>
             <button type="button" class="btn join-item" :class="!isIncome ? 'btn-error' : 'btn-ghost'"
-                @click="setType(false)">
+                aria-label="Expense" :aria-pressed="!isIncome" @click="setType(false)">
                 Expense
             </button>
         </div>
 
-        <input type="number" step="0.01" min="0.01" required placeholder="Amount" :value="display" autofocus
-            class="input w-full font-semibold" :class="isIncome ? 'input-success text-success' : 'input-error text-error'"
-            @input="onInput" />
+        <input type="number" step="0.01" min="0.01" required placeholder="Amount" aria-label="Amount" :value="display"
+            autofocus class="input w-full font-semibold"
+            :class="isIncome ? 'input-success text-success' : 'input-error text-error'" @input="onInput" />
     </div>
 </template>
 

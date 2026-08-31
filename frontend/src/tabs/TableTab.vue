@@ -37,13 +37,19 @@
                     <thead>
                         <tr>
                             <th></th>
-                            <th @click="sortBy('at')" class="cursor-pointer">
+                            <th role="button" tabindex="0" class="cursor-pointer"
+                                :aria-sort="sortConfig.key === 'at' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'"
+                                @click="sortBy('at')" @keydown.enter.prevent="sortBy('at')"
+                                @keydown.space.prevent="sortBy('at')">
                                 Date
                                 <span v-if="sortConfig.key === 'at'">
                                     {{ sortConfig.direction === 'asc' ? '↑' : '↓' }}
                                 </span>
                             </th>
-                            <th @click="sortBy('amount')" class="cursor-pointer">
+                            <th role="button" tabindex="0" class="cursor-pointer"
+                                :aria-sort="sortConfig.key === 'amount' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'"
+                                @click="sortBy('amount')" @keydown.enter.prevent="sortBy('amount')"
+                                @keydown.space.prevent="sortBy('amount')">
                                 Amount
                                 <span v-if="sortConfig.key === 'amount'">
                                     {{ sortConfig.direction === 'asc' ? '↑' : '↓' }}
@@ -57,8 +63,9 @@
                     <tbody>
                         <tr v-for="transaction in filteredTransactions" :key="transaction.id">
                             <td>
-                                <span class="tooltip tooltip-right" :data-tip="sourceLabel(transaction.source)">
-                                    <component :is="sourceIcon(transaction.source)" :size="18" />
+                                <span class="tooltip tooltip-right" :data-tip="sourceLabel(transaction.source)"
+                                    :aria-label="sourceLabel(transaction.source)">
+                                    <component :is="sourceIcon(transaction.source)" :size="18" aria-hidden="true" />
                                 </span>
                             </td>
                             <td class="min-w-18">{{ formatDate(transaction.at) }}</td>

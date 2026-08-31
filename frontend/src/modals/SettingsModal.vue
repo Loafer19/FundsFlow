@@ -1,6 +1,8 @@
 <template>
-    <dialog id="settings_modal" class="modal">
+    <dialog id="settings_modal" class="modal" aria-labelledby="settings_modal_title">
         <div class="modal-box max-w-sm">
+            <h2 id="settings_modal_title" class="card-title mb-4">Settings</h2>
+
             <div class="tabs tabs-box justify-center mb-4">
                 <template v-for="(title, key) in tabs">
                     <a class="tab" @click="tab = key" :class="{ 'tab-active': tab === key }">
@@ -97,11 +99,12 @@
                     </p>
 
                     <form @submit.prevent="saveCredentials">
-                        <input v-model="credentialsForm.email" type="email" placeholder="Email"
+                        <input v-model="credentialsForm.email" type="email" placeholder="Email" aria-label="Email"
                             class="input w-full mb-4" maxlength="255" autofocus required />
 
                         <input v-model="credentialsForm.password" type="password" placeholder="New password"
-                            class="input w-full mb-4" minlength="8" maxlength="255" required />
+                            aria-label="New password" class="input w-full mb-4" minlength="8" maxlength="255"
+                            required />
 
                         <button type="submit" class="btn btn-primary btn-sm" :disabled="savingCredentials">
                             Save

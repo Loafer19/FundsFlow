@@ -1,7 +1,7 @@
 <template>
-    <dialog id="transactions_edit_modal" class="modal">
+    <dialog id="transactions_edit_modal" class="modal" aria-labelledby="transactions_edit_modal_title">
         <div class="modal-box max-w-sm">
-            <h2 class="card-title mb-4">Edit Transaction</h2>
+            <h2 id="transactions_edit_modal_title" class="card-title mb-4">Edit Transaction</h2>
 
             <form @submit.prevent="handleSubmit">
                 <input type="date" v-model="transaction.at" class="input w-full mb-4" required />
@@ -10,7 +10,8 @@
 
                 <TagPicker v-model="transaction.tags" />
 
-                <input type="text" v-model="transaction.note" class="input w-full" placeholder="Note" maxlength="255" />
+                <input type="text" v-model="transaction.note" class="input w-full" placeholder="Note" aria-label="Note"
+                    maxlength="255" />
 
                 <div class="modal-action">
                     <DeleteHold :id="transaction.id" :disabled="transactionsStore.isLoading"

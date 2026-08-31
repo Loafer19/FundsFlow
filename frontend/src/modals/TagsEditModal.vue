@@ -1,14 +1,14 @@
 <template>
-    <dialog id="tags_edit_modal" class="modal">
+    <dialog id="tags_edit_modal" class="modal" aria-labelledby="tags_edit_modal_title">
         <div class="modal-box max-w-sm">
-            <h2 class="card-title mb-4">
+            <h2 id="tags_edit_modal_title" class="card-title mb-4">
                 <Tag :size="24" />
                 Edit Tag
             </h2>
 
             <form @submit.prevent="handleSubmit">
-                <input type="text" v-model="tag.title" placeholder="Title" class="input w-full mb-4" maxlength="255"
-                    required autofocus />
+                <input type="text" v-model="tag.title" placeholder="Title" aria-label="Title"
+                    class="input w-full mb-4" maxlength="255" required autofocus />
 
                 <select v-model="tag.parent_id" class="select w-full mb-4" aria-label="Parent tag">
                     <option value="">No Parent</option>
