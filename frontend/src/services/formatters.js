@@ -86,7 +86,7 @@ export const getTransactionSourceLabel = (source) => transactionSourceLabels[sou
 
 export const apiErrorMessage = (error, prefix = '') => {
     const data = error.response?.data
-    const fieldErrors = data?.errors
+    const fieldErrors = data && typeof data === 'object' && !(data instanceof Blob) ? data.errors : null
 
     if (fieldErrors && typeof fieldErrors === 'object') {
         const messages = Object.values(fieldErrors).flat().filter(Boolean)
@@ -96,5 +96,17 @@ export const apiErrorMessage = (error, prefix = '') => {
         }
     }
 
-    return prefix + (data?.error || data?.message || error.message)
+    if (error.response?.status === 429) {
+        const sec = error.retryAfter
+        const base =
+            (data && typeof data === 'object' && !(data instanceof Blob) && (data.error || data.message)) ||
+            'Too many requests.'
+        const wait = Number.isFinite(sec) ? ` Try again in ${sec}s.` : ' Try again shortly.'
+
+        return prefix + base + wait
+    }
+
+    const message = data && typeof data === 'object' && !(data instanceof Blob) ? data.error || data.message : null
+
+    return prefix + (message || error.message)
 }
