@@ -22,7 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->append(AlwaysJson::class);
 
-        $middleware->throttleApi('60,1');
+        $middleware->throttleApi('180,1');
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->shouldRenderJsonWhen(fn () => true);
