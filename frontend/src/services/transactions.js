@@ -1,13 +1,11 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
-import { useAuthStore } from './auth.js'
-import { noticeCachedData, readCache, writeCache } from './cache.js'
+import { loadWithCache, persistCache } from './cache.js'
 import { apiErrorMessage, toLocalDateStr } from './formatters.js'
 import { isOnboardingDone, markOnboardingDone } from './onboarding.js'
 import toasts from './toasts.js'
 
 const CACHE = 'transactions'
-const userId = () => useAuthStore().user?.id
 
 export const useTransactionsStore = defineStore('transactions', {
     state: () => ({
@@ -40,26 +38,16 @@ export const useTransactionsStore = defineStore('transactions', {
 
     actions: {
         persist() {
-            writeCache(userId(), CACHE, this.transactions)
+            persistCache(CACHE, this.transactions)
         },
 
         async load() {
-            const cached = readCache(userId(), CACHE)
-            if (cached) this.transactions = cached
-
-            this.isLoading = true
-
-            try {
-                const response = await api.get('/transactions')
-
-                this.transactions = response.data
-                this.persist()
-            } catch (error) {
-                if (cached) noticeCachedData()
-                else toasts.error(apiErrorMessage(error, 'Failed to load transactions: '))
-            } finally {
-                this.isLoading = false
-            }
+            await loadWithCache(this, {
+                name: CACHE,
+                key: 'transactions',
+                fetch: async () => (await api.get('/transactions')).data,
+                errorPrefix: 'Failed to load transactions: ',
+            })
         },
 
         async create(raw) {

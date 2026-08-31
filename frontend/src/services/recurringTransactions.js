@@ -1,12 +1,10 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
-import { useAuthStore } from './auth.js'
-import { noticeCachedData, readCache, writeCache } from './cache.js'
+import { loadWithCache, persistCache } from './cache.js'
 import { apiErrorMessage } from './formatters.js'
 import toasts from './toasts.js'
 
 const CACHE = 'recurring'
-const userId = () => useAuthStore().user?.id
 
 export const useRecurringTransactionsStore = defineStore('recurringTransactions', {
     state: () => ({
@@ -17,26 +15,16 @@ export const useRecurringTransactionsStore = defineStore('recurringTransactions'
 
     actions: {
         persist() {
-            writeCache(userId(), CACHE, this.rules)
+            persistCache(CACHE, this.rules)
         },
 
         async load() {
-            const cached = readCache(userId(), CACHE)
-            if (cached) this.rules = cached
-
-            this.isLoading = true
-
-            try {
-                const response = await api.get('/recurring-transactions')
-
-                this.rules = response.data
-                this.persist()
-            } catch (error) {
-                if (cached) noticeCachedData()
-                else toasts.error(apiErrorMessage(error, 'Failed to load recurring transactions: '))
-            } finally {
-                this.isLoading = false
-            }
+            await loadWithCache(this, {
+                name: CACHE,
+                key: 'rules',
+                fetch: async () => (await api.get('/recurring-transactions')).data,
+                errorPrefix: 'Failed to load recurring transactions: ',
+            })
         },
 
         async create(payload) {

@@ -1,12 +1,10 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
-import { useAuthStore } from './auth.js'
-import { noticeCachedData, readCache, writeCache } from './cache.js'
+import { loadWithCache, persistCache } from './cache.js'
 import { apiErrorMessage } from './formatters.js'
 import toasts from './toasts.js'
 
 const CACHE = 'budgets'
-const userId = () => useAuthStore().user?.id
 
 export const useBudgetsStore = defineStore('budgets', {
     state: () => ({
@@ -17,26 +15,16 @@ export const useBudgetsStore = defineStore('budgets', {
 
     actions: {
         persist() {
-            writeCache(userId(), CACHE, this.budgets)
+            persistCache(CACHE, this.budgets)
         },
 
         async load() {
-            const cached = readCache(userId(), CACHE)
-            if (cached) this.budgets = cached
-
-            this.isLoading = true
-
-            try {
-                const response = await api.get('/budgets')
-
-                this.budgets = response.data
-                this.persist()
-            } catch (error) {
-                if (cached) noticeCachedData()
-                else toasts.error(apiErrorMessage(error, 'Failed to load budgets: '))
-            } finally {
-                this.isLoading = false
-            }
+            await loadWithCache(this, {
+                name: CACHE,
+                key: 'budgets',
+                fetch: async () => (await api.get('/budgets')).data,
+                errorPrefix: 'Failed to load budgets: ',
+            })
         },
 
         async create(payload) {

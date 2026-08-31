@@ -1,12 +1,10 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
-import { useAuthStore } from './auth.js'
-import { noticeCachedData, readCache, writeCache } from './cache.js'
+import { loadWithCache, persistCache } from './cache.js'
 import { apiErrorMessage } from './formatters.js'
 import toasts from './toasts.js'
 
 const CACHE = 'tags'
-const userId = () => useAuthStore().user?.id
 
 export const useTagsStore = defineStore('tags', {
     state: () => ({
@@ -22,26 +20,16 @@ export const useTagsStore = defineStore('tags', {
 
     actions: {
         persist() {
-            writeCache(userId(), CACHE, this.tags)
+            persistCache(CACHE, this.tags)
         },
 
         async load() {
-            const cached = readCache(userId(), CACHE)
-            if (cached) this.tags = cached
-
-            this.isLoading = true
-
-            try {
-                const response = await api.get('/tags')
-
-                this.tags = response.data
-                this.persist()
-            } catch (error) {
-                if (cached) noticeCachedData()
-                else toasts.error(apiErrorMessage(error, 'Failed to load tags: '))
-            } finally {
-                this.isLoading = false
-            }
+            await loadWithCache(this, {
+                name: CACHE,
+                key: 'tags',
+                fetch: async () => (await api.get('/tags')).data,
+                errorPrefix: 'Failed to load tags: ',
+            })
         },
 
         normalizePayload(raw) {
