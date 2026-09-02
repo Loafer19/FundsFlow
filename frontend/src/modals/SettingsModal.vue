@@ -147,6 +147,8 @@
                                 <div class="break-all text-base-content/80">{{ mcpUrl }}</div>
                                 <div class="text-base-content/50 pt-1">Client ID</div>
                                 <div class="break-all text-base-content/80">{{ mcpOAuth.clientId }}</div>
+                                <div class="text-base-content/50 pt-1">Client Secret</div>
+                                <div class="break-all text-base-content/80">{{ mcpOAuth.clientSecret }}</div>
                                 <div class="text-base-content/50 pt-1">Authorization Endpoint</div>
                                 <div class="break-all text-base-content/80">{{ mcpOAuth.authorize }}</div>
                                 <div class="text-base-content/50 pt-1">Token Endpoint</div>
@@ -417,6 +419,7 @@ const githubLabel = computed(() => githubIdentity.value?.meta?.name || githubIde
 const mcpUrl = 'https://mcp.fundsflow.fun/mcp'
 const mcpOAuth = {
     clientId: 'fundsflow',
+    clientSecret: '4c85a4e0dfe7be128cc0104400a0128a8df2e9fe017be345',
     authorize: 'https://mcp.fundsflow.fun/oauth/authorize',
     token: 'https://mcp.fundsflow.fun/oauth/token',
 }
@@ -444,11 +447,11 @@ const copyMcpOAuthBlob = () =>
         [
             `MCP URL: ${mcpUrl}`,
             `Client ID: ${mcpOAuth.clientId}`,
-            'Client Secret: (leave empty)',
+            `Client Secret: ${mcpOAuth.clientSecret}`,
             `Authorization Endpoint: ${mcpOAuth.authorize}`,
             `Token Endpoint: ${mcpOAuth.token}`,
             'Scopes: mcp',
-            'Token Auth Method: none',
+            'Token Auth Method: client_secret_post',
         ].join('\n'),
         'oauth',
     )

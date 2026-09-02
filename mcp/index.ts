@@ -3,7 +3,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js'
 import express, { type Request, type Response } from 'express'
 import { z } from 'zod'
-import { oauthClientId, oauthPublicBase, registerOAuthRoutes, unauthorizedMcp } from './oauth.ts'
+import { oauthClientId, oauthClientSecret, oauthPublicBase, registerOAuthRoutes, unauthorizedMcp } from './oauth.ts'
 
 const PORT = Number(process.env.PORT || 8787)
 const HOST = process.env.HOST || '127.0.0.1'
@@ -550,10 +550,11 @@ app.get('/', (_req, res) => {
         tools: TOOL_NAMES,
         oauth: {
             client_id: oauthClientId,
+            client_secret: oauthClientSecret || null,
             authorization_endpoint: `${oauthPublicBase}/oauth/authorize`,
             token_endpoint: `${oauthPublicBase}/oauth/token`,
             scopes: ['mcp'],
-            token_endpoint_auth_method: 'none',
+            token_endpoint_auth_method: oauthClientSecret ? 'client_secret_post' : 'none',
         },
     })
 })

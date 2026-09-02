@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import type { Express, Request, Response } from 'express'
 
 const CLIENT_ID = process.env.OAUTH_CLIENT_ID || 'fundsflow'
+const CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET || ''
 const PUBLIC_BASE = (process.env.MCP_PUBLIC_URL || 'https://mcp.fundsflow.fun').replace(/\/$/, '')
 const API_URL = (process.env.FUNDSFLOW_API_URL || 'https://api.fundsflow.fun/api').replace(/\/$/, '')
 const CODE_TTL_MS = 5 * 60 * 1000
@@ -101,7 +102,9 @@ export function registerOAuthRoutes(app: Express) {
             response_types_supported: ['code'],
             grant_types_supported: ['authorization_code'],
             code_challenge_methods_supported: ['S256', 'plain'],
-            token_endpoint_auth_methods_supported: ['none', 'client_secret_post', 'client_secret_basic'],
+            token_endpoint_auth_methods_supported: CLIENT_SECRET
+                ? ['client_secret_post', 'client_secret_basic']
+                : ['none', 'client_secret_post', 'client_secret_basic'],
             scopes_supported: ['mcp'],
         })
     })
@@ -235,6 +238,34 @@ export function registerOAuthRoutes(app: Express) {
 
         // Support JSON and form-urlencoded token requests.
         const body = (req.body || {}) as Record<string, unknown>
+
+        // Client auth: body client_secret or HTTP Basic
+        let clientId = String(body.client_id || '')
+        let clientSecret = String(body.client_secret || '')
+        const basic = req.header('authorization')
+        if (basic?.toLowerCase().startsWith('basic ')) {
+            try {
+                const decoded = Buffer.from(basic.slice(6), 'base64').toString('utf8')
+                const idx = decoded.indexOf(':')
+                if (idx >= 0) {
+                    clientId = decoded.slice(0, idx)
+                    clientSecret = decoded.slice(idx + 1)
+                }
+            } catch {
+                // ignore malformed basic
+            }
+        }
+        if (CLIENT_SECRET) {
+            if (clientId && clientId !== CLIENT_ID) {
+                res.status(401).json({ error: 'invalid_client' })
+                return
+            }
+            if (clientSecret !== CLIENT_SECRET) {
+                res.status(401).json({ error: 'invalid_client', error_description: 'client_secret mismatch' })
+                return
+            }
+        }
+
         const grantType = String(body.grant_type || '')
         if (grantType !== 'authorization_code') {
             res.status(400).json({ error: 'unsupported_grant_type' })
@@ -302,4 +333,5 @@ export function unauthorizedMcp(res: Response, id: unknown = null) {
 }
 
 export const oauthClientId = CLIENT_ID
+export const oauthClientSecret = CLIENT_SECRET
 export const oauthPublicBase = PUBLIC_BASE
