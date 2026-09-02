@@ -108,7 +108,7 @@
 </template>
 
 <script setup>
-import { Laptop, Pencil, Repeat, Search, Send, Tag } from 'lucide-vue-next'
+import { Bot, Laptop, Pencil, Repeat, Search, Send, Tag } from 'lucide-vue-next'
 import { computed, inject, ref, watch } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -120,7 +120,7 @@ const formatMoney = inject('formatMoney')
 const formatDate = inject('formatDate')
 const sourceLabel = getTransactionSourceLabel
 
-const sourceIcons = { web: Laptop, telegram: Send, recurring: Repeat }
+const sourceIcons = { web: Laptop, telegram: Send, recurring: Repeat, mcp: Bot }
 const sourceIcon = (source) => sourceIcons[source] ?? sourceIcons.web
 
 const transactionsStore = useTransactionsStore()

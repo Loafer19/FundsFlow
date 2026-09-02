@@ -128,6 +128,66 @@
                                 </button>
                             </template>
                         </div>
+
+                        <div class="flex flex-col gap-2 p-3 rounded-box bg-base-200">
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium w-24 shrink-0 flex items-center gap-1">
+                                    <Bot :size="16" aria-hidden="true" />
+                                    MCP
+                                </span>
+                                <span v-if="mcpTokenActive" class="badge badge-success badge-sm">Token active</span>
+                                <span v-else class="badge badge-ghost badge-sm">No token</span>
+                            </div>
+                            <p class="text-xs text-base-content/60 leading-relaxed">
+                                For Grok.com use OAuth below (login with your FundsFlow email/password when prompted).
+                                CLI can use a personal token header instead. MCP creates show a bot icon in List.
+                            </p>
+                            <div class="text-[11px] font-mono bg-base-100 rounded-box px-2 py-1.5 space-y-1">
+                                <div class="text-base-content/50">MCP URL</div>
+                                <div class="break-all text-base-content/80">{{ mcpUrl }}</div>
+                                <div class="text-base-content/50 pt-1">Client ID</div>
+                                <div class="break-all text-base-content/80">{{ mcpOAuth.clientId }}</div>
+                                <div class="text-base-content/50 pt-1">Authorization Endpoint</div>
+                                <div class="break-all text-base-content/80">{{ mcpOAuth.authorize }}</div>
+                                <div class="text-base-content/50 pt-1">Token Endpoint</div>
+                                <div class="break-all text-base-content/80">{{ mcpOAuth.token }}</div>
+                                <div class="text-base-content/50 pt-1">Scopes</div>
+                                <div class="break-all text-base-content/80">mcp</div>
+                                <div class="text-base-content/50 pt-1">Token Auth Method</div>
+                                <div class="break-all text-base-content/80">none</div>
+                            </div>
+                            <div class="flex flex-wrap justify-end gap-1">
+                                <button type="button" class="btn btn-primary btn-xs" @click="copyMcpOAuthBlob">
+                                    {{ mcpCopied === 'oauth' ? 'Copied' : 'Copy OAuth fields' }}
+                                </button>
+                                <button type="button" class="btn btn-ghost btn-xs" @click="copyMcpUrl">
+                                    {{ mcpCopied === 'url' ? 'Copied' : 'Copy URL' }}
+                                </button>
+                            </div>
+                            <div class="divider text-xs my-1">CLI token (optional)</div>
+                            <template v-if="mcpPlainToken">
+                                <div class="text-xs text-warning">Copy now — shown only once</div>
+                                <code
+                                    class="block text-[11px] font-mono break-all bg-base-100 rounded-box px-2 py-1.5 text-base-content/80">{{
+                                        mcpPlainToken }}</code>
+                            </template>
+                            <div class="flex flex-wrap justify-end gap-1">
+                                <button v-if="mcpPlainToken" type="button" class="btn btn-ghost btn-xs"
+                                    @click="copyMcpAuthHeader">
+                                    {{ mcpCopied === 'header' ? 'Copied' : 'Copy header' }}
+                                </button>
+                                <button type="button" class="btn btn-outline btn-xs" :disabled="mcpTokenBusy"
+                                    @click="generateMcpToken">
+                                    <span v-if="mcpTokenBusy" class="loading loading-spinner loading-xs"></span>
+                                    {{ mcpTokenActive || mcpPlainToken ? 'Regenerate' : 'Generate token' }}
+                                </button>
+                                <button v-if="mcpTokenActive || mcpPlainToken" type="button"
+                                    class="btn btn-outline btn-error btn-xs" :disabled="mcpTokenBusy"
+                                    @click="revokeMcpTokenAction">
+                                    Revoke
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="divider text-sm text-base-content/60">Login credentials</div>
@@ -193,9 +253,16 @@ recurring_transactions</pre>
 </template>
 
 <script setup>
-import { Download, KeyRound, Save, Send } from 'lucide-vue-next'
+import { Bot, Download, KeyRound, Save, Send } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
-import { downloadAccountExport, updateCredentials, updatePreferences } from '../services/account'
+import {
+    createMcpToken,
+    downloadAccountExport,
+    getMcpTokenStatus,
+    revokeMcpToken,
+    updateCredentials,
+    updatePreferences,
+} from '../services/account'
 import { useAuthStore } from '../services/auth'
 import { apiErrorMessage, formatDateOptions, formatMoneyOptions } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
@@ -284,6 +351,7 @@ const syncFromSettings = () => {
 
 const onModalClose = () => {
     document.documentElement.setAttribute('data-theme', settings.theme)
+    mcpPlainToken.value = ''
     syncFromSettings()
 }
 
@@ -297,6 +365,7 @@ const bindModalEvents = () => {
     const originalShow = modal.showModal.bind(modal)
     modal.showModal = () => {
         syncFromSettings()
+        if (tab.value === 'accounts') refreshMcpTokenStatus()
         originalShow()
     }
 }
@@ -344,6 +413,93 @@ const telegramLinkLabel = computed(() => {
 
 const googleLabel = computed(() => googleIdentity.value?.meta?.name || googleIdentity.value?.meta?.nickname || '')
 const githubLabel = computed(() => githubIdentity.value?.meta?.name || githubIdentity.value?.meta?.nickname || '')
+
+const mcpUrl = 'https://mcp.fundsflow.fun/mcp'
+const mcpOAuth = {
+    clientId: 'fundsflow',
+    authorize: 'https://mcp.fundsflow.fun/oauth/authorize',
+    token: 'https://mcp.fundsflow.fun/oauth/token',
+}
+const mcpCopied = ref('')
+const mcpPlainToken = ref('')
+const mcpTokenActive = ref(false)
+const mcpTokenBusy = ref(false)
+
+const copyText = async (value, key) => {
+    try {
+        await navigator.clipboard.writeText(value)
+        mcpCopied.value = key
+        window.setTimeout(() => {
+            if (mcpCopied.value === key) mcpCopied.value = ''
+        }, 1500)
+    } catch {
+        toasts.error('Could not copy')
+    }
+}
+
+const copyMcpUrl = () => copyText(mcpUrl, 'url')
+const copyMcpAuthHeader = () => copyText(`Authorization: Bearer ${mcpPlainToken.value}`, 'header')
+const copyMcpOAuthBlob = () =>
+    copyText(
+        [
+            `MCP URL: ${mcpUrl}`,
+            `Client ID: ${mcpOAuth.clientId}`,
+            'Client Secret: (leave empty)',
+            `Authorization Endpoint: ${mcpOAuth.authorize}`,
+            `Token Endpoint: ${mcpOAuth.token}`,
+            'Scopes: mcp',
+            'Token Auth Method: none',
+        ].join('\n'),
+        'oauth',
+    )
+
+const refreshMcpTokenStatus = async () => {
+    if (!authStore.isAuthenticated) {
+        mcpTokenActive.value = false
+        return
+    }
+
+    try {
+        const response = await getMcpTokenStatus()
+        mcpTokenActive.value = !!response.data.active
+    } catch {
+        mcpTokenActive.value = false
+    }
+}
+
+const generateMcpToken = async () => {
+    mcpTokenBusy.value = true
+
+    try {
+        const response = await createMcpToken()
+        mcpPlainToken.value = response.data.token
+        mcpTokenActive.value = true
+        toasts.success(response.data.message || 'MCP token created')
+    } catch (error) {
+        toasts.error(apiErrorMessage(error, 'Failed to create MCP token: '))
+    } finally {
+        mcpTokenBusy.value = false
+    }
+}
+
+const revokeMcpTokenAction = async () => {
+    mcpTokenBusy.value = true
+
+    try {
+        await revokeMcpToken()
+        mcpPlainToken.value = ''
+        mcpTokenActive.value = false
+        toasts.success('MCP token revoked')
+    } catch (error) {
+        toasts.error(apiErrorMessage(error, 'Failed to revoke MCP token: '))
+    } finally {
+        mcpTokenBusy.value = false
+    }
+}
+
+watch(tab, (next) => {
+    if (next === 'accounts') refreshMcpTokenStatus()
+})
 
 const openTelegramLink = async () => {
     generatingTelegramLink.value = true

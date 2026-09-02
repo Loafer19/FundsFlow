@@ -65,4 +65,37 @@ class AccountController extends Controller
             JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
         );
     }
+
+    public function mcpTokenStatus(Request $request): JsonResponse
+    {
+        $active = $request->user()->tokens()->where('name', 'mcp')->exists();
+
+        return response()->json([
+            'active' => $active,
+        ]);
+    }
+
+    public function createMcpToken(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $user->tokens()->where('name', 'mcp')->delete();
+
+        $plainTextToken = $user->createToken('mcp')->plainTextToken;
+
+        return response()->json([
+            'token' => $plainTextToken,
+            'message' => 'MCP token created. Copy it now — it will not be shown again.',
+        ]);
+    }
+
+    public function revokeMcpToken(Request $request): JsonResponse
+    {
+        $request->user()->tokens()->where('name', 'mcp')->delete();
+
+        return response()->json([
+            'message' => 'MCP token revoked.',
+            'active' => false,
+        ]);
+    }
 }

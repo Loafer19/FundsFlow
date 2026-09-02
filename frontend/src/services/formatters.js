@@ -80,6 +80,7 @@ export const transactionSourceLabels = {
     web: 'Added from the web app',
     telegram: 'Added via Telegram',
     recurring: 'Created automatically (recurring)',
+    mcp: 'Added via MCP (Grok / AI)',
 }
 
 export const getTransactionSourceLabel = (source) => transactionSourceLabels[source] ?? transactionSourceLabels.web

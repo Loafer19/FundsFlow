@@ -4,6 +4,12 @@ export const updateCredentials = (data) => api.put('/account/credentials', data)
 
 export const updatePreferences = (data) => api.patch('/account/preferences', data)
 
+export const getMcpTokenStatus = () => api.get('/account/mcp-token')
+
+export const createMcpToken = () => api.post('/account/mcp-token')
+
+export const revokeMcpToken = () => api.delete('/account/mcp-token')
+
 export const downloadAccountExport = async () => {
     // blob: save server bytes as-is — no JSON.parse / stringify on the client
     const response = await api.get('/account/export', {

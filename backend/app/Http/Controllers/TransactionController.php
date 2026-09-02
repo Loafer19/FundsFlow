@@ -31,7 +31,11 @@ class TransactionController extends Controller
 
     public function store(TransactionStoreRequest $request): TransactionResource
     {
-        $transaction = $this->createTransaction->execute(auth()->user(), $request->validated(), TransactionSource::Web);
+        $source = $request->header('X-FundsFlow-Source') === TransactionSource::Mcp->value
+            ? TransactionSource::Mcp
+            : TransactionSource::Web;
+
+        $transaction = $this->createTransaction->execute(auth()->user(), $request->validated(), $source);
 
         return new TransactionResource($transaction);
     }

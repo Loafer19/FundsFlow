@@ -48,6 +48,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/identities/telegram/link-code', [IdentityController::class, 'telegramLinkCode']);
     Route::put('/account/credentials', [AccountController::class, 'updateCredentials']);
     Route::patch('/account/preferences', [AccountController::class, 'updatePreferences']);
+    Route::get('/account/mcp-token', [AccountController::class, 'mcpTokenStatus']);
+    Route::post('/account/mcp-token', [AccountController::class, 'createMcpToken'])
+        ->middleware('throttle:10,1');
+    Route::delete('/account/mcp-token', [AccountController::class, 'revokeMcpToken']);
     Route::get('/account/export', [AccountController::class, 'export'])
         ->middleware('throttle:10,1');
 });
