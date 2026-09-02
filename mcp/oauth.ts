@@ -92,31 +92,6 @@ function authorizePage(params: Record<string, string>, error = '') {
 </html>`
 }
 
-function successPage(redirectUrl: string) {
-    return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Authorized — FundsFlow MCP</title>
-  <style>
-    body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem}
-    .card{max-width:420px;background:#1e293b;border:1px solid #334155;border-radius:1rem;padding:1.5rem;text-align:center}
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>Authorized</h1>
-    <p>Returning to Grok… If this tab does not continue, <a href="${escapeHtml(redirectUrl)}" style="color:#38bdf8">click here</a>.</p>
-  </div>
-  <script>
-    // Give the user a beat to see success, then continue the OAuth redirect.
-    setTimeout(function () { window.location.replace(${JSON.stringify(redirectUrl)}); }, 600);
-  </script>
-</body>
-</html>`
-}
-
 export function registerOAuthRoutes(app: Express) {
     app.get('/.well-known/oauth-authorization-server', (_req, res) => {
         res.json({
@@ -246,12 +221,9 @@ export function registerOAuthRoutes(app: Express) {
             target.searchParams.set('code', code)
             if (state) target.searchParams.set('state', state)
 
-            // Intermediate page so the popup does not look like it "just closed".
-            res
-                .type('html')
-                .set('Cache-Control', 'no-store')
-                .set('Cross-Origin-Opener-Policy', 'unsafe-none')
-                .send(successPage(target.toString()))
+            // Must be a real 302 to redirect_uri?code=... — Grok's popup watches for that URL.
+            // An HTML interstitial breaks detection and the tab just closes as "failed".
+            res.set('Cache-Control', 'no-store').redirect(302, target.toString())
         } catch (error) {
             console.error('oauth authorize failed', error)
             res.status(500).type('html').send(authorizePage(params, 'Login failed. Try again.'))
@@ -261,26 +233,37 @@ export function registerOAuthRoutes(app: Express) {
     app.post('/oauth/token', async (req: Request, res: Response) => {
         cleanupCodes()
 
-        const grantType = String(req.body?.grant_type || '')
+        // Support JSON and form-urlencoded token requests.
+        const body = (req.body || {}) as Record<string, unknown>
+        const grantType = String(body.grant_type || '')
         if (grantType !== 'authorization_code') {
             res.status(400).json({ error: 'unsupported_grant_type' })
             return
         }
 
-        const code = String(req.body?.code || '')
-        const redirectUri = String(req.body?.redirect_uri || '')
-        const codeVerifier = String(req.body?.code_verifier || '')
+        const code = String(body.code || '')
+        const redirectUri = String(body.redirect_uri || '')
+        const codeVerifier = String(body.code_verifier || '')
         const row = authCodes.get(code)
 
-        console.log('oauth token', { hasCode: !!row, redirectUri: redirectUri.slice(0, 80) })
+        console.log('oauth token', {
+            hasCode: !!row,
+            redirectUri: redirectUri.slice(0, 120),
+            storedRedirect: row?.redirectUri?.slice(0, 120),
+            hasVerifier: Boolean(codeVerifier),
+            hasChallenge: Boolean(row?.codeChallenge),
+        })
 
         if (!row || row.expiresAt <= Date.now()) {
             authCodes.delete(code)
-            res.status(400).json({ error: 'invalid_grant' })
+            res.status(400).json({ error: 'invalid_grant', error_description: 'code unknown or expired' })
             return
         }
         if (row.redirectUri !== redirectUri) {
-            res.status(400).json({ error: 'invalid_grant', error_description: 'redirect_uri mismatch' })
+            res.status(400).json({
+                error: 'invalid_grant',
+                error_description: 'redirect_uri mismatch',
+            })
             return
         }
         if (row.codeChallenge) {
