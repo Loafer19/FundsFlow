@@ -139,49 +139,27 @@
                                 <span v-else class="badge badge-ghost badge-sm">No token</span>
                             </div>
                             <p class="text-xs text-base-content/60 leading-relaxed">
-                                For Grok.com use OAuth below (login with your FundsFlow email/password when prompted).
-                                CLI can use a personal token header instead. MCP creates show a bot icon in List.
+                                Grok.com has no header field and its OAuth popup is unreliable — use a connection URL
+                                with your personal token. Generate token → Copy Grok URL → paste as the only MCP URL
+                                in Grok (skip OAuth fields).
                             </p>
-                            <div class="text-[11px] font-mono bg-base-100 rounded-box px-2 py-1.5 space-y-1">
-                                <div class="text-base-content/50">MCP URL</div>
-                                <div class="break-all text-base-content/80">{{ mcpUrl }}</div>
-                                <div class="text-base-content/50 pt-1">Client ID</div>
-                                <div class="break-all text-base-content/80">{{ mcpOAuth.clientId }}</div>
-                                <div class="text-base-content/50 pt-1">Client Secret</div>
-                                <div class="break-all text-base-content/80">{{ mcpOAuth.clientSecret }}</div>
-                                <div class="text-base-content/50 pt-1">Authorization Endpoint</div>
-                                <div class="break-all text-base-content/80">{{ mcpOAuth.authorize }}</div>
-                                <div class="text-base-content/50 pt-1">Token Endpoint</div>
-                                <div class="break-all text-base-content/80">{{ mcpOAuth.token }}</div>
-                                <div class="text-base-content/50 pt-1">Scopes</div>
-                                <div class="break-all text-base-content/80">mcp</div>
-                                <div class="text-base-content/50 pt-1">Token Auth Method</div>
-                                <div class="break-all text-base-content/80">none</div>
-                            </div>
-                            <div class="flex flex-wrap justify-end gap-1">
-                                <button type="button" class="btn btn-primary btn-xs" @click="copyMcpOAuthBlob">
-                                    {{ mcpCopied === 'oauth' ? 'Copied' : 'Copy OAuth fields' }}
-                                </button>
-                                <button type="button" class="btn btn-ghost btn-xs" @click="copyMcpUrl">
-                                    {{ mcpCopied === 'url' ? 'Copied' : 'Copy URL' }}
-                                </button>
-                            </div>
-                            <div class="divider text-xs my-1">CLI token (optional)</div>
+                            <code
+                                class="block text-[11px] font-mono break-all bg-base-100 rounded-box px-2 py-1.5 text-base-content/80">{{
+                                    mcpPlainToken ? mcpGrokUrl : mcpUrl }}</code>
                             <template v-if="mcpPlainToken">
-                                <div class="text-xs text-warning">Copy now — shown only once</div>
-                                <code
-                                    class="block text-[11px] font-mono break-all bg-base-100 rounded-box px-2 py-1.5 text-base-content/80">{{
-                                        mcpPlainToken }}</code>
+                                <div class="text-xs text-warning">
+                                    Token is in the URL (Grok.com limitation). Revoke anytime if it leaks.
+                                </div>
                             </template>
                             <div class="flex flex-wrap justify-end gap-1">
-                                <button v-if="mcpPlainToken" type="button" class="btn btn-ghost btn-xs"
-                                    @click="copyMcpAuthHeader">
-                                    {{ mcpCopied === 'header' ? 'Copied' : 'Copy header' }}
-                                </button>
                                 <button type="button" class="btn btn-outline btn-xs" :disabled="mcpTokenBusy"
                                     @click="generateMcpToken">
                                     <span v-if="mcpTokenBusy" class="loading loading-spinner loading-xs"></span>
                                     {{ mcpTokenActive || mcpPlainToken ? 'Regenerate' : 'Generate token' }}
+                                </button>
+                                <button v-if="mcpPlainToken" type="button" class="btn btn-primary btn-xs"
+                                    @click="copyMcpGrokUrl">
+                                    {{ mcpCopied === 'grok' ? 'Copied' : 'Copy Grok URL' }}
                                 </button>
                                 <button v-if="mcpTokenActive || mcpPlainToken" type="button"
                                     class="btn btn-outline btn-error btn-xs" :disabled="mcpTokenBusy"
@@ -417,16 +395,14 @@ const googleLabel = computed(() => googleIdentity.value?.meta?.name || googleIde
 const githubLabel = computed(() => githubIdentity.value?.meta?.name || githubIdentity.value?.meta?.nickname || '')
 
 const mcpUrl = 'https://mcp.fundsflow.fun/mcp'
-const mcpOAuth = {
-    clientId: 'fundsflow',
-    clientSecret: '4c85a4e0dfe7be128cc0104400a0128a8df2e9fe017be345',
-    authorize: 'https://mcp.fundsflow.fun/oauth/authorize',
-    token: 'https://mcp.fundsflow.fun/oauth/token',
-}
 const mcpCopied = ref('')
 const mcpPlainToken = ref('')
 const mcpTokenActive = ref(false)
 const mcpTokenBusy = ref(false)
+
+const mcpGrokUrl = computed(() =>
+    mcpPlainToken.value ? `${mcpUrl}?token=${encodeURIComponent(mcpPlainToken.value)}` : mcpUrl,
+)
 
 const copyText = async (value, key) => {
     try {
@@ -440,21 +416,7 @@ const copyText = async (value, key) => {
     }
 }
 
-const copyMcpUrl = () => copyText(mcpUrl, 'url')
-const copyMcpAuthHeader = () => copyText(`Authorization: Bearer ${mcpPlainToken.value}`, 'header')
-const copyMcpOAuthBlob = () =>
-    copyText(
-        [
-            `MCP URL: ${mcpUrl}`,
-            `Client ID: ${mcpOAuth.clientId}`,
-            `Client Secret: ${mcpOAuth.clientSecret}`,
-            `Authorization Endpoint: ${mcpOAuth.authorize}`,
-            `Token Endpoint: ${mcpOAuth.token}`,
-            'Scopes: mcp',
-            'Token Auth Method: client_secret_post',
-        ].join('\n'),
-        'oauth',
-    )
+const copyMcpGrokUrl = () => copyText(mcpGrokUrl.value, 'grok')
 
 const refreshMcpTokenStatus = async () => {
     if (!authStore.isAuthenticated) {

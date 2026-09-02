@@ -559,6 +559,17 @@ app.get('/', (_req, res) => {
     })
 })
 
+function isPublicMcpMethod(body: unknown): boolean {
+    if (!body || typeof body !== 'object' || !('method' in body)) return false
+    const method = String((body as { method: unknown }).method)
+    return (
+        method === 'initialize' ||
+        method === 'notifications/initialized' ||
+        method === 'tools/list' ||
+        method === 'ping'
+    )
+}
+
 app.post('/mcp', async (req: Request, res: Response) => {
     const userToken = resolveUserToken(req)
     let token: string | null = userToken
@@ -566,7 +577,10 @@ app.post('/mcp', async (req: Request, res: Response) => {
         token = ENV_TOKEN
     }
 
-    if (!token) {
+    // Grok.com has no header field and its OAuth popup is flaky.
+    // Keep discovery public so adding the MCP URL does not force OAuth.
+    // Tool calls still need ?token= / Authorization (from Settings "Copy Grok URL").
+    if (!token && !isPublicMcpMethod(req.body)) {
         unauthorizedMcp(res, req.body?.id ?? null)
         return
     }
@@ -594,11 +608,7 @@ app.post('/mcp', async (req: Request, res: Response) => {
     }
 })
 
-app.get('/mcp', (req, res) => {
-    if (!resolveUserToken(req) && !(ENV_TOKEN && hasMcpKey(req))) {
-        unauthorizedMcp(res)
-        return
-    }
+app.get('/mcp', (_req, res) => {
     res.status(405).json({
         jsonrpc: '2.0',
         error: { code: -32000, message: 'Method not allowed. Use POST.' },
