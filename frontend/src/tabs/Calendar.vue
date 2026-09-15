@@ -103,16 +103,28 @@
                                 <span v-for="tag in item.tags" :key="tag.id" class="text-lg tooltip"
                                     :data-tip="tag.title">{{ tag.emoji }}</span>
                             </div>
-                            <div v-if="item.note" class="text-xs text-base-content/60 truncate mb-1">{{ item.note }}</div>
-                            <div class="flex items-center justify-center gap-1">
-                                <div class="badge justify-center" :class="badgeClass(item)">
-                                    {{ item.amount > 0 ? '+' : '' }}{{ formatMoney(item.amount) }}
-                                </div>
-                                <span v-if="item.attachments?.length" class="badge badge-ghost badge-xs gap-0.5"
-                                    :aria-label="item.attachments.length + ' attachments'">
-                                    📎{{ item.attachments.length }}
-                                </span>
+                            <div class="flex items-center gap-1.5 min-w-0 mb-1" v-if="item.note || item.attachments?.length">
+                                <button v-if="item.attachments?.length && item.actual" type="button"
+                                    class="btn btn-ghost btn-xs gap-0.5 px-0.5 shrink-0 h-5 min-h-0 items-center"
+                                    :aria-label="'Preview ' + item.attachments.length + ' attachments'"
+                                    @click.stop="previewAttachments(item.transaction)">
+                                    <template v-for="file in item.attachments.slice(0, 2)" :key="file.id">
+                                        <FileText v-if="file.mime === 'application/pdf'" :size="12" aria-hidden="true" />
+                                        <ImageIcon v-else :size="12" aria-hidden="true" />
+                                    </template>
+                                    <span v-if="item.attachments.length > 2"
+                                        class="inline-flex items-center text-[10px] leading-none translate-y-px opacity-70">
+                                        +{{ item.attachments.length - 2 }}
+                                    </span>
+
+                                </button>
+
+                                <div v-if="item.note" class="text-xs text-base-content/60 truncate">{{ item.note }}</div>
                             </div>
+                            <div class="badge w-full justify-center" :class="badgeClass(item)">
+                                {{ item.amount > 0 ? '+' : '' }}{{ formatMoney(item.amount) }}
+                            </div>
+
 
                         </button>
 
@@ -163,7 +175,7 @@
 </template>
 
 <script setup>
-import { Plus } from 'lucide-vue-next'
+import { FileText, Image as ImageIcon, Plus } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import EmptyState from '../components/EmptyState.vue'
 import { formatDate, formatMoney, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
@@ -203,6 +215,10 @@ const selectedDate = ref(todayStr)
 const hasAnyData = computed(() => transactionsStore.transactions.length > 0 || recurringStore.rules.length > 0)
 
 const openAdd = () => transactions_add_modal.showModal()
+
+const previewAttachments = (transaction) => {
+    transactionsStore.openAttachmentPreview(transaction)
+}
 
 const addForSelectedDate = () => {
     transactionsStore.transactionDraftAt = selectedDate.value

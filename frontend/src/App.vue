@@ -6,6 +6,8 @@
     <TagsEditModal />
     <TransactionsAddModal />
     <TransactionsEditModal />
+    <AttachmentPreviewModal />
+
     <BudgetAddModal />
     <BudgetEditModal />
     <RecurringModal />
@@ -199,6 +201,7 @@ import {
 } from 'lucide-vue-next'
 import { computed, markRaw, onMounted, ref, watch } from 'vue'
 import Toasts from './components/Toasts.vue'
+import AttachmentPreviewModal from './modals/AttachmentPreviewModal.vue'
 import AuthModal from './modals/AuthModal.vue'
 import BudgetAddModal from './modals/BudgetAddModal.vue'
 import BudgetEditModal from './modals/BudgetEditModal.vue'

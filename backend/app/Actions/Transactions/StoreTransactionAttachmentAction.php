@@ -25,7 +25,7 @@ class StoreTransactionAttachmentAction
             throw ValidationException::withMessages([
                 'file' => 'A transaction can have at most '
                     . TransactionAttachmentRules::MAX_PER_TRANSACTION
-                    . ' attachments.',
+                    . ' attachments!',
             ]);
         }
 
@@ -43,13 +43,13 @@ class StoreTransactionAttachmentAction
 
         if (!is_string($contents) || $contents === '') {
             throw ValidationException::withMessages([
-                'file' => 'The file is empty or could not be read.',
+                'file' => 'The file is empty or could not be read!',
             ]);
         }
 
         if ($size > TransactionAttachmentRules::MAX_BYTES) {
             throw ValidationException::withMessages([
-                'file' => 'Each attachment must be 8 MB or smaller.',
+                'file' => 'Each attachment must be 8 MB or smaller!',
             ]);
         }
 
@@ -57,9 +57,10 @@ class StoreTransactionAttachmentAction
 
         if ($extension === null) {
             throw ValidationException::withMessages([
-                'file' => 'Only JPEG, PNG, WebP, and PDF files are allowed.',
+                'file' => 'Only JPEG, PNG, WebP, and PDF files are allowed!',
             ]);
         }
+
 
         $disk = config('filesystems.default', 'local');
         $path = sprintf(

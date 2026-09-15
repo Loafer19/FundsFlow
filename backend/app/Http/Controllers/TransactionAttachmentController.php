@@ -42,7 +42,7 @@ class TransactionAttachmentController extends Controller
         $contents = base64_decode($data['content'], true);
 
         if ($contents === false) {
-            abort(422, 'Invalid base64 content.');
+            abort(422, 'Invalid base64 content!');
         }
 
         $attachment = $this->storeAttachment->execute($request->user(), $transaction, [
@@ -59,9 +59,15 @@ class TransactionAttachmentController extends Controller
         TransactionAttachment $attachment,
     ): StreamedResponse {
         Gate::authorize('update', $transaction);
-        $this->assertBelongs($transaction, $attachment);
+        $this->assertBelongs($transaction, $attachment, auth()->id());
 
-        return Storage::disk($attachment->disk)->response(
+        $disk = Storage::disk($attachment->disk);
+
+        if (!$disk->exists($attachment->path)) {
+            abort(404, 'Attachment file is missing from storage!');
+        }
+
+        return $disk->response(
             $attachment->path,
             $attachment->original_name,
             [
@@ -82,9 +88,15 @@ class TransactionAttachmentController extends Controller
         ]);
     }
 
-    private function assertBelongs(Transaction $transaction, TransactionAttachment $attachment): void
-    {
-        if ($attachment->transaction_id !== $transaction->id) {
+    private function assertBelongs(
+        Transaction $transaction,
+        TransactionAttachment $attachment,
+        int|string|null $userId = null,
+    ): void {
+        if (
+            $attachment->transaction_id !== $transaction->id
+            || ($userId !== null && (int) $attachment->user_id !== (int) $userId)
+        ) {
             abort(404);
         }
     }

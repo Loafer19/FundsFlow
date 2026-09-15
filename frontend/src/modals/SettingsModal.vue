@@ -204,7 +204,7 @@
 exported_at,
 account,
 tags,
-transactions,
+transactions (incl. attachment metadata),
 budgets,
 recurring_transactions</pre>
 

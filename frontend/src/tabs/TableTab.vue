@@ -57,6 +57,10 @@
                             </th>
                             <th>Tags</th>
                             <th>Note</th>
+                            <th class="w-0">
+                                <span class="sr-only">Files</span>
+                                <Paperclip :size="14" aria-hidden="true" />
+                            </th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -84,16 +88,28 @@
                                 </div>
                             </td>
                             <td>
-                                <div class="flex items-center gap-1 min-w-0">
-                                    <span class="truncate">{{ transaction.note || '-' }}</span>
-                                    <span v-if="transaction.attachments?.length"
-                                        class="badge badge-ghost badge-sm gap-0.5 shrink-0"
-                                        :aria-label="transaction.attachments.length + ' attachments'">
-                                        <Paperclip :size="12" aria-hidden="true" />
-                                        {{ transaction.attachments.length }}
-                                    </span>
-                                </div>
+                                <span class="truncate">{{ transaction.note || '-' }}</span>
                             </td>
+                            <td>
+                                <button v-if="transaction.attachments?.length" type="button"
+                                    class="btn btn-ghost btn-xs gap-0.5 px-1 items-center"
+                                    :aria-label="'Preview ' + transaction.attachments.length + ' attachments'"
+                                    @click="previewAttachments(transaction)">
+                                    <template v-for="file in transaction.attachments.slice(0, 2)" :key="file.id">
+                                        <FileText v-if="file.mime === 'application/pdf'" :size="14"
+                                            aria-hidden="true" />
+                                        <ImageIcon v-else :size="14" aria-hidden="true" />
+                                    </template>
+                                    <span v-if="transaction.attachments.length > 2"
+                                        class="inline-flex items-center text-[10px] leading-none translate-y-px opacity-70">
+                                        +{{ transaction.attachments.length - 2 }}
+                                    </span>
+
+                                </button>
+
+                            </td>
+
+
 
                             <td class="flex gap-1">
                                 <button v-if="transactionsStore.isLoading == transaction.id"
@@ -119,7 +135,7 @@
 </template>
 
 <script setup>
-import { Bot, Laptop, Paperclip, Pencil, Repeat, Search, Send, Tag } from 'lucide-vue-next'
+import { Bot, FileText, Image as ImageIcon, Laptop, Paperclip, Pencil, Repeat, Search, Send, Tag } from 'lucide-vue-next'
 
 import { computed, inject, ref, watch } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
@@ -191,5 +207,9 @@ const openAdd = () => transactions_add_modal.showModal()
 const editTransaction = (transaction) => {
     transactionsStore.transactionForEdit = transaction
     transactions_edit_modal.showModal()
+}
+
+const previewAttachments = (transaction) => {
+    transactionsStore.openAttachmentPreview(transaction)
 }
 </script>

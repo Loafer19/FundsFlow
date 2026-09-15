@@ -1,9 +1,14 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js'
+import { hostHeaderValidation } from '@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js'
 import express, { type Request, type Response } from 'express'
 import { z } from 'zod'
 import { oauthClientId, oauthClientSecret, oauthPublicBase, registerOAuthRoutes, unauthorizedMcp } from './oauth.ts'
+
+/** 8 MB file → ~10.7 MB base64; leave headroom for JSON-RPC envelope. */
+const JSON_BODY_LIMIT = '12mb'
+const MAX_ATTACHMENT_BASE64_CHARS = Math.ceil((8 * 1024 * 1024 * 4) / 3) + 4096
+
 
 const PORT = Number(process.env.PORT || 8787)
 const HOST = process.env.HOST || '127.0.0.1'
@@ -417,7 +422,7 @@ function createServer(token: string | null) {
         {
             title: 'Attach file to transaction',
             description:
-                'Attach a JPEG/PNG/WebP/PDF to a transaction (max 8 MB, max 5 files per transaction). Pass base64 file content.',
+                'Attach a JPEG/PNG/WebP/PDF to a transaction (max 8 MB decoded, max 5 files per transaction). Pass raw base64 only (no data: URL prefix).',
             inputSchema: {
                 transaction_id: z.number().int(),
                 name: z.string().max(255),
@@ -425,18 +430,27 @@ function createServer(token: string | null) {
                 content_base64: z.string().min(1),
             },
         },
-        async ({ transaction_id, name, mime, content_base64 }) =>
-            textResult(
+        async ({ transaction_id, name, mime, content_base64 }) => {
+            const content = normalizeBase64(content_base64)
+
+            if (content.length > MAX_ATTACHMENT_BASE64_CHARS) {
+                throw new Error('File too large! Max 8 MB decoded.')
+            }
+
+            return textResult(
                 await api(token, `/transactions/${transaction_id}/attachments/base64`, {
                     method: 'POST',
                     body: JSON.stringify({
                         name,
                         mime,
-                        content: content_base64,
+                        content,
                     }),
+                    signal: AbortSignal.timeout(120_000),
                 }),
-            ),
+            )
+        },
     )
+
 
     server.registerTool(
         'list_transaction_attachments',
@@ -748,13 +762,20 @@ function createServer(token: string | null) {
     return server
 }
 
-const app = createMcpExpressApp({
-    host: HOST,
-    allowedHosts: ALLOWED_HOSTS,
-})
-
-app.use(express.urlencoded({ extended: false }))
+// Manual Express setup (not createMcpExpressApp): default express.json() is 100kb,
+// which rejects base64 attachment tool calls with 413 and looks like a hang in Grok.
+const app = express()
+app.use(express.json({ limit: JSON_BODY_LIMIT }))
+app.use(express.urlencoded({ extended: false, limit: JSON_BODY_LIMIT }))
+app.use(hostHeaderValidation(ALLOWED_HOSTS))
 registerOAuthRoutes(app)
+
+function normalizeBase64(input: string): string {
+    const trimmed = input.trim()
+    const dataUrl = /^data:[^;]+;base64,([\s\S]+)$/.exec(trimmed)
+    return (dataUrl?.[1] ?? trimmed).replace(/\s+/g, '')
+}
+
 
 app.get('/', (_req, res) => {
     res.json({

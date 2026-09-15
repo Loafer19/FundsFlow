@@ -13,6 +13,7 @@ export const useTransactionsStore = defineStore('transactions', {
         transactionForEdit: null,
         transactionDraftAt: null,
         tagFilterDraft: null,
+        attachmentPreview: null,
         isLoading: false,
     }),
 
@@ -151,14 +152,45 @@ export const useTransactionsStore = defineStore('transactions', {
             }
         },
 
+        openAttachmentPreview(transaction, attachmentId = null) {
+            const attachments = transaction?.attachments ?? []
+            if (!attachments.length) return
+
+            const index = attachmentId
+                ? Math.max(
+                      0,
+                      attachments.findIndex((a) => a.id === attachmentId),
+                  )
+                : 0
+
+            this.attachmentPreview = {
+                transactionId: transaction.id,
+                attachments,
+                index: index === -1 ? 0 : index,
+            }
+        },
+
+        closeAttachmentPreview() {
+            this.attachmentPreview = null
+        },
+
+        async fetchAttachmentBlob(transactionId, attachment) {
+            const response = await api.get(`/transactions/${transactionId}/attachments/${attachment.id}`, {
+                responseType: 'blob',
+                timeout: 60000,
+            })
+
+            const raw = response.data
+            const type = attachment.mime || raw.type || 'application/octet-stream'
+            const blob = raw instanceof Blob && raw.type === type ? raw : new Blob([raw], { type })
+
+            return URL.createObjectURL(blob)
+        },
+
+
         async openAttachment(transactionId, attachment) {
             try {
-                const response = await api.get(`/transactions/${transactionId}/attachments/${attachment.id}`, {
-                    responseType: 'blob',
-                    timeout: 60000,
-                })
-
-                const blobUrl = URL.createObjectURL(response.data)
+                const blobUrl = await this.fetchAttachmentBlob(transactionId, attachment)
                 window.open(blobUrl, '_blank', 'noopener,noreferrer')
                 setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
             } catch (error) {
