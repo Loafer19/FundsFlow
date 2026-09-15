@@ -40,9 +40,18 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/bootstrap', BootstrapController::class);
 
     Route::apiResource('tags', TagController::class)->except(['show']);
+    Route::post('/transactions/bulk', [TransactionController::class, 'storeBulk'])
+        ->middleware('throttle:30,1');
+    Route::put('/transactions/bulk', [TransactionController::class, 'updateBulk'])
+        ->middleware('throttle:30,1');
+    Route::patch('/transactions/bulk', [TransactionController::class, 'updateBulk'])
+        ->middleware('throttle:30,1');
+    Route::delete('/transactions/bulk', [TransactionController::class, 'destroyBulk'])
+        ->middleware('throttle:30,1');
     Route::apiResource('transactions', TransactionController::class)->except(['show']);
     Route::post('/transactions/{transaction}/attachments', [TransactionAttachmentController::class, 'store'])
         ->middleware('throttle:60,1');
+
     Route::post('/transactions/{transaction}/attachments/base64', [TransactionAttachmentController::class, 'storeBase64'])
         ->middleware('throttle:60,1');
     Route::get('/transactions/{transaction}/attachments/{attachment}', [TransactionAttachmentController::class, 'show']);

@@ -25,9 +25,13 @@ const TOOL_NAMES = [
     'list_transactions',
     'list_recent_transactions',
     'create_transaction',
+    'create_transactions',
     'update_transaction',
+    'update_transactions',
     'delete_transaction',
+    'delete_transactions',
     'attach_transaction_file',
+
     'list_transaction_attachments',
     'get_transaction_attachment',
     'delete_transaction_attachment',
@@ -248,18 +252,20 @@ function createServer(token: string | null) {
         async ({ limit }) => textResult(unwrapList(await api(token, '/transactions')).slice(0, limit)),
     )
 
+    const transactionInputSchema = {
+        amount: z.number(),
+        at: z.string(),
+        note: z.string().max(255).optional(),
+        tags: z.array(z.number().int()).optional(),
+    }
+
     server.registerTool(
         'create_transaction',
         {
             title: 'Create transaction',
             description:
-                'Create a transaction. Amount is signed: negative expense, positive income. Date YYYY-MM-DD. Source will be recorded as mcp.',
-            inputSchema: {
-                amount: z.number(),
-                at: z.string(),
-                note: z.string().max(255).optional(),
-                tags: z.array(z.number().int()).optional(),
-            },
+                'Create a transaction. Amount is signed: negative expense, positive income. Date YYYY-MM-DD. Source will be recorded as mcp. For many rows prefer create_transactions.',
+            inputSchema: transactionInputSchema,
         },
         async ({ amount, at, note, tags }) =>
             textResult(
@@ -276,10 +282,46 @@ function createServer(token: string | null) {
     )
 
     server.registerTool(
+        'create_transactions',
+        {
+            title: 'Create transactions (bulk)',
+            description:
+                'Create up to 50 transactions in one request (all-or-nothing). Amount is signed: negative expense, positive income. Date YYYY-MM-DD. Source will be recorded as mcp.',
+            inputSchema: {
+                transactions: z
+                    .array(
+                        z.object({
+                            amount: z.number(),
+                            at: z.string(),
+                            note: z.string().max(255).optional(),
+                            tags: z.array(z.number().int()).optional(),
+                        }),
+                    )
+                    .min(1)
+                    .max(50),
+            },
+        },
+        async ({ transactions }) =>
+            textResult(
+                await api(token, '/transactions/bulk', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        transactions: transactions.map((row) => ({
+                            amount: row.amount,
+                            at: row.at,
+                            note: row.note ?? null,
+                            tags: row.tags ?? [],
+                        })),
+                    }),
+                }),
+            ),
+    )
+
+    server.registerTool(
         'update_transaction',
         {
             title: 'Update transaction',
-            description: 'Update a transaction by id.',
+            description: 'Update a transaction by id. For many rows prefer update_transactions.',
             inputSchema: {
                 id: z.number().int(),
                 amount: z.number(),
@@ -303,14 +345,72 @@ function createServer(token: string | null) {
     )
 
     server.registerTool(
+        'update_transactions',
+        {
+            title: 'Update transactions (bulk)',
+            description:
+                'Update up to 50 transactions in one request (all-or-nothing). Each item needs id, amount, at; note and tags optional (omit tags to clear them).',
+            inputSchema: {
+                transactions: z
+                    .array(
+                        z.object({
+                            id: z.number().int(),
+                            amount: z.number(),
+                            at: z.string(),
+                            note: z.string().max(255).optional(),
+                            tags: z.array(z.number().int()).optional(),
+                        }),
+                    )
+                    .min(1)
+                    .max(50),
+            },
+        },
+        async ({ transactions }) =>
+            textResult(
+                await api(token, '/transactions/bulk', {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        transactions: transactions.map((row) => ({
+                            id: row.id,
+                            amount: row.amount,
+                            at: row.at,
+                            note: row.note ?? null,
+                            tags: row.tags ?? [],
+                        })),
+                    }),
+                }),
+            ),
+    )
+
+    server.registerTool(
         'delete_transaction',
         {
             title: 'Delete transaction',
-            description: 'Delete a transaction by id.',
+            description: 'Delete a transaction by id. For many rows prefer delete_transactions.',
             inputSchema: { id: z.number().int() },
         },
         async ({ id }) => textResult(await api(token, `/transactions/${id}`, { method: 'DELETE' })),
     )
+
+    server.registerTool(
+        'delete_transactions',
+        {
+            title: 'Delete transactions (bulk)',
+            description:
+                'Delete up to 50 transactions by id in one request (all-or-nothing). Unknown or foreign ids fail the whole batch.',
+            inputSchema: {
+                ids: z.array(z.number().int()).min(1).max(50),
+            },
+        },
+        async ({ ids }) =>
+            textResult(
+                await api(token, '/transactions/bulk', {
+                    method: 'DELETE',
+                    body: JSON.stringify({ ids }),
+                }),
+            ),
+    )
+
 
     server.registerTool(
         'attach_transaction_file',

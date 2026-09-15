@@ -29,7 +29,9 @@ grok mcp add --transport http fundsflow https://mcp.fundsflow.fun/mcp \
 
 ## Tools
 
-Account, tags, transactions (incl. file attachments via base64), budgets (incl. pause/resume), recurring, preferences, export.
+Account, tags, transactions (incl. bulk create + file attachments via base64), budgets (incl. pause/resume), recurring, preferences, export.
 
-Creates are stored with `source=mcp`. Attachment tools: `attach_transaction_file`, `list_transaction_attachments`, `get_transaction_attachment`, `delete_transaction_attachment` (JPEG/PNG/WebP/PDF, max 8 MB, 5 per transaction).
+Creates are stored with `source=mcp`. Bulk (up to 50, all-or-nothing): `create_transactions`, `update_transactions`, `delete_transactions`. Attachment tools: `attach_transaction_file`, `list_transaction_attachments`, `get_transaction_attachment`, `delete_transaction_attachment` (JPEG/PNG/WebP/PDF, max 8 MB, 5 per transaction).
+
+
 
