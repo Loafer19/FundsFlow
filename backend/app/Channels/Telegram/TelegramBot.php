@@ -9,6 +9,7 @@ use App\Actions\Tags\ListTagsAction;
 use App\Actions\Transactions\CreateTransactionAction;
 use App\Actions\Transactions\DeleteTransactionAction;
 use App\Actions\Transactions\ListTransactionsAction;
+use App\Actions\Transactions\StoreTransactionAttachmentAction;
 use App\Actions\Transactions\UpdateTransactionAction;
 use App\Enums\TransactionSource;
 use App\Models\BudgetPeriod;
@@ -17,11 +18,14 @@ use App\Models\RecurringTransaction;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\TransactionAttachmentRules;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\ValidationException;
 use Throwable;
+
 
 class TelegramBot
 {
@@ -42,6 +46,7 @@ class TelegramBot
         private readonly CreateTransactionAction $createTransaction,
         private readonly UpdateTransactionAction $updateTransaction,
         private readonly DeleteTransactionAction $deleteTransaction,
+        private readonly StoreTransactionAttachmentAction $storeAttachment,
         private readonly CreateTagAction $createTag,
         private readonly ListBudgetsAction $listBudgets,
         private readonly ListRecurringTransactionsAction $listRecurring,
@@ -58,10 +63,23 @@ class TelegramBot
             return;
         }
 
-        if (isset($update['message']['text'])) {
-            $this->handleMessage($update['message']);
+        if (!isset($update['message']) || !is_array($update['message'])) {
+            return;
+        }
+
+        $message = $update['message'];
+
+        if (isset($message['photo']) || isset($message['document'])) {
+            $this->handleMediaMessage($message);
+
+            return;
+        }
+
+        if (isset($message['text'])) {
+            $this->handleMessage($message);
         }
     }
+
 
     private function sendWelcome(int|string $chatId, string $headline): void
     {
@@ -75,9 +93,11 @@ class TelegramBot
     private function usageInfo(): string
     {
         return "Send a message like \"-350 groceries\" to log an expense, or \"+15000 salary\" for income.\n"
-            . "Prefix a date for a past entry: \"20.08 -350 groceries\" (DD.MM or DD.MM.YYYY).\n\n"
+            . "Prefix a date for a past entry: \"20.08 -350 groceries\" (DD.MM or DD.MM.YYYY).\n"
+            . "Or send a photo/PDF with that caption to attach a receipt.\n\n"
             . 'Use the menu below, or /help for all commands.';
     }
+
 
     private function sendHelp(int|string $chatId): void
     {
@@ -99,10 +119,13 @@ class TelegramBot
             . "Quick-add\n"
             . "-350 groceries\n"
             . "+15000 salary\n"
-            . '20.08 -350 groceries',
+            . "20.08 -350 groceries\n\n"
+            . "Receipts\n"
+            . 'Send a photo or PDF with a caption like "-350 groceries"',
             $this->menuKeyboard(),
         );
     }
+
 
     private function sendWebsiteLoginCode(User $user, int|string $chatId): void
     {
@@ -249,7 +272,155 @@ class TelegramBot
         $this->sendWelcome($chatId, '✅ Account created');
     }
 
-    private function handleQuickAdd(User $user, int|string $chatId, string $text): void
+    /**
+     * @param array<string, mixed> $message
+     */
+    private function handleMediaMessage(array $message): void
+    {
+        $chatId = $message['chat']['id'];
+        $user = $this->resolveUser($chatId);
+
+        if (!$user) {
+            $this->client->sendMessage($chatId, "Your account isn't linked yet. Send /start to get started");
+
+            return;
+        }
+
+        $caption = trim((string) ($message['caption'] ?? ''));
+
+        if ($caption === '') {
+            $this->client->sendMessage(
+                $chatId,
+                'Add a caption with the amount, e.g. "-350 groceries" (photo or PDF).',
+                $this->menuKeyboard(),
+            );
+
+            return;
+        }
+
+        $parsed = $this->parseQuickAdd($caption);
+
+        if ($parsed === null) {
+            $this->client->sendMessage(
+                $chatId,
+                'Caption must look like "-350 groceries" or "20.08 -350 groceries".',
+                $this->menuKeyboard(),
+            );
+
+            return;
+        }
+
+        if (isset($parsed['error'])) {
+            $this->client->sendMessage($chatId, $parsed['error']);
+
+            return;
+        }
+
+        $file = $this->extractTelegramFile($message);
+
+        if ($file === null) {
+            $this->client->sendMessage($chatId, 'Only JPEG, PNG, WebP, and PDF receipts are supported.');
+
+            return;
+        }
+
+        try {
+            $meta = $this->client->getFile($file['file_id']);
+            $filePath = $meta['result']['file_path'] ?? null;
+            $fileSize = (int) ($meta['result']['file_size'] ?? $file['file_size'] ?? 0);
+
+            if (!$filePath) {
+                $this->client->sendMessage($chatId, "Couldn't download that file from Telegram");
+
+                return;
+            }
+
+            if ($fileSize > TransactionAttachmentRules::MAX_BYTES) {
+                $this->client->sendMessage($chatId, 'Each attachment must be 8 MB or smaller.');
+
+                return;
+            }
+
+            $contents = $this->client->downloadFile($filePath);
+        } catch (Throwable) {
+            $this->client->sendMessage($chatId, "Couldn't download that file from Telegram");
+
+            return;
+        }
+
+        $transaction = $this->createTransaction->execute($user, [
+            'at' => $parsed['at'],
+            'amount' => $parsed['amount'],
+            'note' => $parsed['note'],
+        ], TransactionSource::Telegram);
+
+        try {
+            $this->storeAttachment->execute($user, $transaction, [
+                'name' => $file['name'],
+                'mime' => $file['mime'],
+                'contents' => $contents,
+            ]);
+            $transaction->load('attachments');
+        } catch (ValidationException $exception) {
+            $this->client->sendMessage(
+                $chatId,
+                "✅ Saved without file\n"
+                    . $this->formatTransactionLine($user, $transaction) . "\n"
+                    . $this->formatTagList($transaction) . "\n"
+                    . collect($exception->errors())->flatten()->first(),
+                $this->tagKeyboard($user, $transaction),
+            );
+
+            return;
+        }
+
+        $this->client->sendMessage(
+            $chatId,
+            "✅ Saved with receipt\n" . $this->formatTransactionLine($user, $transaction) . "\n" . $this->formatTagList($transaction),
+            $this->tagKeyboard($user, $transaction),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $message
+     * @return array{file_id: string, name: string, mime: string, file_size: int}|null
+     */
+    private function extractTelegramFile(array $message): ?array
+    {
+        if (isset($message['document']) && is_array($message['document'])) {
+            $document = $message['document'];
+            $mime = (string) ($document['mime_type'] ?? '');
+
+            if (!isset(TransactionAttachmentRules::ALLOWED_MIMES[$mime])) {
+                return null;
+            }
+
+            return [
+                'file_id' => (string) $document['file_id'],
+                'name' => (string) ($document['file_name'] ?? ('receipt.' . TransactionAttachmentRules::ALLOWED_MIMES[$mime])),
+                'mime' => $mime,
+                'file_size' => (int) ($document['file_size'] ?? 0),
+            ];
+        }
+
+        if (isset($message['photo']) && is_array($message['photo']) && $message['photo'] !== []) {
+            $photo = $message['photo'][array_key_last($message['photo'])];
+
+            return [
+                'file_id' => (string) $photo['file_id'],
+                'name' => 'receipt.jpg',
+                'mime' => 'image/jpeg',
+                'file_size' => (int) ($photo['file_size'] ?? 0),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{at: string, amount: float, note: ?string}|array{error: string}|null
+     */
+    private function parseQuickAdd(string $text): ?array
     {
         $date = now()->toDateString();
 
@@ -257,9 +428,7 @@ class TelegramBot
             $parsedDate = $this->parseDate($dateMatch[1]);
 
             if ($parsedDate === null) {
-                $this->client->sendMessage($chatId, "Couldn't parse that date. Use DD.MM or DD.MM.YYYY");
-
-                return;
+                return ['error' => "Couldn't parse that date. Use DD.MM or DD.MM.YYYY"];
             }
 
             $date = $parsedDate;
@@ -267,13 +436,7 @@ class TelegramBot
         }
 
         if (!preg_match('/^([+-]?\d+(?:[.,]\d{1,2})?)\s*(.*)$/u', $text, $matches)) {
-            $this->client->sendMessage(
-                $chatId,
-                "Didn't recognize that. Format: -350 groceries (minus is an expense, plus is income). "
-                    . 'Prefix a date like "20.08 -350 groceries" to log a past day.',
-            );
-
-            return;
+            return null;
         }
 
         $amount = (float) str_replace(',', '.', $matches[1]);
@@ -283,23 +446,46 @@ class TelegramBot
         }
 
         if ($amount === 0.0) {
-            $this->client->sendMessage($chatId, "Amount can't be zero");
-
-            return;
+            return ['error' => "Amount can't be zero"];
         }
 
         $note = trim($matches[2]);
 
         if (mb_strlen($note) > 255) {
-            $this->client->sendMessage($chatId, 'Note is too long (255 characters max)');
+            return ['error' => 'Note is too long (255 characters max)'];
+        }
+
+        return [
+            'at' => $date,
+            'amount' => $amount,
+            'note' => $note !== '' ? $note : null,
+        ];
+    }
+
+    private function handleQuickAdd(User $user, int|string $chatId, string $text): void
+    {
+        $parsed = $this->parseQuickAdd($text);
+
+        if ($parsed === null) {
+            $this->client->sendMessage(
+                $chatId,
+                "Didn't recognize that. Format: -350 groceries (minus is an expense, plus is income). "
+                    . 'Prefix a date like "20.08 -350 groceries" to log a past day.',
+            );
+
+            return;
+        }
+
+        if (isset($parsed['error'])) {
+            $this->client->sendMessage($chatId, $parsed['error']);
 
             return;
         }
 
         $transaction = $this->createTransaction->execute($user, [
-            'at' => $date,
-            'amount' => $amount,
-            'note' => $note !== '' ? $note : null,
+            'at' => $parsed['at'],
+            'amount' => $parsed['amount'],
+            'note' => $parsed['note'],
         ], TransactionSource::Telegram);
 
         $this->client->sendMessage(
@@ -308,6 +494,7 @@ class TelegramBot
             $this->tagKeyboard($user, $transaction),
         );
     }
+
 
     private function handleEditAmountReply(User $user, int|string $chatId, string $text): void
     {
@@ -629,7 +816,8 @@ class TelegramBot
 
     private function findOwnTransaction(User $user, int $transactionId): ?Transaction
     {
-        $transaction = Transaction::with('tags')->find($transactionId);
+        $transaction = Transaction::with(['tags', 'attachments'])->find($transactionId);
+
 
         if (!$transaction || $transaction->user_id !== $user->id) {
             return null;
@@ -876,12 +1064,18 @@ class TelegramBot
     {
         $emoji = $transaction->amount > 0 ? '📈' : '📉';
         $note = $transaction->note ? " — {$transaction->note}" : '';
+        $files = '';
+
+        if ($transaction->relationLoaded('attachments') && $transaction->attachments->isNotEmpty()) {
+            $files = ' 📎' . $transaction->attachments->count();
+        }
 
         return sprintf(
-            '%s %s%s (%s)',
+            '%s %s%s%s (%s)',
             $emoji,
             UserFormatter::formatMoney($user, $transaction->amount),
             $note,
+            $files,
             UserFormatter::formatDate($user, $transaction->at),
         );
     }

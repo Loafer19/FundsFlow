@@ -19,6 +19,7 @@ class TransactionResource extends JsonResource
             'note' => $this->note,
             'source' => $this->source,
             'tags' => TagResource::collection($this->whenLoaded('tags')),
+            'attachments' => TransactionAttachmentResource::collection($this->whenLoaded('attachments')),
         ];
     }
 }

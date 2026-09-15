@@ -10,8 +10,10 @@
 
                 <TagPicker v-model="transaction.tags" />
 
-                <input type="text" v-model="transaction.note" class="input w-full" placeholder="Note" aria-label="Note"
-                    maxlength="255" />
+                <input type="text" v-model="transaction.note" class="input w-full mb-4" placeholder="Note"
+                    aria-label="Note" maxlength="255" />
+
+                <AttachmentField v-model:pending="pendingFiles" :busy="Boolean(transactionsStore.isLoading)" />
 
                 <div class="modal-action">
                     <button type="submit" class="btn btn-success" :disabled="transactionsStore.isLoading">
@@ -32,6 +34,7 @@
 import { Save } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
 import AmountField from '../components/AmountField.vue'
+import AttachmentField from '../components/AttachmentField.vue'
 import TagPicker from '../components/TagPicker.vue'
 import { toLocalDateStr } from '../services/formatters.js'
 import { useTransactionsStore } from '../services/transactions.js'
@@ -46,6 +49,7 @@ const createDefault = () => ({
 })
 
 const transaction = ref(createDefault())
+const pendingFiles = ref([])
 
 watch(
     () => transactionsStore.transactionDraftAt,
@@ -58,11 +62,12 @@ watch(
 )
 
 const handleSubmit = async () => {
-    const ok = await transactionsStore.create(transaction.value)
+    const ok = await transactionsStore.create(transaction.value, pendingFiles.value)
 
     if (!ok) return
 
     transaction.value = createDefault()
+    pendingFiles.value = []
     transactions_add_modal.close()
 }
 </script>

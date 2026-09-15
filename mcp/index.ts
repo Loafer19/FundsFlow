@@ -27,7 +27,12 @@ const TOOL_NAMES = [
     'create_transaction',
     'update_transaction',
     'delete_transaction',
+    'attach_transaction_file',
+    'list_transaction_attachments',
+    'get_transaction_attachment',
+    'delete_transaction_attachment',
     'list_budgets',
+
     'create_budget',
     'update_budget',
     'delete_budget',
@@ -307,7 +312,116 @@ function createServer(token: string | null) {
         async ({ id }) => textResult(await api(token, `/transactions/${id}`, { method: 'DELETE' })),
     )
 
+    server.registerTool(
+        'attach_transaction_file',
+        {
+            title: 'Attach file to transaction',
+            description:
+                'Attach a JPEG/PNG/WebP/PDF to a transaction (max 8 MB, max 5 files per transaction). Pass base64 file content.',
+            inputSchema: {
+                transaction_id: z.number().int(),
+                name: z.string().max(255),
+                mime: z.enum(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']),
+                content_base64: z.string().min(1),
+            },
+        },
+        async ({ transaction_id, name, mime, content_base64 }) =>
+            textResult(
+                await api(token, `/transactions/${transaction_id}/attachments/base64`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        name,
+                        mime,
+                        content: content_base64,
+                    }),
+                }),
+            ),
+    )
+
+    server.registerTool(
+        'list_transaction_attachments',
+        {
+            title: 'List transaction attachments',
+            description: 'List attachment metadata for a transaction.',
+            inputSchema: { transaction_id: z.number().int() },
+        },
+        async ({ transaction_id }) => {
+            const list = unwrapList(await api(token, '/transactions')) as Array<{
+                id: number
+                attachments?: unknown[]
+            }>
+            const tx = list.find((row) => row.id === transaction_id)
+            if (!tx) throw new Error(`Transaction ${transaction_id} not found`)
+            return textResult(tx.attachments ?? [])
+        },
+    )
+
+    server.registerTool(
+        'get_transaction_attachment',
+        {
+            title: 'Get transaction attachment',
+            description: 'Download an attachment as base64 (name, mime, content_base64).',
+            inputSchema: {
+                transaction_id: z.number().int(),
+                attachment_id: z.number().int(),
+            },
+        },
+        async ({ transaction_id, attachment_id }) => {
+            if (!token) {
+                throw new Error('Authentication required.')
+            }
+
+            const response = await fetch(
+                `${API_URL}/transactions/${transaction_id}/attachments/${attachment_id}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'X-FundsFlow-Source': 'mcp',
+                    },
+                },
+            )
+
+            if (!response.ok) {
+                const message = await response.text()
+                throw new Error(`FundsFlow API ${response.status}: ${message || response.statusText}`)
+            }
+
+            const buffer = Buffer.from(await response.arrayBuffer())
+            const mime = response.headers.get('content-type') || 'application/octet-stream'
+            const disposition = response.headers.get('content-disposition') || ''
+            const nameMatch = /filename="([^"]+)"/.exec(disposition)
+
+            return textResult({
+                id: attachment_id,
+                transaction_id,
+                name: nameMatch?.[1] || `attachment-${attachment_id}`,
+                mime,
+                size: buffer.length,
+                content_base64: buffer.toString('base64'),
+            })
+        },
+    )
+
+    server.registerTool(
+        'delete_transaction_attachment',
+        {
+            title: 'Delete transaction attachment',
+            description: 'Delete one attachment from a transaction.',
+            inputSchema: {
+                transaction_id: z.number().int(),
+                attachment_id: z.number().int(),
+            },
+        },
+        async ({ transaction_id, attachment_id }) =>
+            textResult(
+                await api(token, `/transactions/${transaction_id}/attachments/${attachment_id}`, {
+                    method: 'DELETE',
+                }),
+            ),
+    )
+
     // —— Budgets ——
+
     server.registerTool(
         'list_budgets',
         {

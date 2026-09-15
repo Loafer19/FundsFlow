@@ -104,9 +104,16 @@
                                     :data-tip="tag.title">{{ tag.emoji }}</span>
                             </div>
                             <div v-if="item.note" class="text-xs text-base-content/60 truncate mb-1">{{ item.note }}</div>
-                            <div class="badge w-full justify-center" :class="badgeClass(item)">
-                                {{ item.amount > 0 ? '+' : '' }}{{ formatMoney(item.amount) }}
+                            <div class="flex items-center justify-center gap-1">
+                                <div class="badge justify-center" :class="badgeClass(item)">
+                                    {{ item.amount > 0 ? '+' : '' }}{{ formatMoney(item.amount) }}
+                                </div>
+                                <span v-if="item.attachments?.length" class="badge badge-ghost badge-xs gap-0.5"
+                                    :aria-label="item.attachments.length + ' attachments'">
+                                    📎{{ item.attachments.length }}
+                                </span>
                             </div>
+
                         </button>
 
                         <button type="button"
@@ -210,6 +217,7 @@ const itemsInRange = (start, end) => {
         amount: t.amount,
         note: t.note,
         tags: t.tags,
+        attachments: t.attachments ?? [],
         transaction: t,
     }))
 
@@ -348,9 +356,17 @@ const monthName = (date) => date.toLocaleDateString('en-US', { month: 'long' })
 
 const itemAriaLabel = (item) => {
     const amount = `${item.amount > 0 ? '+' : ''}${formatMoney(item.amount)}`
-    const detail = item.note?.trim() || item.tags?.map((tag) => tag.title).filter(Boolean).join(', ')
+    const detail =
+        item.note?.trim() ||
+        item.tags
+            ?.map((tag) => tag.title)
+            .filter(Boolean)
+            .join(', ')
+    const files = item.attachments?.length
+        ? `, ${item.attachments.length} attachment${item.attachments.length === 1 ? '' : 's'}`
+        : ''
 
-    return detail ? `${amount}, ${detail}` : amount
+    return (detail ? `${amount}, ${detail}` : amount) + files
 }
 
 const jumpToMonth = (m) => emit('jump-to-month', m.start)

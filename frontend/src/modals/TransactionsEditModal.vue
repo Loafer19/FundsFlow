@@ -10,8 +10,11 @@
 
                 <TagPicker v-model="transaction.tags" />
 
-                <input type="text" v-model="transaction.note" class="input w-full" placeholder="Note" aria-label="Note"
-                    maxlength="255" />
+                <input type="text" v-model="transaction.note" class="input w-full mb-4" placeholder="Note"
+                    aria-label="Note" maxlength="255" />
+
+                <AttachmentField :transaction-id="transaction.id" :attachments="liveAttachments"
+                    :busy="Boolean(transactionsStore.isLoading)" @changed="syncAttachments" />
 
                 <div class="modal-action">
                     <DeleteHold :id="transaction.id" :disabled="transactionsStore.isLoading"
@@ -33,8 +36,9 @@
 
 <script setup>
 import { Save } from 'lucide-vue-next'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import AmountField from '../components/AmountField.vue'
+import AttachmentField from '../components/AttachmentField.vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import TagPicker from '../components/TagPicker.vue'
 import { toLocalDateStr } from '../services/formatters.js'
@@ -44,6 +48,14 @@ const transactionsStore = useTransactionsStore()
 
 const transaction = ref({
     tags: [],
+})
+
+const liveAttachments = computed(() => {
+    if (!transaction.value.id) return []
+
+    const current = transactionsStore.transactions.find((t) => t.id === transaction.value.id)
+
+    return current?.attachments ?? []
 })
 
 watch(
@@ -60,6 +72,15 @@ watch(
         }
     },
 )
+
+const syncAttachments = () => {
+    // Store already mutated; keep edit target in sync for reopen.
+    const current = transactionsStore.transactions.find((t) => t.id === transaction.value.id)
+
+    if (current && transactionsStore.transactionForEdit?.id === current.id) {
+        transactionsStore.transactionForEdit = current
+    }
+}
 
 const handleSubmit = async () => {
     const ok = await transactionsStore.update(transaction.value)

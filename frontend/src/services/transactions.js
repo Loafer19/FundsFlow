@@ -50,14 +50,37 @@ export const useTransactionsStore = defineStore('transactions', {
             })
         },
 
-        async create(raw) {
+        mergeTransaction(data) {
+            const index = this.transactions.findIndex((t) => t.id === data.id)
+
+            if (index === -1) {
+                this.transactions.push(data)
+            } else {
+                this.transactions[index] = data
+            }
+
+            this.persist()
+        },
+
+        async create(raw, files = []) {
             this.isLoading = true
 
             try {
                 const response = await api.post('/transactions', raw)
+                let transaction = { ...response.data, attachments: response.data.attachments ?? [] }
 
-                this.transactions.push(response.data)
-                this.persist()
+                this.mergeTransaction(transaction)
+
+                for (const file of files) {
+                    const uploaded = await this.uploadAttachment(transaction.id, file, { silent: true })
+
+                    if (!uploaded) {
+                        toasts.error('Transaction saved, but some attachments failed to upload')
+                        break
+                    }
+
+                    transaction = this.transactions.find((t) => t.id === transaction.id) ?? transaction
+                }
 
                 if (!isOnboardingDone()) {
                     markOnboardingDone()
@@ -75,15 +98,83 @@ export const useTransactionsStore = defineStore('transactions', {
             }
         },
 
+        async uploadAttachment(transactionId, file, { silent = false } = {}) {
+            const form = new FormData()
+            form.append('file', file)
+
+            try {
+                const response = await api.post(`/transactions/${transactionId}/attachments`, form, {
+                    timeout: 60000,
+                })
+
+                const index = this.transactions.findIndex((t) => t.id === transactionId)
+
+                if (index !== -1) {
+                    const current = this.transactions[index]
+                    const attachments = [...(current.attachments ?? []), response.data]
+                    this.transactions[index] = { ...current, attachments }
+                    this.persist()
+                }
+
+                if (!silent) {
+                    toasts.success('Attachment uploaded')
+                }
+
+                return true
+            } catch (error) {
+                toasts.error(apiErrorMessage(error, 'Failed to upload attachment: '))
+
+                return false
+            }
+        },
+
+        async deleteAttachment(transactionId, attachmentId) {
+            try {
+                await api.delete(`/transactions/${transactionId}/attachments/${attachmentId}`)
+
+                const index = this.transactions.findIndex((t) => t.id === transactionId)
+
+                if (index !== -1) {
+                    const current = this.transactions[index]
+                    const attachments = (current.attachments ?? []).filter((a) => a.id !== attachmentId)
+                    this.transactions[index] = { ...current, attachments }
+                    this.persist()
+                }
+
+                toasts.info('Attachment removed')
+
+                return true
+            } catch (error) {
+                toasts.error(apiErrorMessage(error, 'Failed to delete attachment: '))
+
+                return false
+            }
+        },
+
+        async openAttachment(transactionId, attachment) {
+            try {
+                const response = await api.get(`/transactions/${transactionId}/attachments/${attachment.id}`, {
+                    responseType: 'blob',
+                    timeout: 60000,
+                })
+
+                const blobUrl = URL.createObjectURL(response.data)
+                window.open(blobUrl, '_blank', 'noopener,noreferrer')
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
+            } catch (error) {
+                toasts.error(apiErrorMessage(error, 'Failed to open attachment: '))
+            }
+        },
+
         async update(raw) {
             this.isLoading = raw.id
 
             try {
                 const response = await api.patch('/transactions/' + raw.id, raw)
+                const existing = this.transactions.find((t) => t.id === raw.id)
+                const attachments = response.data.attachments ?? existing?.attachments ?? []
 
-                const index = this.transactions.findIndex((t) => t.id === raw.id)
-                this.transactions[index] = response.data
-                this.persist()
+                this.mergeTransaction({ ...response.data, attachments })
 
                 toasts.success('Transaction updated successfully!')
 

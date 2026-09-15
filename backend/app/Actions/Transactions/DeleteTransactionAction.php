@@ -12,6 +12,13 @@ class DeleteTransactionAction
     {
         Gate::forUser($user)->authorize('delete', $transaction);
 
+        $transaction->loadMissing('attachments');
+
+        foreach ($transaction->attachments as $attachment) {
+            $attachment->deleteFile();
+        }
+
         $transaction->delete();
     }
 }
+

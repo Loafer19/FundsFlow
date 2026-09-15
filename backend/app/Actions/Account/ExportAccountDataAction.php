@@ -18,9 +18,11 @@ class ExportAccountDataAction
         $user->load([
             'identities',
             'transactions.tags',
+            'transactions.attachments',
             'budgets.periods.tags',
             'recurringTransactions.tags',
         ]);
+
 
         // Include soft-deleted tags too — they still appear on historical transactions.
         $tags = $user->tags()->withTrashed()->orderBy('id')->get();

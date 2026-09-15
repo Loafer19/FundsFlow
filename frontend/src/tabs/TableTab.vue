@@ -83,7 +83,18 @@
                                     </div>
                                 </div>
                             </td>
-                            <td>{{ transaction.note || '-' }}</td>
+                            <td>
+                                <div class="flex items-center gap-1 min-w-0">
+                                    <span class="truncate">{{ transaction.note || '-' }}</span>
+                                    <span v-if="transaction.attachments?.length"
+                                        class="badge badge-ghost badge-sm gap-0.5 shrink-0"
+                                        :aria-label="transaction.attachments.length + ' attachments'">
+                                        <Paperclip :size="12" aria-hidden="true" />
+                                        {{ transaction.attachments.length }}
+                                    </span>
+                                </div>
+                            </td>
+
                             <td class="flex gap-1">
                                 <button v-if="transactionsStore.isLoading == transaction.id"
                                     class="btn btn-outline btn-error btn-square btn-sm" disabled>
@@ -108,7 +119,8 @@
 </template>
 
 <script setup>
-import { Bot, Laptop, Pencil, Repeat, Search, Send, Tag } from 'lucide-vue-next'
+import { Bot, Laptop, Paperclip, Pencil, Repeat, Search, Send, Tag } from 'lucide-vue-next'
+
 import { computed, inject, ref, watch } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'

@@ -61,6 +61,25 @@ class TelegramClient
     /**
      * @return array<string, mixed>
      */
+    public function getFile(string $fileId): array
+    {
+        return Http::get($this->baseUrl . 'getFile', [
+            'file_id' => $fileId,
+        ])->throw()->json();
+    }
+
+    public function downloadFile(string $filePath): string
+    {
+        $token = config('services.telegram.bot_token');
+        $response = Http::get('https://api.telegram.org/file/bot' . $token . '/' . ltrim($filePath, '/'))
+            ->throw();
+
+        return $response->body();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function setWebhook(string $url, string $secretToken): array
     {
         return Http::post($this->baseUrl . 'setWebhook', [
@@ -68,6 +87,7 @@ class TelegramClient
             'secret_token' => $secretToken,
         ])->json();
     }
+
 
     /**
      * @param array<int, array{command: string, description: string}> $commands

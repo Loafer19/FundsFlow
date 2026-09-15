@@ -25,6 +25,7 @@ class CreateTransactionAction
 
         $transaction->tags()->attach($tags);
 
-        return $transaction->load('tags');
+        return $transaction->load(['tags', 'attachments']);
     }
 }
+

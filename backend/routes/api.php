@@ -8,8 +8,10 @@ use App\Http\Controllers\IdentityController;
 use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\Telegram\TelegramWebhookController;
+use App\Http\Controllers\TransactionAttachmentController;
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
+
 
 Route::prefix('auth')->group(function () {
     // Strict only on credential entry — not on /me/logout (those fire on every refresh).
@@ -39,7 +41,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::apiResource('tags', TagController::class)->except(['show']);
     Route::apiResource('transactions', TransactionController::class)->except(['show']);
+    Route::post('/transactions/{transaction}/attachments', [TransactionAttachmentController::class, 'store'])
+        ->middleware('throttle:60,1');
+    Route::post('/transactions/{transaction}/attachments/base64', [TransactionAttachmentController::class, 'storeBase64'])
+        ->middleware('throttle:60,1');
+    Route::get('/transactions/{transaction}/attachments/{attachment}', [TransactionAttachmentController::class, 'show']);
+    Route::delete('/transactions/{transaction}/attachments/{attachment}', [TransactionAttachmentController::class, 'destroy']);
     Route::apiResource('budgets', BudgetController::class)->except(['show']);
+
     Route::post('/budgets/{budget}/pause', [BudgetController::class, 'pause']);
     Route::post('/budgets/{budget}/resume', [BudgetController::class, 'resume']);
     Route::apiResource('recurring-transactions', RecurringTransactionController::class)
