@@ -2,7 +2,7 @@
     <div class="mb-4">
         <div class="flex items-center justify-between gap-2 mb-2">
             <span class="text-sm font-medium">Attachments</span>
-            <span class="text-xs text-base-content/50">{{ totalCount }}/{{ MAX }} · images & PDF</span>
+            <span class="text-xs text-base-content/50">{{ totalCount }}/{{ MAX_PER_TRANSACTION }} · images & PDF</span>
         </div>
 
         <ul v-if="attachments.length || pending.length" class="flex flex-col gap-2 mb-2">
@@ -40,11 +40,12 @@
             </li>
         </ul>
 
-        <label v-if="totalCount < MAX" class="btn btn-outline btn-sm w-full" :class="{ 'btn-disabled': busy }">
+        <label v-if="totalCount < MAX_PER_TRANSACTION" class="btn btn-outline btn-sm w-full"
+            :class="{ 'btn-disabled': busy }">
             <Paperclip :size="16" />
             Add files
-            <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp,application/pdf"
-                multiple :disabled="busy || totalCount >= MAX" @change="onPick" />
+            <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp,application/pdf" multiple
+                :disabled="busy || totalCount >= MAX_PER_TRANSACTION" @change="onPick" />
         </label>
     </div>
 </template>
@@ -52,12 +53,9 @@
 <script setup>
 import { FileText, Image as ImageIcon, Paperclip, X } from 'lucide-vue-next'
 import { computed } from 'vue'
+import { ALLOWED_MIMES, MAX_BYTES, MAX_PER_TRANSACTION } from '../services/attachmentLimits.js'
 import toasts from '../services/toasts.js'
 import { useTransactionsStore } from '../services/transactions.js'
-
-const MAX = 5
-const MAX_BYTES = 8 * 1024 * 1024
-const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
 
 const props = defineProps({
     attachments: { type: Array, default: () => [] },
@@ -87,16 +85,16 @@ const onPick = async (event) => {
 
     if (!picked.length) return
 
-    const room = MAX - totalCount.value
+    const room = MAX_PER_TRANSACTION - totalCount.value
     const accepted = []
 
     for (const file of picked.slice(0, room)) {
-        if (!ALLOWED.has(file.type)) {
-            toasts.error(`${file.name}: only JPEG, PNG, WebP, and PDF are allowed`)
+        if (!ALLOWED_MIMES.has(file.type)) {
+            toasts.error(`${file.name}: only JPEG, PNG, WebP, and PDF are allowed!`)
             continue
         }
         if (file.size > MAX_BYTES) {
-            toasts.error(`${file.name}: must be 8 MB or smaller`)
+            toasts.error(`${file.name}: must be 8 MB or smaller!`)
             continue
         }
         accepted.push(file)
@@ -128,7 +126,7 @@ const removeRemote = async (file) => {
     if (ok) emit('changed')
 }
 
-const openRemote = async (file) => {
-    await transactionsStore.openAttachment(props.transactionId, file)
+const openRemote = (file) => {
+    transactionsStore.openAttachmentPreview({ id: props.transactionId, attachments: props.attachments }, file.id)
 }
 </script>

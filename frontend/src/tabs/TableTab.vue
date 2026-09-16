@@ -135,7 +135,18 @@
 </template>
 
 <script setup>
-import { Bot, FileText, Image as ImageIcon, Laptop, Paperclip, Pencil, Repeat, Search, Send, Tag } from 'lucide-vue-next'
+import {
+    Bot,
+    FileText,
+    Image as ImageIcon,
+    Laptop,
+    Paperclip,
+    Pencil,
+    Repeat,
+    Search,
+    Send,
+    Tag,
+} from 'lucide-vue-next'
 
 import { computed, inject, ref, watch } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'

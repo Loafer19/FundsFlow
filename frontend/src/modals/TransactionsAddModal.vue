@@ -36,13 +36,15 @@ import { ref, watch } from 'vue'
 import AmountField from '../components/AmountField.vue'
 import AttachmentField from '../components/AttachmentField.vue'
 import TagPicker from '../components/TagPicker.vue'
-import { toLocalDateStr } from '../services/formatters.js'
+import { nowDateStr } from '../services/formatters.js'
+
 import { useTransactionsStore } from '../services/transactions.js'
 
 const transactionsStore = useTransactionsStore()
 
 const createDefault = () => ({
-    at: toLocalDateStr(new Date()),
+    at: nowDateStr(),
+
     amount: '',
     note: '',
     tags: [],

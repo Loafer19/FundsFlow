@@ -7,11 +7,8 @@ import { useTagsStore } from './tags.js'
 import toasts from './toasts.js'
 import { useTransactionsStore } from './transactions.js'
 
-/**
- * One round-trip for initial app data. Hydrates from local cache first,
- * then replaces with /bootstrap and refreshes per-resource snapshots.
- */
 export const bootstrapStores = async () => {
+
     const userId = currentUserId()
     const tagsStore = useTagsStore()
     const transactionsStore = useTransactionsStore()

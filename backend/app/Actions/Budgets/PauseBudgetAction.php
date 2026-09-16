@@ -12,7 +12,8 @@ class PauseBudgetAction
     {
         Gate::forUser($user)->authorize('update', $budget);
 
-        $budget->currentPeriod?->update(['ends_at' => now()->toDateString()]);
+        $budget->currentPeriod?->update(['ends_at' => $user->todayDateString()]);
+
 
         return $budget->load('periods.tags');
     }

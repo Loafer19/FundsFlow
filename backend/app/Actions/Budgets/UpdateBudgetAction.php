@@ -23,7 +23,9 @@ class UpdateBudgetAction
         $current = $budget->currentPeriod;
         $newTagIds = collect($data['tag_ids'])->map(fn ($id) => (int) $id)->sort()->values();
         $length = BudgetLength::from($data['length']);
-        $startsAt = ($data['align_to_calendar'] ?? false) ? $length->calendarStart() : now();
+        $now = $user->nowInTimezone();
+        $startsAt = ($data['align_to_calendar'] ?? false) ? $length->calendarStart($now) : $now;
+        $today = $now->toDateString();
 
         if ($current) {
             $currentTagIds = $current->tags->pluck('id')->sort()->values();
@@ -38,7 +40,7 @@ class UpdateBudgetAction
 
             // Same-day edits refine the open period in place instead of
             // leaving a zero-length history row behind.
-            if ($current->starts_at->isToday()) {
+            if ($current->starts_at->toDateString() === $today) {
                 $current->update([
                     'amount' => $data['amount'],
                     'length' => $data['length'],
@@ -49,8 +51,9 @@ class UpdateBudgetAction
                 return $budget->load('periods.tags');
             }
 
-            $current->update(['ends_at' => now()->toDateString()]);
+            $current->update(['ends_at' => $today]);
         }
+
 
         $period = $budget->periods()->create([
             'amount' => $data['amount'],

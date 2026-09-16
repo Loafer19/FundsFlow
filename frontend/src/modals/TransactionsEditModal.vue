@@ -74,8 +74,8 @@ watch(
 )
 
 const syncAttachments = () => {
-    // Store already mutated; keep edit target in sync for reopen.
     const current = transactionsStore.transactions.find((t) => t.id === transaction.value.id)
+
 
     if (current && transactionsStore.transactionForEdit?.id === current.id) {
         transactionsStore.transactionForEdit = current

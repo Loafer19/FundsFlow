@@ -12,6 +12,11 @@ class TransactionPolicy
         return true;
     }
 
+    public function view(User $user, Transaction $transaction): bool
+    {
+        return $user->id === $transaction->user_id;
+    }
+
     public function create(User $user): bool
     {
         return true;
@@ -21,6 +26,7 @@ class TransactionPolicy
     {
         return $user->id === $transaction->user_id;
     }
+
 
     public function delete(User $user, Transaction $transaction): bool
     {

@@ -72,7 +72,8 @@ import { Repeat, Save } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import AmountField from '../components/AmountField.vue'
 import TagPicker from '../components/TagPicker.vue'
-import { formatDate, toLocalDateStr } from '../services/formatters.js'
+import { formatDate, nowDateStr } from '../services/formatters.js'
+
 import { advanceDateStr } from '../services/recurringSchedule.js'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 
@@ -82,7 +83,8 @@ const createDefault = () => ({
     amount: '',
     note: '',
     frequency: 'monthly',
-    starts_at: toLocalDateStr(new Date()),
+    starts_at: nowDateStr(),
+
     ends_at: '',
     tags: [],
 })

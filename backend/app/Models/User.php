@@ -21,7 +21,9 @@ class User extends Authenticatable
         'moneyFormat' => 'uk-UA',
         'dateFormat' => 'DD.MM.YYYY',
         'decimals' => true,
+        'timezone' => 'Europe/Kyiv',
     ];
+
 
     /**
      * @var list<string>
@@ -52,7 +54,7 @@ class User extends Authenticatable
     }
 
     /**
-     * @return array{moneyFormat: string, dateFormat: string, decimals: bool}
+     * @return array{moneyFormat: string, dateFormat: string, decimals: bool, timezone: string}
      */
     public function resolvedPreferences(): array
     {
@@ -73,6 +75,30 @@ class User extends Authenticatable
     {
         return (bool) ($this->resolvedPreferences()['decimals'] ?? self::DEFAULT_PREFERENCES['decimals']);
     }
+
+    public function timezone(): string
+    {
+        $timezone = (string) ($this->resolvedPreferences()['timezone'] ?? self::DEFAULT_PREFERENCES['timezone']);
+
+        try {
+            new \DateTimeZone($timezone);
+        } catch (\Exception) {
+            return self::DEFAULT_PREFERENCES['timezone'];
+        }
+
+        return $timezone;
+    }
+
+    public function nowInTimezone(): \Carbon\Carbon
+    {
+        return now($this->timezone());
+    }
+
+    public function todayDateString(): string
+    {
+        return $this->nowInTimezone()->toDateString();
+    }
+
 
     /**
      * @return HasMany<Tag, $this>

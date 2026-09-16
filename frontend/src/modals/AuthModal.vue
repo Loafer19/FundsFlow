@@ -89,9 +89,11 @@
                 </p>
 
                 <form @submit.prevent="submitTelegramCode">
-                    <input v-model="telegramCode" type="text" inputmode="numeric" maxlength="6"
-                        placeholder="Code from the bot" aria-label="Code from the bot" class="input w-full mb-4"
-                        autofocus />
+                    <input v-model="telegramCode" type="text" inputmode="text" autocomplete="one-time-code"
+                        maxlength="8" placeholder="Code from the bot" aria-label="Code from the bot"
+                        class="input w-full mb-4 font-mono uppercase tracking-wider" autofocus
+                        @input="telegramCode = telegramCode.toUpperCase().replace(/[^A-Z0-9]/g, '')" />
+
 
                     <div class="modal-action justify-between">
                         <button type="button" class="btn btn-ghost" @click="showTelegramLogin = false">
@@ -164,7 +166,8 @@ const handleSubmit = async () => {
 }
 
 const submitTelegramCode = async () => {
-    const ok = await authStore.loginWithTelegramCode(telegramCode.value.trim())
+    const ok = await authStore.loginWithTelegramCode(telegramCode.value.trim().toUpperCase())
+
 
     if (!ok) return
 

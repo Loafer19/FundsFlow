@@ -41,13 +41,16 @@ class AccountController extends Controller
             'moneyFormat' => 'required|string|max:32',
             'dateFormat' => 'required|string|max:64',
             'decimals' => 'required|boolean',
+            'timezone' => 'required|string|timezone:all',
         ]);
 
         $user->preferences = array_merge($user->preferences ?? [], [
             'moneyFormat' => $data['moneyFormat'],
             'dateFormat' => $data['dateFormat'],
             'decimals' => $data['decimals'],
+            'timezone' => $data['timezone'],
         ]);
+
         $user->save();
 
         return response()->json([

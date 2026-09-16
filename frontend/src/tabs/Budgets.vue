@@ -123,7 +123,8 @@ import { Pause, Pencil, Play, Plus } from 'lucide-vue-next'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { useBudgetsStore } from '../services/budgets.js'
-import { formatDate, formatMoney, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
+import { formatDate, formatMoney, nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
+
 import { useTransactionsStore } from '../services/transactions.js'
 
 const budgetsStore = useBudgetsStore()
@@ -163,14 +164,16 @@ const dayBefore = (dateStr) => {
     return toLocalDateStr(d)
 }
 
+const todayWallDate = () => parseLocalDate(nowDateStr())
+
 const currentBucketStart = (period) => {
-    const boundary = toLocalDateStr(bucketStartFor(new Date(), period.length))
+    const boundary = toLocalDateStr(bucketStartFor(todayWallDate(), period.length))
 
     return boundary > period.starts_at ? boundary : period.starts_at
 }
 
 const currentBucketEnd = (period) => {
-    const nextStart = toLocalDateStr(nextBucketStart(bucketStartFor(new Date(), period.length), period.length))
+    const nextStart = toLocalDateStr(nextBucketStart(bucketStartFor(todayWallDate(), period.length), period.length))
 
     return dayBefore(nextStart)
 }
@@ -182,7 +185,7 @@ const bucketProgress = (period) => {
     const end = currentBucketEnd(period)
     const total = daysBetween(start, end) + 1
 
-    return { elapsed: Math.min(daysBetween(start, toLocalDateStr(new Date())) + 1, total), total }
+    return { elapsed: Math.min(daysBetween(start, nowDateStr()) + 1, total), total }
 }
 
 // Slices a closed period's whole [starts_at, ends_at] range into
@@ -217,7 +220,7 @@ const spentBetween = (start, end, tags) => {
 
 // Only ever called with the active period — its current week/month/year
 // bucket so far. Closed periods go through historyBuckets() instead.
-const spentForActive = (period) => spentBetween(currentBucketStart(period), toLocalDateStr(new Date()), period.tags)
+const spentForActive = (period) => spentBetween(currentBucketStart(period), nowDateStr(), period.tags)
 
 const currentTags = (budget) => (currentPeriod(budget) ?? budget.periods[0])?.tags ?? []
 

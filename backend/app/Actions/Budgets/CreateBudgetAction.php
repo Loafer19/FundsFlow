@@ -21,7 +21,8 @@ class CreateBudgetAction
         ]);
 
         $length = BudgetLength::from($data['length']);
-        $startsAt = ($data['align_to_calendar'] ?? false) ? $length->calendarStart() : now();
+        $now = $user->nowInTimezone();
+        $startsAt = ($data['align_to_calendar'] ?? false) ? $length->calendarStart($now) : $now;
 
         $period = $budget->periods()->create([
             'amount' => $data['amount'],
@@ -29,6 +30,7 @@ class CreateBudgetAction
             'starts_at' => $startsAt->toDateString(),
             'ends_at' => null,
         ]);
+
 
         $period->tags()->sync($data['tag_ids']);
 

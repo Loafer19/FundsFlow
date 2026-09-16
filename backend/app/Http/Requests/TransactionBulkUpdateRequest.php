@@ -2,13 +2,12 @@
 
 namespace App\Http\Requests;
 
+use App\Support\TransactionBulkRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class TransactionBulkUpdateRequest extends FormRequest
 {
-    public const MAX_ITEMS = 50;
-
     public function authorize(): bool
     {
         return true;
@@ -20,7 +19,8 @@ class TransactionBulkUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'transactions' => 'required|array|min:1|max:' . self::MAX_ITEMS,
+            'transactions' => 'required|array|min:1|max:' . TransactionBulkRules::MAX_ITEMS,
+
             'transactions.*.id' => [
                 'required',
                 'integer',

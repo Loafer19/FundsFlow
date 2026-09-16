@@ -1,6 +1,6 @@
 <template>
     <dialog id="attachment_preview_modal" class="modal" aria-labelledby="attachment_preview_modal_title">
-        <div class="modal-box max-w-lg w-full">
+        <div class="modal-box max-w-3xl w-full overflow-x-hidden">
             <div class="flex items-start justify-between gap-2 mb-3">
                 <div class="min-w-0">
                     <h2 id="attachment_preview_modal_title" class="card-title text-base truncate">
@@ -21,14 +21,15 @@
                 </div>
             </div>
 
-            <div class="min-h-48 flex items-center justify-center rounded-lg bg-base-200/50 overflow-hidden">
+            <div class="min-h-48 w-full max-w-full flex items-center justify-center rounded-lg bg-base-200/50 overflow-hidden">
                 <span v-if="loading" class="loading loading-spinner loading-md"></span>
                 <p v-else-if="error" class="text-sm text-error px-4 text-center">{{ error }}</p>
                 <img v-else-if="blobUrl && isImage" :src="blobUrl" :alt="current?.name || 'Attachment'"
                     class="max-h-[60vh] w-auto max-w-full object-contain" />
                 <iframe v-else-if="blobUrl && isPdf" :src="blobUrl" title="PDF preview"
-                    class="w-full h-[60vh] rounded-lg bg-base-100"></iframe>
+                    class="block w-full max-w-full h-[60vh] rounded-lg bg-base-100 border-0"></iframe>
             </div>
+
 
             <div v-if="attachments.length > 1" class="modal-action justify-between mt-4">
                 <button type="button" class="btn btn-ghost btn-sm" :disabled="loading || index <= 0"
@@ -50,6 +51,7 @@
 <script setup>
 import { Download, X } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { showModal } from '../services/modal.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
 const transactionsStore = useTransactionsStore()
@@ -57,6 +59,7 @@ const transactionsStore = useTransactionsStore()
 const loading = ref(false)
 const error = ref('')
 const blobUrl = ref(null)
+let loadId = 0
 
 const preview = computed(() => transactionsStore.attachmentPreview)
 const attachments = computed(() => preview.value?.attachments ?? [])
@@ -73,10 +76,11 @@ const revoke = () => {
 }
 
 const close = () => {
+    loadId += 1
     revoke()
     error.value = ''
     transactionsStore.closeAttachmentPreview()
-    attachment_preview_modal.close()
+    document.getElementById('attachment_preview_modal')?.close()
 }
 
 const download = () => {
@@ -92,6 +96,7 @@ const download = () => {
 }
 
 const load = async () => {
+    const id = ++loadId
     revoke()
     error.value = ''
 
@@ -100,11 +105,17 @@ const load = async () => {
     loading.value = true
 
     try {
-        blobUrl.value = await transactionsStore.fetchAttachmentBlob(preview.value.transactionId, current.value)
+        const url = await transactionsStore.fetchAttachmentBlob(preview.value.transactionId, current.value)
+        if (id !== loadId) {
+            URL.revokeObjectURL(url)
+            return
+        }
+        blobUrl.value = url
     } catch {
+        if (id !== loadId) return
         error.value = 'Failed to open attachment!'
     } finally {
-        loading.value = false
+        if (id === loadId) loading.value = false
     }
 }
 
@@ -137,8 +148,8 @@ watch(
         }
 
         await nextTick()
-        if (!attachment_preview_modal.open) {
-            attachment_preview_modal.showModal()
+        if (!document.getElementById('attachment_preview_modal')?.open) {
+            showModal('attachment_preview_modal')
         }
         await load()
     },
@@ -146,11 +157,11 @@ watch(
 )
 
 onMounted(() => {
-    attachment_preview_modal.addEventListener('close', onDialogClose)
+    document.getElementById('attachment_preview_modal')?.addEventListener('close', onDialogClose)
 })
 
 onBeforeUnmount(() => {
-    attachment_preview_modal.removeEventListener('close', onDialogClose)
+    document.getElementById('attachment_preview_modal')?.removeEventListener('close', onDialogClose)
     revoke()
 })
 </script>

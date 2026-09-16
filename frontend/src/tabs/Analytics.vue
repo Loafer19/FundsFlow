@@ -107,7 +107,8 @@
                             <tr>
                                 <td colspan="4">
                                     <span class="text-xl font-semibold tooltip tooltip-right"
-                                        data-tip="Based on all transactions (not just this period)">Balances Per Tag</span>
+                                        data-tip="All-time. Parent tags include child tags">Balances Per Tag</span>
+
                                 </td>
                             </tr>
                             <tr v-for="(tag, index) in balancesByTags.slice(0, balancesByTags.length / 2)" :key="index">
@@ -221,7 +222,18 @@ const balancesByTags = computed(() => {
     const grouped = transactionsStore.groupedByTags()
 
     return tagsStore.forBalances().map((tag) => {
-        const transactions = grouped.get(tag.id) || []
+        const ids = tagsStore.descendantIds(tag.id)
+        const seen = new Set()
+        const transactions = []
+
+        for (const id of ids) {
+            for (const transaction of grouped.get(id) || []) {
+                if (seen.has(transaction.id)) continue
+                seen.add(transaction.id)
+                transactions.push(transaction)
+            }
+        }
+
         return {
             ...tag,
             balance: transactions.reduce((acc, t) => acc + t.amount, 0),
@@ -229,6 +241,7 @@ const balancesByTags = computed(() => {
         }
     })
 })
+
 
 const filteredTransactions = computed(() =>
     transactionsStore.filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd),

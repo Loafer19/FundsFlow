@@ -18,10 +18,14 @@ class TransactionAttachmentBase64Request extends FormRequest
      */
     public function rules(): array
     {
+        // ~8 MB binary ≈ 11 MB base64; keep a little headroom under PHP post_max_size.
+        $maxBase64Chars = (int) ceil(TransactionAttachmentRules::MAX_BYTES * 4 / 3) + 4096;
+
         return [
             'name' => 'required|string|max:255',
             'mime' => ['required', 'string', Rule::in(TransactionAttachmentRules::allowedMimes())],
-            'content' => 'required|string',
+            'content' => 'required|string|max:' . $maxBase64Chars,
         ];
+
     }
 }

@@ -10,9 +10,12 @@ use App\Http\Resources\TransactionAttachmentResource;
 use App\Models\Transaction;
 use App\Models\TransactionAttachment;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+
+
 
 class TransactionAttachmentController extends Controller
 {
@@ -55,33 +58,34 @@ class TransactionAttachmentController extends Controller
     }
 
     public function show(
+        Request $request,
         Transaction $transaction,
         TransactionAttachment $attachment,
     ): StreamedResponse {
-        Gate::authorize('update', $transaction);
-        $this->assertBelongs($transaction, $attachment, auth()->id());
+        Gate::forUser($request->user())->authorize('view', $transaction);
+        $this->assertBelongs($transaction, $attachment, $request->user()->id);
 
         $disk = Storage::disk($attachment->disk);
 
-        if (!$disk->exists($attachment->path)) {
-            abort(404, 'Attachment file is missing from storage!');
-        }
+        abort_if($disk->missing($attachment->path), 404, 'Attachment file is missing from storage!');
 
         return $disk->response(
+
             $attachment->path,
             $attachment->original_name,
-            [
-                'Content-Type' => $attachment->mime,
-                'Content-Disposition' => 'inline; filename="' . addslashes($attachment->original_name) . '"',
-            ],
+            ['Content-Type' => $attachment->mime],
+            'inline',
         );
+
     }
 
+
     public function destroy(
+        Request $request,
         Transaction $transaction,
         TransactionAttachment $attachment,
     ): JsonResponse {
-        $this->deleteAttachment->execute(auth()->user(), $transaction, $attachment);
+        $this->deleteAttachment->execute($request->user(), $transaction, $attachment);
 
         return response()->json([
             'message' => 'Attachment deleted successfully!',

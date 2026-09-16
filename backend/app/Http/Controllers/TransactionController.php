@@ -17,6 +17,7 @@ use App\Http\Requests\TransactionStoreRequest;
 use App\Http\Resources\TransactionResource;
 use App\Models\Transaction;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class TransactionController extends Controller
@@ -31,10 +32,9 @@ class TransactionController extends Controller
         private readonly DeleteTransactionsAction $deleteTransactions,
     ) {}
 
-
-    public function index(): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection
     {
-        $transactions = $this->listTransactions->execute(auth()->user());
+        $transactions = $this->listTransactions->execute($request->user());
 
         return TransactionResource::collection($transactions);
     }
@@ -45,7 +45,7 @@ class TransactionController extends Controller
             ? TransactionSource::Mcp
             : TransactionSource::Web;
 
-        $transaction = $this->createTransaction->execute(auth()->user(), $request->validated(), $source);
+        $transaction = $this->createTransaction->execute($request->user(), $request->validated(), $source);
 
         return new TransactionResource($transaction);
     }
@@ -65,10 +65,9 @@ class TransactionController extends Controller
         return TransactionResource::collection($transactions);
     }
 
-
     public function update(Transaction $transaction, TransactionStoreRequest $request): TransactionResource
     {
-        $transaction = $this->updateTransaction->execute(auth()->user(), $transaction, $request->validated());
+        $transaction = $this->updateTransaction->execute($request->user(), $transaction, $request->validated());
 
         return new TransactionResource($transaction);
     }
@@ -83,9 +82,9 @@ class TransactionController extends Controller
         return TransactionResource::collection($transactions);
     }
 
-    public function destroy(Transaction $transaction): JsonResponse
+    public function destroy(Request $request, Transaction $transaction): JsonResponse
     {
-        $this->deleteTransaction->execute(auth()->user(), $transaction);
+        $this->deleteTransaction->execute($request->user(), $transaction);
 
         return response()->json([
             'message' => 'Transaction deleted successfully!',
@@ -105,4 +104,3 @@ class TransactionController extends Controller
         ]);
     }
 }
-

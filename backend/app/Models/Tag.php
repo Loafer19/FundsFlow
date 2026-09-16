@@ -14,15 +14,12 @@ class Tag extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        // 'id',
-        // 'user_id',
         'parent_id',
         'title',
         'emoji',
         'calc_balance',
-        // 'created_at',
-        // 'updated_at',
     ];
+
 
     protected $casts = [
         'calc_balance' => 'boolean',

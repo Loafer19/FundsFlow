@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 class StoreTransactionAttachmentAction
 {
     /**
-     * @param  array{name: string, mime: string, contents: string}|UploadedFile  $file
+     * @param  array{name: string, mime?: string, contents: string}|UploadedFile  $file
      */
     public function execute(User $user, Transaction $transaction, UploadedFile|array $file): TransactionAttachment
     {
@@ -30,16 +30,17 @@ class StoreTransactionAttachmentAction
         }
 
         if ($file instanceof UploadedFile) {
-            $mime = (string) ($file->getMimeType() ?: $file->getClientMimeType());
-            $name = $file->getClientOriginalName() ?: 'attachment';
-            $size = $file->getSize() ?: 0;
-            $contents = file_get_contents($file->getRealPath());
+            $claimedMime = (string) ($file->getMimeType() ?: $file->getClientMimeType());
+            $name = $file->getClientOriginalName() ?: TransactionAttachmentRules::fallbackFileName();
+            $contents = $file->getContent();
+            $size = $file->getSize() ?: strlen($contents);
         } else {
-            $mime = $file['mime'];
+            $claimedMime = $file['mime'] ?? null;
             $name = $file['name'];
             $contents = $file['contents'];
             $size = strlen($contents);
         }
+
 
         if (!is_string($contents) || $contents === '') {
             throw ValidationException::withMessages([
@@ -53,14 +54,14 @@ class StoreTransactionAttachmentAction
             ]);
         }
 
-        $extension = TransactionAttachmentRules::extensionForMime($mime);
+        $mime = TransactionAttachmentRules::detectMime($contents, $claimedMime);
+        $extension = $mime ? TransactionAttachmentRules::extensionForMime($mime) : null;
 
         if ($extension === null) {
             throw ValidationException::withMessages([
                 'file' => 'Only JPEG, PNG, WebP, and PDF files are allowed!',
             ]);
         }
-
 
         $disk = config('filesystems.default', 'local');
         $path = sprintf(
@@ -77,7 +78,7 @@ class StoreTransactionAttachmentAction
             'user_id' => $user->id,
             'disk' => $disk,
             'path' => $path,
-            'original_name' => Str::limit($name, 255, ''),
+            'original_name' => TransactionAttachmentRules::sanitizeOriginalName($name),
             'mime' => $mime,
             'size' => $size,
         ]);

@@ -8,7 +8,7 @@ export const formatDateOptions = {
     'Day First (Short)': ['DD-MM', 'DD/MM', 'DD.MM'],
 }
 
-const dateFormatMap = {
+export const dateFormatMap = {
     'YYYY/MM/DD': { month: '2-digit', day: '2-digit', year: 'numeric', locale: 'zh-CN' },
     'MM/DD/YYYY': { month: '2-digit', day: '2-digit', year: 'numeric', locale: 'en-US' },
     'MM/DD': { month: '2-digit', day: '2-digit', locale: 'en-US' },
@@ -56,8 +56,10 @@ export const formatPercentage = (value) => {
 }
 
 export const toLocalDateStr = (value) => {
-    if (typeof value === 'string') {
-        return value.split('T')[0]
+    if (value == null || value === '') return ''
+
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+        return value.slice(0, 10)
     }
 
     const date = value instanceof Date ? value : new Date(value)
@@ -68,6 +70,19 @@ export const toLocalDateStr = (value) => {
     return `${year}-${month}-${day}`
 }
 
+export const nowDateStr = () =>
+    new Intl.DateTimeFormat('en-CA', {
+        timeZone: settings.timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(new Date())
+
+export const timezoneOptions =
+    typeof Intl.supportedValuesOf === 'function'
+        ? Intl.supportedValuesOf('timeZone')
+        : ['UTC', 'Europe/Kyiv', 'Europe/London', 'Europe/Warsaw', 'America/New_York']
+
 // "2026-01-16" as a wall-clock Date — new Date(dateOnlyString) parses as UTC
 // midnight and can land on the wrong local day. Pair for toLocalDateStr().
 export const parseLocalDate = (dateStr) => {
@@ -77,10 +92,10 @@ export const parseLocalDate = (dateStr) => {
 }
 
 export const transactionSourceLabels = {
-    web: 'Added from the web app',
-    telegram: 'Added via Telegram',
-    recurring: 'Created automatically (recurring)',
-    mcp: 'Added via MCP (Grok / AI)',
+    web: 'Web',
+    telegram: 'Telegram',
+    recurring: 'Recurring',
+    mcp: 'MCP',
 }
 
 export const getTransactionSourceLabel = (source) => transactionSourceLabels[source] ?? transactionSourceLabels.web

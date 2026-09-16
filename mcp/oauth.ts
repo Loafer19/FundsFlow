@@ -77,7 +77,8 @@ function authorizePage(params: Record<string, string>, error = '') {
 <body>
   <div class="card">
     <h1>Authorize FundsFlow MCP</h1>
-    <p>Sign in with your FundsFlow email and password. Keep this tab open until you see the redirect back to Grok.</p>
+    <p>Sign in with your FundsFlow email and password. Keep this tab open until you are redirected back to your MCP client.</p>
+
     ${err}
     <form method="post" action="/oauth/authorize" autocomplete="on">
       ${hidden}
@@ -224,7 +225,8 @@ export function registerOAuthRoutes(app: Express) {
             target.searchParams.set('code', code)
             if (state) target.searchParams.set('state', state)
 
-            // Must be a real 302 to redirect_uri?code=... — Grok's popup watches for that URL.
+            // Must be a real 302 to redirect_uri?code=... — some MCP clients watch for that URL.
+
             // An HTML interstitial breaks detection and the tab just closes as "failed".
             res.set('Cache-Control', 'no-store').redirect(302, target.toString())
         } catch (error) {
@@ -236,10 +238,8 @@ export function registerOAuthRoutes(app: Express) {
     app.post('/oauth/token', async (req: Request, res: Response) => {
         cleanupCodes()
 
-        // Support JSON and form-urlencoded token requests.
         const body = (req.body || {}) as Record<string, unknown>
 
-        // Client auth: body client_secret or HTTP Basic
         let clientId = String(body.client_id || '')
         let clientSecret = String(body.client_secret || '')
         const basic = req.header('authorization')
@@ -252,8 +252,8 @@ export function registerOAuthRoutes(app: Express) {
                     clientSecret = decoded.slice(idx + 1)
                 }
             } catch {
-                // ignore malformed basic
             }
+
         }
         if (CLIENT_SECRET) {
             if (clientId && clientId !== CLIENT_ID) {

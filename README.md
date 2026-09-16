@@ -24,9 +24,10 @@ Personal finance tracker
   - photo / PDF receipt with caption (e.g. `-350 groceries`)
   - bot-first registration/login
   - budget and digest alerts, mute/unmute
-- MCP (Grok / AI):
-  - personal token + Grok connector URL in Settings
+- MCP (AI clients):
+  - personal token + connection URL in Settings
   - create / update transactions, attach files (base64), budgets, tags, export
+
 - Filter:
   - by date: week, month, year
   - by tags (List tab + from Budgets)
@@ -41,7 +42,8 @@ Personal finance tracker
 - Settings:
   - money / date format
   - 30+ themes (favorites)
-  - Accounts: Telegram link, MCP token / Grok URL
+  - Accounts: Telegram link, MCP token / connection URL
+
   - JSON account export
 - Helpful Insights (tabs):
   - Analytics — totals, averages, balances per tag

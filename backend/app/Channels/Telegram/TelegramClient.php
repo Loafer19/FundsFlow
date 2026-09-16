@@ -16,14 +16,20 @@ class TelegramClient
     /**
      * @param array<string, mixed>|null $replyMarkup
      */
-    public function sendMessage(int|string $chatId, string $text, ?array $replyMarkup = null): void
-    {
+    public function sendMessage(
+        int|string $chatId,
+        string $text,
+        ?array $replyMarkup = null,
+        ?string $parseMode = null,
+    ): void {
         Http::post($this->baseUrl . 'sendMessage', array_filter([
             'chat_id' => $chatId,
             'text' => $text,
+            'parse_mode' => $parseMode,
             'reply_markup' => $replyMarkup ? json_encode($replyMarkup) : null,
         ]));
     }
+
 
     public function answerCallbackQuery(string $callbackQueryId, ?string $text = null): void
     {

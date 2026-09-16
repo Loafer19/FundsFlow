@@ -14,15 +14,12 @@ class Transaction extends Model
     use HasFactory;
 
     protected $fillable = [
-        // 'id',
-        // 'user_id',
         'at',
         'amount',
         'note',
         'source',
-        // 'created_at',
-        // 'updated_at',
     ];
+
 
     protected $casts = [
         'at' => 'datetime',

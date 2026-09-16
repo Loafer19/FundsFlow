@@ -10,12 +10,15 @@ enum BudgetLength: string
     case Month = 'month';
     case Year = 'year';
 
-    public function calendarStart(): Carbon
+    public function calendarStart(?Carbon $now = null): Carbon
     {
+        $now = ($now ?? now())->copy();
+
         return match ($this) {
-            self::Week => now()->startOfWeek(),
-            self::Month => now()->startOfMonth(),
-            self::Year => now()->startOfYear(),
+            self::Week => $now->startOfWeek(),
+            self::Month => $now->startOfMonth(),
+            self::Year => $now->startOfYear(),
         };
     }
 }
+

@@ -76,7 +76,8 @@ export const useTransactionsStore = defineStore('transactions', {
                     const uploaded = await this.uploadAttachment(transaction.id, file, { silent: true })
 
                     if (!uploaded) {
-                        toasts.error('Transaction saved, but some attachments failed to upload')
+                        toasts.error('Transaction saved, but some attachments failed to upload!')
+
                         break
                     }
 
@@ -105,7 +106,7 @@ export const useTransactionsStore = defineStore('transactions', {
 
             try {
                 const response = await api.post(`/transactions/${transactionId}/attachments`, form, {
-                    timeout: 60000,
+                    timeout: 60_000,
                 })
 
                 const index = this.transactions.findIndex((t) => t.id === transactionId)
@@ -118,7 +119,7 @@ export const useTransactionsStore = defineStore('transactions', {
                 }
 
                 if (!silent) {
-                    toasts.success('Attachment uploaded')
+                    toasts.success('Attachment uploaded successfully!')
                 }
 
                 return true
@@ -142,7 +143,7 @@ export const useTransactionsStore = defineStore('transactions', {
                     this.persist()
                 }
 
-                toasts.info('Attachment removed')
+                toasts.info('Attachment removed successfully!')
 
                 return true
             } catch (error) {
@@ -177,7 +178,7 @@ export const useTransactionsStore = defineStore('transactions', {
         async fetchAttachmentBlob(transactionId, attachment) {
             const response = await api.get(`/transactions/${transactionId}/attachments/${attachment.id}`, {
                 responseType: 'blob',
-                timeout: 60000,
+                timeout: 60_000,
             })
 
             const raw = response.data
@@ -185,17 +186,6 @@ export const useTransactionsStore = defineStore('transactions', {
             const blob = raw instanceof Blob && raw.type === type ? raw : new Blob([raw], { type })
 
             return URL.createObjectURL(blob)
-        },
-
-
-        async openAttachment(transactionId, attachment) {
-            try {
-                const blobUrl = await this.fetchAttachmentBlob(transactionId, attachment)
-                window.open(blobUrl, '_blank', 'noopener,noreferrer')
-                setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
-            } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to open attachment: '))
-            }
         },
 
         async update(raw) {

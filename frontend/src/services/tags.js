@@ -16,7 +16,26 @@ export const useTagsStore = defineStore('tags', {
     getters: {
         list: (state) => () => state.buildTagsList(state.tags),
         forBalances: (state) => () => state.list().filter((tag) => tag.calc_balance),
+        descendantIds: (state) => (rootId) => {
+
+            const ids = new Set([rootId])
+            let grew = true
+
+            while (grew) {
+                grew = false
+
+                for (const tag of state.tags) {
+                    if (tag.parent_id != null && ids.has(tag.parent_id) && !ids.has(tag.id)) {
+                        ids.add(tag.id)
+                        grew = true
+                    }
+                }
+            }
+
+            return ids
+        },
     },
+
 
     actions: {
         persist() {

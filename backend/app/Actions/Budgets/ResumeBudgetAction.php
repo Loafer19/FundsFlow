@@ -26,7 +26,8 @@ class ResumeBudgetAction
         $period = $budget->periods()->create([
             'amount' => $last->amount,
             'length' => $last->length,
-            'starts_at' => now()->toDateString(),
+            'starts_at' => $user->todayDateString(),
+
             'ends_at' => null,
         ]);
 

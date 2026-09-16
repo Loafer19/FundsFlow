@@ -8,6 +8,8 @@ import { oauthClientId, oauthClientSecret, oauthPublicBase, registerOAuthRoutes,
 /** 8 MB file → ~10.7 MB base64; leave headroom for JSON-RPC envelope. */
 const JSON_BODY_LIMIT = '12mb'
 const MAX_ATTACHMENT_BASE64_CHARS = Math.ceil((8 * 1024 * 1024 * 4) / 3) + 4096
+const BULK_MAX_ITEMS = 50
+
 
 
 const PORT = Number(process.env.PORT || 8787)
@@ -58,9 +60,10 @@ const TOOL_NAMES = [
 async function api<T = unknown>(token: string | null, path: string, init: RequestInit = {}): Promise<T> {
     if (!token) {
         throw new Error(
-            'Authentication required. In Settings → Accounts → MCP generate a token, then add header Authorization: Bearer <token> (do not put the token in the URL).',
+            'Authentication required. In Settings → Accounts → MCP generate a token, then use Authorization: Bearer <token> (or ?token= for clients that cannot set headers).',
         )
     }
+
 
     const response = await fetch(`${API_URL}${path}`, {
         ...init,
@@ -162,7 +165,6 @@ function createServer(token: string | null) {
         async () => textResult(await api(token, '/bootstrap')),
     )
 
-    // —— Tags ——
     server.registerTool(
         'list_tags',
         {
@@ -234,7 +236,6 @@ function createServer(token: string | null) {
         async ({ id }) => textResult(await api(token, `/tags/${id}`, { method: 'DELETE' })),
     )
 
-    // —— Transactions ——
     server.registerTool(
         'list_transactions',
         {
@@ -303,13 +304,14 @@ function createServer(token: string | null) {
                         }),
                     )
                     .min(1)
-                    .max(50),
+                    .max(BULK_MAX_ITEMS),
             },
         },
         async ({ transactions }) =>
             textResult(
                 await api(token, '/transactions/bulk', {
                     method: 'POST',
+
                     body: JSON.stringify({
                         transactions: transactions.map((row) => ({
                             amount: row.amount,
@@ -367,13 +369,14 @@ function createServer(token: string | null) {
                         }),
                     )
                     .min(1)
-                    .max(50),
+                    .max(BULK_MAX_ITEMS),
             },
         },
         async ({ transactions }) =>
             textResult(
                 await api(token, '/transactions/bulk', {
                     method: 'PUT',
+
                     body: JSON.stringify({
                         transactions: transactions.map((row) => ({
                             id: row.id,
@@ -404,7 +407,8 @@ function createServer(token: string | null) {
             description:
                 'Delete up to 50 transactions by id in one request (all-or-nothing). Unknown or foreign ids fail the whole batch.',
             inputSchema: {
-                ids: z.array(z.number().int()).min(1).max(50),
+                ids: z.array(z.number().int()).min(1).max(BULK_MAX_ITEMS),
+
             },
         },
         async ({ ids }) =>
@@ -503,18 +507,23 @@ function createServer(token: string | null) {
             const buffer = Buffer.from(await response.arrayBuffer())
             const mime = response.headers.get('content-type') || 'application/octet-stream'
             const disposition = response.headers.get('content-disposition') || ''
-            const nameMatch = /filename="([^"]+)"/.exec(disposition)
+            const star = /filename\*=UTF-8''([^;]+)/i.exec(disposition)
+            const quoted = /filename="([^"]+)"/.exec(disposition)
+            const name = star?.[1]
+                ? decodeURIComponent(star[1])
+                : quoted?.[1] || `attachment-${attachment_id}`
 
             return textResult({
                 id: attachment_id,
                 transaction_id,
-                name: nameMatch?.[1] || `attachment-${attachment_id}`,
+                name,
                 mime,
                 size: buffer.length,
                 content_base64: buffer.toString('base64'),
             })
         },
     )
+
 
     server.registerTool(
         'delete_transaction_attachment',
@@ -534,7 +543,6 @@ function createServer(token: string | null) {
             ),
     )
 
-    // —— Budgets ——
 
     server.registerTool(
         'list_budgets',
@@ -621,7 +629,6 @@ function createServer(token: string | null) {
         async ({ id }) => textResult(await api(token, `/budgets/${id}/resume`, { method: 'POST' })),
     )
 
-    // —— Recurring ——
     server.registerTool(
         'list_recurring',
         {
@@ -701,7 +708,6 @@ function createServer(token: string | null) {
         async ({ id }) => textResult(await api(token, `/recurring-transactions/${id}`, { method: 'DELETE' })),
     )
 
-    // —— Account ——
     server.registerTool(
         'update_preferences',
         {
@@ -732,39 +738,14 @@ function createServer(token: string | null) {
         async () => textResult(await api(token, '/account/export')),
     )
 
-    // Keep old name as alias for create_transaction
-    server.registerTool(
-        'add_transaction',
-        {
-            title: 'Add transaction (alias)',
-            description: 'Alias of create_transaction.',
-            inputSchema: {
-                amount: z.number(),
-                at: z.string(),
-                note: z.string().max(255).optional(),
-                tags: z.array(z.number().int()).optional(),
-            },
-        },
-        async ({ amount, at, note, tags }) =>
-            textResult(
-                await api(token, '/transactions', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        amount,
-                        at,
-                        note: note ?? null,
-                        tags: tags ?? [],
-                    }),
-                }),
-            ),
-    )
-
     return server
 }
 
+
 // Manual Express setup (not createMcpExpressApp): default express.json() is 100kb,
-// which rejects base64 attachment tool calls with 413 and looks like a hang in Grok.
+// which rejects base64 attachment tool calls with 413 and looks like a hang in the client.
 const app = express()
+
 app.use(express.json({ limit: JSON_BODY_LIMIT }))
 app.use(express.urlencoded({ extended: false, limit: JSON_BODY_LIMIT }))
 app.use(hostHeaderValidation(ALLOWED_HOSTS))
@@ -812,13 +793,13 @@ app.post('/mcp', async (req: Request, res: Response) => {
         token = ENV_TOKEN
     }
 
-    // Grok.com has no header field and its OAuth popup is flaky.
     // Keep discovery public so adding the MCP URL does not force OAuth.
-    // Tool calls still need ?token= / Authorization (from Settings "Copy Grok URL").
+    // Tool calls still need Authorization: Bearer or ?token= (Settings → Copy connection URL).
     if (!token && !isPublicMcpMethod(req.body)) {
         unauthorizedMcp(res, req.body?.id ?? null)
         return
     }
+
 
     const server = createServer(token)
     try {

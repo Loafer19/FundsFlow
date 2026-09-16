@@ -45,15 +45,10 @@ export const writeCache = (userId, name, data) => {
     }
 }
 
-/** Persist a store list field for the current user. */
 export const persistCache = (name, data) => writeCache(currentUserId(), name, data)
 
-/**
- * Stale-while-revalidate load for Pinia list stores.
- * @param {object} store pinia store (`this` in an action)
- * @param {{ name: string, key: string, fetch: () => Promise<any[]>, errorPrefix: string }} options
- */
 export const loadWithCache = async (store, { name, key, fetch, errorPrefix }) => {
+
     const userId = currentUserId()
     const cached = readCache(userId, name)
 

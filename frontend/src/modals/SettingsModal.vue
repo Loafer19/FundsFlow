@@ -42,7 +42,18 @@
                             <span class="label-text text-sm">Show decimals</span>
                         </label>
                     </div>
+
+                    <div class="p-3 rounded-box bg-base-200 mb-3">
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <label for="timezone" class="font-medium text-sm">Timezone</label>
+                            <span class="text-xs text-base-content/60 font-mono shrink-0">{{ timezoneNowPreview }}</span>
+                        </div>
+                        <select v-model="timezone" class="select select-sm w-full" id="timezone">
+                            <option v-for="tz in timezoneOptions" :key="tz" :value="tz">{{ tz }}</option>
+                        </select>
+                    </div>
                 </template>
+
 
                 <template v-else-if="tab === 'theme'">
                     <template v-if="favoriteThemes.length">
@@ -139,16 +150,18 @@
                                 <span v-else class="badge badge-ghost badge-sm">No token</span>
                             </div>
                             <p class="text-xs text-base-content/60 leading-relaxed">
-                                Grok.com has no header field and its OAuth popup is unreliable — use a connection URL
-                                with your personal token. Generate token → Copy Grok URL → paste as the only MCP URL
-                                in Grok (skip OAuth fields).
+                                Generate a personal token for MCP clients. Prefer
+                                <code class="text-[10px]">Authorization: Bearer</code> when the client supports
+                                headers. Tip for Grok.com: it has no header field — copy the connection URL and paste
+                                it as the only MCP URL (skip OAuth).
                             </p>
+
                             <code
                                 class="block text-[11px] font-mono break-all bg-base-100 rounded-box px-2 py-1.5 text-base-content/80">{{
-                                    mcpPlainToken ? mcpGrokUrl : mcpUrl }}</code>
+                                    mcpPlainToken ? mcpConnectionUrl : mcpUrl }}</code>
                             <template v-if="mcpPlainToken">
                                 <div class="text-xs text-warning">
-                                    Token is in the URL (Grok.com limitation). Revoke anytime if it leaks.
+                                    Token is in the URL. Revoke anytime if it leaks.
                                 </div>
                             </template>
                             <div class="flex flex-wrap justify-end gap-1">
@@ -158,9 +171,10 @@
                                     {{ mcpTokenActive || mcpPlainToken ? 'Regenerate' : 'Generate token' }}
                                 </button>
                                 <button v-if="mcpPlainToken" type="button" class="btn btn-primary btn-xs"
-                                    @click="copyMcpGrokUrl">
-                                    {{ mcpCopied === 'grok' ? 'Copied' : 'Copy Grok URL' }}
+                                    @click="copyMcpConnectionUrl">
+                                    {{ mcpCopied === 'url' ? 'Copied' : 'Copy connection URL' }}
                                 </button>
+
                                 <button v-if="mcpTokenActive || mcpPlainToken" type="button"
                                     class="btn btn-outline btn-error btn-xs" :disabled="mcpTokenBusy"
                                     @click="revokeMcpTokenAction">
@@ -244,9 +258,23 @@ import {
     updatePreferences,
 } from '../services/account'
 import { useAuthStore } from '../services/auth'
-import { apiErrorMessage, formatDateOptions, formatMoneyOptions } from '../services/formatters'
+import {
+    apiErrorMessage,
+    dateFormatMap,
+    formatDateOptions,
+    formatMoneyOptions,
+    nowDateStr,
+    timezoneOptions,
+} from '../services/formatters'
+
 import { openTelegramLinkBot } from '../services/identities'
-import settings, { updateDateFormat, updateDecimals, updateMoneyFormat, updateTheme } from '../services/settings'
+import settings, {
+    updateDateFormat,
+    updateDecimals,
+    updateMoneyFormat,
+    updateTheme,
+    updateTimezone,
+} from '../services/settings'
 import toasts from '../services/toasts'
 
 const authStore = useAuthStore()
@@ -263,6 +291,7 @@ const exporting = ref(false)
 const formatDate = ref(settings.dateFormat)
 const formatMoney = ref(settings.moneyFormat)
 const decimals = ref(settings.decimals)
+const timezone = ref(settings.timezone)
 
 const themeOptions = [
     'acid',
@@ -325,6 +354,7 @@ const syncFromSettings = () => {
     formatDate.value = settings.dateFormat
     formatMoney.value = settings.moneyFormat
     decimals.value = settings.decimals
+    timezone.value = settings.timezone
     themeSelected.value = settings.theme
     credentialsForm.value.email = authStore.user?.email ?? ''
 }
@@ -352,26 +382,12 @@ const bindModalEvents = () => {
 
 onMounted(bindModalEvents)
 
-const datePreviewMap = {
-    'YYYY/MM/DD': { month: '2-digit', day: '2-digit', year: 'numeric', locale: 'zh-CN' },
-    'MM/DD/YYYY': { month: '2-digit', day: '2-digit', year: 'numeric', locale: 'en-US' },
-    'MM/DD': { month: '2-digit', day: '2-digit', locale: 'en-US' },
-    'long Month with Day & Year': { day: '2-digit', month: 'long', year: 'numeric' },
-    'short Month with Day & Year': { day: '2-digit', month: 'short', year: 'numeric' },
-    'long Month with Day': { day: '2-digit', month: 'long' },
-    'short Month with Day': { day: '2-digit', month: 'short' },
-    'DD-MM-YYYY': { day: '2-digit', month: '2-digit', year: 'numeric', locale: 'nl-NL' },
-    'DD/MM/YYYY': { day: '2-digit', month: '2-digit', year: 'numeric', locale: 'en-GB' },
-    'DD.MM.YYYY': { day: '2-digit', month: '2-digit', year: 'numeric', locale: 'uk-UA' },
-    'DD-MM': { day: '2-digit', month: '2-digit', locale: 'nl-NL' },
-    'DD/MM': { day: '2-digit', month: '2-digit', locale: 'en-GB' },
-    'DD.MM': { day: '2-digit', month: '2-digit', locale: 'uk-UA' },
-}
-
 const formatDatePreview = computed(() => {
-    const config = datePreviewMap[formatDate.value]
+    const config = dateFormatMap[formatDate.value]
     return new Intl.DateTimeFormat(config.locale, config).format(new Date())
 })
+
+const timezoneNowPreview = computed(() => nowDateStr())
 
 const generatingTelegramLink = ref(false)
 
@@ -400,7 +416,7 @@ const mcpPlainToken = ref('')
 const mcpTokenActive = ref(false)
 const mcpTokenBusy = ref(false)
 
-const mcpGrokUrl = computed(() =>
+const mcpConnectionUrl = computed(() =>
     mcpPlainToken.value ? `${mcpUrl}?token=${encodeURIComponent(mcpPlainToken.value)}` : mcpUrl,
 )
 
@@ -412,11 +428,11 @@ const copyText = async (value, key) => {
             if (mcpCopied.value === key) mcpCopied.value = ''
         }, 1500)
     } catch {
-        toasts.error('Could not copy')
+        toasts.error('Could not copy!')
     }
 }
 
-const copyMcpGrokUrl = () => copyText(mcpGrokUrl.value, 'grok')
+const copyMcpConnectionUrl = () => copyText(mcpConnectionUrl.value, 'url')
 
 const refreshMcpTokenStatus = async () => {
     if (!authStore.isAuthenticated) {
@@ -439,7 +455,7 @@ const generateMcpToken = async () => {
         const response = await createMcpToken()
         mcpPlainToken.value = response.data.token
         mcpTokenActive.value = true
-        toasts.success(response.data.message || 'MCP token created')
+        toasts.success(response.data.message || 'MCP token created successfully!')
     } catch (error) {
         toasts.error(apiErrorMessage(error, 'Failed to create MCP token: '))
     } finally {
@@ -454,7 +470,7 @@ const revokeMcpTokenAction = async () => {
         await revokeMcpToken()
         mcpPlainToken.value = ''
         mcpTokenActive.value = false
-        toasts.success('MCP token revoked')
+        toasts.success('MCP token revoked successfully!')
     } catch (error) {
         toasts.error(apiErrorMessage(error, 'Failed to revoke MCP token: '))
     } finally {
@@ -503,7 +519,7 @@ const exportData = async () => {
 
     try {
         await downloadAccountExport()
-        toasts.success('Export downloaded')
+        toasts.success('Export downloaded successfully!')
     } catch (error) {
         toasts.error(apiErrorMessage(error, 'Export failed: '))
     } finally {
@@ -519,6 +535,7 @@ const saveSettings = async () => {
     updateDateFormat(formatDate.value)
     updateMoneyFormat(formatMoney.value)
     updateDecimals(decimals.value)
+    updateTimezone(timezone.value)
     updateTheme(themeSelected.value)
 
     if (authStore.isAuthenticated) {
@@ -527,13 +544,14 @@ const saveSettings = async () => {
                 moneyFormat: formatMoney.value,
                 dateFormat: formatDate.value,
                 decimals: decimals.value,
+                timezone: timezone.value,
             })
 
             if (response.data?.user) {
                 authStore.user = response.data.user
             }
         } catch {
-            toasts.info('Saved locally; could not sync formatting preferences')
+            toasts.info('Saved locally; could not sync formatting preferences!')
         }
     }
 

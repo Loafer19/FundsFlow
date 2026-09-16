@@ -1,10 +1,26 @@
 # FundsFlow MCP
 
-Streamable HTTP MCP + OAuth for Grok and other MCP clients.
+Streamable HTTP MCP for AI clients (Claude, Cursor, Grok, etc.).
 
 **Production:** `https://mcp.fundsflow.fun/mcp`
 
-## Grok.com OAuth form
+## Connect with a token (recommended)
+
+Settings → Accounts → MCP → Generate token.
+
+- Clients with header support: `Authorization: Bearer YOUR_TOKEN`
+- Tip for Grok.com (no header field): use the connection URL with `?token=…` as the only MCP URL (skip OAuth)
+
+```bash
+# Example: any MCP CLI that supports HTTP + headers
+# (Grok CLI example)
+grok mcp add --transport http fundsflow https://mcp.fundsflow.fun/mcp \
+  --header "Authorization: Bearer YOUR_TOKEN"
+```
+
+## OAuth (optional)
+
+Some clients can use OAuth instead of a personal token:
 
 | Field | Value |
 |-------|--------|
@@ -16,22 +32,8 @@ Streamable HTTP MCP + OAuth for Grok and other MCP clients.
 | Scopes | `mcp` |
 | Token Auth Method | `none` |
 
-Grok opens the authorize page → sign in with FundsFlow email/password → done.
-
-## CLI (optional, bearer token)
-
-Settings → Accounts → MCP → Generate token, then:
-
-```bash
-grok mcp add --transport http fundsflow https://mcp.fundsflow.fun/mcp \
-  --header "Authorization: Bearer YOUR_TOKEN"
-```
-
 ## Tools
 
 Account, tags, transactions (incl. bulk create + file attachments via base64), budgets (incl. pause/resume), recurring, preferences, export.
 
 Creates are stored with `source=mcp`. Bulk (up to 50, all-or-nothing): `create_transactions`, `update_transactions`, `delete_transactions`. Attachment tools: `attach_transaction_file`, `list_transaction_attachments`, `get_transaction_attachment`, `delete_transaction_attachment` (JPEG/PNG/WebP/PDF, max 8 MB, 5 per transaction).
-
-
-

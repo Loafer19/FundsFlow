@@ -13,6 +13,8 @@ use Carbon\CarbonInterface;
 
 class GenerateRecurringTransactionsAction
 {
+    private const MAX_CATCH_UP = 500;
+
     /** @var array<int|string, list<string>> */
     private array $messagesByChat = [];
 
@@ -23,15 +25,23 @@ class GenerateRecurringTransactionsAction
 
     public function execute(): void
     {
-        $today = now()->toDateString();
         $this->messagesByChat = [];
+
+        // Loose UTC bound (max calendar day ahead), then filter by each user's timezone "today".
+        $latestPossibleToday = now()->addDay()->toDateString();
 
         RecurringTransaction::query()
             ->where('active', true)
-            ->where('next_run_at', '<=', $today)
+            ->where('next_run_at', '<=', $latestPossibleToday)
             ->with(['user.identities', 'tags'])
-            ->chunkById(50, function ($rules) use ($today) {
+            ->chunkById(50, function ($rules) {
                 foreach ($rules as $rule) {
+                    $today = $rule->user->todayDateString();
+
+                    if ($rule->next_run_at->toDateString() > $today) {
+                        continue;
+                    }
+
                     $this->materialize($rule, $today);
                 }
             });
@@ -45,7 +55,10 @@ class GenerateRecurringTransactionsAction
     {
         // A rule can be many occurrences behind if the scheduler was down —
         // catch up in order rather than only firing the latest one.
-        while ($rule->next_run_at->toDateString() <= $today) {
+        $created = 0;
+
+
+        while ($rule->next_run_at->toDateString() <= $today && $created < self::MAX_CATCH_UP) {
             if ($rule->ends_at && $rule->next_run_at->toDateString() > $rule->ends_at->toDateString()) {
                 $rule->update(['active' => false]);
 
@@ -63,8 +76,10 @@ class GenerateRecurringTransactionsAction
 
             $rule->next_run_at = $this->advance($rule->next_run_at, $rule->frequency);
             $rule->save();
+            $created++;
         }
     }
+
 
     // One combined message per user per run, not one per transaction — a
     // rule catching up several missed days shouldn't spam a message each.

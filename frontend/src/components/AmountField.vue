@@ -22,7 +22,8 @@ import { ref, watch } from 'vue'
 
 const model = defineModel({ type: [Number, String], default: '' })
 
-const isIncome = ref(true)
+const isIncome = ref(false)
+
 const display = ref('')
 
 const applyModel = (value) => {
@@ -81,7 +82,17 @@ const onInput = (event) => {
         return
     }
 
+    if (raw.includes('+')) {
+        isIncome.value = true
+        const absolute = Math.abs(Number(raw.replace(/\+/g, '')))
+        display.value = Number.isNaN(absolute) || raw.replace(/\+/g, '') === '' ? '' : String(absolute)
+        event.target.value = display.value
+        emitSigned()
+        return
+    }
+
     display.value = raw
     emitSigned()
 }
+
 </script>

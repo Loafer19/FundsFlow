@@ -27,11 +27,9 @@ class AuthController extends Controller
             abort(401, 'Invalid credentials');
         }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
-
         return response()->json([
             'user' => $user->load('identities'),
-            'token' => $token,
+            'token' => $this->issueAuthToken($user),
         ]);
     }
 
@@ -45,21 +43,20 @@ class AuthController extends Controller
 
         $user = User::create($data);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
-
         return response()->json([
             'user' => $user->load('identities'),
-            'token' => $token,
+            'token' => $this->issueAuthToken($user),
         ], 201);
     }
 
     public function loginWithTelegramCode(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'code' => 'required|string',
+            'code' => 'required|string|size:8|alpha_num',
         ]);
 
-        $userId = Cache::pull("telegram_login:{$data['code']}");
+        $code = strtoupper($data['code']);
+        $userId = Cache::pull("telegram_login:{$code}");
 
         if (!$userId) {
             abort(422, 'This code is invalid or has expired.');
@@ -67,13 +64,12 @@ class AuthController extends Controller
 
         $user = User::findOrFail($userId);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
-
         return response()->json([
             'user' => $user->load('identities'),
-            'token' => $token,
+            'token' => $this->issueAuthToken($user),
         ]);
     }
+
 
     public function me(Request $request): JsonResponse
     {
@@ -145,11 +141,17 @@ class AuthController extends Controller
                 ]);
             }
 
-            $token = $user->createToken('auth_token')->plainTextToken;
-
-            return redirect($frontend . '#token=' . urlencode($token));
+            return redirect($frontend . '#token=' . urlencode($this->issueAuthToken($user)));
         } catch (Exception $e) {
             return redirect($frontend . '#auth_error=' . urlencode('Authentication failed'));
         }
     }
+
+    private function issueAuthToken(User $user): string
+    {
+        $user->tokens()->where('name', 'auth_token')->delete();
+
+        return $user->createToken('auth_token', ['*'], now()->addDays(30))->plainTextToken;
+    }
 }
+

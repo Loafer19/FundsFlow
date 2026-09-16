@@ -23,8 +23,9 @@ class UpdateRecurringTransactionAction
         $resuming = ($data['active'] ?? false) && !$recurringTransaction->active;
 
         if ($resuming) {
-            $data['next_run_at'] = now()->toDateString();
+            $data['next_run_at'] = $user->todayDateString();
         }
+
 
         $recurringTransaction->update($data);
         $recurringTransaction->tags()->sync($tagIds);

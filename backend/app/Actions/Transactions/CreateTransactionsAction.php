@@ -7,7 +7,6 @@ use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 
 class CreateTransactionsAction
 {
@@ -21,8 +20,6 @@ class CreateTransactionsAction
      */
     public function execute(User $user, array $items, TransactionSource $source): Collection
     {
-        Gate::forUser($user)->authorize('create', Transaction::class);
-
         return DB::transaction(function () use ($user, $items, $source) {
             $created = collect();
 

@@ -14,11 +14,6 @@ class SendWeeklyDigestAction
 
     public function execute(): void
     {
-        $start = now()->subWeek()->startOfWeek();
-        $end = now()->subWeek()->endOfWeek();
-        $previousStart = now()->subWeeks(2)->startOfWeek();
-        $previousEnd = now()->subWeeks(2)->endOfWeek();
-
         $users = User::query()->has('transactions')->with('identities')->get();
 
         foreach ($users as $user) {
@@ -28,6 +23,12 @@ class SendWeeklyDigestAction
                 continue;
             }
 
+            $now = $user->nowInTimezone();
+            $start = $now->copy()->subWeek()->startOfWeek();
+            $end = $now->copy()->subWeek()->endOfWeek();
+            $previousStart = $now->copy()->subWeeks(2)->startOfWeek();
+            $previousEnd = $now->copy()->subWeeks(2)->endOfWeek();
+
             $current = $this->summarize($user, $start, $end);
 
             if ($current['count'] === 0) {
@@ -36,7 +37,10 @@ class SendWeeklyDigestAction
 
             $previous = $this->summarize($user, $previousStart, $previousEnd);
 
-            $this->client->sendMessage($identity->external_id, $this->formatMessage($user, $start, $end, $current, $previous));
+            $this->client->sendMessage(
+                $identity->external_id,
+                $this->formatMessage($user, $start, $end, $current, $previous),
+            );
         }
     }
 
@@ -47,7 +51,7 @@ class SendWeeklyDigestAction
     {
         $transactions = Transaction::query()
             ->where('user_id', $user->id)
-            ->whereBetween('at', [$start, $end])
+            ->whereBetween('at', [$start->toDateString(), $end->toDateString()])
             ->with('tags')
             ->get();
 
@@ -78,37 +82,28 @@ class SendWeeklyDigestAction
     private function formatMessage(User $user, Carbon $start, Carbon $end, array $current, array $previous): string
     {
         $net = $current['income'] - $current['expenses'];
-        $netFormatted = UserFormatter::formatMoney($user, abs($net));
-        $netSigned = ($net >= 0 ? '+' : '-') . $netFormatted;
+        $delta = $previous['count'] > 0
+            ? $current['expenses'] - $previous['expenses']
+            : null;
 
         $lines = [
-            sprintf(
-                '📊 Weekly report (%s–%s)',
-                UserFormatter::formatDate($user, $start),
-                UserFormatter::formatDate($user, $end),
-            ),
-            "{$current['count']} transactions",
-            sprintf(
-                'Income: +%s · Expenses: -%s',
-                UserFormatter::formatMoney($user, $current['income']),
-                UserFormatter::formatMoney($user, $current['expenses']),
-            ),
-            "Net: {$netSigned}",
+            '📬 Weekly digest',
+            UserFormatter::formatDate($user, $start) . ' – ' . UserFormatter::formatDate($user, $end),
+            'Transactions: ' . $current['count'],
+            'Income: +' . UserFormatter::formatMoney($user, $current['income']),
+            'Expenses: ' . UserFormatter::formatMoney($user, $current['expenses']),
+            'Net: ' . UserFormatter::formatMoney($user, $net),
         ];
 
         if ($current['top']) {
             $tag = $current['top']['tag'];
-            $lines[] = sprintf(
-                'Top category: %s %s (-%s)',
-                $tag->emoji,
-                $tag->title,
-                UserFormatter::formatMoney($user, $current['top']['amount']),
-            );
+            $lines[] = 'Top: ' . trim($tag->emoji . ' ' . $tag->title)
+                . ' — ' . UserFormatter::formatMoney($user, $current['top']['amount']);
         }
 
-        if ($previous['expenses'] > 0) {
-            $diff = (($current['expenses'] - $previous['expenses']) / $previous['expenses']) * 100;
-            $lines[] = sprintf('Expenses vs last week: %+.0f%%', $diff);
+        if ($delta !== null) {
+            $sign = $delta > 0 ? '+' : '';
+            $lines[] = 'vs prior week: ' . $sign . UserFormatter::formatMoney($user, $delta) . ' expenses';
         }
 
         return implode("\n", $lines);
