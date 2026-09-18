@@ -22,7 +22,8 @@ class UpdateTransactionAction
 
         $transaction->tags()->sync($tags);
 
-        return $transaction->load(['tags', 'attachments']);
+        // Reload from DB so the response reflects stored amount (not in-memory input).
+        return $transaction->fresh()->load(['tags', 'attachments']);
     }
 }
 

@@ -37,6 +37,11 @@ class AccountController extends Controller
     {
         $user = $request->user();
 
+        // Browsers/ICU still expose Europe/Kiev; PHP DateTimeZone expects Europe/Kyiv.
+        if ($request->input('timezone') === 'Europe/Kiev') {
+            $request->merge(['timezone' => 'Europe/Kyiv']);
+        }
+
         $data = $request->validate([
             'moneyFormat' => 'required|string|max:32',
             'dateFormat' => 'required|string|max:64',

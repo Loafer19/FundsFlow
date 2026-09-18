@@ -1,10 +1,13 @@
 import { reactive } from 'vue'
 
+/** ICU lists Europe/Kiev; PHP/IANA use Europe/Kyiv. */
+const normalizeTimezone = (timezone) => (timezone === 'Europe/Kiev' ? 'Europe/Kyiv' : timezone)
+
 const defaults = {
     dateFormat: 'short Month with Day',
     moneyFormat: 'uk-UA',
     decimals: true,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Kyiv',
+    timezone: normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Kyiv'),
     theme: 'bumblebee',
 }
 
@@ -21,7 +24,7 @@ function loadSaved() {
     if (decimals !== null) settings.decimals = JSON.parse(decimals)
 
     const timezone = localStorage.getItem('format:timezone')
-    if (timezone) settings.timezone = timezone
+    if (timezone) settings.timezone = normalizeTimezone(timezone)
 
     const theme = localStorage.getItem('theme')
     if (theme) settings.theme = theme
@@ -51,8 +54,9 @@ export function updateDecimals(decimals) {
 }
 
 export function updateTimezone(timezone) {
-    settings.timezone = timezone
-    save('format:timezone', timezone)
+    const normalized = normalizeTimezone(timezone)
+    settings.timezone = normalized
+    save('format:timezone', normalized)
 }
 
 export function updateTheme(theme) {

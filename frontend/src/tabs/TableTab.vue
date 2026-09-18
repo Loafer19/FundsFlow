@@ -70,8 +70,8 @@
                                     </div>
                                 </div>
                             </td>
-                            <td>
-                                <span class="truncate">{{ transaction.note || '-' }}</span>
+                            <td class="max-w-xs" :title="transaction.note || undefined">
+                                <span class="line-clamp-2 whitespace-normal break-words">{{ transaction.note || '-' }}</span>
                             </td>
                             <td>
                                 <button v-if="transaction.attachments?.length" type="button"

@@ -78,10 +78,18 @@ export const nowDateStr = () =>
         day: '2-digit',
     }).format(new Date())
 
-export const timezoneOptions =
+/** ICU still lists Europe/Kiev; PHP/IANA use Europe/Kyiv. */
+export const normalizeTimezone = (timezone) => {
+    if (timezone === 'Europe/Kiev') return 'Europe/Kyiv'
+    return timezone
+}
+
+const rawTimezoneOptions =
     typeof Intl.supportedValuesOf === 'function'
         ? Intl.supportedValuesOf('timeZone')
         : ['UTC', 'Europe/Kyiv', 'Europe/London', 'Europe/Warsaw', 'America/New_York']
+
+export const timezoneOptions = [...new Set(rawTimezoneOptions.map(normalizeTimezone))]
 
 // "2026-01-16" as a wall-clock Date — new Date(dateOnlyString) parses as UTC
 // midnight and can land on the wrong local day. Pair for toLocalDateStr().
