@@ -17,7 +17,7 @@
                     :busy="Boolean(transactionsStore.isLoading)" @changed="syncAttachments" />
 
                 <div class="modal-action">
-                    <DeleteHold :id="transaction.id" :disabled="transactionsStore.isLoading"
+                    <DeleteHold v-if="transaction.id" :id="transaction.id" :disabled="transactionsStore.isLoading"
                         :isLoading="transactionsStore.isLoading === transaction.id" @delete="handleDelete" />
 
                     <button type="submit" class="btn btn-success btn-sm" :disabled="transactionsStore.isLoading">

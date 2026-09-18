@@ -7,19 +7,31 @@
         <div class="grid grid-cols-3 gap-2 sm:gap-3 mb-3">
             <div class="card card-border border-base-300 bg-base-100 p-2 sm:p-3 min-w-0">
                 <div class="text-[10px] sm:text-xs text-base-content/60">Income</div>
-                <div class="text-sm sm:text-lg font-semibold text-success truncate">{{ formatMoney(periodTotals.income) }}
+                <div class="text-sm sm:text-lg font-semibold text-success truncate">
+                    {{ formatMoney(factTotals.income) }}
+                </div>
+                <div v-if="hasForecast" class="text-[10px] sm:text-xs text-success/70 truncate mt-0.5">
+                    Forecast {{ formatMoney(forecastTotals.income) }}
                 </div>
             </div>
             <div class="card card-border border-base-300 bg-base-100 p-2 sm:p-3 min-w-0">
                 <div class="text-[10px] sm:text-xs text-base-content/60">Expenses</div>
-                <div class="text-sm sm:text-lg font-semibold text-error truncate">{{ formatMoney(periodTotals.expense) }}
+                <div class="text-sm sm:text-lg font-semibold text-error truncate">
+                    {{ formatMoney(factTotals.expense) }}
+                </div>
+                <div v-if="hasForecast" class="text-[10px] sm:text-xs text-error/70 truncate mt-0.5">
+                    Forecast {{ formatMoney(forecastTotals.expense) }}
                 </div>
             </div>
             <div class="card card-border border-base-300 bg-base-100 p-2 sm:p-3 min-w-0">
                 <div class="text-[10px] sm:text-xs text-base-content/60">Total</div>
                 <div class="text-sm sm:text-lg font-semibold truncate"
-                    :class="periodTotals.total >= 0 ? 'text-success' : 'text-error'">
-                    {{ formatMoney(periodTotals.total) }}
+                    :class="factTotals.total >= 0 ? 'text-success' : 'text-error'">
+                    {{ formatMoney(factTotals.total) }}
+                </div>
+                <div v-if="hasForecast" class="text-[10px] sm:text-xs truncate mt-0.5"
+                    :class="forecastTotals.total >= 0 ? 'text-success/70' : 'text-error/70'">
+                    Forecast {{ formatMoney(forecastTotals.total) }}
                 </div>
             </div>
         </div>
@@ -313,13 +325,20 @@ const gridCells = computed(() => {
     return cells
 })
 
-const periodTotals = computed(() => {
-    const items = itemsInRange(props.dateRange.currentStart, props.dateRange.currentEnd)
+const sumPeriodTotals = (items) => {
     const income = items.filter((i) => i.amount > 0).reduce((sum, i) => sum + i.amount, 0)
     const expense = items.filter((i) => i.amount < 0).reduce((sum, i) => sum + i.amount, 0)
 
     return { income, expense, total: income + expense }
-})
+}
+
+const periodItems = computed(() => itemsInRange(props.dateRange.currentStart, props.dateRange.currentEnd))
+
+const factTotals = computed(() => sumPeriodTotals(periodItems.value.filter((i) => i.actual)))
+
+const forecastTotals = computed(() => sumPeriodTotals(periodItems.value.filter((i) => !i.actual)))
+
+const hasForecast = computed(() => forecastTotals.value.income !== 0 || forecastTotals.value.expense !== 0)
 
 const selectedItems = computed(() => {
     const date = parseLocalDate(selectedDate.value)

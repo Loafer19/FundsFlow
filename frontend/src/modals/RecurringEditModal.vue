@@ -25,7 +25,7 @@
                 <TagPicker v-model="form.tags" />
 
                 <div class="modal-action">
-                    <DeleteHold :id="form.id" :disabled="recurringStore.isLoading"
+                    <DeleteHold v-if="form.id" :id="form.id" :disabled="recurringStore.isLoading"
                         :isLoading="recurringStore.isLoading === form.id" @delete="handleDelete" />
 
                     <button type="submit" class="btn btn-success btn-sm" :disabled="recurringStore.isLoading">
