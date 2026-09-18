@@ -32,8 +32,8 @@ const hasPeriodData = computed(() => {
     const { currentStart, currentEnd, previousStart, previousEnd } = props.dateRange
 
     return (
-        transactionsStore.filteredByDateRange(currentStart, currentEnd).length > 0 ||
-        transactionsStore.filteredByDateRange(previousStart, previousEnd).length > 0
+        transactionsStore.filteredByDateRangeAndTags(currentStart, currentEnd).length > 0 ||
+        transactionsStore.filteredByDateRangeAndTags(previousStart, previousEnd).length > 0
     )
 })
 
@@ -41,7 +41,7 @@ const balanceTrend = computed(() => {
     const { currentStart, currentEnd, previousStart, previousEnd } = props.dateRange
 
     const calculateBalance = (start, end) => {
-        const dailyTotals = transactionsStore.filteredByDateRange(start, end).reduce((acc, t) => {
+        const dailyTotals = transactionsStore.filteredByDateRangeAndTags(start, end).reduce((acc, t) => {
             const dateStr = toLocalDateStr(t.at)
             acc[dateStr] = (acc[dateStr] || 0) + t.amount
             return acc

@@ -48,7 +48,6 @@ export const writeCache = (userId, name, data) => {
 export const persistCache = (name, data) => writeCache(currentUserId(), name, data)
 
 export const loadWithCache = async (store, { name, key, fetch, errorPrefix }) => {
-
     const userId = currentUserId()
     const cached = readCache(userId, name)
 

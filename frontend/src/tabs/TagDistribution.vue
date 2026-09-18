@@ -136,8 +136,10 @@ const openAdd = () => transactions_add_modal.showModal()
 
 const hasPeriodData = computed(
     () =>
-        transactionsStore.filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd).length > 0 ||
-        transactionsStore.filteredByDateRange(props.dateRange.previousStart, props.dateRange.previousEnd).length > 0,
+        transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd).length >
+            0 ||
+        transactionsStore.filteredByDateRangeAndTags(props.dateRange.previousStart, props.dateRange.previousEnd)
+            .length > 0,
 )
 
 const calculateTagAmounts = (start, end) => {
@@ -148,7 +150,7 @@ const calculateTagAmounts = (start, end) => {
         untaggedNegative: { amount: 0, count: 0 },
     }
 
-    transactionsStore.filteredByDateRange(start, end).forEach((t) => {
+    transactionsStore.filteredByDateRangeAndTags(start, end).forEach((t) => {
         const isPositive = t.amount > 0
         const target = isPositive ? result.positive : result.negative
         const untaggedTarget = isPositive ? result.untaggedPositive : result.untaggedNegative

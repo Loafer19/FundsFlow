@@ -56,8 +56,10 @@ const groupBy = ref('day')
 const openAdd = () => transactions_add_modal.showModal()
 const hasPeriodData = computed(
     () =>
-        transactionsStore.filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd).length > 0 ||
-        transactionsStore.filteredByDateRange(props.dateRange.previousStart, props.dateRange.previousEnd).length > 0,
+        transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd).length >
+            0 ||
+        transactionsStore.filteredByDateRangeAndTags(props.dateRange.previousStart, props.dateRange.previousEnd)
+            .length > 0,
 )
 
 watch(
@@ -145,7 +147,7 @@ const getPeriodEnds = (start, end, groupBy) => {
 const moneyFlow = computed(() => {
     const { currentStart, currentEnd } = props.dateRange
 
-    const transactions = transactionsStore.filteredByDateRange(currentStart, currentEnd)
+    const transactions = transactionsStore.filteredByDateRangeAndTags(currentStart, currentEnd)
 
     const groupTotals = transactions.reduce((acc, t) => {
         const periodEnd = getPeriodEnd(t.at, groupBy.value)

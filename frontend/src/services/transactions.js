@@ -13,6 +13,8 @@ export const useTransactionsStore = defineStore('transactions', {
         transactionForEdit: null,
         transactionDraftAt: null,
         tagFilterDraft: null,
+        selectedTagIds: [],
+        filterUntagged: false,
         attachmentPreview: null,
         isLoading: false,
     }),
@@ -23,6 +25,22 @@ export const useTransactionsStore = defineStore('transactions', {
                 const date = toLocalDateStr(t.at)
                 return date >= toLocalDateStr(start) && date <= toLocalDateStr(end)
             }),
+        tagFilterActive: (state) => state.selectedTagIds.length > 0 || state.filterUntagged,
+        matchesTagFilter: (state) => (transaction) => {
+            if (!state.selectedTagIds.length && !state.filterUntagged) {
+                return true
+            }
+
+            const tags = transaction.tags
+            if (state.filterUntagged && !tags?.length) {
+                return true
+            }
+
+            return Array.isArray(tags) && tags.some((t) => state.selectedTagIds.includes(t.id))
+        },
+        filteredByDateRangeAndTags() {
+            return (start, end) => this.filteredByDateRange(start, end).filter(this.matchesTagFilter)
+        },
         groupedByTags: (state) => () =>
             state.transactions.reduce((map, t) => {
                 let i = 0
@@ -38,6 +56,21 @@ export const useTransactionsStore = defineStore('transactions', {
     },
 
     actions: {
+        clearTagFilter() {
+            this.selectedTagIds = []
+            this.filterUntagged = false
+        },
+
+        setTagFilterFromDraft() {
+            if (!this.tagFilterDraft) {
+                return
+            }
+
+            this.selectedTagIds = [...this.tagFilterDraft]
+            this.filterUntagged = false
+            this.tagFilterDraft = null
+        },
+
         persist() {
             persistCache(CACHE, this.transactions)
         },

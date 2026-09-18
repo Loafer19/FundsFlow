@@ -227,7 +227,7 @@ const addForSelectedDate = () => {
 }
 
 const itemsInRange = (start, end) => {
-    const actual = transactionsStore.filteredByDateRange(start, end).map((t) => ({
+    const actual = transactionsStore.filteredByDateRangeAndTags(start, end).map((t) => ({
         key: 'txn-' + t.id,
         date: toLocalDateStr(t.at),
         actual: true,
@@ -238,17 +238,19 @@ const itemsInRange = (start, end) => {
         transaction: t,
     }))
 
-    const projected = recurringStore.rules.flatMap((rule) =>
-        projectOccurrences(rule, start, end).map((date) => ({
-            key: 'rule-' + rule.id + '-' + date,
-            date,
-            actual: false,
-            amount: rule.amount,
-            note: rule.note,
-            tags: rule.tags,
-            rule,
-        })),
-    )
+    const projected = recurringStore.rules
+        .flatMap((rule) =>
+            projectOccurrences(rule, start, end).map((date) => ({
+                key: 'rule-' + rule.id + '-' + date,
+                date,
+                actual: false,
+                amount: rule.amount,
+                note: rule.note,
+                tags: rule.tags,
+                rule,
+            })),
+        )
+        .filter((item) => transactionsStore.matchesTagFilter(item))
 
     return [...actual, ...projected]
 }

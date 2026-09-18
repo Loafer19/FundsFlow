@@ -57,7 +57,7 @@
         </header>
 
         <main>
-            <div class="flex gap-2 mb-3 items-stretch">
+            <div class="flex gap-2 mb-3 items-stretch flex-wrap">
                 <select class="select w-24 sm:w-30 border-base-300 focus:border-base-content cursor-pointer"
                     v-model="dateSelectionType" aria-label="Date range type">
                     <option value="week">Week</option>
@@ -83,6 +83,30 @@
                     aria-label="Next period">
                     <ChevronRight :size="20" />
                 </button>
+
+                <div class="dropdown">
+                    <div tabindex="0" role="button"
+                        class="btn border-base-300 text-base-content/60 text-sm h-full min-h-0">
+                        <Tag :size="16" />
+                        Filter tags
+                        <span v-if="tagFilterBadgeCount" class="badge badge-outline badge-sm">{{ tagFilterBadgeCount }}</span>
+                    </div>
+                    <div tabindex="0"
+                        class="dropdown-content menu bg-base-100 rounded-box z-1 w-64 p-3 border border-base-300">
+                        <button type="button" class="badge badge-info gap-0 px-1 text-lg cursor-pointer mb-2 w-fit"
+                            :class="{ 'badge-soft': !transactionsStore.filterUntagged }"
+                            :aria-pressed="transactionsStore.filterUntagged"
+                            @click="transactionsStore.filterUntagged = !transactionsStore.filterUntagged">
+                            <span>🏷️</span>
+                            <span>Untagged</span>
+                        </button>
+                        <TagPicker v-model="transactionsStore.selectedTagIds" />
+                        <button v-if="transactionsStore.tagFilterActive" type="button" class="btn btn-ghost btn-xs"
+                            @click="transactionsStore.clearTagFilter()">
+                            Clear
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="mb-4 -mx-4 px-4 overflow-x-auto">
@@ -200,6 +224,7 @@ import {
     TrendingUp,
 } from 'lucide-vue-next'
 import { computed, markRaw, onMounted, ref, watch } from 'vue'
+import TagPicker from './components/TagPicker.vue'
 import Toasts from './components/Toasts.vue'
 import AttachmentPreviewModal from './modals/AttachmentPreviewModal.vue'
 import AuthModal from './modals/AuthModal.vue'
@@ -242,6 +267,18 @@ const dateSelectionType = ref('month')
 const datePicker = ref(null)
 const selectedRange = ref(getDefaultRange('month'))
 const selectedTab = ref(markRaw(Analytics))
+
+const tagFilterBadgeCount = computed(
+    () => transactionsStore.selectedTagIds.length + (transactionsStore.filterUntagged ? 1 : 0),
+)
+
+watch(
+    () => transactionsStore.tagFilterDraft,
+    () => {
+        transactionsStore.setTagFilterFromDraft()
+    },
+    { immediate: true },
+)
 
 onMounted(() => authStore.checkAuth())
 

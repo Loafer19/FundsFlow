@@ -8,7 +8,6 @@ import toasts from './toasts.js'
 import { useTransactionsStore } from './transactions.js'
 
 export const bootstrapStores = async () => {
-
     const userId = currentUserId()
     const tagsStore = useTagsStore()
     const transactionsStore = useTransactionsStore()

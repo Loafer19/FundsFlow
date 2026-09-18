@@ -185,8 +185,10 @@ const props = defineProps({
 
 const hasPeriodData = computed(
     () =>
-        transactionsStore.filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd).length > 0 ||
-        transactionsStore.filteredByDateRange(props.dateRange.previousStart, props.dateRange.previousEnd).length > 0,
+        transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd).length >
+            0 ||
+        transactionsStore.filteredByDateRangeAndTags(props.dateRange.previousStart, props.dateRange.previousEnd)
+            .length > 0,
 )
 
 const calculatePercentageDiff = (current, previous) => {
@@ -242,13 +244,12 @@ const balancesByTags = computed(() => {
     })
 })
 
-
 const filteredTransactions = computed(() =>
-    transactionsStore.filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd),
+    transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd),
 )
 
 const previousTransactions = computed(() =>
-    transactionsStore.filteredByDateRange(props.dateRange.previousStart, props.dateRange.previousEnd),
+    transactionsStore.filteredByDateRangeAndTags(props.dateRange.previousStart, props.dateRange.previousEnd),
 )
 
 const currentMetrics = computed(() =>

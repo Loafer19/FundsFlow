@@ -17,7 +17,6 @@ export const useTagsStore = defineStore('tags', {
         list: (state) => () => state.buildTagsList(state.tags),
         forBalances: (state) => () => state.list().filter((tag) => tag.calc_balance),
         descendantIds: (state) => (rootId) => {
-
             const ids = new Set([rootId])
             let grew = true
 
@@ -35,7 +34,6 @@ export const useTagsStore = defineStore('tags', {
             return ids
         },
     },
-
 
     actions: {
         persist() {

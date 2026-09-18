@@ -76,7 +76,6 @@ watch(
 const syncAttachments = () => {
     const current = transactionsStore.transactions.find((t) => t.id === transaction.value.id)
 
-
     if (current && transactionsStore.transactionForEdit?.id === current.id) {
         transactionsStore.transactionForEdit = current
     }

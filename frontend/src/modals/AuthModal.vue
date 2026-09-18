@@ -168,7 +168,6 @@ const handleSubmit = async () => {
 const submitTelegramCode = async () => {
     const ok = await authStore.loginWithTelegramCode(telegramCode.value.trim().toUpperCase())
 
-
     if (!ok) return
 
     telegramCode.value = ''

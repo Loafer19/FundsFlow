@@ -94,5 +94,4 @@ const onInput = (event) => {
     display.value = raw
     emitSigned()
 }
-
 </script>
