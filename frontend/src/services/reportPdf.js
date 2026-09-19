@@ -94,15 +94,24 @@ export const buildReportHtmlDocument = async () => {
         })
 
         const css = collectDocumentCss()
+        const theme = root.getAttribute('data-theme') || 'bumblebee'
+        // Escape theme for attribute context (DaisyUI theme names are alnum/hyphen)
+        const safeTheme = String(theme).replace(/[^a-zA-Z0-9_-]/g, '')
 
         return `<!DOCTYPE html>
-<html class="printing-report" lang="en">
+<html class="printing-report" lang="en" data-theme="${safeTheme}">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>FundsFlow Report</title>
 <style>
 ${css}
+html, body {
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
 </style>
 </head>
 <body>

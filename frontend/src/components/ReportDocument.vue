@@ -107,8 +107,8 @@ const dateRange = computed(() => props.dateRange)
     top: 0;
     width: 1100px;
     padding: 16px;
-    background: #fff;
-    color: #111;
+    background: var(--color-base-100);
+    color: var(--color-base-content);
     pointer-events: none;
 }
 
@@ -116,7 +116,7 @@ const dateRange = computed(() => props.dateRange)
     display: flex;
     align-items: center;
     gap: 12px;
-    border-bottom: 2px solid #111;
+    border-bottom: 2px solid var(--color-base-content);
     padding-bottom: 10px;
     margin-bottom: 20px;
 }
@@ -138,7 +138,7 @@ const dateRange = computed(() => props.dateRange)
 
 .fundsflow-report .report-sub,
 .fundsflow-report .report-generated {
-    color: #555;
+    color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
     font-size: 0.8rem;
 }
 
@@ -156,7 +156,7 @@ const dateRange = computed(() => props.dateRange)
     font-weight: 700;
     margin: 0 0 12px;
     padding-bottom: 6px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--color-base-300);
 }
 
 @media print {
@@ -179,7 +179,8 @@ const dateRange = computed(() => props.dateRange)
         padding: 0 !important;
         margin: 0 !important;
         pointer-events: auto !important;
-        background: #fff !important;
+        background: var(--color-base-100) !important;
+        color: var(--color-base-content) !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
@@ -266,13 +267,16 @@ const dateRange = computed(() => props.dateRange)
         display: none !important;
     }
 
-    /* Page fill white so theme color does not paint empty space under List */
+    /* Page fill follows active DaisyUI theme (base-100) */
     html.printing-report,
     html.printing-report body,
     html.printing-report body::before,
     html.printing-report body::after {
-        background: #fff !important;
-        background-color: #fff !important;
+        background: var(--color-base-100) !important;
+        background-color: var(--color-base-100) !important;
+        color: var(--color-base-content) !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
 
     html.printing-report #fundsflow-report .report-section {
