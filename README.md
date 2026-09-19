@@ -23,6 +23,8 @@ Personal finance tracker
   - quick-add by chatting
   - photo / PDF receipt with caption (e.g. `-350 groceries`)
   - bot-first registration/login
+  - Mini App (Web UI) with auto-login when Telegram is linked
+  - send attachments and PDF reports to the chat
   - budget and digest alerts, mute/unmute
 - MCP (AI clients):
   - personal token + connection URL in Settings
@@ -30,7 +32,7 @@ Personal finance tracker
 
 - Filter:
   - by date: week, month, year
-  - by tags (List tab + from Budgets)
+  - by tags (header filter + Untagged, List and insights)
   - search notes (List tab)
 - Calendar:
   - month / week / year views
@@ -43,7 +45,7 @@ Personal finance tracker
   - money / date format
   - 30+ themes (favorites)
   - Accounts: Telegram link, MCP token / connection URL
-
+  - Report: print / save PDF of selected insight tabs (or send to Telegram)
   - JSON account export
 - Helpful Insights (tabs):
   - Analytics — totals, averages, balances per tag

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Telegram\SendFileToUserTelegramAction;
 use App\Actions\Transactions\DeleteTransactionAttachmentAction;
 use App\Actions\Transactions\StoreTransactionAttachmentAction;
 use App\Http\Requests\TransactionAttachmentBase64Request;
@@ -22,6 +23,7 @@ class TransactionAttachmentController extends Controller
     public function __construct(
         private readonly StoreTransactionAttachmentAction $storeAttachment,
         private readonly DeleteTransactionAttachmentAction $deleteAttachment,
+        private readonly SendFileToUserTelegramAction $sendFileToTelegram,
     ) {}
 
     public function store(
@@ -79,6 +81,36 @@ class TransactionAttachmentController extends Controller
 
     }
 
+    public function sendToTelegram(
+        Request $request,
+        Transaction $transaction,
+        TransactionAttachment $attachment,
+    ): JsonResponse {
+        Gate::forUser($request->user())->authorize('view', $transaction);
+        $this->assertBelongs($transaction, $attachment, $request->user()->id);
+
+        $disk = Storage::disk($attachment->disk);
+
+        abort_if($disk->missing($attachment->path), 404, 'Attachment file is missing from storage!');
+
+        $contents = $disk->get($attachment->path);
+
+        if (!is_string($contents) || $contents === '') {
+            abort(404, 'Attachment file is missing from storage!');
+        }
+
+        $this->sendFileToTelegram->execute(
+            $request->user(),
+            $contents,
+            $attachment->original_name ?: 'attachment',
+            (string) ($attachment->mime ?: 'application/octet-stream'),
+            filled($request->input('caption')) ? (string) $request->input('caption') : null,
+        );
+
+        return response()->json([
+            'message' => 'Sent to Telegram',
+        ]);
+    }
 
     public function destroy(
         Request $request,

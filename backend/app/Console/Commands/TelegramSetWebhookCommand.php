@@ -42,7 +42,7 @@ class TelegramSetWebhookCommand extends Command
             ['command' => 'newtag', 'description' => 'Create a tag: /newtag 🍕 Fast Food > Food'],
             ['command' => 'budgets', 'description' => 'Active budgets: spent vs limit'],
             ['command' => 'recurring', 'description' => 'List recurring transaction rules'],
-            ['command' => 'app', 'description' => 'Open the FundsFlow Mini App from the menu button'],
+            ['command' => 'app', 'description' => 'Open the Web UI from the menu button'],
             ['command' => 'website', 'description' => 'Get a one-time code to log in on the website'],
             ['command' => 'mute', 'description' => 'Mute budget alerts, weekly digest, and recurring notifications'],
             ['command' => 'unmute', 'description' => 'Turn budget alerts, weekly digest, and recurring notifications back on'],
@@ -57,7 +57,7 @@ class TelegramSetWebhookCommand extends Command
         if ($frontend !== '') {
             $menuResponse = $client->setChatMenuButton(null, [
                 'type' => 'web_app',
-                'text' => 'Open FundsFlow',
+                'text' => 'Web UI',
                 'web_app' => ['url' => $frontend],
             ]);
 

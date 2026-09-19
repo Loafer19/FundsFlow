@@ -8,6 +8,7 @@ use App\Http\Controllers\IdentityController;
 use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\Telegram\TelegramWebhookController;
+use App\Http\Controllers\TelegramSendController;
 use App\Http\Controllers\TransactionAttachmentController;
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
@@ -59,6 +60,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->middleware('throttle:60,1');
     Route::get('/transactions/{transaction}/attachments/{attachment}', [TransactionAttachmentController::class, 'show']);
     Route::delete('/transactions/{transaction}/attachments/{attachment}', [TransactionAttachmentController::class, 'destroy']);
+    Route::post('/transactions/{transaction}/attachments/{attachment}/telegram', [TransactionAttachmentController::class, 'sendToTelegram'])
+        ->middleware('throttle:30,1');
+    Route::post('/telegram/send-file', [TelegramSendController::class, 'sendFile'])
+        ->middleware('throttle:20,1');
     Route::apiResource('budgets', BudgetController::class)->except(['show']);
 
     Route::post('/budgets/{budget}/pause', [BudgetController::class, 'pause']);

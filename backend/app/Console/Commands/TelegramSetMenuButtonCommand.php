@@ -27,7 +27,7 @@ class TelegramSetMenuButtonCommand extends Command
 
         $response = $client->setChatMenuButton(null, [
             'type' => 'web_app',
-            'text' => 'Open FundsFlow',
+            'text' => 'Web UI',
             'web_app' => [
                 'url' => $url,
             ],

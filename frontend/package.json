@@ -5,6 +5,8 @@
         "axios": "^1.20.0",
         "chart.js": "^4.5.1",
         "emoji-mart-vue-fast": "15.0.5",
+        "html2canvas": "^1.4.1",
+        "jspdf": "^4.2.1",
         "lucide-vue-next": "^1.0.0",
         "pinia": "3",
         "vue": "^3.5.42",
@@ -25,5 +27,5 @@
         "prod": "vite build"
     },
     "type": "module",
-    "version": "1.11.0"
+    "version": "1.12.0"
 }

@@ -3,6 +3,7 @@
 namespace App\Channels\Telegram;
 
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 
 class TelegramClient
 {
@@ -62,6 +63,82 @@ class TelegramClient
             'text' => $text,
             'reply_markup' => $replyMarkup ? json_encode($replyMarkup) : null,
         ]));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function sendPhoto(
+        int|string $chatId,
+        string $contentsOrPath,
+        string $filename,
+        ?string $caption = null,
+    ): array {
+        return $this->sendMultipart('sendPhoto', 'photo', $chatId, $contentsOrPath, $filename, $caption);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function sendDocument(
+        int|string $chatId,
+        string $contentsOrPath,
+        string $filename,
+        ?string $caption = null,
+    ): array {
+        return $this->sendMultipart('sendDocument', 'document', $chatId, $contentsOrPath, $filename, $caption);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sendMultipart(
+        string $method,
+        string $field,
+        int|string $chatId,
+        string $contentsOrPath,
+        string $filename,
+        ?string $caption,
+    ): array {
+        $contents = $this->resolveFileContents($contentsOrPath);
+
+        $response = Http::attach($field, $contents, $filename)
+            ->post($this->baseUrl . $method, array_filter([
+                'chat_id' => $chatId,
+                'caption' => $caption,
+            ], static fn ($value) => $value !== null && $value !== ''));
+
+        $json = $response->json() ?? [];
+
+        if (!($json['ok'] ?? false)) {
+            $description = is_string($json['description'] ?? null)
+                ? $json['description']
+                : 'Telegram send failed';
+
+            throw new RuntimeException($description);
+        }
+
+        return $json;
+    }
+
+    private function resolveFileContents(string $contentsOrPath): string
+    {
+        if (
+            $contentsOrPath !== ''
+            && !str_contains($contentsOrPath, "\0")
+            && is_file($contentsOrPath)
+            && is_readable($contentsOrPath)
+        ) {
+            $contents = file_get_contents($contentsOrPath);
+
+            if ($contents === false) {
+                throw new RuntimeException('Could not read file for Telegram upload.');
+            }
+
+            return $contents;
+        }
+
+        return $contentsOrPath;
     }
 
     /**

@@ -268,8 +268,15 @@ recurring_transactions</pre>
                         </label>
                     </div>
 
-                    <div class="flex justify-end">
-                        <button type="button" class="btn btn-primary btn-sm" :disabled="!reportHasSection"
+                    <div class="flex flex-wrap justify-end gap-2">
+                        <button type="button" class="btn btn-outline btn-sm"
+                            :disabled="!reportHasSection || sendingReportTelegram"
+                            @click="sendReportToTelegram">
+                            <span v-if="sendingReportTelegram" class="loading loading-spinner loading-xs"></span>
+                            <Send v-else :size="20" />
+                            Send to Telegram
+                        </button>
+                        <button v-if="!inTelegram" type="button" class="btn btn-primary btn-sm" :disabled="!reportHasSection"
                             @click="printReport">
                             <Download :size="20" />
                             Print / Save PDF
@@ -323,6 +330,9 @@ import {
     timezoneOptions,
 } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
+import { isTelegramWebApp } from '../services/telegramWebApp.js'
+import { buildReportPdfBlob } from '../services/reportPdf.js'
+import { sendFileToTelegram } from '../services/telegramSend.js'
 import settings, {
     updateDateFormat,
     updateDecimals,
@@ -345,6 +355,7 @@ const tabs = ref({
 })
 const tab = ref('formatting')
 const exporting = ref(false)
+const sendingReportTelegram = ref(false)
 
 const formatDateFn = inject('formatDate')
 const insightDateRange = inject('insightDateRange')
@@ -409,6 +420,26 @@ const printReport = async () => {
     window.print()
     // Safari may not fire afterprint reliably
     setTimeout(cleanup, 1000)
+}
+
+const sendReportToTelegram = async () => {
+    if (!reportHasSection.value || sendingReportTelegram.value) return
+
+    sendingReportTelegram.value = true
+    try {
+        await nextTick()
+        const blob = await buildReportPdfBlob()
+        const file = new File([blob], 'fundsflow-report.pdf', { type: 'application/pdf' })
+        const caption = `FundsFlow report · ${reportPeriodLabel.value || 'Report'}`
+        const result = await sendFileToTelegram(file, caption)
+        if (result?.needsLink) {
+            tab.value = 'accounts'
+        }
+    } catch (error) {
+        toasts.error(error?.message || 'Could not build report PDF')
+    } finally {
+        sendingReportTelegram.value = false
+    }
 }
 
 const formatDate = ref(settings.dateFormat)
@@ -516,6 +547,7 @@ const generatingTelegramLink = ref(false)
 
 const identityFor = (provider) => authStore.user?.identities?.find((identity) => identity.provider === provider) ?? null
 
+const inTelegram = isTelegramWebApp()
 const telegramIdentity = computed(() => identityFor('telegram'))
 const googleIdentity = computed(() => identityFor('google'))
 const githubIdentity = computed(() => identityFor('github'))

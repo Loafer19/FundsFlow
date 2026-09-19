@@ -3,15 +3,15 @@
         description="Nothing in the selected or previous period. Add a transaction or change the range"
         action-label="Add Transaction" @action="openAdd" />
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div class="card card-border border-base-300 bg-base-100">
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full min-w-0">
+        <div class="card card-border border-base-300 bg-base-100 min-w-0 overflow-hidden">
             <div class="card-body">
-                <h2 class="card-title">
+                <h2 class="card-title flex-wrap text-base sm:text-lg min-w-0">
                     <Receipt :size="24" class="text-primary" />
                     Total Transactions
                 </h2>
-                <div class="flex justify-between items-center">
-                    <span class="text-2xl">{{ filteredTransactions.length }}</span>
+                <div class="flex justify-between items-center gap-2 min-w-0">
+                    <span class="text-xl sm:text-2xl min-w-0 truncate tabular-nums">{{ filteredTransactions.length }}</span>
                     <div class="tooltip tooltip-left" :data-tip="`Previous period: ${previousTransactions.length}`">
                         <div class="badge badge-outline badge-secondary">
                             {{ formatPercentage(calculatePercentageDiff(filteredTransactions.length,
@@ -22,14 +22,14 @@
             </div>
         </div>
 
-        <div class="card card-border border-base-300 bg-base-100">
+        <div class="card card-border border-base-300 bg-base-100 min-w-0 overflow-hidden">
             <div class="card-body">
-                <h2 class="card-title">
+                <h2 class="card-title flex-wrap text-base sm:text-lg min-w-0">
                     <Scale :size="24" class="text-info" />
                     Balance Change
                 </h2>
-                <div class="flex justify-between items-center">
-                    <span class="text-2xl tooltip tooltip-right"
+                <div class="flex justify-between items-center gap-2 min-w-0">
+                    <span class="text-xl sm:text-2xl min-w-0 truncate tabular-nums tooltip tooltip-right"
                         :data-tip="`Percentage of Income: ${formatPercentage(incomeToBalancePercentage)}`">
                         {{ formatMoney(balanceChange) }}
                     </span>
@@ -47,14 +47,14 @@
             </div>
         </div>
 
-        <div class="card card-border border-base-300 bg-base-100">
+        <div class="card card-border border-base-300 bg-base-100 min-w-0 overflow-hidden">
             <div class="card-body">
-                <h2 class="card-title">
+                <h2 class="card-title flex-wrap text-base sm:text-lg min-w-0">
                     <TrendingUp :size="24" class="text-success" />
                     Average Daily Income
                 </h2>
-                <div class="flex justify-between items-center">
-                    <span class="text-2xl tooltip tooltip-right"
+                <div class="flex justify-between items-center gap-2 min-w-0">
+                    <span class="text-xl sm:text-2xl min-w-0 truncate tabular-nums tooltip tooltip-right"
                         :data-tip="`Total Income: ${formatMoney(totalIncome)}`">
                         {{ formatMoney(averageDailyIncome) }}
                     </span>
@@ -73,14 +73,14 @@
             </div>
         </div>
 
-        <div class="card card-border border-base-300 bg-base-100">
+        <div class="card card-border border-base-300 bg-base-100 min-w-0 overflow-hidden">
             <div class="card-body">
-                <h2 class="card-title">
+                <h2 class="card-title flex-wrap text-base sm:text-lg min-w-0">
                     <TrendingDown :size="24" class="text-error" />
                     Average Daily Expenses
                 </h2>
-                <div class="flex justify-between items-center">
-                    <span class="text-2xl tooltip tooltip-right"
+                <div class="flex justify-between items-center gap-2 min-w-0">
+                    <span class="text-xl sm:text-2xl min-w-0 truncate tabular-nums tooltip tooltip-right"
                         :data-tip="`Total Expenses: ${formatMoney(totalExpenses)}`">
                         {{ formatMoney(averageDailyExpenses) }}
                     </span>
@@ -99,23 +99,23 @@
             </div>
         </div>
 
-        <div class="card card-border border-base-300 bg-base-100 md:col-span-2">
+        <div class="card card-border border-base-300 bg-base-100 md:col-span-2 min-w-0 overflow-hidden">
             <div class="card-body gap-3">
-                <h2 class="card-title">
+                <h2 class="card-title flex-wrap text-base sm:text-lg min-w-0">
                     <span class="tooltip tooltip-right" data-tip="All-time. Parent tags include child tags">
                         Balances Per Tag
                     </span>
                 </h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-0">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-0 min-w-0">
                     <div v-for="tag in balancesByTags" :key="tag.id"
-                        class="flex items-center justify-between gap-3 py-2.5 border-b border-base-300/60">
+                        class="flex items-center justify-between gap-2 min-w-0 py-2.5 border-b border-base-300/60">
                         <div class="flex min-w-0 items-center gap-2">
                             <div class="badge badge-soft badge-info shrink-0 text-xl py-4 px-2">
                                 {{ tag.emoji }}
                             </div>
                             <span class="truncate">{{ tag.title }}</span>
                         </div>
-                        <span class="shrink-0 text-xl tabular-nums tooltip tooltip-left"
+                        <span class="min-w-0 max-w-[45%] shrink text-base sm:text-xl tabular-nums tooltip tooltip-left truncate text-right"
                             :data-tip="tag.txns + ' transaction' + (tag.txns === 1 ? '' : 's')">
                             {{ formatMoney(tag.balance) }}
                         </span>

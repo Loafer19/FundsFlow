@@ -58,7 +58,7 @@ class TelegramSupport
             . "/newtag — create a tag: /newtag 🍕 Fast Food > Food\n"
             . "/budgets — active budgets for the current period\n"
             . "/recurring — recurring rules\n"
-            . "/app — open the FundsFlow Mini App from the menu button\n"
+            . "/app — open the Web UI from the menu button\n"
             . "/website — one-time web login code\n"
             . "/mute — mute budget alerts, weekly digest, recurring notifications\n"
             . "/unmute — turn notifications back on\n"
@@ -78,7 +78,7 @@ class TelegramSupport
     {
         $this->client->sendMessage(
             $chatId,
-            'Open the FundsFlow Mini App from the menu button next to the message field.',
+            'Open the Web UI from the menu button next to the message field.',
             $this->menuKeyboard(),
         );
     }

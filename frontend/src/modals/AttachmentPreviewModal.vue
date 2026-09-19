@@ -11,7 +11,12 @@
                     </p>
                 </div>
                 <div class="flex items-center gap-1 shrink-0">
-                    <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Download"
+                    <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Send to Telegram"
+                        :disabled="loading || sending || !current" @click="sendToTelegram">
+                        <span v-if="sending" class="loading loading-spinner loading-xs"></span>
+                        <Send v-else :size="18" />
+                    </button>
+                    <button v-if="!inTelegram" type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Download"
                         :disabled="loading || !blobUrl" @click="download">
                         <Download :size="18" />
                     </button>
@@ -49,14 +54,18 @@
 </template>
 
 <script setup>
-import { Download, X } from 'lucide-vue-next'
+import { Download, Send, X } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { showModal } from '../services/modal.js'
+import { sendAttachmentToTelegram } from '../services/telegramSend.js'
+import { isTelegramWebApp } from '../services/telegramWebApp.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
 const transactionsStore = useTransactionsStore()
 
 const loading = ref(false)
+const sending = ref(false)
+const inTelegram = isTelegramWebApp()
 const error = ref('')
 const blobUrl = ref(null)
 let loadId = 0
@@ -93,6 +102,17 @@ const download = () => {
     document.body.appendChild(link)
     link.click()
     link.remove()
+}
+
+const sendToTelegram = async () => {
+    if (!preview.value || !current.value || sending.value) return
+
+    sending.value = true
+    try {
+        await sendAttachmentToTelegram(preview.value.transactionId, current.value.id)
+    } finally {
+        sending.value = false
+    }
 }
 
 const load = async () => {
