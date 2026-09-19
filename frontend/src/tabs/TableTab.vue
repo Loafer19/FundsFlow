@@ -14,7 +14,7 @@
         <EmptyState v-if="!filteredTransactions.length" icon="🔍" title="No transactions match the current filters"
             description="Try a different search term or clear the tag filter (including Untagged)" />
 
-        <div v-else class="card card-border border-base-300 bg-base-100">
+        <div v-else class="card card-border border-base-300 bg-base-100 overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="table">
                     <thead>
@@ -44,7 +44,7 @@
                                 <span class="sr-only">Files</span>
                                 <Paperclip :size="14" aria-hidden="true" />
                             </th>
-                            <th>Actions</th>
+                            <th class="table-actions-col">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -94,7 +94,7 @@
 
 
 
-                            <td class="flex gap-1">
+                            <td class="table-actions-col flex gap-1">
                                 <button v-if="transactionsStore.isLoading == transaction.id"
                                     class="btn btn-outline btn-error btn-square btn-sm" disabled>
                                     <span class="loading loading-spinner text-error"></span>

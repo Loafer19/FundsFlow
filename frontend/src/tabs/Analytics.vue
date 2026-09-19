@@ -99,64 +99,27 @@
             </div>
         </div>
 
-        <div class="card card-border border-base-300 bg-base-100">
-            <div class="card-body">
-                <div class="tags-list">
-                    <table class="table">
-                        <tbody>
-                            <tr>
-                                <td colspan="4">
-                                    <span class="text-xl font-semibold tooltip tooltip-right"
-                                        data-tip="All-time. Parent tags include child tags">Balances Per Tag</span>
-
-                                </td>
-                            </tr>
-                            <tr v-for="(tag, index) in balancesByTags.slice(0, balancesByTags.length / 2)" :key="index">
-                                <td>
-                                    <div class="flex items-center gap-2">
-                                        <div class="badge badge-soft badge-info text-xl py-4 px-2">
-                                            {{ tag.emoji }}
-                                        </div>
-                                        <span>{{ tag.title }}</span>
-                                    </div>
-                                </td>
-                                <td class="w-full text-right">
-                                    <span class="text-2xl tooltip tooltip-left"
-                                        :data-tip="tag.txns + ' transaction' + (tag.txns === 1 ? '' : 's')">
-                                        {{ formatMoney(tag.balance) }}
-                                    </span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div class="card card-border border-base-300 bg-base-100">
-            <div class="card-body">
-                <div class="tags-list">
-                    <table class="table">
-                        <tbody>
-                            <tr v-for="(tag, index) in balancesByTags.slice(balancesByTags.length / 2, balancesByTags.length)"
-                                :key="index">
-                                <td>
-                                    <div class="flex items-center gap-2">
-                                        <div class="badge badge-soft badge-info text-xl py-4 px-2">
-                                            {{ tag.emoji }}
-                                        </div>
-                                        <span>{{ tag.title }}</span>
-                                    </div>
-                                </td>
-                                <td class="w-full text-right">
-                                    <span class="text-2xl tooltip tooltip-left"
-                                        :data-tip="tag.txns + ' transaction' + (tag.txns === 1 ? '' : 's')">
-                                        {{ formatMoney(tag.balance) }}
-                                    </span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+        <div class="card card-border border-base-300 bg-base-100 md:col-span-2">
+            <div class="card-body gap-3">
+                <h2 class="card-title">
+                    <span class="tooltip tooltip-right" data-tip="All-time. Parent tags include child tags">
+                        Balances Per Tag
+                    </span>
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-0">
+                    <div v-for="tag in balancesByTags" :key="tag.id"
+                        class="flex items-center justify-between gap-3 py-2.5 border-b border-base-300/60">
+                        <div class="flex min-w-0 items-center gap-2">
+                            <div class="badge badge-soft badge-info shrink-0 text-xl py-4 px-2">
+                                {{ tag.emoji }}
+                            </div>
+                            <span class="truncate">{{ tag.title }}</span>
+                        </div>
+                        <span class="shrink-0 text-xl tabular-nums tooltip tooltip-left"
+                            :data-tip="tag.txns + ' transaction' + (tag.txns === 1 ? '' : 's')">
+                            {{ formatMoney(tag.balance) }}
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>

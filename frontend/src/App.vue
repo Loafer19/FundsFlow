@@ -223,7 +223,7 @@ import {
     Tags,
     TrendingUp,
 } from 'lucide-vue-next'
-import { computed, markRaw, onMounted, ref, watch } from 'vue'
+import {computed, markRaw, onMounted, ref, watch, provide} from 'vue'
 import TagPicker from './components/TagPicker.vue'
 import Toasts from './components/Toasts.vue'
 import AttachmentPreviewModal from './modals/AttachmentPreviewModal.vue'
@@ -399,6 +399,9 @@ const getDateRange = computed(() => {
 
     return { currentStart, currentEnd, previousStart, previousEnd }
 })
+provide('insightDateRange', getDateRange)
+provide('insightDateSelectionType', dateSelectionType)
+
 </script>
 
 <style scoped>

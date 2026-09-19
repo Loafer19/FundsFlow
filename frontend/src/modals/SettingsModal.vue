@@ -1,6 +1,6 @@
 <template>
     <dialog id="settings_modal" class="modal" aria-labelledby="settings_modal_title">
-        <div class="modal-box max-w-sm">
+        <div class="modal-box max-w-md">
             <h2 id="settings_modal_title" class="card-title mb-4">Settings</h2>
 
             <div class="tabs tabs-box justify-center mb-4">
@@ -230,6 +230,52 @@ recurring_transactions</pre>
                         </button>
                     </div>
                 </template>
+
+                <template v-else-if="tab === 'report'">
+                    <p class="text-sm text-base-content/70 mb-2">
+                        Export the selected tabs as on screen, using the current period type, dates, and tag filter from the header
+                    </p>
+                    <p class="text-xs text-base-content/50 mb-3 break-words whitespace-normal leading-relaxed">{{ reportPeriodLabel }}</p>
+
+                    <div class="flex flex-col gap-2 mb-4">
+                        <label class="label cursor-pointer justify-start gap-2 py-0">
+                            <input v-model="reportSections.analytics" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
+                            <span class="label-text text-sm">Analytics</span>
+                        </label>
+                        <label class="label cursor-pointer justify-start gap-2 py-0">
+                            <input v-model="reportSections.calendar" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
+                            <span class="label-text text-sm">Calendar</span>
+                        </label>
+                        <label class="label cursor-pointer justify-start gap-2 py-0">
+                            <input v-model="reportSections.budgets" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
+                            <span class="label-text text-sm">Budgets</span>
+                        </label>
+                        <label class="label cursor-pointer justify-start gap-2 py-0">
+                            <input v-model="reportSections.tags" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
+                            <span class="label-text text-sm">Tags</span>
+                        </label>
+                        <label class="label cursor-pointer justify-start gap-2 py-0">
+                            <input v-model="reportSections.flow" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
+                            <span class="label-text text-sm">Flow</span>
+                        </label>
+                        <label class="label cursor-pointer justify-start gap-2 py-0">
+                            <input v-model="reportSections.trend" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
+                            <span class="label-text text-sm">Trend</span>
+                        </label>
+                        <label class="label cursor-pointer justify-start gap-2 py-0">
+                            <input v-model="reportSections.list" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
+                            <span class="label-text text-sm">List</span>
+                        </label>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button type="button" class="btn btn-primary btn-sm" :disabled="!reportHasSection"
+                            @click="printReport">
+                            <Download :size="20" />
+                            Print / Save PDF
+                        </button>
+                    </div>
+                </template>
             </div>
 
             <div class="modal-action" v-if="tab === 'formatting' || tab === 'theme'">
@@ -244,11 +290,23 @@ recurring_transactions</pre>
             <button>close</button>
         </form>
     </dialog>
+
+    <Teleport to="body">
+        <ReportDocument
+            :sections="reportSections"
+            :date-range="insightDateRange"
+            :date-selection-type="reportDateSelectionType"
+            :tag-filter-label="selectedTagTitles.length ? selectedTagTitles.join(', ') : 'All tags'"
+        />
+    </Teleport>
 </template>
 
 <script setup>
 import { Bot, Download, KeyRound, Save, Send } from 'lucide-vue-next'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
+import ReportDocument from '../components/ReportDocument.vue'
+import { useTagsStore } from '../services/tags'
+import { useTransactionsStore } from '../services/transactions'
 import {
     createMcpToken,
     downloadAccountExport,
@@ -284,9 +342,75 @@ const tabs = ref({
     theme: 'Theme',
     accounts: 'Accounts',
     data: 'Data',
+    report: 'Report',
 })
 const tab = ref('formatting')
 const exporting = ref(false)
+
+const formatDateFn = inject('formatDate')
+const insightDateRange = inject('insightDateRange')
+const insightDateSelectionType = inject('insightDateSelectionType')
+const transactionsStore = useTransactionsStore()
+const tagsStore = useTagsStore()
+const reportSections = ref({
+    analytics: true,
+    calendar: true,
+    budgets: true,
+    tags: true,
+    flow: true,
+    trend: true,
+    list: true,
+})
+const reportHasSection = computed(() => Object.values(reportSections.value).some(Boolean))
+const reportDateSelectionType = computed(() => {
+    const raw = insightDateSelectionType?.value ?? insightDateSelectionType ?? 'month'
+    return typeof raw === 'string' ? raw : 'month'
+})
+const periodTypeLabel = (type) => {
+    if (type === 'week') return 'Week'
+    if (type === 'year') return 'Year'
+    return 'Month'
+}
+const selectedTagTitles = computed(() => {
+    const parts = []
+    if (transactionsStore.filterUntagged) parts.push('🏷️ Untagged')
+    const ids = transactionsStore.selectedTagIds || []
+    if (ids.length) {
+        const all = tagsStore.list()
+        for (const id of ids) {
+            const tag = all.find((t) => t.id == id)
+            parts.push(tag ? `${tag.emoji ? tag.emoji + ' ' : ''}${tag.title}` : `#${id}`)
+        }
+    }
+    return parts
+})
+const reportPeriodLabel = computed(() => {
+    const range = insightDateRange?.value ?? insightDateRange
+    if (!range?.currentStart || !range?.currentEnd) return ''
+    const rawType = insightDateSelectionType?.value ?? insightDateSelectionType ?? 'month'
+    const type = typeof rawType === 'string' ? rawType : 'month'
+    const period = `${periodTypeLabel(type)} · ${formatDateFn(range.currentStart)} – ${formatDateFn(range.currentEnd)}`
+    const tags = selectedTagTitles.value
+    if (!tags.length) return `${period} · All tags`
+    return `${period} · ${tags.join(', ')}`
+})
+const printReport = async () => {
+    await nextTick()
+    // Let Chart.js paint canvases in the off-screen report before printing.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    const root = document.documentElement
+    const cleanup = () => {
+        root.classList.remove('printing-report')
+        window.removeEventListener('afterprint', cleanup)
+    }
+    root.classList.add('printing-report')
+    window.addEventListener('afterprint', cleanup)
+    window.print()
+    // Safari may not fire afterprint reliably
+    setTimeout(cleanup, 1000)
+}
 
 const formatDate = ref(settings.dateFormat)
 const formatMoney = ref(settings.moneyFormat)
