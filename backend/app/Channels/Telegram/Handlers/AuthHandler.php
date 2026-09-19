@@ -102,13 +102,17 @@ class AuthHandler
 
         Cache::put("telegram_login:{$code}", $user->id, now()->addMinutes(10));
 
+        $frontend = rtrim((string) config('app.frontend_url'), '/');
+        $loginUrl = $frontend.'/?telegram_code='.rawurlencode($code);
+
         $this->client->sendMessage(
             $chatId,
-            "Web login code:\n<code>{$code}</code>\n\nEnter it on the FundsFlow login screen within 10 minutes. No password needed.",
+            "Web login code:\n<code>{$code}</code>\n\nOpen FundsFlow to sign in automatically, or copy the code. Valid 10 minutes.",
             [
-                'inline_keyboard' => [[
-                    ['text' => 'Copy code', 'copy_text' => ['text' => $code]],
-                ]],
+                'inline_keyboard' => [
+                    [['text' => 'Open FundsFlow', 'url' => $loginUrl]],
+                    [['text' => 'Copy code', 'copy_text' => ['text' => $code]]],
+                ],
             ],
             'HTML',
         );

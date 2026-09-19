@@ -57,7 +57,7 @@
         </header>
 
         <main>
-            <div class="flex gap-2 mb-3 items-stretch flex-wrap">
+            <div class="flex gap-2 mb-3 items-center flex-wrap">
                 <select class="select w-24 sm:w-30 border-base-300 focus:border-base-content cursor-pointer"
                     v-model="dateSelectionType" aria-label="Date range type">
                     <option value="week">Week</option>
@@ -84,9 +84,9 @@
                     <ChevronRight :size="20" />
                 </button>
 
-                <div class="dropdown">
+                <div class="dropdown max-md:basis-full md:basis-auto">
                     <div tabindex="0" role="button"
-                        class="btn border-base-300 text-base-content/60 text-sm h-full min-h-0">
+                        class="btn border-base-300 text-base-content/60 text-sm max-md:w-full">
                         <Tag :size="16" />
                         Filter tags
                         <span v-if="tagFilterBadgeCount" class="badge badge-outline badge-sm">{{ tagFilterBadgeCount }}</span>

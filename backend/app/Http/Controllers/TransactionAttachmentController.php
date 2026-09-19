@@ -108,7 +108,7 @@ class TransactionAttachmentController extends Controller
         );
 
         return response()->json([
-            'message' => 'Sent to Telegram',
+            'message' => 'Sent to Telegram successfully!',
         ]);
     }
 

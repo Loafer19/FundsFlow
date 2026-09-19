@@ -11,16 +11,16 @@
                     </p>
                 </div>
                 <div class="flex items-center gap-1 shrink-0">
-                    <button type="button" class="btn btn-ghost btn-sm btn-square tooltip" data-tip="Send to Telegram"
+                    <button type="button" class="btn btn-ghost btn-sm btn-square tooltip tooltip-left" data-tip="Send to Telegram"
                         aria-label="Send to Telegram" :disabled="loading || sending || !current" @click="sendToTelegram">
                         <span v-if="sending" class="loading loading-spinner loading-xs"></span>
                         <Send v-else :size="18" />
                     </button>
-                    <button v-if="!inTelegram" type="button" class="btn btn-ghost btn-sm btn-square tooltip"
+                    <button v-if="!inTelegram" type="button" class="btn btn-ghost btn-sm btn-square tooltip tooltip-left"
                         data-tip="Download" aria-label="Download" :disabled="loading || !blobUrl" @click="download">
                         <Download :size="18" />
                     </button>
-                    <button type="button" class="btn btn-ghost btn-sm btn-square tooltip" data-tip="Close"
+                    <button type="button" class="btn btn-ghost btn-sm btn-square tooltip tooltip-left" data-tip="Close"
                         aria-label="Close" @click="close">
                         <X :size="18" />
                     </button>

@@ -166,6 +166,37 @@ const consumeAuthHash = async () => {
 
 consumeAuthHash()
 
+const consumeTelegramCodeQuery = async () => {
+    const params = new URLSearchParams(window.location.search)
+    const fromQuery = params.get('telegram_code')
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const fromHash = hashParams.get('telegram_code')
+    const raw = (fromQuery || fromHash || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+
+    if (!raw) return
+
+    showTelegramLogin.value = true
+    telegramCode.value = raw.slice(0, 8)
+
+    // Drop the code from the URL before login so a refresh cannot reuse it in the bar
+    params.delete('telegram_code')
+    const search = params.toString()
+    const next = window.location.pathname + (search ? `?${search}` : '')
+    window.history.replaceState({}, '', next)
+
+    document.getElementById('auth_modal')?.showModal()
+
+    const ok = await authStore.loginWithTelegramCode(telegramCode.value)
+    if (!ok) return
+
+    await maybeLinkTelegramWebApp()
+    telegramCode.value = ''
+    showTelegramLogin.value = false
+    document.getElementById('auth_modal')?.close()
+}
+
+consumeTelegramCodeQuery()
+
 const handleSubmit = async () => {
     const ok = isRegister.value ? await authStore.register(credentials.value) : await authStore.login(credentials.value)
 
