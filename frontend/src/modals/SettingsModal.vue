@@ -222,7 +222,7 @@ transactions (incl. attachment metadata),
 budgets,
 recurring_transactions</pre>
 
-                    <div class="flex justify-end">
+                    <div v-if="!inTelegram" class="flex justify-end">
                         <button type="button" class="btn btn-primary btn-sm" :disabled="exporting" @click="exportData">
                             <span v-if="exporting" class="loading loading-spinner loading-xs"></span>
                             <Download v-else :size="20" />
@@ -330,9 +330,7 @@ import {
     timezoneOptions,
 } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
-import { isTelegramWebApp } from '../services/telegramWebApp.js'
 import { buildReportPdfBlob } from '../services/reportPdf.js'
-import { sendFileToTelegram } from '../services/telegramSend.js'
 import settings, {
     updateDateFormat,
     updateDecimals,
@@ -341,6 +339,8 @@ import settings, {
     updateTimezone,
 } from '../services/settings'
 import { useTagsStore } from '../services/tags'
+import { sendFileToTelegram } from '../services/telegramSend.js'
+import { isTelegramWebApp } from '../services/telegramWebApp.js'
 import toasts from '../services/toasts'
 import { useTransactionsStore } from '../services/transactions'
 
@@ -388,7 +388,7 @@ const selectedTagTitles = computed(() => {
     if (ids.length) {
         const all = tagsStore.list()
         for (const id of ids) {
-            const tag = all.find((t) => t.id == id)
+            const tag = all.find((t) => t.id === id)
             parts.push(tag ? `${tag.emoji ? tag.emoji + ' ' : ''}${tag.title}` : `#${id}`)
         }
     }
@@ -436,7 +436,7 @@ const sendReportToTelegram = async () => {
             tab.value = 'accounts'
         }
     } catch (error) {
-        toasts.error(error?.message || 'Could not build report PDF')
+        toasts.error(error?.message || 'Failed to build report PDF!')
     } finally {
         sendingReportTelegram.value = false
     }

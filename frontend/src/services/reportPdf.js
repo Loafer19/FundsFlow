@@ -1,4 +1,4 @@
-import html2canvas from 'html2canvas'
+import html2canvas from 'html2canvas-pro'
 import { jsPDF } from 'jspdf'
 
 const waitForCharts = async () => {
@@ -8,6 +8,8 @@ const waitForCharts = async () => {
 
 /**
  * Build a landscape A4 PDF from #fundsflow-report (one page per .report-section; header on first page).
+ * Uses html2canvas-pro (oklch / lab / color() support) because browser Print/Save PDF cannot
+ * yield a Blob for Telegram upload.
  * @returns {Promise<Blob>}
  */
 export const buildReportPdfBlob = async () => {
@@ -65,14 +67,7 @@ export const buildReportPdfBlob = async () => {
             const drawHeight = naturalHeight * scale
             const x = margin + (usableWidth - drawWidth) / 2
 
-            pdf.addImage(
-                sectionCanvas.toDataURL('image/jpeg', 0.88),
-                'JPEG',
-                x,
-                y,
-                drawWidth,
-                drawHeight,
-            )
+            pdf.addImage(sectionCanvas.toDataURL('image/jpeg', 0.88), 'JPEG', x, y, drawWidth, drawHeight)
         }
 
         return pdf.output('blob')

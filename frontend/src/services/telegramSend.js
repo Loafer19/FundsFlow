@@ -12,7 +12,7 @@ export const hasTelegramLinked = () => {
 export const requireTelegramLinked = () => {
     if (hasTelegramLinked()) return true
 
-    toasts.info('Link Telegram in Settings → Accounts first.')
+    toasts.info('Link Telegram in Settings → Accounts first!')
     return false
 }
 
@@ -23,16 +23,14 @@ export const sendAttachmentToTelegram = async (transactionId, attachmentId, capt
 
     try {
         const body = caption ? { caption } : {}
-        const response = await api.post(
-            `/transactions/${transactionId}/attachments/${attachmentId}/telegram`,
-            body,
-            { timeout: 120_000 },
-        )
+        const response = await api.post(`/transactions/${transactionId}/attachments/${attachmentId}/telegram`, body, {
+            timeout: 120_000,
+        })
 
-        toasts.success(response.data?.message || 'Sent to Telegram')
+        toasts.success(response.data?.message || 'Sent to Telegram successfully!')
         return { ok: true }
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Could not send to Telegram: '))
+        toasts.error(apiErrorMessage(error, 'Failed to send to Telegram: '))
         return { ok: false, error }
     }
 }
@@ -56,10 +54,10 @@ export const sendFileToTelegram = async (file, caption = null) => {
             headers: { 'Content-Type': 'multipart/form-data' },
         })
 
-        toasts.success(response.data?.message || 'Sent to Telegram')
+        toasts.success(response.data?.message || 'Sent to Telegram successfully!')
         return { ok: true }
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Could not send to Telegram: '))
+        toasts.error(apiErrorMessage(error, 'Failed to send to Telegram: '))
         return { ok: false, error }
     }
 }
