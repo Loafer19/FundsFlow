@@ -119,6 +119,7 @@
 import { LogIn, Send, User, UserPlus } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { useAuthStore } from './../services/auth.js'
+import { takeStashedInitData } from './../services/telegramWebApp.js'
 import toasts from './../services/toasts.js'
 
 const googleAuthUrl = import.meta.env.VITE_API_URL + '/auth/google'
@@ -137,6 +138,14 @@ const credentials = ref({
     password: '',
 })
 
+const maybeLinkTelegramWebApp = async () => {
+    const initData = takeStashedInitData()
+
+    if (!initData) return
+
+    await authStore.linkTelegramWebApp(initData)
+}
+
 const consumeAuthHash = async () => {
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     const token = params.get('token')
@@ -145,6 +154,7 @@ const consumeAuthHash = async () => {
     if (token) {
         authStore.setToken(token)
         await authStore.checkAuth()
+        await maybeLinkTelegramWebApp()
         window.history.replaceState({}, '', window.location.pathname + window.location.search)
     }
 
@@ -161,6 +171,8 @@ const handleSubmit = async () => {
 
     if (!ok) return
 
+    await maybeLinkTelegramWebApp()
+
     credentials.value = { name: '', email: '', password: '' }
     auth_modal.close()
 }
@@ -169,6 +181,8 @@ const submitTelegramCode = async () => {
     const ok = await authStore.loginWithTelegramCode(telegramCode.value.trim().toUpperCase())
 
     if (!ok) return
+
+    await maybeLinkTelegramWebApp()
 
     telegramCode.value = ''
     showTelegramLogin.value = false

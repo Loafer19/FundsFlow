@@ -58,6 +58,7 @@ class TelegramSupport
             . "/newtag — create a tag: /newtag 🍕 Fast Food > Food\n"
             . "/budgets — active budgets for the current period\n"
             . "/recurring — recurring rules\n"
+            . "/app — open the FundsFlow Mini App from the menu button\n"
             . "/website — one-time web login code\n"
             . "/mute — mute budget alerts, weekly digest, recurring notifications\n"
             . "/unmute — turn notifications back on\n"
@@ -69,6 +70,15 @@ class TelegramSupport
             . "20.08 -350 groceries\n\n"
             . "Receipts\n"
             . 'Send a photo or PDF with a caption like "-350 groceries"',
+            $this->menuKeyboard(),
+        );
+    }
+
+    public function sendMiniAppHint(int|string $chatId): void
+    {
+        $this->client->sendMessage(
+            $chatId,
+            'Open the FundsFlow Mini App from the menu button next to the message field.',
             $this->menuKeyboard(),
         );
     }

@@ -19,12 +19,15 @@ Route::prefix('auth')->group(function () {
         Route::post('/login', [AuthController::class, 'login']);
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/telegram-code', [AuthController::class, 'loginWithTelegramCode']);
+        Route::post('/telegram-webapp', [AuthController::class, 'loginWithTelegramWebApp']);
     });
 
     // Register before /{provider} so "me" is not captured as a provider slug.
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
+        Route::post('/telegram-webapp/link', [AuthController::class, 'linkTelegramWebApp'])
+            ->middleware('throttle:20,1');
     });
 
     Route::middleware('throttle:30,1')->group(function () {

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Auth\AuthenticateTelegramWebAppAction;
+use App\Actions\Auth\LinkTelegramWebAppAction;
 use App\Models\Identity;
 use App\Models\User;
 use Exception;
@@ -70,6 +72,42 @@ class AuthController extends Controller
         ]);
     }
 
+    public function loginWithTelegramWebApp(Request $request, AuthenticateTelegramWebAppAction $action): JsonResponse
+    {
+        $data = $request->validate([
+            'initData' => 'required|string',
+        ]);
+
+        $result = $action->execute($data['initData']);
+
+        if (isset($result['needs_auth'])) {
+            return response()->json([
+                'needs_auth' => true,
+                'telegram' => $result['telegram'],
+            ]);
+        }
+
+        /** @var User $user */
+        $user = $result['user'];
+
+        return response()->json([
+            'user' => $user->load('identities'),
+            'token' => $this->issueAuthToken($user),
+        ]);
+    }
+
+    public function linkTelegramWebApp(Request $request, LinkTelegramWebAppAction $action): JsonResponse
+    {
+        $data = $request->validate([
+            'initData' => 'required|string',
+        ]);
+
+        $user = $action->execute($request->user(), $data['initData']);
+
+        return response()->json([
+            'user' => $user,
+        ]);
+    }
 
     public function me(Request $request): JsonResponse
     {
@@ -154,4 +192,3 @@ class AuthController extends Controller
         return $user->createToken('auth_token', ['*'], now()->addDays(30))->plainTextToken;
     }
 }
-

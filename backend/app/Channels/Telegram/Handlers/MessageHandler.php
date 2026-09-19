@@ -36,6 +36,12 @@ class MessageHandler
             return;
         }
 
+        if ($text === '/app') {
+            $this->support->sendMiniAppHint($chatId);
+
+            return;
+        }
+
         $user = $this->support->resolveUser($chatId);
 
         if (!$user) {

@@ -305,8 +305,6 @@ recurring_transactions</pre>
 import { Bot, Download, KeyRound, Save, Send } from 'lucide-vue-next'
 import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
 import ReportDocument from '../components/ReportDocument.vue'
-import { useTagsStore } from '../services/tags'
-import { useTransactionsStore } from '../services/transactions'
 import {
     createMcpToken,
     downloadAccountExport,
@@ -324,7 +322,6 @@ import {
     nowDateStr,
     timezoneOptions,
 } from '../services/formatters'
-
 import { openTelegramLinkBot } from '../services/identities'
 import settings, {
     updateDateFormat,
@@ -333,7 +330,9 @@ import settings, {
     updateTheme,
     updateTimezone,
 } from '../services/settings'
+import { useTagsStore } from '../services/tags'
 import toasts from '../services/toasts'
+import { useTransactionsStore } from '../services/transactions'
 
 const authStore = useAuthStore()
 

@@ -105,4 +105,18 @@ class TelegramClient
             'commands' => json_encode($commands),
         ])->json();
     }
+
+    /**
+     * Set the chat menu button (omit chatId to set the default for all private chats).
+     *
+     * @param array<string, mixed> $menuButton
+     * @return array<string, mixed>
+     */
+    public function setChatMenuButton(?int $chatId, array $menuButton): array
+    {
+        return Http::post($this->baseUrl . 'setChatMenuButton', array_filter([
+            'chat_id' => $chatId,
+            'menu_button' => json_encode($menuButton),
+        ], static fn ($value) => $value !== null))->json();
+    }
 }

@@ -42,6 +42,7 @@ class TelegramSetWebhookCommand extends Command
             ['command' => 'newtag', 'description' => 'Create a tag: /newtag 🍕 Fast Food > Food'],
             ['command' => 'budgets', 'description' => 'Active budgets: spent vs limit'],
             ['command' => 'recurring', 'description' => 'List recurring transaction rules'],
+            ['command' => 'app', 'description' => 'Open the FundsFlow Mini App from the menu button'],
             ['command' => 'website', 'description' => 'Get a one-time code to log in on the website'],
             ['command' => 'mute', 'description' => 'Mute budget alerts, weekly digest, and recurring notifications'],
             ['command' => 'unmute', 'description' => 'Turn budget alerts, weekly digest, and recurring notifications back on'],
@@ -50,6 +51,22 @@ class TelegramSetWebhookCommand extends Command
         ]);
 
         $this->info('Bot command menu registered.');
+
+        $frontend = rtrim((string) config('app.frontend_url'), '/');
+
+        if ($frontend !== '') {
+            $menuResponse = $client->setChatMenuButton(null, [
+                'type' => 'web_app',
+                'text' => 'Open FundsFlow',
+                'web_app' => ['url' => $frontend],
+            ]);
+
+            if ($menuResponse['ok'] ?? false) {
+                $this->info("Mini App menu button set to {$frontend}");
+            } else {
+                $this->warn('Webhook OK, but menu button failed: ' . json_encode($menuResponse));
+            }
+        }
 
         return self::SUCCESS;
     }

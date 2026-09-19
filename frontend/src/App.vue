@@ -223,7 +223,7 @@ import {
     Tags,
     TrendingUp,
 } from 'lucide-vue-next'
-import {computed, markRaw, onMounted, ref, watch, provide} from 'vue'
+import { computed, markRaw, onMounted, provide, ref, watch } from 'vue'
 import TagPicker from './components/TagPicker.vue'
 import Toasts from './components/Toasts.vue'
 import AttachmentPreviewModal from './modals/AttachmentPreviewModal.vue'
@@ -248,6 +248,14 @@ import { showModal } from './services/modal.js'
 import { shouldShowOnboarding } from './services/onboarding.js'
 import { useRecurringTransactionsStore } from './services/recurringTransactions.js'
 import { useTagsStore } from './services/tags.js'
+import {
+    getInitData,
+    isTelegramWebApp,
+    peekStashedInitData,
+    stashInitData,
+    takeStashedInitData,
+    ready as telegramReady,
+} from './services/telegramWebApp.js'
 import { useTransactionsStore } from './services/transactions.js'
 import Analytics from './tabs/Analytics.vue'
 import BalanceTrend from './tabs/BalanceTrend.vue'
@@ -280,7 +288,42 @@ watch(
     { immediate: true },
 )
 
-onMounted(() => authStore.checkAuth())
+onMounted(async () => {
+    if (isTelegramWebApp()) {
+        telegramReady()
+
+        const initData = getInitData()
+
+        if (initData) {
+            const result = await authStore.loginWithTelegramWebApp(initData)
+
+            if (result === true) {
+                return
+            }
+
+            if (result === 'needs_auth') {
+                stashInitData(initData)
+            }
+        }
+    }
+
+    const ok = await authStore.checkAuth()
+
+    if (ok && isTelegramWebApp()) {
+        const initData = peekStashedInitData() || getInitData()
+
+        if (initData) {
+            await authStore.linkTelegramWebApp(initData)
+            takeStashedInitData()
+        }
+
+        return
+    }
+
+    if (peekStashedInitData()) {
+        showModal('auth_modal')
+    }
+})
 
 watch(
     () => authStore.isAuthenticated,
@@ -401,7 +444,6 @@ const getDateRange = computed(() => {
 })
 provide('insightDateRange', getDateRange)
 provide('insightDateSelectionType', dateSelectionType)
-
 </script>
 
 <style scoped>

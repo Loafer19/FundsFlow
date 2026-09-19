@@ -80,6 +80,44 @@ export const useAuthStore = defineStore('auth', {
             }
         },
 
+        async loginWithTelegramWebApp(initData) {
+            this.isLoading = true
+
+            try {
+                const response = await api.post('/auth/telegram-webapp', { initData })
+
+                if (response.data.needs_auth) {
+                    return 'needs_auth'
+                }
+
+                this.user = response.data.user
+                this.setToken(response.data.token)
+                applyUserPreferences(this.user?.preferences)
+
+                return true
+            } catch (error) {
+                toasts.error(apiErrorMessage(error, 'Telegram Mini App login failed: '))
+
+                return false
+            } finally {
+                this.isLoading = false
+            }
+        },
+
+        async linkTelegramWebApp(initData) {
+            try {
+                const response = await api.post('/auth/telegram-webapp/link', { initData })
+
+                this.user = response.data.user
+
+                return true
+            } catch (error) {
+                toasts.error(apiErrorMessage(error, 'Could not link Telegram: '))
+
+                return false
+            }
+        },
+
         async logout() {
             this.isLoading = true
 
