@@ -107,7 +107,7 @@ const dateRange = computed(() => props.dateRange)
     top: 0;
     width: 1100px;
     padding: 16px;
-    background: var(--color-base-100);
+    background: var(--color-base-200);
     color: var(--color-base-content);
     pointer-events: none;
 }
@@ -163,7 +163,8 @@ const dateRange = computed(() => props.dateRange)
     /* Explicit landscape dimensions — "A4 landscape" is ignored when Chrome remembered Portrait */
     @page {
         size: 297mm 210mm;
-        margin: 12mm;
+        margin: 6mm;
+        background: var(--color-base-200);
     }
 
     html.printing-report body > *:not(#fundsflow-report) {
@@ -179,7 +180,7 @@ const dateRange = computed(() => props.dateRange)
         padding: 0 !important;
         margin: 0 !important;
         pointer-events: auto !important;
-        background: var(--color-base-100) !important;
+        background: var(--color-base-200) !important;
         color: var(--color-base-content) !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
@@ -267,14 +268,15 @@ const dateRange = computed(() => props.dateRange)
         display: none !important;
     }
 
-    /* Page fill follows active DaisyUI theme (base-100) */
+    /* Page fill = app chrome (base-200); cards stay base-100 for contrast */
     html.printing-report,
     html.printing-report body,
     html.printing-report body::before,
     html.printing-report body::after {
-        background: var(--color-base-100) !important;
-        background-color: var(--color-base-100) !important;
+        background: var(--color-base-200) !important;
+        background-color: var(--color-base-200) !important;
         color: var(--color-base-content) !important;
+        margin: 0 !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
@@ -286,12 +288,14 @@ const dateRange = computed(() => props.dateRange)
         height: auto !important;
     }
 
-    /* Cards keep theme colors; only hug content (no tall empty theme slab) */
+    /* Cards: base-100 on base-200 page so they read as cards, not flat slabs */
     html.printing-report #fundsflow-report .card {
         height: auto !important;
         min-height: 0 !important;
         break-inside: avoid;
         page-break-inside: avoid;
+        background-color: var(--color-base-100) !important;
+        border-color: var(--color-base-300) !important;
     }
 
     html.printing-report #fundsflow-report .overflow-x-auto {

@@ -28,10 +28,10 @@ class ConvertHtmlToPdfViaGotenbergAction
                 'printBackground' => 'true',
                 'emulatedMediaType' => 'print',
                 'preferCssPageSize' => 'true',
-                'marginTop' => '0.4',
-                'marginBottom' => '0.4',
-                'marginLeft' => '0.4',
-                'marginRight' => '0.4',
+                'marginTop' => '0.2',
+                'marginBottom' => '0.2',
+                'marginLeft' => '0.2',
+                'marginRight' => '0.2',
             ]);
 
         if (! $response->successful()) {

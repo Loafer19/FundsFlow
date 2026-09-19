@@ -107,10 +107,18 @@ export const buildReportHtmlDocument = async () => {
 <style>
 ${css}
 html, body {
-  background: var(--color-base-100);
+  background: var(--color-base-200);
   color: var(--color-base-content);
+  margin: 0;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+}
+#fundsflow-report {
+  background: var(--color-base-200);
+}
+#fundsflow-report .card {
+  background-color: var(--color-base-100);
+  border-color: var(--color-base-300);
 }
 </style>
 </head>
