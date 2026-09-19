@@ -330,7 +330,7 @@ import {
     timezoneOptions,
 } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
-import { buildReportPdfBlob } from '../services/reportPdf.js'
+import { sendReportPdfToTelegram } from '../services/reportPdf.js'
 import settings, {
     updateDateFormat,
     updateDecimals,
@@ -339,7 +339,6 @@ import settings, {
     updateTimezone,
 } from '../services/settings'
 import { useTagsStore } from '../services/tags'
-import { sendFileToTelegram } from '../services/telegramSend.js'
 import { isTelegramWebApp } from '../services/telegramWebApp.js'
 import toasts from '../services/toasts'
 import { useTransactionsStore } from '../services/transactions'
@@ -428,10 +427,8 @@ const sendReportToTelegram = async () => {
     sendingReportTelegram.value = true
     try {
         await nextTick()
-        const blob = await buildReportPdfBlob()
-        const file = new File([blob], 'fundsflow-report.pdf', { type: 'application/pdf' })
         const caption = `FundsFlow report · ${reportPeriodLabel.value || 'Report'}`
-        const result = await sendFileToTelegram(file, caption)
+        const result = await sendReportPdfToTelegram(caption)
         if (result?.needsLink) {
             tab.value = 'accounts'
         }

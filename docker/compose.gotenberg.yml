@@ -1,0 +1,13 @@
+# Optional local/Dokploy helper for Gotenberg (Chromium HTML→PDF).
+# Dokploy: add a service from image gotenberg/gotenberg:8, same network as backend,
+# then set GOTENBERG_URL=http://<service-name>:3000 on the backend.
+services:
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    command:
+      - "gotenberg"
+      - "--chromium-disable-javascript=false"
+      - "--api-timeout=120s"

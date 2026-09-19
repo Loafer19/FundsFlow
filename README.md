@@ -62,5 +62,10 @@ Personal finance tracker
 | ![app](./.github/screenshots/tabs/table.png) | ![app](./.github/screenshots/tabs/tag_distribution_donuts.png) | ![app](./.github/screenshots/tabs/tag_distribution_list.png) |
 | ![app](./.github/screenshots/modals/tags_add.png) | ![app](./.github/screenshots/modals/transactions_add.png) |  |
 
+## Report PDF (Gotenberg)
 
+Send to Telegram builds a print-ready HTML snapshot in the browser (Chart.js canvases → PNG), then the API converts it with [Gotenberg](https://gotenberg.dev) Chromium.
+
+- Local: `docker compose -f docker/compose.gotenberg.yml up -d` and `GOTENBERG_URL=http://127.0.0.1:3000` in `backend/.env`
+- Dokploy: add service image `gotenberg/gotenberg:8` on the same network as the backend; set `GOTENBERG_URL=http://<service>:3000`
 

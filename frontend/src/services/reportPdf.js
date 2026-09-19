@@ -1,5 +1,7 @@
-import html2canvas from 'html2canvas-pro'
-import { jsPDF } from 'jspdf'
+import api from './api.js'
+import { apiErrorMessage } from './formatters.js'
+import { requireTelegramLinked } from './telegramSend.js'
+import toasts from './toasts.js'
 
 const waitForCharts = async () => {
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
@@ -7,12 +9,31 @@ const waitForCharts = async () => {
 }
 
 /**
- * Build a landscape A4 PDF from #fundsflow-report (one page per .report-section; header on first page).
- * Uses html2canvas-pro (oklch / lab / color() support) because browser Print/Save PDF cannot
- * yield a Blob for Telegram upload.
- * @returns {Promise<Blob>}
+ * Collect CSS text from same-origin stylesheets (cross-origin sheets are skipped).
+ * @returns {string}
  */
-export const buildReportPdfBlob = async () => {
+const collectDocumentCss = () => {
+    let css = ''
+    for (const sheet of document.styleSheets) {
+        try {
+            const rules = sheet.cssRules
+            if (!rules) continue
+            for (const rule of rules) {
+                css += `${rule.cssText}\n`
+            }
+        } catch {
+            // Ignore cross-origin / unreadable sheets
+        }
+    }
+    return css
+}
+
+/**
+ * Clone #fundsflow-report for Gotenberg: Chart.js canvases become PNG images so Chromium
+ * does not need to re-run Vue/Chart.js.
+ * @returns {Promise<string>} full HTML document
+ */
+export const buildReportHtmlDocument = async () => {
     const root = document.documentElement
     const el = document.getElementById('fundsflow-report')
 
@@ -20,58 +41,99 @@ export const buildReportPdfBlob = async () => {
         throw new Error('Report document is not ready')
     }
 
+    const sections = el.querySelectorAll('.report-section')
+    if (!sections.length) {
+        throw new Error('No report sections selected')
+    }
+
     root.classList.add('printing-report')
 
     try {
         await waitForCharts()
 
-        const header = el.querySelector('.report-header')
-        const sections = [...el.querySelectorAll('.report-section')]
+        const clone = el.cloneNode(true)
+        const liveCanvases = el.querySelectorAll('canvas')
+        const cloneCanvases = clone.querySelectorAll('canvas')
 
-        if (!sections.length) {
-            throw new Error('No report sections selected')
-        }
+        liveCanvases.forEach((canvas, index) => {
+            const target = cloneCanvases[index]
+            if (!target) return
 
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-        const pageWidth = pdf.internal.pageSize.getWidth()
-        const pageHeight = pdf.internal.pageSize.getHeight()
-        const margin = 8
-        const usableWidth = pageWidth - margin * 2
-
-        const capture = async (node) =>
-            html2canvas(node, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff',
-                windowWidth: Math.max(el.scrollWidth, 1100),
-            })
-
-        for (let i = 0; i < sections.length; i++) {
-            if (i > 0) pdf.addPage()
-
-            let y = margin
-
-            if (i === 0 && header) {
-                const headerCanvas = await capture(header)
-                const headerHeight = (headerCanvas.height * usableWidth) / headerCanvas.width
-                pdf.addImage(headerCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, y, usableWidth, headerHeight)
-                y += headerHeight + 4
+            let dataUrl = ''
+            try {
+                dataUrl = canvas.toDataURL('image/png')
+            } catch {
+                dataUrl = ''
             }
 
-            const sectionCanvas = await capture(sections[i])
-            const naturalHeight = (sectionCanvas.height * usableWidth) / sectionCanvas.width
-            const maxHeight = pageHeight - y - margin
-            const scale = naturalHeight > maxHeight ? maxHeight / naturalHeight : 1
-            const drawWidth = usableWidth * scale
-            const drawHeight = naturalHeight * scale
-            const x = margin + (usableWidth - drawWidth) / 2
+            if (!dataUrl) {
+                target.remove()
+                return
+            }
 
-            pdf.addImage(sectionCanvas.toDataURL('image/jpeg', 0.88), 'JPEG', x, y, drawWidth, drawHeight)
-        }
+            const img = document.createElement('img')
+            img.src = dataUrl
+            img.alt = ''
+            img.width = canvas.width
+            img.height = canvas.height
+            const style = canvas.getAttribute('style')
+            if (style) img.setAttribute('style', style)
+            img.className = canvas.className
+            target.replaceWith(img)
+        })
 
-        return pdf.output('blob')
+        // Absolute-ify same-origin img src (logo) when still relative
+        clone.querySelectorAll('img[src]').forEach((img) => {
+            const src = img.getAttribute('src')
+            if (!src || src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) return
+            try {
+                img.setAttribute('src', new URL(src, window.location.origin).href)
+            } catch {
+                // keep as-is
+            }
+        })
+
+        const css = collectDocumentCss()
+
+        return `<!DOCTYPE html>
+<html class="printing-report" lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FundsFlow Report</title>
+<style>
+${css}
+</style>
+</head>
+<body>
+${clone.outerHTML}
+</body>
+</html>`
     } finally {
         root.classList.remove('printing-report')
+    }
+}
+
+/**
+ * Build print HTML, convert via Gotenberg on the API, send PDF to Telegram.
+ * @param {string} caption
+ */
+export const sendReportPdfToTelegram = async (caption) => {
+    if (!requireTelegramLinked()) {
+        return { ok: false, needsLink: true }
+    }
+
+    try {
+        const html = await buildReportHtmlDocument()
+        const response = await api.post(
+            '/telegram/send-report',
+            { html, caption: caption || null },
+            { timeout: 180_000 },
+        )
+        toasts.success(response.data?.message || 'Sent to Telegram successfully!')
+        return { ok: true }
+    } catch (error) {
+        toasts.error(apiErrorMessage(error, 'Failed to send report to Telegram: '))
+        return { ok: false, error }
     }
 }

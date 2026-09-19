@@ -64,6 +64,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->middleware('throttle:30,1');
     Route::post('/telegram/send-file', [TelegramSendController::class, 'sendFile'])
         ->middleware('throttle:20,1');
+    Route::post('/telegram/send-report', [TelegramSendController::class, 'sendReport'])
+        ->middleware('throttle:10,1');
     Route::apiResource('budgets', BudgetController::class)->except(['show']);
 
     Route::post('/budgets/{budget}/pause', [BudgetController::class, 'pause']);
