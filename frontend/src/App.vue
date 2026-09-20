@@ -85,12 +85,12 @@
                 </button>
 
                 <div class="dropdown max-md:basis-full md:basis-auto">
-                    <div tabindex="0" role="button"
-                        class="btn border-base-300 text-base-content/60 text-sm max-md:w-full">
+                    <button type="button" tabindex="0"
+                        class="btn border-base-300 text-base-content/50 text-sm max-md:w-full">
                         <Tag :size="16" />
                         Filter tags
                         <span v-if="tagFilterBadgeCount" class="badge badge-outline badge-sm">{{ tagFilterBadgeCount }}</span>
-                    </div>
+                    </button>
                     <div tabindex="0"
                         class="dropdown-content menu bg-base-100 rounded-box z-1 w-64 p-3 border border-base-300">
                         <button type="button" class="badge badge-info gap-0 px-1 text-lg cursor-pointer mb-2 w-fit"
@@ -114,7 +114,7 @@
                     aria-label="Main views">
                     <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
                         :aria-selected="selectedTab === markRaw(Analytics)">
-                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab" checked="checked"
+                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
                             :value="markRaw(Analytics)" aria-hidden="true" />
 
                         <Presentation :size="22" />

@@ -28,7 +28,7 @@ export const useAuthStore = defineStore('auth', {
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Login failed: '))
+                toasts.error(apiErrorMessage(error, 'Failed to log in: '))
 
                 return false
             } finally {
@@ -50,7 +50,7 @@ export const useAuthStore = defineStore('auth', {
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Registration failed: '))
+                toasts.error(apiErrorMessage(error, 'Failed to register: '))
 
                 return false
             } finally {
@@ -72,7 +72,7 @@ export const useAuthStore = defineStore('auth', {
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Login failed: '))
+                toasts.error(apiErrorMessage(error, 'Failed to log in: '))
 
                 return false
             } finally {
@@ -96,7 +96,7 @@ export const useAuthStore = defineStore('auth', {
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Telegram Mini App login failed: '))
+                toasts.error(apiErrorMessage(error, 'Failed to log in with Telegram Mini App: '))
 
                 return false
             } finally {
@@ -112,7 +112,7 @@ export const useAuthStore = defineStore('auth', {
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Could not link Telegram: '))
+                toasts.error(apiErrorMessage(error, 'Failed to link Telegram: '))
 
                 return false
             }
@@ -130,7 +130,7 @@ export const useAuthStore = defineStore('auth', {
             } catch (error) {
                 this.clearSession()
 
-                toasts.error(apiErrorMessage(error, 'Logout failed: '))
+                toasts.error(apiErrorMessage(error, 'Failed to log out: '))
             } finally {
                 this.isLoading = false
             }

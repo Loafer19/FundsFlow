@@ -23,7 +23,7 @@
                 <input type="date" v-model="form.starts_at" class="input w-full mb-4" required />
 
                 <div class="text-sm text-base-content/60 mb-1">Ends</div>
-                <div class="join w-full mb-1">
+                <div class="join w-full" :class="endMode === 'none' ? 'mb-4' : 'mb-1'">
                     <button type="button" class="btn join-item flex-1" :class="{ 'btn-active': endMode === 'none' }"
                         @click="endMode = 'none'">No end</button>
                     <button type="button" class="btn join-item flex-1" :class="{ 'btn-active': endMode === 'count' }"
@@ -48,7 +48,6 @@
                     </div>
                 </template>
 
-                <div v-else class="mb-4"></div>
 
                 <TagPicker v-model="form.tags" />
 

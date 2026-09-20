@@ -166,11 +166,11 @@
                             </div>
                             <div class="flex-1 min-w-0 flex items-center gap-1 text-sm">
                                 <span class="shrink-0 text-base-content/60">{{ formatDate(item.date) }}</span>
-                                <span class="text-base-content/40">·</span>
+                                <span class="text-base-content/50">·</span>
                                 <span v-for="tag in item.tags" :key="tag.id" class="tooltip shrink-0"
                                     :data-tip="tag.title">{{ tag.emoji }}</span>
                                 <template v-if="item.note">
-                                    <span class="text-base-content/40">·</span>
+                                    <span class="text-base-content/50">·</span>
                                     <span class="truncate">{{ item.note }}</span>
                                 </template>
                             </div>

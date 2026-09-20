@@ -16,6 +16,8 @@ use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
 {
+    private const MAX_AUTH_TOKENS = 5;
+
     public function login(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -187,7 +189,16 @@ class AuthController extends Controller
 
     private function issueAuthToken(User $user): string
     {
-        $user->tokens()->where('name', 'auth_token')->delete();
+        $existing = $user->tokens()
+            ->where('name', 'auth_token')
+            ->orderBy('created_at')
+            ->get();
+
+        $overflow = $existing->count() - (self::MAX_AUTH_TOKENS - 1);
+
+        if ($overflow > 0) {
+            $existing->take($overflow)->each->delete();
+        }
 
         return $user->createToken('auth_token', ['*'], now()->addDays(30))->plainTextToken;
     }

@@ -157,7 +157,7 @@
                             </p>
 
                             <code
-                                class="block text-[11px] font-mono break-all bg-base-100 rounded-box px-2 py-1.5 text-base-content/80">{{
+                                class="block text-[11px] font-mono break-all bg-base-100 rounded-box px-2 py-1.5 text-base-content/60">{{
                                     mcpPlainToken ? mcpConnectionUrl : mcpUrl }}</code>
                             <template v-if="mcpPlainToken">
                                 <div class="text-xs text-warning">
@@ -199,7 +199,7 @@
                             required />
 
                         <div class="flex justify-end">
-                            <button type="submit" class="btn btn-primary btn-sm" :disabled="savingCredentials">
+                            <button type="submit" class="btn btn-success btn-sm" :disabled="savingCredentials">
                                 Save
                                 <span v-if="savingCredentials" class="loading loading-spinner loading-xs"></span>
                                 <KeyRound v-else :size="20" />
@@ -232,7 +232,7 @@ recurring_transactions</pre>
                 </template>
 
                 <template v-else-if="tab === 'report'">
-                    <p class="text-sm text-base-content/70 mb-2">
+                    <p class="text-sm text-base-content/60 mb-2">
                         Export the selected tabs as on screen, using the current period type, dates, and tag filter from the header
                     </p>
                     <p class="text-xs text-base-content/50 mb-3 break-words whitespace-normal leading-relaxed">{{ reportPeriodLabel }}</p>
@@ -580,7 +580,7 @@ const copyText = async (value, key) => {
             if (mcpCopied.value === key) mcpCopied.value = ''
         }, 1500)
     } catch {
-        toasts.error('Could not copy!')
+        toasts.error('Failed to copy!')
     }
 }
 
@@ -657,7 +657,7 @@ const saveCredentials = async () => {
 
         authStore.user.email = response.data.user.email
 
-        toasts.success('Saved!')
+        toasts.success('Credentials saved successfully!')
         credentialsForm.value = { email: response.data.user.email, password: '' }
     } catch (error) {
         toasts.error(apiErrorMessage(error, 'Failed to save: '))
@@ -673,7 +673,7 @@ const exportData = async () => {
         await downloadAccountExport()
         toasts.success('Export downloaded successfully!')
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Export failed: '))
+        toasts.error(apiErrorMessage(error, 'Failed to export: '))
     } finally {
         exporting.value = false
     }
@@ -703,7 +703,7 @@ const saveSettings = async () => {
                 authStore.user = response.data.user
             }
         } catch {
-            toasts.info('Saved locally; could not sync formatting preferences!')
+            toasts.info('Saved locally; failed to sync formatting preferences!')
         }
     }
 

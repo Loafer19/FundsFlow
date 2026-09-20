@@ -80,7 +80,7 @@ export const useBudgetsStore = defineStore('budgets', {
                 this.budgets[index] = response.data
                 this.persist()
 
-                toasts.info('Budget paused')
+                toasts.info('Budget paused successfully!')
 
                 return true
             } catch (error) {
@@ -102,7 +102,7 @@ export const useBudgetsStore = defineStore('budgets', {
                 this.budgets[index] = response.data
                 this.persist()
 
-                toasts.success('Budget resumed')
+                toasts.success('Budget resumed successfully!')
 
                 return true
             } catch (error) {

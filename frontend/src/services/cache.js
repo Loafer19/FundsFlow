@@ -14,7 +14,7 @@ export const noticeCachedData = () => {
     if (cachedNoticeShown) return
 
     cachedNoticeShown = true
-    toasts.info('Showing cached data')
+    toasts.info('Showing cached data!')
 }
 
 // Avoid importing auth.js here (auth clears cache on logout → circular).

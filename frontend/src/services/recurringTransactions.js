@@ -88,7 +88,11 @@ export const useRecurringTransactionsStore = defineStore('recurringTransactions'
                 this.rules[index] = response.data
                 this.persist()
 
-                toasts.info(response.data.active ? 'Resumed' : 'Paused')
+                toasts.info(
+                    response.data.active
+                        ? 'Recurring transaction resumed successfully!'
+                        : 'Recurring transaction paused successfully!',
+                )
 
                 return true
             } catch (error) {

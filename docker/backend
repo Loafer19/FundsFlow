@@ -4,7 +4,7 @@ RUN apk add icu-dev libzip-dev unzip && \
     install-php-extensions bcmath intl pcntl pdo_mysql opcache redis zip
 
 RUN echo "memory_limit = 4G" >> /usr/local/etc/php/conf.d/memory-limit.ini && \
-    printf "upload_max_filesize = 10M\npost_max_size = 16M\n" > /usr/local/etc/php/conf.d/uploads.ini
+    printf "upload_max_filesize = 25M\npost_max_size = 32M\n" > /usr/local/etc/php/conf.d/uploads.ini
 
 
 
