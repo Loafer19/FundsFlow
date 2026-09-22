@@ -45,11 +45,7 @@ class QuickAddHandler
             'note' => $parsed['note'],
         ], TransactionSource::Telegram);
 
-        $this->client->sendMessage(
-            $chatId,
-            "✅ Saved\n" . $this->support->formatTransactionLine($user, $transaction) . "\n" . $this->support->formatTagList($transaction),
-            $this->support->tagKeyboard($user, $transaction),
-        );
+        $this->support->sendSavedTransaction($chatId, $user, $transaction, '✅ Saved');
     }
 
     public function handleEditAmountReply(User $user, int|string $chatId, string $text): void
@@ -91,10 +87,6 @@ class QuickAddHandler
 
         Cache::forget($cacheKey);
 
-        $this->client->sendMessage(
-            $chatId,
-            "✅ Amount updated\n" . $this->support->formatTransactionLine($user, $transaction) . "\n" . $this->support->formatTagList($transaction),
-            $this->support->postSaveKeyboard($transaction),
-        );
+        $this->support->sendSavedTransaction($chatId, $user, $transaction, '✅ Amount updated');
     }
 }

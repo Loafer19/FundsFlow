@@ -22,6 +22,16 @@ class TelegramSupport
 
     public const MENU_BUDGETS = '💰 Budgets';
 
+    public const MENU_RECURRING = '🔁 Recurring';
+
+    public const MENU_WEB = '🌐 Web UI';
+
+    public const PARSE_HTML = 'HTML';
+
+    public const RECENT_LIMIT = 5;
+
+    public const NOTE_LIST_MAX = 28;
+
     private const TAGS_PER_PAGE = 8;
 
     public function __construct(
@@ -53,7 +63,7 @@ class TelegramSupport
             "Commands\n"
             . "/month — this month's income, expenses, net, top tags\n"
             . "/analytics — same as /month\n"
-            . "/recent — last 10 transactions\n"
+            . "/recent — last " . self::RECENT_LIMIT . " transactions\n"
             . "/tags — list your tags\n"
             . "/newtag — create a tag: /newtag 🍕 Fast Food > Food\n"
             . "/budgets — active budgets for the current period\n"
@@ -64,12 +74,14 @@ class TelegramSupport
             . "/unmute — turn notifications back on\n"
             . "/unlink — unlink Telegram (account stays on the website)\n"
             . "/help — this list\n\n"
+            . "Reply menu\n"
+            . "Month · Recent · Tags · Budgets · Recurring · Web UI\n\n"
             . "Quick-add\n"
             . "-350 groceries\n"
             . "+15000 salary\n"
             . "20.08 -350 groceries\n\n"
             . "Receipts\n"
-            . 'Send a photo or PDF with a caption like "-350 groceries"',
+            . 'Send a photo or PDF with a caption like "-350 groceries", or without a caption to pick an amount',
             $this->menuKeyboard(),
         );
     }
@@ -92,6 +104,7 @@ class TelegramSupport
             'keyboard' => [
                 [self::MENU_MONTH, self::MENU_RECENT],
                 [self::MENU_TAGS, self::MENU_BUDGETS],
+                [self::MENU_RECURRING, self::MENU_WEB],
             ],
             'resize_keyboard' => true,
         ];
@@ -108,6 +121,99 @@ class TelegramSupport
             ->where('provider', 'telegram')
             ->where('external_id', (string) $chatId)
             ->first();
+    }
+
+    public function escapeHtml(string $text): string
+    {
+        return htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
+    public function truncateNote(?string $note, int $max = self::NOTE_LIST_MAX): string
+    {
+        if ($note === null || $note === '') {
+            return '';
+        }
+
+        if (mb_strlen($note) <= $max) {
+            return $note;
+        }
+
+        return mb_substr($note, 0, max(1, $max - 1)) . '…';
+    }
+
+    public function progressBar(float $ratio, int $width = 10): string
+    {
+        $clamped = max(0.0, min(1.0, $ratio));
+        $filled = (int) round($clamped * $width);
+        $empty = max(0, $width - $filled);
+        $bar = str_repeat('█', $filled) . str_repeat('░', $empty);
+        $pct = (int) round($ratio * 100);
+
+        // Overspend: full bar + unclamped percent; otherwise bare bar (caller may append pct).
+        if ($ratio > 1.0) {
+            return str_repeat('█', $width) . " {$pct}%";
+        }
+
+        return $bar;
+    }
+
+    public function formatTagListHtml(Transaction $transaction): string
+    {
+        if ($transaction->tags->isEmpty()) {
+            return 'No tags';
+        }
+
+        return $transaction->tags
+            ->map(fn (Tag $tag) => $this->escapeHtml(trim($tag->emoji . ' ' . $tag->title)))
+            ->implode(' · ');
+    }
+
+    public function formatTransactionCard(User $user, Transaction $transaction, string $headline = '✅ Saved'): string
+    {
+        $emoji = $transaction->amount > 0 ? '📈' : '📉';
+        $money = $this->escapeHtml(UserFormatter::formatMoney($user, $transaction->amount));
+        $date = $this->escapeHtml(UserFormatter::formatDate($user, $transaction->at));
+
+        $lines = [
+            $this->escapeHtml($headline),
+            '',
+            "<b>{$money}</b> {$emoji}",
+            "📅 {$date}",
+        ];
+
+        if ($transaction->note) {
+            $lines[] = '📝 ' . $this->escapeHtml($transaction->note);
+        }
+
+        if ($transaction->relationLoaded('attachments') && $transaction->attachments->isNotEmpty()) {
+            $count = $transaction->attachments->count();
+            $lines[] = '📎 ' . $count . ' file' . ($count === 1 ? '' : 's');
+        }
+
+        $lines[] = '🏷 ' . $this->formatTagListHtml($transaction);
+
+        return implode("\n", $lines);
+    }
+
+    public function formatTransactionListItem(User $user, Transaction $transaction, int $index): string
+    {
+        $money = $this->escapeHtml(UserFormatter::formatMoney($user, $transaction->amount));
+        $note = $transaction->note
+            ? $this->escapeHtml($this->truncateNote($transaction->note))
+            : '—';
+        $date = $this->escapeHtml(UserFormatter::formatDate($user, $transaction->at));
+        $firstTag = $transaction->tags->first();
+        $tagLabel = $firstTag
+            ? $this->escapeHtml(trim($firstTag->emoji . ' ' . $firstTag->title))
+            : 'Untagged';
+
+        $meta = "📅 {$date} · 🏷 {$tagLabel}";
+
+        if ($transaction->relationLoaded('attachments') && $transaction->attachments->isNotEmpty()) {
+            $meta .= ' · 📎';
+        }
+
+        return ($index + 1) . ". <b>{$money}</b> · {$note}\n    {$meta}";
     }
 
     public function formatTransactionLine(User $user, Transaction $transaction): string
@@ -141,6 +247,20 @@ class TelegramSupport
         return '🏷 ' . implode(', ', $labels);
     }
 
+    public function sendSavedTransaction(
+        int|string $chatId,
+        User $user,
+        Transaction $transaction,
+        string $headline = '✅ Saved',
+    ): void {
+        $this->client->sendMessage(
+            $chatId,
+            $this->formatTransactionCard($user, $transaction, $headline),
+            $this->postSaveKeyboard($transaction),
+            self::PARSE_HTML,
+        );
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -148,9 +268,37 @@ class TelegramSupport
     {
         return [
             'inline_keyboard' => [[
-                ['text' => '✏️ Change tags', 'callback_data' => "retag:{$transaction->id}"],
-                ['text' => '💰 Edit amount', 'callback_data' => "editamt:{$transaction->id}"],
-                ['text' => '🗑 Delete', 'callback_data' => "del:{$transaction->id}"],
+                ['text' => '🏷 Tags', 'callback_data' => "retag:{$transaction->id}"],
+                ['text' => '✏️ Amount', 'callback_data' => "editamt:{$transaction->id}"],
+                ['text' => '🗑', 'callback_data' => "delask:{$transaction->id}"],
+            ]],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function deleteConfirmKeyboard(int $transactionId): array
+    {
+        return [
+            'inline_keyboard' => [[
+                ['text' => '✅ Delete', 'callback_data' => "delyes:{$transactionId}"],
+                ['text' => '↩️ Cancel', 'callback_data' => "delno:{$transactionId}"],
+            ]],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function mediaAmountKeyboard(): array
+    {
+        return [
+            'inline_keyboard' => [[
+                ['text' => '−100', 'callback_data' => 'mediaamt:-100'],
+                ['text' => '−500', 'callback_data' => 'mediaamt:-500'],
+                ['text' => 'Other', 'callback_data' => 'mediaamt:other'],
+                ['text' => 'Cancel', 'callback_data' => 'mediacancel'],
             ]],
         ];
     }
@@ -190,7 +338,6 @@ class TelegramSupport
             ['text' => '🚫 Clear all', 'callback_data' => "tagclear:{$transaction->id}:{$page}"],
             ['text' => '✅ Done', 'callback_data' => "tagdone:{$transaction->id}"],
         ];
-        $rows[] = [['text' => '🗑 Delete', 'callback_data' => "del:{$transaction->id}"]];
 
         return ['inline_keyboard' => $rows];
     }

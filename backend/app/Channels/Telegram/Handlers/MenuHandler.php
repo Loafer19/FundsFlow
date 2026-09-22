@@ -40,11 +40,12 @@ class MenuHandler
         $income = (float) $transactions->filter(fn (Transaction $transaction) => $transaction->amount > 0)->sum('amount');
         $expense = (float) $transactions->filter(fn (Transaction $transaction) => $transaction->amount < 0)->sum('amount');
 
+        $monthLabel = $this->support->escapeHtml($user->nowInTimezone()->format('m.Y'));
         $lines = [
-            '📊 ' . $user->nowInTimezone()->format('m.Y'),
-            'Income: +' . UserFormatter::formatMoney($user, $income),
-            'Expenses: ' . UserFormatter::formatMoney($user, $expense),
-            'Net: ' . UserFormatter::formatMoney($user, $income + $expense),
+            '📊 <b>' . $monthLabel . '</b>',
+            'Income: +' . $this->support->escapeHtml(UserFormatter::formatMoney($user, $income)),
+            'Expenses: ' . $this->support->escapeHtml(UserFormatter::formatMoney($user, $expense)),
+            'Net: ' . $this->support->escapeHtml(UserFormatter::formatMoney($user, $income + $expense)),
         ];
 
         $byTag = [];
@@ -60,17 +61,17 @@ class MenuHandler
 
         if ($top->isNotEmpty()) {
             $lines[] = '';
-            $lines[] = 'Top expense tags';
+            $lines[] = '<b>Top expense tags</b>';
 
             foreach ($top as $index => $row) {
                 /** @var Tag $tag */
                 $tag = $row['tag'];
-                $lines[] = ($index + 1) . ') ' . trim($tag->emoji . ' ' . $tag->title)
-                    . ' — ' . UserFormatter::formatMoney($user, -1 * $row['amount']);
+                $lines[] = ($index + 1) . ') ' . $this->support->escapeHtml(trim($tag->emoji . ' ' . $tag->title))
+                    . ' — ' . $this->support->escapeHtml(UserFormatter::formatMoney($user, -1 * $row['amount']));
             }
         }
 
-        $this->client->sendMessage($chatId, implode("\n", $lines));
+        $this->client->sendMessage($chatId, implode("\n", $lines), null, TelegramSupport::PARSE_HTML);
     }
 
     public function sendTags(User $user, int|string $chatId): void
@@ -101,7 +102,12 @@ class MenuHandler
             return;
         }
 
-        $this->client->sendMessage($chatId, $payload['text'], $payload['reply_markup']);
+        $this->client->sendMessage(
+            $chatId,
+            $payload['text'],
+            $payload['reply_markup'],
+            TelegramSupport::PARSE_HTML,
+        );
     }
 
     /**
@@ -109,23 +115,23 @@ class MenuHandler
      */
     public function recentListPayload(User $user): ?array
     {
-        $transactions = $this->listTransactions->execute($user)->take(10)->values();
+        $transactions = $this->listTransactions->execute($user)->take(TelegramSupport::RECENT_LIMIT)->values();
 
         if ($transactions->isEmpty()) {
             return null;
         }
 
-        $lines = $transactions->map(
-            fn (Transaction $transaction, int $index) => ($index + 1) . ') ' . $this->support->formatTransactionLine($user, $transaction),
+        $items = $transactions->map(
+            fn (Transaction $transaction, int $index) => $this->support->formatTransactionListItem($user, $transaction, $index),
         )->all();
 
         $buttons = $transactions->map(fn (Transaction $transaction, int $index) => [
-            'text' => '🗑 ' . ($index + 1),
-            'callback_data' => "delrow:{$transaction->id}",
+            'text' => 'Open ' . ($index + 1),
+            'callback_data' => "open:{$transaction->id}",
         ])->all();
 
         return [
-            'text' => "🕘 Recent transactions\n" . implode("\n", $lines),
+            'text' => "🕘 <b>Recent</b>\n\n" . implode("\n\n", $items),
             'reply_markup' => ['inline_keyboard' => array_chunk($buttons, 5)],
         ];
     }
@@ -133,7 +139,7 @@ class MenuHandler
     public function sendBudgets(User $user, int|string $chatId): void
     {
         $budgets = $this->listBudgets->execute($user);
-        $lines = [];
+        $blocks = [];
 
         foreach ($budgets as $budget) {
             $period = $budget->periods->first(fn (BudgetPeriod $period) => $period->ends_at === null);
@@ -148,22 +154,31 @@ class MenuHandler
 
             $spent = $this->calculateBudgetSpent->execute($period, $user);
             $limit = (float) $period->amount;
+            $ratio = $limit > 0 ? ($spent / $limit) : 0.0;
+            $pct = (int) round($ratio * 100);
 
-            $lines[] = sprintf(
-                '%s: %s / %s',
-                $label,
-                UserFormatter::formatMoney($user, $spent),
-                UserFormatter::formatMoney($user, $limit),
-            );
+            $bar = $this->support->progressBar($ratio);
+            $barLine = $ratio > 1.0 ? $bar : "{$bar} {$pct}%";
+
+            $blocks[] = '<b>' . $this->support->escapeHtml($label) . "</b>\n"
+                . $barLine . "\n"
+                . $this->support->escapeHtml(UserFormatter::formatMoney($user, $spent))
+                . ' / '
+                . $this->support->escapeHtml(UserFormatter::formatMoney($user, $limit));
         }
 
-        if ($lines === []) {
+        if ($blocks === []) {
             $this->client->sendMessage($chatId, 'No active budgets');
 
             return;
         }
 
-        $this->client->sendMessage($chatId, "💰 Budgets\n" . implode("\n", $lines));
+        $this->client->sendMessage(
+            $chatId,
+            "💰 <b>Budgets</b>\n\n" . implode("\n\n", $blocks),
+            null,
+            TelegramSupport::PARSE_HTML,
+        );
     }
 
     public function sendRecurring(User $user, int|string $chatId): void
@@ -176,21 +191,30 @@ class MenuHandler
             return;
         }
 
-        $lines = $rules->map(function (RecurringTransaction $rule) use ($user) {
-            $note = $rule->note ? " — {$rule->note}" : '';
-            $active = $rule->active ? 'yes' : 'no';
+        $blocks = $rules->map(function (RecurringTransaction $rule) use ($user) {
+            $status = $rule->active ? '✅' : '⏸';
+            $money = $this->support->escapeHtml(UserFormatter::formatMoney($user, $rule->amount));
+            $freq = $this->support->escapeHtml($rule->frequency->value);
+            $next = $this->support->escapeHtml(UserFormatter::formatDate($user, $rule->next_run_at));
 
-            return sprintf(
-                '%s · %s · next %s · active %s%s',
-                UserFormatter::formatMoney($user, $rule->amount),
-                $rule->frequency->value,
-                UserFormatter::formatDate($user, $rule->next_run_at),
-                $active,
-                $note,
-            );
+            $lines = [
+                "{$status} <b>{$money}</b> · {$freq}",
+                "next {$next}",
+            ];
+
+            if ($rule->note) {
+                $lines[] = '📝 ' . $this->support->escapeHtml($rule->note);
+            }
+
+            return implode("\n", $lines);
         })->all();
 
-        $this->client->sendMessage($chatId, "🔁 Recurring\n" . implode("\n", $lines));
+        $this->client->sendMessage(
+            $chatId,
+            "🔁 <b>Recurring</b>\n\n" . implode("\n\n", $blocks),
+            null,
+            TelegramSupport::PARSE_HTML,
+        );
     }
 
     public function handleNewTag(User $user, int|string $chatId, string $text): void

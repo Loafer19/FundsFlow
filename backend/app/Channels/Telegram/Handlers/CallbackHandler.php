@@ -18,6 +18,7 @@ class CallbackHandler
         private readonly UpdateTransactionAction $updateTransaction,
         private readonly DeleteTransactionAction $deleteTransaction,
         private readonly MenuHandler $menuHandler,
+        private readonly MediaHandler $mediaHandler,
     ) {}
 
     /**
@@ -74,14 +75,33 @@ class CallbackHandler
             return;
         }
 
-        if (preg_match('/^del:(\d+)$/', $data, $matches)) {
-            $this->handleDelete($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
+        if (preg_match('/^open:(\d+)$/', $data, $matches)) {
+            $this->handleOpen($user, $chatId, $callbackId, (int) $matches[1]);
+
+            return;
+        }
+
+        if (preg_match('/^delask:(\d+)$/', $data, $matches) || preg_match('/^del:(\d+)$/', $data, $matches)) {
+            $this->handleDeleteAsk($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
+
+            return;
+        }
+
+        if (preg_match('/^delyes:(\d+)$/', $data, $matches)) {
+            $this->handleDeleteYes($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
+
+            return;
+        }
+
+        if (preg_match('/^delno:(\d+)$/', $data, $matches)) {
+            $this->handleDeleteNo($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
 
             return;
         }
 
         if (preg_match('/^delrow:(\d+)$/', $data, $matches)) {
-            $this->handleDeleteRow($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
+            // Legacy recent-list delete: open confirm instead.
+            $this->handleDeleteAsk($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
 
             return;
         }
@@ -94,6 +114,30 @@ class CallbackHandler
 
         if (preg_match('/^editamt:(\d+)$/', $data, $matches)) {
             $this->handleEditAmountPrompt($user, $chatId, $callbackId, (int) $matches[1]);
+
+            return;
+        }
+
+        if ($data === 'mediaamt:-100' || $data === 'mediaamt:-500') {
+            $amount = (float) substr($data, strlen('mediaamt:'));
+            $this->client->answerCallbackQuery($callbackId);
+            $this->mediaHandler->completePendingMediaAmount($user, $chatId, $amount);
+
+            return;
+        }
+
+        if ($data === 'mediaamt:other') {
+            Cache::put("telegram_pending_media_await_text:{$chatId}", true, now()->addMinutes(15));
+            $this->client->answerCallbackQuery($callbackId);
+            $this->client->sendMessage($chatId, 'Send amount like -350 groceries');
+
+            return;
+        }
+
+        if ($data === 'mediacancel') {
+            $this->mediaHandler->cancelPendingMedia($chatId);
+            $this->client->answerCallbackQuery($callbackId, 'Cancelled');
+            $this->client->sendMessage($chatId, 'Cancelled');
 
             return;
         }
@@ -175,13 +219,56 @@ class CallbackHandler
             $this->client->editMessageText(
                 $chatId,
                 $messageId,
-                "✅ Saved\n" . $this->support->formatTransactionLine($user, $transaction) . "\n" . $this->support->formatTagList($transaction),
+                $this->support->formatTransactionCard($user, $transaction, '✅ Saved'),
                 $this->support->postSaveKeyboard($transaction),
+                TelegramSupport::PARSE_HTML,
             );
         }
     }
 
-    private function handleDelete(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
+    private function handleOpen(User $user, int|string $chatId, string $callbackId, int $transactionId): void
+    {
+        $transaction = $this->support->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction) {
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found');
+
+            return;
+        }
+
+        $this->client->answerCallbackQuery($callbackId);
+        $this->support->sendSavedTransaction($chatId, $user, $transaction, 'Transaction');
+    }
+
+    private function handleDeleteAsk(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
+    {
+        $transaction = $this->support->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction) {
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found');
+
+            return;
+        }
+
+        $this->client->answerCallbackQuery($callbackId);
+
+        if (!$messageId) {
+            return;
+        }
+
+        $card = $this->support->formatTransactionCard($user, $transaction, 'Transaction');
+        $text = $card . "\n\nDelete this transaction?";
+
+        $this->client->editMessageText(
+            $chatId,
+            $messageId,
+            $text,
+            $this->support->deleteConfirmKeyboard($transactionId),
+            TelegramSupport::PARSE_HTML,
+        );
+    }
+
+    private function handleDeleteYes(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
     {
         $transaction = $this->support->findOwnTransaction($user, $transactionId);
 
@@ -202,7 +289,7 @@ class CallbackHandler
         }
     }
 
-    private function handleDeleteRow(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
+    private function handleDeleteNo(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
     {
         $transaction = $this->support->findOwnTransaction($user, $transactionId);
 
@@ -212,23 +299,17 @@ class CallbackHandler
             return;
         }
 
-        $this->deleteTransaction->execute($user, $transaction);
+        $this->client->answerCallbackQuery($callbackId);
 
-        $this->client->answerCallbackQuery($callbackId, 'Deleted 🗑');
-
-        if (!$messageId) {
-            return;
+        if ($messageId) {
+            $this->client->editMessageText(
+                $chatId,
+                $messageId,
+                $this->support->formatTransactionCard($user, $transaction, '✅ Saved'),
+                $this->support->postSaveKeyboard($transaction),
+                TelegramSupport::PARSE_HTML,
+            );
         }
-
-        $payload = $this->menuHandler->recentListPayload($user);
-
-        if ($payload === null) {
-            $this->client->editMessageText($chatId, $messageId, 'No transactions yet', ['inline_keyboard' => []]);
-
-            return;
-        }
-
-        $this->client->editMessageText($chatId, $messageId, $payload['text'], $payload['reply_markup']);
     }
 
     private function handleRetag(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
@@ -270,8 +351,9 @@ class CallbackHandler
         $this->client->editMessageText(
             $chatId,
             $messageId,
-            "✅ Saved\n" . $this->support->formatTransactionLine($user, $transaction) . "\n" . $this->support->formatTagList($transaction),
+            $this->support->formatTransactionCard($user, $transaction, '✅ Saved'),
             $this->support->tagKeyboard($user, $transaction, $page),
+            TelegramSupport::PARSE_HTML,
         );
     }
 }
