@@ -4,6 +4,8 @@ Streamable HTTP MCP for AI clients (Claude, Cursor, Grok, etc.).
 
 **Production:** `https://mcp.fundsflow.fun/mcp`
 
+Server advertises `title`, `websiteUrl`, and bee brand `icons` (PNG from fundsflow.fun) in MCP `initialize` / discovery JSON. Clients may or may not render them.
+
 ## Connect with a token (recommended)
 
 Settings → Accounts → MCP → Generate token.
@@ -41,3 +43,5 @@ Creates are stored with `source=mcp`. Bulk (up to 50, all-or-nothing): `create_t
 `attach_transaction_file` accepts **exactly one** of:
 - `content_base64` — raw base64 (no `data:` prefix); `name` + `mime` required
 - `source_url` — public `https` URL; MCP downloads (max 8 MB, blocks private/localhost hosts), sniffs type, then uploads via the existing base64 API. `name` / `mime` optional.
+
+Optional fields like `note` (and recurring `ends_at`) are omitted from the API body when not provided — MCP does not send `null`.
