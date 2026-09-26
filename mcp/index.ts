@@ -13,6 +13,21 @@ const BULK_MAX_ITEMS = 50
 const ATTACHMENT_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] as const
 type AttachmentMime = (typeof ATTACHMENT_MIMES)[number]
 
+const MCP_VERSION = '1.3.1'
+const MCP_WEBSITE_URL = 'https://fundsflow.fun'
+const MCP_ICONS = [
+    {
+        src: `${MCP_WEBSITE_URL}/apple-touch-icon.png`,
+        mimeType: 'image/png' as const,
+        sizes: ['180x180'],
+    },
+    {
+        src: `${MCP_WEBSITE_URL}/favicon-32.png`,
+        mimeType: 'image/png' as const,
+        sizes: ['32x32'],
+    },
+]
+
 
 
 const PORT = Number(process.env.PORT || 8787)
@@ -145,7 +160,11 @@ function hasMcpKey(req: Request): boolean {
 function createServer(token: string | null) {
     const server = new McpServer({
         name: 'fundsflow',
-        version: '1.1.0',
+        version: MCP_VERSION,
+        title: 'FundsFlow',
+        description: 'Personal finance via FundsFlow: transactions, tags, budgets, recurring, attachments, and account export.',
+        websiteUrl: MCP_WEBSITE_URL,
+        icons: MCP_ICONS,
     })
 
     server.registerTool(
@@ -956,7 +975,12 @@ async function fetchAttachmentFromUrl(sourceUrl: string): Promise<{
 app.get('/', (_req, res) => {
     res.json({
         name: 'fundsflow-mcp',
-        version: '1.3.0',
+        version: MCP_VERSION,
+        title: 'FundsFlow',
+        description:
+            'Personal finance via FundsFlow: transactions, tags, budgets, recurring, attachments, and account export.',
+        websiteUrl: MCP_WEBSITE_URL,
+        icons: MCP_ICONS,
         mcp: '/mcp',
         tools: TOOL_NAMES,
         oauth: {
