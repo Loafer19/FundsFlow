@@ -28,7 +28,7 @@ Personal finance tracker
   - budget and digest alerts, mute/unmute
 - MCP (AI clients):
   - personal token + connection URL in Settings
-  - create / update transactions, attach files (base64), budgets, tags, export
+  - create / update transactions, attach files (base64 or source_url), budgets, tags, export
 
 - Filter:
   - by date: week, month, year

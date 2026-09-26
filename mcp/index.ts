@@ -7,8 +7,11 @@ import { oauthClientId, oauthClientSecret, oauthPublicBase, registerOAuthRoutes,
 
 /** 8 MB file → ~10.7 MB base64; leave headroom for JSON-RPC envelope. */
 const JSON_BODY_LIMIT = '12mb'
-const MAX_ATTACHMENT_BASE64_CHARS = Math.ceil((8 * 1024 * 1024 * 4) / 3) + 4096
+const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
+const MAX_ATTACHMENT_BASE64_CHARS = Math.ceil((MAX_ATTACHMENT_BYTES * 4) / 3) + 4096
 const BULK_MAX_ITEMS = 50
+const ATTACHMENT_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] as const
+type AttachmentMime = (typeof ATTACHMENT_MIMES)[number]
 
 
 
@@ -426,16 +429,40 @@ function createServer(token: string | null) {
         {
             title: 'Attach file to transaction',
             description:
-                'Attach a JPEG/PNG/WebP/PDF to a transaction (max 8 MB decoded, max 5 files per transaction). Pass raw base64 only (no data: URL prefix).',
+                'Attach a JPEG/PNG/WebP/PDF to a transaction (max 8 MB, max 5 files per transaction). Pass exactly one of content_base64 (raw base64, no data: URL prefix) or source_url (https URL; MCP downloads then uploads). Optional name/mime: derived from URL / Content-Type / magic bytes when omitted.',
             inputSchema: {
                 transaction_id: z.number().int(),
-                name: z.string().max(255),
-                mime: z.enum(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']),
-                content_base64: z.string().min(1),
+                name: z.string().max(255).optional(),
+                mime: z.enum(ATTACHMENT_MIMES).optional(),
+                content_base64: z.string().min(1).optional(),
+                source_url: z.string().url().optional(),
             },
         },
-        async ({ transaction_id, name, mime, content_base64 }) => {
-            const content = normalizeBase64(content_base64)
+        async ({ transaction_id, name, mime, content_base64, source_url }) => {
+            const hasBase64 = Boolean(content_base64?.trim())
+            const hasUrl = Boolean(source_url?.trim())
+            if (hasBase64 === hasUrl) {
+                throw new Error('Provide exactly one of content_base64 or source_url.')
+            }
+
+            let content: string
+            let finalName = name?.trim() || ''
+            let finalMime: AttachmentMime | undefined = mime
+
+            if (hasUrl) {
+                const downloaded = await fetchAttachmentFromUrl(source_url!.trim())
+                content = downloaded.buffer.toString('base64')
+                if (!finalName) finalName = downloaded.name
+                if (!finalMime) finalMime = downloaded.mime
+            } else {
+                content = normalizeBase64(content_base64!)
+                if (!finalName) {
+                    throw new Error('name is required when using content_base64.')
+                }
+                if (!finalMime) {
+                    throw new Error('mime is required when using content_base64.')
+                }
+            }
 
             if (content.length > MAX_ATTACHMENT_BASE64_CHARS) {
                 throw new Error('File too large! Max 8 MB decoded.')
@@ -445,8 +472,8 @@ function createServer(token: string | null) {
                 await api(token, `/transactions/${transaction_id}/attachments/base64`, {
                     method: 'POST',
                     body: JSON.stringify({
-                        name,
-                        mime,
+                        name: finalName,
+                        mime: finalMime,
                         content,
                     }),
                     signal: AbortSignal.timeout(120_000),
@@ -757,11 +784,179 @@ function normalizeBase64(input: string): string {
     return (dataUrl?.[1] ?? trimmed).replace(/\s+/g, '')
 }
 
+function isBlockedAttachmentHost(hostname: string): boolean {
+    const host = hostname.toLowerCase().replace(/\.$/, '')
+    if (
+        host === 'localhost'
+        || host.endsWith('.localhost')
+        || host === 'metadata.google.internal'
+        || host.endsWith('.internal')
+        || host.endsWith('.local')
+    ) {
+        return true
+    }
+
+    const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
+    if (ipv4) {
+        const parts = ipv4.slice(1).map(Number)
+        if (parts.some((n) => n > 255)) return true
+        const [a, b] = parts
+        if (a === 10 || a === 127 || a === 0) return true
+        if (a === 169 && b === 254) return true
+        if (a === 172 && b >= 16 && b <= 31) return true
+        if (a === 192 && b === 168) return true
+        if (a === 100 && b >= 64 && b <= 127) return true // carrier-grade NAT
+        return false
+    }
+
+    // Bracketed or bare IPv6 literals — block loopback / ULA / link-local conservatively.
+    if (host.includes(':')) {
+        const h = host.replace(/^\[|\]$/g, '')
+        if (h === '::1' || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80')) return true
+        return true // reject all raw IPv6 for attach downloads
+    }
+
+    return false
+}
+
+function assertSafeAttachmentUrl(raw: string, base?: URL): URL {
+    let url: URL
+    try {
+        url = base ? new URL(raw, base) : new URL(raw)
+    } catch {
+        throw new Error('Invalid source_url.')
+    }
+    if (url.protocol !== 'https:') {
+        throw new Error('source_url must use https.')
+    }
+    if (url.username || url.password) {
+        throw new Error('source_url must not include credentials.')
+    }
+    if (isBlockedAttachmentHost(url.hostname)) {
+        throw new Error('source_url host is not allowed.')
+    }
+    return url
+}
+
+function sniffAttachmentMime(buf: Buffer): AttachmentMime | null {
+    if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg'
+    if (
+        buf.length >= 8
+        && buf[0] === 0x89
+        && buf[1] === 0x50
+        && buf[2] === 0x4e
+        && buf[3] === 0x47
+        && buf[4] === 0x0d
+        && buf[5] === 0x0a
+        && buf[6] === 0x1a
+        && buf[7] === 0x0a
+    ) {
+        return 'image/png'
+    }
+    if (
+        buf.length >= 12
+        && buf.toString('ascii', 0, 4) === 'RIFF'
+        && buf.toString('ascii', 8, 12) === 'WEBP'
+    ) {
+        return 'image/webp'
+    }
+    if (buf.length >= 5 && buf.toString('ascii', 0, 5) === '%PDF-') return 'application/pdf'
+    return null
+}
+
+function mimeFromContentType(header: string | null): AttachmentMime | null {
+    if (!header) return null
+    const raw = header.split(';', 1)[0]?.trim().toLowerCase()
+    return (ATTACHMENT_MIMES as readonly string[]).includes(raw || '')
+        ? (raw as AttachmentMime)
+        : null
+}
+
+function nameFromContentDisposition(header: string | null): string | null {
+    if (!header) return null
+    const star = /filename\*=(?:UTF-8''|utf-8'')([^;]+)/i.exec(header)
+    if (star?.[1]) {
+        try {
+            return decodeURIComponent(star[1].trim().replace(/^"|"$/g, ''))
+        } catch {
+            /* ignore */
+        }
+    }
+    const plain = /filename="([^"]+)"|filename=([^;]+)/i.exec(header)
+    const value = (plain?.[1] || plain?.[2] || '').trim().replace(/^"|"$/g, '')
+    return value || null
+}
+
+function nameFromUrlPath(url: URL): string {
+    const base = url.pathname.split('/').filter(Boolean).pop() || 'attachment'
+    try {
+        return decodeURIComponent(base).slice(0, 255) || 'attachment'
+    } catch {
+        return base.slice(0, 255) || 'attachment'
+    }
+}
+
+async function fetchAttachmentFromUrl(sourceUrl: string): Promise<{
+    buffer: Buffer
+    name: string
+    mime: AttachmentMime
+}> {
+    let url = assertSafeAttachmentUrl(sourceUrl)
+
+    for (let hop = 0; hop < 4; hop++) {
+        const response = await fetch(url, {
+            method: 'GET',
+            redirect: 'manual',
+            signal: AbortSignal.timeout(60_000),
+            headers: {
+                Accept: 'image/jpeg,image/png,image/webp,application/pdf,*/*',
+            },
+        })
+
+        if ([301, 302, 303, 307, 308].includes(response.status)) {
+            const location = response.headers.get('location')
+            if (!location) throw new Error('source_url redirect missing Location.')
+            url = assertSafeAttachmentUrl(location, url)
+            continue
+        }
+
+        if (!response.ok) {
+            throw new Error(`Failed to download source_url (HTTP ${response.status}).`)
+        }
+
+        const contentLength = response.headers.get('content-length')
+        if (contentLength && Number(contentLength) > MAX_ATTACHMENT_BYTES) {
+            throw new Error('File too large! Max 8 MB decoded.')
+        }
+
+        const ab = await response.arrayBuffer()
+        if (ab.byteLength === 0) throw new Error('source_url returned an empty file.')
+        if (ab.byteLength > MAX_ATTACHMENT_BYTES) {
+            throw new Error('File too large! Max 8 MB decoded.')
+        }
+
+        const buffer = Buffer.from(ab)
+        const nameHint = nameFromContentDisposition(response.headers.get('content-disposition'))
+        const typeHint = mimeFromContentType(response.headers.get('content-type'))
+
+        const sniffed = sniffAttachmentMime(buffer)
+        const mime = sniffed || typeHint
+        if (!mime) {
+            throw new Error('Could not detect file type. Only JPEG, PNG, WebP, and PDF are allowed.')
+        }
+
+        const name = (nameHint || nameFromUrlPath(url)).slice(0, 255)
+        return { buffer, name, mime }
+    }
+
+    throw new Error('source_url redirected too many times.')
+}
+
 
 app.get('/', (_req, res) => {
     res.json({
         name: 'fundsflow-mcp',
-        version: '1.2.0',
+        version: '1.3.0',
         mcp: '/mcp',
         tools: TOOL_NAMES,
         oauth: {
