@@ -197,6 +197,32 @@ class CallbackHandler
             return;
         }
 
+        if ($data === 'nl:agent:ok') {
+            $this->client->answerCallbackQuery($callbackId, 'Applying…');
+            $this->naturalLanguageHandler->confirmAgentMutation($user, $chatId, $telegramUserId);
+
+            return;
+        }
+
+        if ($data === 'nl:agent:cancel') {
+            $this->client->answerCallbackQuery($callbackId, 'Cancelled');
+            $this->naturalLanguageHandler->cancelAgentMutation($chatId, $telegramUserId);
+
+            return;
+        }
+
+        if (preg_match('/^nl:ask:choice:(\d+)$/', $data, $matches)) {
+            $this->naturalLanguageHandler->handleAskChoice(
+                $user,
+                $chatId,
+                (int) $matches[1],
+                $callbackId,
+                $telegramUserId,
+            );
+
+            return;
+        }
+
         if ($data === 'mediaamt:-100' || $data === 'mediaamt:-500') {
             $amount = (float) substr($data, strlen('mediaamt:'));
             $this->client->answerCallbackQuery($callbackId);

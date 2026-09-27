@@ -10,6 +10,8 @@ use Throwable;
 
 class InterpretTelegramTextAction
 {
+    // Kept for reference / possible reuse. Free-form Telegram text now goes through RunTelegramAgentAction.
+
     public function __construct(
         private readonly TelegramAiQuota $quota,
     ) {}

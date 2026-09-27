@@ -56,7 +56,7 @@ class TelegramSupport
             . "Photo without an amount: AI draft (limited per day), then Confirm.\n"
             . "Album of photos: choose one receipt or separate transactions.\n"
             . "Voice notes work too — same commands as typing (shared daily AI limit).\n"
-            . "Natural language: show recent/budgets/menu/tags, rename tags, month summary.\n"
+            . "Natural language: ask about your finances, show recent/budgets/menu/tags, rename tags, month summary.\n"
             . "AI has a daily limit; Settings shows quota, and the bot says when you're out.\n\n"
             . 'Use the menu below, or /help for all commands.';
     }
@@ -91,8 +91,8 @@ class TelegramSupport
             . "Voice\n"
             . "Send a voice note for the same actions as typing (quick-add, menu, tags, help, month summary). Uses the shared daily AI budget.\n\n"
             . "Text AI\n"
-            . "Examples: show recent, budgets, menu, tags; rename tags; month summary / this month; ask what I can do.\n"
-            . "Same views as the reply-menu buttons (including Month).\n\n"
+            . "Ask free-form questions about your finances (any language). Examples: show recent, budgets, menu, tags; rename tags; month summary; what do you think about my finances.\n"
+            . "Same views as the reply-menu buttons when you ask to show them.\n\n"
             . "AI limit\n"
             . "Receipt AI, voice, and text AI share a daily limit. Settings in the Web UI shows used/limit and reset time; the bot tells you when you're out.",
             $this->menuKeyboard(),
@@ -385,6 +385,40 @@ class TelegramSupport
             $buttons[] = [
                 'text' => $label,
                 'callback_data' => 'nl:rename:pick:' . (int) $item['id'],
+            ];
+        }
+
+        return ['inline_keyboard' => array_chunk($buttons, 2)];
+    }
+
+    /**
+     * Confirm keyboard for agent-staged mutations (transactions, budgets, …).
+     *
+     * @return array<string, mixed>
+     */
+    public function nlAgentConfirmKeyboard(): array
+    {
+        return [
+            'inline_keyboard' => [[
+                ['text' => '✅ Confirm', 'callback_data' => 'nl:agent:ok'],
+                ['text' => 'Cancel', 'callback_data' => 'nl:agent:cancel'],
+            ]],
+        ];
+    }
+
+    /**
+     * Inline suggestions for ask_user (English labels). Callback index into pending suggestions.
+     *
+     * @param list<string> $suggestions
+     * @return array<string, mixed>
+     */
+    public function nlAskSuggestionsKeyboard(array $suggestions): array
+    {
+        $buttons = [];
+        foreach (array_values($suggestions) as $index => $label) {
+            $buttons[] = [
+                'text' => mb_substr((string) $label, 0, 64),
+                'callback_data' => 'nl:ask:choice:' . $index,
             ];
         }
 

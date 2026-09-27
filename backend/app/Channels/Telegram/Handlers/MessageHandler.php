@@ -211,6 +211,10 @@ class MessageHandler
 
     private function handleDefaultText(User $user, int|string $chatId, string $text, int|string $telegramUserId): void
     {
+        if ($this->naturalLanguageHandler->handlePendingAskAnswer($user, $chatId, $text, $telegramUserId)) {
+            return;
+        }
+
         if ($this->naturalLanguageHandler->handlePendingRenameTitle($user, $chatId, $text, $telegramUserId)) {
             return;
         }
