@@ -53,19 +53,6 @@
                         </select>
                     </div>
 
-                    <div class="p-3 rounded-box bg-base-200 mb-3">
-                        <div class="flex items-center justify-between gap-2 mb-1">
-                            <span class="font-medium text-sm">AI assists today</span>
-                            <span v-if="aiQuotaLoading" class="loading loading-spinner loading-xs"></span>
-                            <span v-else class="text-sm font-mono tabular-nums">
-                                {{ aiQuotaUsed }} / {{ aiQuotaLimit }}
-                            </span>
-                        </div>
-                        <p class="text-xs text-base-content/60 leading-relaxed">
-                            Shared across Telegram receipt scan, voice, and text help.
-                            <template v-if="aiQuotaResetLabel"> Resets: {{ aiQuotaResetLabel }}</template>
-                        </p>
-                    </div>
                 </template>
 
 
@@ -196,6 +183,20 @@
                                 </button>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="p-3 rounded-box bg-base-200 mb-4">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <span class="font-medium text-sm">AI assists today</span>
+                            <span v-if="aiQuotaLoading" class="loading loading-spinner loading-xs"></span>
+                            <span v-else class="text-sm font-mono tabular-nums">
+                                {{ aiQuotaUsed }} / {{ aiQuotaLimit }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-base-content/60 leading-relaxed">
+                            Shared across Telegram receipt scan, voice, and text help.
+                            <template v-if="aiQuotaResetLabel"> Resets: {{ aiQuotaResetLabel }}</template>
+                        </p>
                     </div>
 
                     <div class="divider text-sm text-base-content/60">Login credentials</div>
@@ -406,7 +407,6 @@ const refreshAiQuota = async () => {
     }
 }
 
-
 const formatDateFn = inject('formatDate')
 const insightDateRange = inject('insightDateRange')
 const insightDateSelectionType = inject('insightDateSelectionType')
@@ -577,18 +577,15 @@ const bindModalEvents = () => {
     const originalShow = modal.showModal.bind(modal)
     modal.showModal = () => {
         syncFromSettings()
-        if (tab.value === 'accounts') refreshMcpTokenStatus()
-        if (tab.value === 'formatting') refreshAiQuota()
+        if (tab.value === 'accounts') {
+            refreshMcpTokenStatus()
+            refreshAiQuota()
+        }
         originalShow()
     }
 }
 
 onMounted(bindModalEvents)
-
-watch(tab, (next) => {
-    if (next === 'formatting') refreshAiQuota()
-})
-
 
 const formatDatePreview = computed(() => {
     const config = dateFormatMap[formatDate.value]
@@ -688,7 +685,10 @@ const revokeMcpTokenAction = async () => {
 }
 
 watch(tab, (next) => {
-    if (next === 'accounts') refreshMcpTokenStatus()
+    if (next === 'accounts') {
+        refreshMcpTokenStatus()
+        refreshAiQuota()
+    }
 })
 
 const openTelegramLink = async () => {

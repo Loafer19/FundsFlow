@@ -67,7 +67,10 @@ Session context (account data is authoritative; do not invent tag ids):
 {$contextJson}
 
 Rules:
-- help: asks what the bot can do, its capabilities, or how to use it.
+- help: asks what the bot can do, its capabilities, or how to use it. Prefer help over none
+  for capability / usage questions in any language. Examples (non-exhaustive): help, what can
+  you do, what can you help with, show capabilities, how can you help, що ти вмієш, що вмієш,
+  що ти можеш, допомога, довідка, як користуватися, як користуватись.
 - show_menu: asks to show/open the reply menu or keyboard buttons (Recent, Budgets, Tags, …).
 - list_recent: asks to show recent / latest transactions (same as the Recent menu button).
 - list_budgets: asks to show budgets / budget progress (same as Budgets).

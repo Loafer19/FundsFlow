@@ -45,14 +45,6 @@ class NaturalLanguageHandler
         $identity = $telegramUserId ?? $chatId;
         $this->session->touch($identity, $chatId);
 
-        // Keep common help requests free of AI quota. /help is handled earlier too.
-        if ($this->looksLikeHelp($text)) {
-            $this->support->sendHelp($chatId);
-            $this->session->setSummary($identity, $chatId, 'Help and capabilities sent.');
-
-            return true;
-        }
-
         if (!$this->looksLikeNaturalLanguage($text)) {
             return false;
         }
@@ -76,12 +68,6 @@ class NaturalLanguageHandler
 
         $session = $this->session->get($identity, $chatId);
 
-        // A first rename request still gets authoritative tag ids in the prompt.
-        if ($this->looksLikeTagRenameRequest($text) && $session['last_list'] === []) {
-            $this->saveTagListSession($identity, $chatId, $this->listTags->execute($user));
-            $session = $this->session->get($identity, $chatId);
-        }
-
         $this->client->sendMessage($chatId, 'Thinking…');
 
         $result = $this->interpretText->execute($user, $text, $session);
@@ -89,7 +75,7 @@ class NaturalLanguageHandler
         if ($result === null) {
             $this->client->sendMessage(
                 $chatId,
-                "Couldn't understand that. Try -350 groceries, /newtag, or /help.",
+                "Couldn't understand that. Try show recent, budgets, month summary, menu, -350 groceries, or /help.",
             );
             $this->session->setSummary($identity, $chatId, "Couldn't understand the request.");
 
@@ -424,18 +410,6 @@ class NaturalLanguageHandler
 
         // Pure amounts already handled by quick-add; anything with letters may be intent.
         return (bool) preg_match('/\p{L}/u', $trimmed);
-    }
-
-    private function looksLikeHelp(string $text): bool
-    {
-        $text = mb_strtolower(trim($text));
-
-        return (bool) preg_match('/^(help|what can you do|what can you help with|show capabilities|capabilities|how can you help)\b/u', $text);
-    }
-
-    private function looksLikeTagRenameRequest(string $text): bool
-    {
-        return (bool) preg_match('/\b(rename|renaming|переймен|переназв|україн|ukrainian)\p{L}*/ui', $text);
     }
 
     /**

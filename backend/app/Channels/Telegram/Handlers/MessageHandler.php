@@ -161,7 +161,7 @@ class MessageHandler
             return;
         }
 
-        if ($text === '/help' || strcasecmp($text, 'help') === 0 || strcasecmp($text, 'what can you do') === 0) {
+        if ($text === '/help') {
             $this->support->sendHelp($chatId);
 
             return;
