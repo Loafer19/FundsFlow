@@ -32,8 +32,9 @@ class MenuHandler
         private readonly TelegramChatSession $session,
     ) {}
 
-    public function sendMonthSummary(User $user, int|string $chatId): void
+    public function sendMonthSummary(User $user, int|string $chatId, int|string|null $telegramUserId = null): void
     {
+        $identity = $telegramUserId ?? $chatId;
         $month = $user->nowInTimezone()->format('Y-m');
 
         $transactions = $this->listTransactions->execute($user)
@@ -74,6 +75,8 @@ class MenuHandler
         }
 
         $this->client->sendMessage($chatId, implode("\n", $lines), null, TelegramSupport::PARSE_HTML);
+        $this->session->setDomain($identity, $chatId, 'analytics');
+        $this->session->setSummary($identity, $chatId, 'Month summary sent.');
     }
 
     public function sendTags(User $user, int|string $chatId, int|string|null $telegramUserId = null): void

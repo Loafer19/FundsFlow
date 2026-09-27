@@ -122,4 +122,9 @@ class TranscribeTelegramAudioAction
     {
         return $this->quota->dailyLimit();
     }
+
+    public function quota(): TelegramAiQuota
+    {
+        return $this->quota;
+    }
 }

@@ -73,10 +73,12 @@ class MessageHandler
         }
 
         if (!$this->transcribeAudio->hasQuota($user)) {
-            $limit = $this->transcribeAudio->dailyLimit();
             $this->client->sendMessage(
                 $chatId,
-                "Daily AI limit reached ({$limit}/day). Type your message, or try again after midnight in your timezone.",
+                $this->transcribeAudio->quota()->exhaustedMessage(
+                    $user,
+                    'Type your message instead, or try again after the reset. Settings in the Web UI shows your quota.',
+                ),
             );
 
             return;
@@ -122,11 +124,21 @@ class MessageHandler
         // One shared-quota decrement per voice message that successfully hits STT.
         // Downstream NL/receipt AI calls may consume additional units like typed text.
         $this->transcribeAudio->consumeQuota($user);
+        $remainingAfterStt = $this->transcribeAudio->quota()->remaining($user);
 
         $this->client->sendMessage($chatId, 'Heard: ' . $transcript);
 
         // Caption-style: if the voice was sent with a caption, ignore it — transcript is the command.
         $this->handleIncomingText($chatId, $telegramUserId, $transcript, skipAuthGate: true, user: $user);
+
+        // If NL also ran and consumed, it already sent a low-remaining hint.
+        // Otherwise hint here when STT alone left the budget low.
+        if ($this->transcribeAudio->quota()->remaining($user) === $remainingAfterStt) {
+            $hint = $this->transcribeAudio->quota()->lowRemainingHint($user);
+            if ($hint !== null) {
+                $this->client->sendMessage($chatId, $hint);
+            }
+        }
     }
 
     /**
@@ -182,7 +194,7 @@ class MessageHandler
         $this->session->touch($telegramUserId, $chatId);
 
         match (true) {
-            $text === '/month' || $text === '/analytics' || $text === TelegramSupport::MENU_MONTH => $this->menuHandler->sendMonthSummary($user, $chatId),
+            $text === '/month' || $text === '/analytics' || $text === TelegramSupport::MENU_MONTH => $this->menuHandler->sendMonthSummary($user, $chatId, $telegramUserId),
             $text === '/recent' || $text === TelegramSupport::MENU_RECENT => $this->menuHandler->sendRecent($user, $chatId, $telegramUserId),
             $text === '/tags' || $text === TelegramSupport::MENU_TAGS => $this->menuHandler->sendTags($user, $chatId, $telegramUserId),
             $text === '/budgets' || $text === TelegramSupport::MENU_BUDGETS => $this->menuHandler->sendBudgets($user, $chatId, $telegramUserId),

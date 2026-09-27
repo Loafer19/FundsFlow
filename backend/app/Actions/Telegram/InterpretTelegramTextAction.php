@@ -22,12 +22,11 @@ class InterpretTelegramTextAction
      * intents map 1:1 onto MenuHandler / TelegramSupport helpers; ui-slots may only
      * re-attach prebuilt keyboards from TelegramSupport (e.g. menuKeyboard).
      * NL intents: help, show_menu, list_recent, list_budgets, list_recurring,
-     * open_web, list_tags, create_tags, rename_tags, none.
-     * Out of scope for now: period_summary / Month analytics.
+     * open_web, list_tags, create_tags, rename_tags, period_summary, none.
      *
      * @param array<string, mixed> $sessionContext
      * @return array{
-     *     intent: 'help'|'show_menu'|'list_recent'|'list_budgets'|'list_recurring'|'open_web'|'create_tags'|'list_tags'|'rename_tags'|'none',
+     *     intent: 'help'|'show_menu'|'list_recent'|'list_budgets'|'list_recurring'|'open_web'|'create_tags'|'list_tags'|'rename_tags'|'period_summary'|'none',
      *     titles: list<string>,
      *     proposals: list<array{id: int|null, index: int|null, before: string, after: string}>,
      *     confidence: float,
@@ -56,7 +55,7 @@ class InterpretTelegramTextAction
 You classify short messages to a personal finance Telegram bot (FundsFlow).
 Reply with ONLY a JSON object (no markdown):
 {
-  "intent": "help" | "show_menu" | "list_recent" | "list_budgets" | "list_recurring" | "open_web" | "create_tags" | "list_tags" | "rename_tags" | "none",
+  "intent": "help" | "show_menu" | "list_recent" | "list_budgets" | "list_recurring" | "open_web" | "create_tags" | "list_tags" | "rename_tags" | "period_summary" | "none",
   "titles": string[],
   "proposals": [{"id": number|null, "index": number|null, "before": string, "after": string}],
   "confidence": number,
@@ -74,6 +73,10 @@ Rules:
 - list_budgets: asks to show budgets / budget progress (same as Budgets).
 - list_recurring: asks to show recurring rules / subscriptions (same as Recurring).
 - open_web: asks to open the website / Web UI / mini app (same as Web UI / /app).
+- period_summary: asks for this month's summary / spend / income / analytics (same as the Month
+  menu button / /month). Aliases include: month summary, this month, how much did I spend this
+  month, витрати цього місяця, аналітика за місяць. Do not invent tag filters; MVP is the
+  same full-month view as Month.
 - list_tags: asks to show/list tags.
 - create_tags: user wants to create one or more tags/categories. Put cleaned titles in
   titles (1–10 items, no emojis unless clearly part of the name). Keep the user's wording.
@@ -87,10 +90,10 @@ Rules:
   only when the user must choose among last_list; otherwise use ui.type="none".
 - ui.item_ids may contain only ids explicitly present in last_list. The handler validates them.
 - needs_confirm must be true for create_tags and rename_tags. It must be false for
-  help/show_menu/list_*/open_web/none.
+  help/show_menu/list_*/open_web/period_summary/none.
 - ui.type should be confirm for a mutation preview, pick_one when a tag selection is required,
   and none for read-only or unclear requests. Do not invent callback_data.
-- none: unrelated chat, unclear requests, or analytics/month summaries (not supported via NL yet).
+- none: unrelated chat or unclear requests (not a listed intent).
 - confidence: 0–1.
 PROMPT;
 
@@ -138,7 +141,7 @@ PROMPT;
 
     /**
      * @return array{
-     *     intent: 'help'|'show_menu'|'list_recent'|'list_budgets'|'list_recurring'|'open_web'|'create_tags'|'list_tags'|'rename_tags'|'none',
+     *     intent: 'help'|'show_menu'|'list_recent'|'list_budgets'|'list_recurring'|'open_web'|'create_tags'|'list_tags'|'rename_tags'|'period_summary'|'none',
      *     titles: list<string>,
      *     proposals: list<array{id: int|null, index: int|null, before: string, after: string}>,
      *     confidence: float,
@@ -176,6 +179,7 @@ PROMPT;
             'create_tags',
             'list_tags',
             'rename_tags',
+            'period_summary',
             'none',
         ];
         if (!in_array($intent, $allowedIntents, true)) {

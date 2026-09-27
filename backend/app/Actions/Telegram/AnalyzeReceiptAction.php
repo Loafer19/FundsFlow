@@ -157,6 +157,11 @@ PROMPT;
         return $this->quota->key($user);
     }
 
+    public function quota(): TelegramAiQuota
+    {
+        return $this->quota;
+    }
+
     public function isVisionMime(string $mime): bool
     {
         return in_array($mime, ['image/jpeg', 'image/png'], true);

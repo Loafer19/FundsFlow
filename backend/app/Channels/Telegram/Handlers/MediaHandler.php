@@ -342,6 +342,7 @@ class MediaHandler
 
         if (!$canUseVision) {
             $this->fallbackToAmountKeyboard(
+                $user,
                 $chatId,
                 $file,
                 overLimit: !$this->analyzeReceipt->hasQuota($user),
@@ -363,7 +364,7 @@ class MediaHandler
         $analysis = $this->analyzeReceipt->execute($user, $contents, $file['mime'], $captionHint);
 
         if ($analysis === null) {
-            $this->fallbackToAmountKeyboard($chatId, $file, overLimit: false, aiFailed: true, allFiles: $attachmentFiles);
+            $this->fallbackToAmountKeyboard($user, $chatId, $file, overLimit: false, aiFailed: true, allFiles: $attachmentFiles);
 
             return;
         }
@@ -426,6 +427,7 @@ class MediaHandler
      * @param list<array{file_id: string, name: string, mime: string, file_size?: int}>|null $allFiles
      */
     private function fallbackToAmountKeyboard(
+        User $user,
         int|string $chatId,
         array $file,
         bool $overLimit = false,
@@ -437,10 +439,12 @@ class MediaHandler
         $this->forgetDraft($chatId);
 
         if ($overLimit) {
-            $limit = $this->analyzeReceipt->dailyLimit();
             $this->client->sendMessage(
                 $chatId,
-                "Daily AI receipt limit reached ({$limit}/day). Pick an amount or send like -350 groceries",
+                $this->analyzeReceipt->quota()->exhaustedMessage(
+                    $user,
+                    'Pick an amount or send like -350 groceries.',
+                ),
                 $this->support->mediaAmountKeyboard(),
             );
 

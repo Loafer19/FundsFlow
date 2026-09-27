@@ -56,7 +56,8 @@ class TelegramSupport
             . "Photo without an amount: AI draft (limited per day), then Confirm.\n"
             . "Album of photos: choose one receipt or separate transactions.\n"
             . "Voice notes work too — same commands as typing (shared daily AI limit).\n"
-            . "Natural language: show recent, budgets, menu, tags; create or rename tags.\n\n"
+            . "Natural language: show recent/budgets/menu/tags, rename tags, month summary.\n"
+            . "AI has a daily limit; Settings shows quota, and the bot says when you're out.\n\n"
             . 'Use the menu below, or /help for all commands.';
     }
 
@@ -88,10 +89,12 @@ class TelegramSupport
             . "Send a photo or PDF with a caption like \"-350 groceries\" for instant save. Without an amount, AI may draft a receipt (Confirm / Edit / Cancel).\n"
             . "Albums: choose one transaction or separate.\n\n"
             . "Voice\n"
-            . "Send a voice note for the same actions as typing (quick-add, menu, tags, help). Uses the shared daily AI budget.\n\n"
+            . "Send a voice note for the same actions as typing (quick-add, menu, tags, help, month summary). Uses the shared daily AI budget.\n\n"
             . "Text AI\n"
-            . "Examples: show recent, budgets, recurring, menu, web ui; list/create/rename tags; ask what I can do.\n"
-            . "Same views as the reply-menu buttons (Month is still /month or the Month button).",
+            . "Examples: show recent, budgets, menu, tags; rename tags; month summary / this month; ask what I can do.\n"
+            . "Same views as the reply-menu buttons (including Month).\n\n"
+            . "AI limit\n"
+            . "Receipt AI, voice, and text AI share a daily limit. Settings in the Web UI shows used/limit and reset time; the bot tells you when you're out.",
             $this->menuKeyboard(),
         );
     }

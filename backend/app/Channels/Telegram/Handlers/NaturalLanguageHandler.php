@@ -57,8 +57,21 @@ class NaturalLanguageHandler
             return false;
         }
 
-        if (!$this->quota->hasQuota($user) || (string) config('services.xai.api_key') === '') {
+        if ((string) config('services.xai.api_key') === '') {
             return false;
+        }
+
+        if (!$this->quota->hasQuota($user)) {
+            $this->client->sendMessage(
+                $chatId,
+                $this->quota->exhaustedMessage(
+                    $user,
+                    'Use the menu buttons, type a quick-add, or try again after the reset. Settings in the Web UI shows your quota.',
+                ),
+            );
+            $this->session->setSummary($identity, $chatId, 'AI quota exhausted.');
+
+            return true;
         }
 
         $session = $this->session->get($identity, $chatId);
@@ -85,21 +98,43 @@ class NaturalLanguageHandler
 
         $this->quota->consume($user);
 
+        $this->applyIntent($user, $chatId, $identity, $result);
+        $this->maybeHintLowRemaining($user, $chatId);
+
+        return true;
+    }
+
+    /**
+     * @param array{
+     *     intent: string,
+     *     titles: list<string>,
+     *     proposals: list<array{id: int|null, index: int|null, before: string, after: string}>,
+     *     confidence: float,
+     *     needs_confirm: bool,
+     *     ui: array{type: string, item_ids: list<int>}
+     * } $result
+     */
+    private function applyIntent(
+        User $user,
+        int|string $chatId,
+        int|string $identity,
+        array $result,
+    ): void {
         if ($result['intent'] === 'help') {
             $this->support->sendHelp($chatId);
             $this->session->setSummary($identity, $chatId, 'Help and capabilities sent.');
 
-            return true;
+            return;
         }
 
         if ($result['intent'] === 'none' || $result['confidence'] < 0.45) {
             $this->client->sendMessage(
                 $chatId,
-                "Didn't catch an action there. Try show recent, budgets, menu, -350 groceries, or /help.",
+                "Didn't catch an action there. Try show recent, budgets, month summary, menu, -350 groceries, or /help.",
             );
             $this->session->setSummary($identity, $chatId, "Didn't catch an action.");
 
-            return true;
+            return;
         }
 
         if ($result['intent'] === 'show_menu') {
@@ -110,45 +145,51 @@ class NaturalLanguageHandler
             );
             $this->session->setSummary($identity, $chatId, 'Reply menu sent.');
 
-            return true;
+            return;
         }
 
         if ($result['intent'] === 'list_recent') {
             $this->menuHandler->sendRecent($user, $chatId, $identity);
 
-            return true;
+            return;
         }
 
         if ($result['intent'] === 'list_budgets') {
             $this->menuHandler->sendBudgets($user, $chatId, $identity);
 
-            return true;
+            return;
         }
 
         if ($result['intent'] === 'list_recurring') {
             $this->menuHandler->sendRecurring($user, $chatId);
             $this->session->setSummary($identity, $chatId, 'Recurring rules listed.');
 
-            return true;
+            return;
+        }
+
+        if ($result['intent'] === 'period_summary') {
+            $this->menuHandler->sendMonthSummary($user, $chatId, $identity);
+
+            return;
         }
 
         if ($result['intent'] === 'open_web') {
             $this->support->sendMiniAppHint($chatId);
             $this->session->setSummary($identity, $chatId, 'Web UI hint sent.');
 
-            return true;
+            return;
         }
 
         if ($result['intent'] === 'list_tags') {
             $this->menuHandler->sendTags($user, $chatId, $identity);
 
-            return true;
+            return;
         }
 
         if ($result['intent'] === 'create_tags') {
             $this->handleCreateTags($user, $chatId, $identity, $result['titles'], $result['needs_confirm']);
 
-            return true;
+            return;
         }
 
         if ($result['intent'] === 'rename_tags') {
@@ -157,7 +198,7 @@ class NaturalLanguageHandler
             if ($proposals === [] && $result['ui']['type'] === 'pick_one') {
                 $this->promptRenamePick($chatId, $identity, $result['ui']['item_ids']);
 
-                return true;
+                return;
             }
 
             if ($proposals === []) {
@@ -167,7 +208,7 @@ class NaturalLanguageHandler
                 );
                 $this->session->setSummary($identity, $chatId, 'Rename request had no valid tag proposals.');
 
-                return true;
+                return;
             }
 
             $this->putPendingRename($identity, $chatId, $proposals);
@@ -177,11 +218,15 @@ class NaturalLanguageHandler
                 $this->support->nlRenameConfirmKeyboard(),
             );
             $this->session->setSummary($identity, $chatId, 'Rename preview shown.');
-
-            return true;
         }
+    }
 
-        return true;
+    private function maybeHintLowRemaining(User $user, int|string $chatId): void
+    {
+        $hint = $this->quota->lowRemainingHint($user);
+        if ($hint !== null) {
+            $this->client->sendMessage($chatId, $hint);
+        }
     }
 
     public function confirmCreateTags(
