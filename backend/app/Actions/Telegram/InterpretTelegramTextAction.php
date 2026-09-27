@@ -15,16 +15,20 @@ class InterpretTelegramTextAction
     ) {}
 
     /**
-     * Classify free-form Telegram text into a small intent set (no mutations).
+     * Classify free-form Telegram text into structured intent and UI slots.
+     * This action never mutates account data.
      *
+     * @param array<string, mixed> $sessionContext
      * @return array{
-     *     intent: 'create_tags'|'list_tags'|'none',
+     *     intent: 'help'|'create_tags'|'list_tags'|'rename_tags'|'none',
      *     titles: list<string>,
+     *     proposals: list<array{id: int|null, index: int|null, before: string, after: string}>,
      *     confidence: float,
-     *     needs_confirm: bool
+     *     needs_confirm: bool,
+     *     ui: array{type: 'confirm'|'pick_one'|'none', item_ids: list<int>}
      * }|null Null when AI is unavailable or the call fails (does not burn quota).
      */
-    public function execute(User $user, string $text): ?array
+    public function execute(User $user, string $text, array $sessionContext = []): ?array
     {
         $apiKey = (string) config('services.xai.api_key');
         $baseUrl = rtrim((string) config('services.xai.base_url', 'https://api.x.ai/v1'), '/');
@@ -34,22 +38,47 @@ class InterpretTelegramTextAction
             return null;
         }
 
-        $system = <<<'PROMPT'
+        $contextJson = json_encode([
+            'domain' => $sessionContext['domain'] ?? null,
+            'last_list' => $sessionContext['last_list'] ?? [],
+            'last_bot_summary' => $sessionContext['last_bot_summary'] ?? '',
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $contextJson = is_string($contextJson) ? $contextJson : '{}';
+
+        $system = <<<PROMPT
 You classify short messages to a personal finance Telegram bot (FundsFlow).
 Reply with ONLY a JSON object (no markdown):
 {
-  "intent": "create_tags" | "list_tags" | "none",
+  "intent": "help" | "create_tags" | "list_tags" | "rename_tags" | "none",
   "titles": string[],
+  "proposals": [{"id": number|null, "index": number|null, "before": string, "after": string}],
   "confidence": number,
-  "needs_confirm": boolean
+  "needs_confirm": boolean,
+  "ui": {"type": "confirm" | "pick_one" | "none", "item_ids": number[]}
 }
+
+Session context (account data is authoritative; do not invent tag ids):
+{$contextJson}
+
 Rules:
-- create_tags: user wants to create one or more tags/categories. Put cleaned tag titles in "titles" (1–10 items, no emojis unless clearly part of the name). Languages: accept Ukrainian/Russian/English; keep titles in the user's wording (trimmed).
-- list_tags: user asks to show their tags.
-- none: anything else (transactions, chit-chat, unclear).
-- needs_confirm: true unless the message clearly and unambiguously asks to create those tags (e.g. "create tags A, B" / "створи теги A, B"). Prefer true when unsure.
+- help: asks what the bot can do, its capabilities, or how to use it.
+- list_tags: asks to show/list tags.
+- create_tags: user wants to create one or more tags/categories. Put cleaned titles in
+  titles (1–10 items, no emojis unless clearly part of the name). Keep the user's wording.
+- rename_tags: user wants to rename one or more existing tags. For each proposal, use an id
+  from last_list when available. If the user refers to an ordinal such as "second", use
+  index=2 and the handler will resolve it against last_list. Copy the exact current name
+  into before and put the requested new name in after. "rename tags to Ukrainian" means
+  propose Ukrainian translations for the tags in last_list. Do not invent tags or ids.
+- Ordinals and follow-ups refer to last_list. Keep the domain sticky across short follow-ups.
+- If a rename request identifies a tag but does not provide a new title, use ui.type="pick_one"
+  only when the user must choose among last_list; otherwise use ui.type="none".
+- ui.item_ids may contain only ids explicitly present in last_list. The handler validates them.
+- needs_confirm must be true for create_tags and rename_tags. It must be false for help/list_tags/none.
+- ui.type should be confirm for a mutation preview, pick_one when a tag selection is required,
+  and none for read-only or unclear requests.
+- none: transactions, unrelated chat, or unclear requests.
 - confidence: 0–1.
-- Do not invent titles that were not mentioned for create_tags.
 PROMPT;
 
         try {
@@ -59,7 +88,7 @@ PROMPT;
                 ->post($baseUrl . '/chat/completions', [
                     'model' => $model,
                     'temperature' => 0,
-                    'max_tokens' => 300,
+                    'max_tokens' => 700,
                     'messages' => [
                         ['role' => 'system', 'content' => $system],
                         ['role' => 'user', 'content' => $text],
@@ -96,10 +125,12 @@ PROMPT;
 
     /**
      * @return array{
-     *     intent: 'create_tags'|'list_tags'|'none',
+     *     intent: 'help'|'create_tags'|'list_tags'|'rename_tags'|'none',
      *     titles: list<string>,
+     *     proposals: list<array{id: int|null, index: int|null, before: string, after: string}>,
      *     confidence: float,
-     *     needs_confirm: bool
+     *     needs_confirm: bool,
+     *     ui: array{type: 'confirm'|'pick_one'|'none', item_ids: list<int>}
      * }|null
      */
     private function parseModelJson(string $content): ?array
@@ -122,16 +153,86 @@ PROMPT;
         }
 
         $intent = $decoded['intent'] ?? 'none';
-        if (!in_array($intent, ['create_tags', 'list_tags', 'none'], true)) {
+        if (!in_array($intent, ['help', 'create_tags', 'list_tags', 'rename_tags', 'none'], true)) {
             $intent = 'none';
         }
 
-        $titles = $decoded['titles'] ?? [];
-        if (!is_array($titles)) {
-            $titles = [];
+        $titles = $this->parseTitles($decoded['titles'] ?? []);
+        $proposals = $this->parseProposals($decoded['proposals'] ?? []);
+
+        if ($intent === 'create_tags' && $titles === []) {
+            $intent = 'none';
         }
+        if ($intent === 'rename_tags' && $proposals === []) {
+            // Keep the intent: the handler may turn a pick_one UI slot into a follow-up.
+            $uiType = data_get($decoded, 'ui.type');
+            if ($uiType !== 'pick_one') {
+                $intent = 'none';
+            }
+        }
+
+        $confidence = $decoded['confidence'] ?? 0;
+        $confidence = is_numeric($confidence) ? max(0.0, min(1.0, (float) $confidence)) : 0.0;
+
+        $needsConfirm = (bool) ($decoded['needs_confirm'] ?? true);
+        if ($intent === 'create_tags') {
+            // Preserve the existing behavior: only a very confident explicit create may skip confirmation.
+            if ($confidence < 0.75) {
+                $needsConfirm = true;
+            }
+        } elseif ($intent === 'rename_tags') {
+            // Renames always show a before → after preview before mutation.
+            $needsConfirm = true;
+        } else {
+            $needsConfirm = false;
+        }
+
+        $uiType = data_get($decoded, 'ui.type', 'none');
+        if (!in_array($uiType, ['confirm', 'pick_one', 'none'], true)) {
+            $uiType = 'none';
+        }
+
+        if (($intent === 'rename_tags' && $proposals !== []) || $intent === 'create_tags') {
+            $uiType = $needsConfirm ? 'confirm' : 'none';
+        }
+        if ($intent === 'rename_tags' && $proposals === [] && $uiType !== 'pick_one') {
+            $uiType = 'none';
+        }
+
+        $itemIds = data_get($decoded, 'ui.item_ids', []);
+        if (!is_array($itemIds)) {
+            $itemIds = [];
+        }
+        $itemIds = array_values(array_unique(array_filter(array_map(
+            static fn (mixed $id): ?int => is_numeric($id) && (int) $id > 0 ? (int) $id : null,
+            $itemIds,
+        ))));
+
+        return [
+            'intent' => $intent,
+            'titles' => $titles,
+            'proposals' => $proposals,
+            'confidence' => $confidence,
+            'needs_confirm' => $needsConfirm,
+            'ui' => [
+                'type' => $uiType,
+                'item_ids' => $itemIds,
+            ],
+        ];
+    }
+
+    /**
+     * @param mixed $raw
+     * @return list<string>
+     */
+    private function parseTitles(mixed $raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
+        }
+
         $titles = array_values(array_unique(array_filter(array_map(
-            static function ($title) {
+            static function (mixed $title): ?string {
                 if (!is_string($title)) {
                     return null;
                 }
@@ -142,32 +243,49 @@ PROMPT;
 
                 return mb_substr($title, 0, 255);
             },
-            $titles,
+            $raw,
         ))));
-        $titles = array_slice($titles, 0, 10);
 
-        if ($intent === 'create_tags' && $titles === []) {
-            $intent = 'none';
+        return array_slice($titles, 0, 10);
+    }
+
+    /**
+     * @param mixed $raw
+     * @return list<array{id: int|null, index: int|null, before: string, after: string}>
+     */
+    private function parseProposals(mixed $raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
         }
 
-        $confidence = $decoded['confidence'] ?? 0;
-        $confidence = is_numeric($confidence) ? max(0.0, min(1.0, (float) $confidence)) : 0.0;
-
-        $needsConfirm = (bool) ($decoded['needs_confirm'] ?? true);
-        if ($intent === 'create_tags') {
-            // Always confirm mutations for MVP safety unless model is very sure and said no confirm.
-            if ($confidence < 0.75) {
-                $needsConfirm = true;
+        $proposals = [];
+        foreach ($raw as $proposal) {
+            if (!is_array($proposal)) {
+                continue;
             }
-        } else {
-            $needsConfirm = false;
+
+            $id = is_numeric($proposal['id'] ?? null) && (int) $proposal['id'] > 0
+                ? (int) $proposal['id']
+                : null;
+            $index = is_numeric($proposal['index'] ?? null) && (int) $proposal['index'] > 0
+                ? (int) $proposal['index']
+                : null;
+            $before = is_string($proposal['before'] ?? null) ? trim($proposal['before']) : '';
+            $after = is_string($proposal['after'] ?? null) ? trim($proposal['after']) : '';
+
+            if (($id === null && $index === null) || $after === '') {
+                continue;
+            }
+
+            $proposals[] = [
+                'id' => $id,
+                'index' => $index,
+                'before' => mb_substr($before, 0, 255),
+                'after' => mb_substr($after, 0, 255),
+            ];
         }
 
-        return [
-            'intent' => $intent,
-            'titles' => $titles,
-            'confidence' => $confidence,
-            'needs_confirm' => $needsConfirm,
-        ];
+        return array_slice($proposals, 0, 50);
     }
 }

@@ -8,6 +8,7 @@ use App\Actions\RecurringTransactions\ListRecurringTransactionsAction;
 use App\Actions\Tags\CreateTagAction;
 use App\Actions\Tags\ListTagsAction;
 use App\Actions\Transactions\ListTransactionsAction;
+use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
 use App\Models\BudgetPeriod;
@@ -28,6 +29,7 @@ class MenuHandler
         private readonly ListBudgetsAction $listBudgets,
         private readonly ListRecurringTransactionsAction $listRecurring,
         private readonly CalculateBudgetPeriodSpentAction $calculateBudgetSpent,
+        private readonly TelegramChatSession $session,
     ) {}
 
     public function sendMonthSummary(User $user, int|string $chatId): void
@@ -74,11 +76,23 @@ class MenuHandler
         $this->client->sendMessage($chatId, implode("\n", $lines), null, TelegramSupport::PARSE_HTML);
     }
 
-    public function sendTags(User $user, int|string $chatId): void
+    public function sendTags(User $user, int|string $chatId, int|string|null $telegramUserId = null): void
     {
         $tags = $this->listTags->execute($user);
+        $identity = $telegramUserId ?? $chatId;
+        $tree = $this->support->buildTagTree($tags);
+        $this->session->setDomain($identity, $chatId, 'tags');
+        $this->session->setLastList($identity, $chatId, array_map(
+            static fn (array $node): array => [
+                'id' => (int) $node['tag']->id,
+                'title' => (string) $node['tag']->title,
+                'emoji' => (string) $node['tag']->emoji,
+            ],
+            $tree,
+        ));
 
         if ($tags->isEmpty()) {
+            $this->session->setSummary($identity, $chatId, 'No tags yet.');
             $this->client->sendMessage($chatId, 'No tags yet');
 
             return;
@@ -86,10 +100,12 @@ class MenuHandler
 
         $lines = array_map(
             fn (array $node) => $this->support->formatTagLabel($node['tag'], $node['depth']),
-            $this->support->buildTagTree($tags),
+            $tree,
         );
 
-        $this->client->sendMessage($chatId, "🏷 Your tags\n" . implode("\n", $lines));
+        $summary = "🏷 Your tags\n" . implode("\n", $lines);
+        $this->client->sendMessage($chatId, $summary);
+        $this->session->setSummary($identity, $chatId, $summary);
     }
 
     public function sendRecent(User $user, int|string $chatId): void

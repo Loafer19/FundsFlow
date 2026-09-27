@@ -2,6 +2,7 @@
 
 namespace App\Channels\Telegram\Handlers;
 
+use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
 use App\Models\User;
@@ -17,6 +18,7 @@ class MessageHandler
         private readonly QuickAddHandler $quickAddHandler,
         private readonly MediaHandler $mediaHandler,
         private readonly NaturalLanguageHandler $naturalLanguageHandler,
+        private readonly TelegramChatSession $session,
     ) {}
 
     /**
@@ -25,6 +27,7 @@ class MessageHandler
     public function handleMessage(array $message): void
     {
         $chatId = $message['chat']['id'];
+        $telegramUserId = isset($message['from']['id']) ? (int) $message['from']['id'] : $chatId;
         $text = trim($message['text']);
 
         if (str_starts_with($text, '/start')) {
@@ -59,9 +62,11 @@ class MessageHandler
             return;
         }
 
+        $this->session->touch($telegramUserId, $chatId);
+
         match (true) {
             $text === '/month' || $text === '/analytics' || $text === TelegramSupport::MENU_MONTH => $this->menuHandler->sendMonthSummary($user, $chatId),
-            $text === '/tags' || $text === TelegramSupport::MENU_TAGS => $this->menuHandler->sendTags($user, $chatId),
+            $text === '/tags' || $text === TelegramSupport::MENU_TAGS => $this->menuHandler->sendTags($user, $chatId, $telegramUserId),
             $text === '/recent' || $text === TelegramSupport::MENU_RECENT => $this->menuHandler->sendRecent($user, $chatId),
             $text === '/budgets' || $text === TelegramSupport::MENU_BUDGETS => $this->menuHandler->sendBudgets($user, $chatId),
             $text === '/recurring' || $text === TelegramSupport::MENU_RECURRING => $this->menuHandler->sendRecurring($user, $chatId),
@@ -71,12 +76,16 @@ class MessageHandler
             $text === '/unmute' => $this->authHandler->handleMute($chatId, false),
             $text === '/unlink' => $this->authHandler->handleUnlink($chatId),
             str_starts_with($text, '/newtag') => $this->menuHandler->handleNewTag($user, $chatId, $text),
-            default => $this->handleDefaultText($user, $chatId, $text),
+            default => $this->handleDefaultText($user, $chatId, $text, $telegramUserId),
         };
     }
 
-    private function handleDefaultText(User $user, int|string $chatId, string $text): void
+    private function handleDefaultText(User $user, int|string $chatId, string $text, int|string $telegramUserId): void
     {
+        if ($this->naturalLanguageHandler->handlePendingRenameTitle($user, $chatId, $text, $telegramUserId)) {
+            return;
+        }
+
         if ($this->mediaHandler->hasAwaitingDraft($chatId)) {
             $this->mediaHandler->completeDraftAmount($user, $chatId, $text);
 
@@ -103,7 +112,7 @@ class MessageHandler
             return;
         }
 
-        if ($this->naturalLanguageHandler->tryHandle($user, $chatId, $text)) {
+        if ($this->naturalLanguageHandler->tryHandle($user, $chatId, $text, $telegramUserId)) {
             return;
         }
 

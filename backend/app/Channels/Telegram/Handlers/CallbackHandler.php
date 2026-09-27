@@ -31,6 +31,7 @@ class CallbackHandler
         $chatId = $callbackQuery['message']['chat']['id'] ?? null;
         $messageId = $callbackQuery['message']['message_id'] ?? null;
         $data = $callbackQuery['data'] ?? '';
+        $telegramUserId = isset($callbackQuery['from']['id']) ? (int) $callbackQuery['from']['id'] : $chatId;
 
         if ($data === 'noop') {
             $this->client->answerCallbackQuery($callbackId);
@@ -158,14 +159,40 @@ class CallbackHandler
 
         if ($data === 'nl:tags:ok') {
             $this->client->answerCallbackQuery($callbackId, 'Creating…');
-            $this->naturalLanguageHandler->confirmCreateTags($user, $chatId);
+            $this->naturalLanguageHandler->confirmCreateTags($user, $chatId, $telegramUserId);
 
             return;
         }
 
         if ($data === 'nl:tags:cancel') {
             $this->client->answerCallbackQuery($callbackId, 'Cancelled');
-            $this->naturalLanguageHandler->cancelCreateTags($chatId);
+            $this->naturalLanguageHandler->cancelCreateTags($chatId, $telegramUserId);
+
+            return;
+        }
+
+        if (preg_match('/^nl:rename:pick:(\d+)$/', $data, $matches)) {
+            $this->naturalLanguageHandler->pickRenameTag(
+                $user,
+                $chatId,
+                (int) $matches[1],
+                $callbackId,
+                $telegramUserId,
+            );
+
+            return;
+        }
+
+        if ($data === 'nl:rename:ok') {
+            $this->client->answerCallbackQuery($callbackId, 'Renaming…');
+            $this->naturalLanguageHandler->confirmRenameTags($user, $chatId, $telegramUserId);
+
+            return;
+        }
+
+        if ($data === 'nl:rename:cancel') {
+            $this->client->answerCallbackQuery($callbackId, 'Cancelled');
+            $this->naturalLanguageHandler->cancelRenameTags($chatId, $telegramUserId);
 
             return;
         }

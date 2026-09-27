@@ -4,18 +4,20 @@ namespace App\Channels\Telegram\Handlers;
 
 use App\Actions\Tags\CreateTagAction;
 use App\Actions\Tags\ListTagsAction;
+use App\Actions\Tags\UpdateTagAction;
 use App\Actions\Telegram\InterpretTelegramTextAction;
+use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
 use App\Models\Tag;
 use App\Models\User;
 use App\Support\TelegramAiQuota;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class NaturalLanguageHandler
 {
-    private const PENDING_TTL_MINUTES = 15;
-
     private const DEFAULT_EMOJI = '🏷';
 
     public function __construct(
@@ -25,14 +27,31 @@ class NaturalLanguageHandler
         private readonly TelegramAiQuota $quota,
         private readonly CreateTagAction $createTag,
         private readonly ListTagsAction $listTags,
+        private readonly UpdateTagAction $updateTag,
+        private readonly TelegramChatSession $session,
     ) {}
 
     /**
      * Try AI intent handling. Returns true when the message was consumed
      * (including "didn't understand" after a failed/low-confidence intent call).
      */
-    public function tryHandle(User $user, int|string $chatId, string $text): bool
-    {
+    public function tryHandle(
+        User $user,
+        int|string $chatId,
+        string $text,
+        int|string|null $telegramUserId = null,
+    ): bool {
+        $identity = $telegramUserId ?? $chatId;
+        $this->session->touch($identity, $chatId);
+
+        // Keep common help requests free of AI quota. /help is handled earlier too.
+        if ($this->looksLikeHelp($text)) {
+            $this->support->sendHelp($chatId);
+            $this->session->setSummary($identity, $chatId, 'Help and capabilities sent.');
+
+            return true;
+        }
+
         if (!$this->looksLikeNaturalLanguage($text)) {
             return false;
         }
@@ -41,70 +60,85 @@ class NaturalLanguageHandler
             return false;
         }
 
+        $session = $this->session->get($identity, $chatId);
+
+        // A first rename request still gets authoritative tag ids in the prompt.
+        if ($this->looksLikeTagRenameRequest($text) && $session['last_list'] === []) {
+            $this->saveTagListSession($identity, $chatId, $this->listTags->execute($user));
+            $session = $this->session->get($identity, $chatId);
+        }
+
         $this->client->sendMessage($chatId, 'Thinking…');
 
-        $result = $this->interpretText->execute($user, $text);
+        $result = $this->interpretText->execute($user, $text, $session);
 
         if ($result === null) {
             $this->client->sendMessage(
                 $chatId,
                 "Couldn't understand that. Try -350 groceries, /newtag, or /help.",
             );
+            $this->session->setSummary($identity, $chatId, "Couldn't understand the request.");
 
             return true;
         }
 
         $this->quota->consume($user);
 
+        if ($result['intent'] === 'help') {
+            $this->support->sendHelp($chatId);
+            $this->session->setSummary($identity, $chatId, 'Help and capabilities sent.');
+
+            return true;
+        }
+
         if ($result['intent'] === 'none' || $result['confidence'] < 0.45) {
             $this->client->sendMessage(
                 $chatId,
                 "Didn't catch an action there. Try -350 groceries, /tags, /newtag 🏷 Title, or /help.",
             );
+            $this->session->setSummary($identity, $chatId, "Didn't catch an action.");
 
             return true;
         }
 
         if ($result['intent'] === 'list_tags') {
-            // Reuse menu listing via a lightweight reply (avoid circular MenuHandler deps).
-            $tags = $this->listTags->execute($user);
-            if ($tags->isEmpty()) {
-                $this->client->sendMessage($chatId, 'You have no tags yet. Try: create tags groceries, coffee');
-
-                return true;
-            }
-
-            $lines = [];
-            foreach ($tags->values() as $i => $tag) {
-                $lines[] = ($i + 1) . ') ' . trim($tag->emoji . ' ' . $tag->title);
-            }
-            $this->client->sendMessage($chatId, "🏷 Your tags\n" . implode("\n", $lines));
+            $this->sendTagList($user, $chatId, $identity);
 
             return true;
         }
 
         if ($result['intent'] === 'create_tags') {
-            $titles = $this->filterNewTagTitles($user, $result['titles']);
+            $this->handleCreateTags($user, $chatId, $identity, $result['titles'], $result['needs_confirm']);
 
-            if ($titles === []) {
-                $this->client->sendMessage($chatId, 'Those tags already exist (or none were left to create).');
+            return true;
+        }
+
+        if ($result['intent'] === 'rename_tags') {
+            $proposals = $this->resolveRenameProposals($user, $identity, $chatId, $result['proposals']);
+
+            if ($proposals === [] && $result['ui']['type'] === 'pick_one') {
+                $this->promptRenamePick($chatId, $identity, $result['ui']['item_ids']);
 
                 return true;
             }
 
-            if ($result['needs_confirm']) {
-                $this->putPendingCreateTags($chatId, $titles);
-                $label = implode(', ', $titles);
+            if ($proposals === []) {
                 $this->client->sendMessage(
                     $chatId,
-                    "Create tags: {$label}?",
-                    $this->support->nlCreateTagsKeyboard(),
+                    'I could not match a tag and a new title. Try: rename the second to Groceries, or list tags first.',
                 );
+                $this->session->setSummary($identity, $chatId, 'Rename request had no valid tag proposals.');
 
                 return true;
             }
 
-            $this->createTags($user, $chatId, $titles);
+            $this->putPendingRename($identity, $chatId, $proposals);
+            $this->client->sendMessage(
+                $chatId,
+                "Rename tags:\n" . $this->formatRenamePreview($proposals) . "\n\nApply these changes?",
+                $this->support->nlRenameConfirmKeyboard(),
+            );
+            $this->session->setSummary($identity, $chatId, 'Rename preview shown.');
 
             return true;
         }
@@ -112,22 +146,181 @@ class NaturalLanguageHandler
         return true;
     }
 
-    public function confirmCreateTags(User $user, int|string $chatId): void
-    {
-        $titles = $this->pullPendingCreateTags($chatId);
+    public function confirmCreateTags(
+        User $user,
+        int|string $chatId,
+        int|string|null $telegramUserId = null,
+    ): void {
+        $identity = $telegramUserId ?? $chatId;
+        $pending = $this->session->get($identity, $chatId)['pending'];
+        $this->session->clearPending($identity, $chatId);
 
-        if ($titles === null || $titles === []) {
+        if (!is_array($pending) || ($pending['type'] ?? null) !== 'create_tags') {
             $this->client->sendMessage($chatId, 'Nothing to confirm. Send a message like: create tags groceries, coffee');
 
             return;
         }
 
-        $this->createTags($user, $chatId, $this->filterNewTagTitles($user, $titles));
+        $titles = is_array($pending['titles'] ?? null)
+            ? array_values(array_filter($pending['titles'], 'is_string'))
+            : [];
+        $this->createTags($user, $chatId, $identity, $this->filterNewTagTitles($user, $titles));
     }
 
-    public function cancelCreateTags(int|string $chatId): void
-    {
-        Cache::forget($this->pendingKey($chatId));
+    public function cancelCreateTags(
+        int|string $chatId,
+        int|string|null $telegramUserId = null,
+    ): void {
+        $identity = $telegramUserId ?? $chatId;
+        $this->session->clearPending($identity, $chatId);
+        $this->session->setSummary($identity, $chatId, 'Tag creation cancelled.');
+        $this->client->sendMessage($chatId, 'Cancelled');
+    }
+
+    public function pickRenameTag(
+        User $user,
+        int|string $chatId,
+        int $tagId,
+        string $callbackId,
+        int|string|null $telegramUserId = null,
+    ): void {
+        $identity = $telegramUserId ?? $chatId;
+        $session = $this->session->get($identity, $chatId);
+        $pending = $session['pending'];
+        $allowedIds = is_array($pending['item_ids'] ?? null) ? $pending['item_ids'] : [];
+        $allowedIds = array_map('intval', $allowedIds);
+
+        if (($pending['type'] ?? null) !== 'rename_pick' || !in_array($tagId, $allowedIds, true)) {
+            $this->client->answerCallbackQuery($callbackId, 'That tag selection expired.');
+
+            return;
+        }
+
+        $tag = Tag::query()->where('user_id', $user->id)->find($tagId);
+        if (!$tag) {
+            $this->client->answerCallbackQuery($callbackId, 'Tag not found.');
+            $this->session->clearPending($identity, $chatId);
+
+            return;
+        }
+
+        $this->session->setPending($identity, $chatId, [
+            'type' => 'rename_title',
+            'id' => $tag->id,
+            'before' => $tag->title,
+        ]);
+        $this->session->setSummary($identity, $chatId, 'Waiting for a new title for tag ' . $tag->title . '.');
+        $this->client->answerCallbackQuery($callbackId);
+        $this->client->sendMessage($chatId, "Send the new title for {$tag->emoji} {$tag->title}.");
+    }
+
+    public function handlePendingRenameTitle(
+        User $user,
+        int|string $chatId,
+        string $text,
+        int|string|null $telegramUserId = null,
+    ): bool {
+        $identity = $telegramUserId ?? $chatId;
+        $pending = $this->session->get($identity, $chatId)['pending'];
+
+        if (!is_array($pending) || ($pending['type'] ?? null) !== 'rename_title') {
+            return false;
+        }
+
+        $title = mb_substr(trim($text), 0, 255);
+        if ($title === '') {
+            $this->client->sendMessage($chatId, 'Send a non-empty new tag title.');
+
+            return true;
+        }
+
+        $tag = Tag::query()->where('user_id', $user->id)->find((int) ($pending['id'] ?? 0));
+        if (!$tag) {
+            $this->session->clearPending($identity, $chatId);
+            $this->client->sendMessage($chatId, 'That tag no longer exists.');
+
+            return true;
+        }
+
+        $this->session->setPending($identity, $chatId, [
+            'type' => 'rename_tags',
+            'proposals' => [[
+                'id' => $tag->id,
+                'before' => $tag->title,
+                'after' => $title,
+            ]],
+        ]);
+        $this->client->sendMessage(
+            $chatId,
+            "Rename tag:\n{$tag->title} → {$title}\n\nApply this change?",
+            $this->support->nlRenameConfirmKeyboard(),
+        );
+
+        return true;
+    }
+
+    public function confirmRenameTags(
+        User $user,
+        int|string $chatId,
+        int|string|null $telegramUserId = null,
+    ): void {
+        $identity = $telegramUserId ?? $chatId;
+        $pending = $this->session->get($identity, $chatId)['pending'];
+        $this->session->clearPending($identity, $chatId);
+
+        if (!is_array($pending) || ($pending['type'] ?? null) !== 'rename_tags') {
+            $this->client->sendMessage($chatId, 'Nothing to confirm.');
+
+            return;
+        }
+
+        $rawProposals = is_array($pending['proposals'] ?? null) ? $pending['proposals'] : [];
+        $proposals = $this->resolveRenameProposals($user, $identity, $chatId, $rawProposals);
+        if ($proposals === []) {
+            $this->client->sendMessage($chatId, 'The rename preview is stale or has no valid changes.');
+
+            return;
+        }
+
+        try {
+            DB::transaction(function () use ($user, $proposals): void {
+                foreach ($proposals as $proposal) {
+                    $tag = Tag::query()
+                        ->where('user_id', $user->id)
+                        ->whereKey($proposal['id'])
+                        ->first();
+
+                    if (!$tag || mb_strtolower(trim($tag->title)) !== mb_strtolower(trim($proposal['before']))) {
+                        throw new \RuntimeException('A tag changed while the preview was waiting.');
+                    }
+
+                    $this->updateTag->execute($user, $tag, [
+                        'title' => $proposal['after'],
+                        'emoji' => $tag->emoji,
+                        'calc_balance' => $tag->calc_balance,
+                        'parent_id' => $tag->parent_id,
+                    ]);
+                }
+            });
+        } catch (Throwable) {
+            $this->client->sendMessage($chatId, 'Could not apply the rename preview; no changes were saved.');
+            $this->session->setSummary($identity, $chatId, 'Rename failed because a tag changed or could not be updated.');
+
+            return;
+        }
+
+        $this->saveTagListSession($identity, $chatId, $this->listTags->execute($user));
+        $this->session->setSummary($identity, $chatId, 'Tags renamed.');
+        $this->client->sendMessage($chatId, '✅ Renamed tags:\n' . $this->formatRenamePreview($proposals));
+    }
+
+    public function cancelRenameTags(
+        int|string $chatId,
+        int|string|null $telegramUserId = null,
+    ): void {
+        $identity = $telegramUserId ?? $chatId;
+        $this->session->clearPending($identity, $chatId);
+        $this->session->setSummary($identity, $chatId, 'Tag rename cancelled.');
         $this->client->sendMessage($chatId, 'Cancelled');
     }
 
@@ -148,6 +341,198 @@ class NaturalLanguageHandler
 
         // Pure amounts already handled by quick-add; anything with letters may be intent.
         return (bool) preg_match('/\p{L}/u', $trimmed);
+    }
+
+    private function looksLikeHelp(string $text): bool
+    {
+        $text = mb_strtolower(trim($text));
+
+        return (bool) preg_match('/^(help|what can you do|what can you help with|show capabilities|capabilities|how can you help)\b/u', $text);
+    }
+
+    private function looksLikeTagRenameRequest(string $text): bool
+    {
+        return (bool) preg_match('/\b(rename|renaming|переймен|переназв|україн|ukrainian)\p{L}*/ui', $text);
+    }
+
+    private function sendTagList(User $user, int|string $chatId, int|string $identity): void
+    {
+        $tags = $this->listTags->execute($user);
+        $this->saveTagListSession($identity, $chatId, $tags);
+
+        if ($tags->isEmpty()) {
+            $summary = 'No tags found.';
+            $this->session->setSummary($identity, $chatId, $summary);
+            $this->client->sendMessage($chatId, 'You have no tags yet. Try: create tags groceries, coffee');
+
+            return;
+        }
+
+        $lines = [];
+        foreach ($tags->values() as $i => $tag) {
+            $lines[] = ($i + 1) . ') ' . trim($tag->emoji . ' ' . $tag->title);
+        }
+        $summary = "🏷 Your tags\n" . implode("\n", $lines);
+        $this->client->sendMessage($chatId, $summary);
+        $this->session->setSummary($identity, $chatId, $summary);
+    }
+
+    /**
+     * @param list<string> $titles
+     */
+    private function handleCreateTags(
+        User $user,
+        int|string $chatId,
+        int|string $identity,
+        array $titles,
+        bool $needsConfirm,
+    ): void {
+        $titles = $this->filterNewTagTitles($user, $titles);
+        $this->session->setDomain($identity, $chatId, 'tags');
+
+        if ($titles === []) {
+            $this->client->sendMessage($chatId, 'Those tags already exist (or none were left to create).');
+            $this->session->setSummary($identity, $chatId, 'No new tags were created.');
+
+            return;
+        }
+
+        if ($needsConfirm) {
+            $this->session->setPending($identity, $chatId, [
+                'type' => 'create_tags',
+                'titles' => $titles,
+            ]);
+            $label = implode(', ', $titles);
+            $this->client->sendMessage(
+                $chatId,
+                "Create tags: {$label}?",
+                $this->support->nlCreateTagsKeyboard(),
+            );
+            $this->session->setSummary($identity, $chatId, 'Create-tag preview shown.');
+
+            return;
+        }
+
+        $this->createTags($user, $chatId, $identity, $titles);
+    }
+
+    /**
+     * @param list<array{id: int|null, index: int|null, before: string, after: string}> $rawProposals
+     * @return list<array{id: int, before: string, after: string}>
+     */
+    private function resolveRenameProposals(
+        User $user,
+        int|string $identity,
+        int|string $chatId,
+        array $rawProposals,
+    ): array {
+        $session = $this->session->get($identity, $chatId);
+        $lastList = $session['last_list'];
+        $byId = [];
+        foreach ($lastList as $index => $item) {
+            $byId[(int) $item['id']] = ['index' => $index + 1, 'title' => $item['title']];
+        }
+
+        $tags = $this->listTags->execute($user)->keyBy('id');
+        $out = [];
+        $usedAfter = [];
+
+        foreach ($rawProposals as $proposal) {
+            $id = is_numeric($proposal['id'] ?? null) ? (int) $proposal['id'] : null;
+            $index = is_numeric($proposal['index'] ?? null) ? (int) $proposal['index'] : null;
+
+            if (($id === null || !isset($byId[$id])) && $index !== null && isset($lastList[$index - 1])) {
+                $id = (int) $lastList[$index - 1]['id'];
+            }
+            if ($id === null || !isset($byId[$id])) {
+                continue;
+            }
+
+            /** @var Tag|null $tag */
+            $tag = $tags->get($id);
+            if (!$tag) {
+                continue;
+            }
+
+            $before = trim((string) ($proposal['before'] ?? ''));
+            if ($before !== '' && mb_strtolower($before) !== mb_strtolower($tag->title)) {
+                continue;
+            }
+
+            $after = mb_substr(trim((string) ($proposal['after'] ?? '')), 0, 255);
+            if ($after === '' || mb_strtolower($after) === mb_strtolower($tag->title)) {
+                continue;
+            }
+
+            $afterKey = mb_strtolower($after);
+            $duplicate = $tags->contains(function (Tag $other) use ($afterKey, $id): bool {
+                return (int) $other->id !== $id && mb_strtolower(trim($other->title)) === $afterKey;
+            });
+            if ($duplicate || isset($usedAfter[$afterKey])) {
+                continue;
+            }
+
+            $usedAfter[$afterKey] = true;
+            $out[] = [
+                'id' => $id,
+                'before' => $tag->title,
+                'after' => $after,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $requestedIds
+     */
+    private function promptRenamePick(
+        int|string $chatId,
+        int|string $identity,
+        array $requestedIds,
+    ): void {
+        $session = $this->session->get($identity, $chatId);
+        $available = $session['last_list'];
+        $availableIds = array_map(static fn (array $item): int => (int) $item['id'], $available);
+        $ids = array_values(array_intersect($requestedIds, $availableIds));
+        if ($ids === []) {
+            $ids = $availableIds;
+        }
+
+        if ($ids === []) {
+            $this->client->sendMessage($chatId, 'No tags are available to rename.');
+
+            return;
+        }
+
+        $items = array_values(array_filter($available, static fn (array $item): bool => in_array((int) $item['id'], $ids, true)));
+        $this->session->setPending($identity, $chatId, [
+            'type' => 'rename_pick',
+            'item_ids' => $ids,
+        ]);
+        $this->client->sendMessage($chatId, 'Which tag should I rename?', $this->support->nlRenamePickKeyboard($items));
+    }
+
+    /**
+     * @param list<array{id: int, before: string, after: string}> $proposals
+     */
+    private function formatRenamePreview(array $proposals): string
+    {
+        return implode("\n", array_map(
+            static fn (array $proposal): string => $proposal['before'] . ' → ' . $proposal['after'],
+            $proposals,
+        ));
+    }
+
+    /**
+     * @param list<array{id: int, before: string, after: string}> $proposals
+     */
+    private function putPendingRename(int|string $identity, int|string $chatId, array $proposals): void
+    {
+        $this->session->setPending($identity, $chatId, [
+            'type' => 'rename_tags',
+            'proposals' => $proposals,
+        ]);
     }
 
     /**
@@ -177,7 +562,7 @@ class NaturalLanguageHandler
     /**
      * @param list<string> $titles
      */
-    private function createTags(User $user, int|string $chatId, array $titles): void
+    private function createTags(User $user, int|string $chatId, int|string $identity, array $titles): void
     {
         if ($titles === []) {
             $this->client->sendMessage($chatId, 'Those tags already exist (or none were left to create).');
@@ -196,32 +581,24 @@ class NaturalLanguageHandler
             $created[] = trim($tag->emoji . ' ' . $tag->title);
         }
 
-        $this->client->sendMessage($chatId, '✅ Created tags: ' . implode(', ', $created));
+        $this->saveTagListSession($identity, $chatId, $this->listTags->execute($user));
+        $summary = '✅ Created tags: ' . implode(', ', $created);
+        $this->session->setSummary($identity, $chatId, $summary);
+        $this->client->sendMessage($chatId, $summary);
     }
 
     /**
-     * @param list<string> $titles
+     * @param Collection<int, Tag> $tags
      */
-    private function putPendingCreateTags(int|string $chatId, array $titles): void
+    private function saveTagListSession(int|string $identity, int|string $chatId, Collection $tags): void
     {
-        Cache::put($this->pendingKey($chatId), ['titles' => $titles], now()->addMinutes(self::PENDING_TTL_MINUTES));
-    }
-
-    /**
-     * @return list<string>|null
-     */
-    private function pullPendingCreateTags(int|string $chatId): ?array
-    {
-        $data = Cache::pull($this->pendingKey($chatId));
-        if (!is_array($data) || !isset($data['titles']) || !is_array($data['titles'])) {
-            return null;
-        }
-
-        return array_values(array_filter($data['titles'], 'is_string'));
-    }
-
-    private function pendingKey(int|string $chatId): string
-    {
-        return "telegram_nl_create_tags:{$chatId}";
+        $this->session->setDomain($identity, $chatId, 'tags');
+        $this->session->setLastList($identity, $chatId, $tags->map(
+            static fn (Tag $tag): array => [
+                'id' => (int) $tag->id,
+                'title' => (string) $tag->title,
+                'emoji' => (string) $tag->emoji,
+            ],
+        )->values()->all());
     }
 }

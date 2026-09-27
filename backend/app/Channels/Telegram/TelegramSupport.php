@@ -55,7 +55,7 @@ class TelegramSupport
             . "Or send a photo/PDF with that caption to attach a receipt.\n"
             . "Photo without an amount: AI draft (limited per day), then Confirm.\n"
             . "Album of photos: choose one receipt or separate transactions.\n"
-            . "Natural language: e.g. create tags groceries, coffee.\n\n"
+            . "Natural language: list, create, or rename tags (e.g. create tags groceries, coffee).\n\n"
             . 'Use the menu below, or /help for all commands.';
     }
 
@@ -85,7 +85,7 @@ class TelegramSupport
             . "20.08 -350 groceries\n\n"
             . "Receipts\n"
             . "Send a photo or PDF with a caption like \"-350 groceries\" for instant save. Without an amount, AI may draft a receipt (Confirm / Edit / Cancel).\n"
-            . "Albums: choose one transaction or separate. Text: create tags groceries, coffee.",
+            . "Albums: choose one transaction or separate. Text: create or rename tags; ask what I can do for capabilities.",
             $this->menuKeyboard(),
         );
     }
@@ -345,6 +345,41 @@ class TelegramSupport
                 ['text' => 'Cancel', 'callback_data' => 'nl:tags:cancel'],
             ]],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function nlRenameConfirmKeyboard(): array
+    {
+        return [
+            'inline_keyboard' => [[
+                ['text' => '✅ Confirm', 'callback_data' => 'nl:rename:ok'],
+                ['text' => 'Cancel', 'callback_data' => 'nl:rename:cancel'],
+            ]],
+        ];
+    }
+
+    /**
+     * @param list<array{id: int, title: string, emoji?: string}> $items
+     * @return array<string, mixed>
+     */
+    public function nlRenamePickKeyboard(array $items): array
+    {
+        $buttons = [];
+        foreach ($items as $item) {
+            if (!isset($item['id'], $item['title'])) {
+                continue;
+            }
+
+            $label = trim((string) ($item['emoji'] ?? '') . ' ' . (string) $item['title']);
+            $buttons[] = [
+                'text' => $label,
+                'callback_data' => 'nl:rename:pick:' . (int) $item['id'],
+            ];
+        }
+
+        return ['inline_keyboard' => array_chunk($buttons, 2)];
     }
 
     /**
