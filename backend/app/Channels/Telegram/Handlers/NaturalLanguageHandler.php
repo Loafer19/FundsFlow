@@ -75,9 +75,9 @@ class NaturalLanguageHandler
         if ($result === null) {
             $this->client->sendMessage(
                 $chatId,
-                "Couldn't understand that. Try show recent, budgets, month summary, menu, -350 groceries, or /help.",
+                'AI is temporarily unavailable. Try /help, menu buttons, or -350 groceries.',
             );
-            $this->session->setSummary($identity, $chatId, "Couldn't understand the request.");
+            $this->session->setSummary($identity, $chatId, 'AI temporarily unavailable.');
 
             return true;
         }

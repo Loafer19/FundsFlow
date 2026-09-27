@@ -38,7 +38,7 @@ class InterpretTelegramTextAction
     {
         $apiKey = (string) config('services.xai.api_key');
         $baseUrl = rtrim((string) config('services.xai.base_url', 'https://api.x.ai/v1'), '/');
-        $model = (string) config('services.xai.text_model', 'grok-2-1212');
+        $model = (string) config('services.xai.text_model', 'grok-4');
 
         if ($apiKey === '') {
             return null;

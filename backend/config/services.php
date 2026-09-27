@@ -24,10 +24,10 @@ return [
     'xai' => [
         'api_key' => env('XAI_API_KEY'),
         'base_url' => env('XAI_BASE_URL', 'https://api.x.ai/v1'),
-        // Stable pinned vision model for OpenAI-compatible chat completions + image.
-        'vision_model' => env('XAI_VISION_MODEL', 'grok-2-vision-1212'),
-        // Text model for Telegram natural-language intents (shared daily AI budget).
-        'text_model' => env('XAI_TEXT_MODEL', 'grok-2-1212'),
+        // Multimodal model for receipt vision (OpenAI-compatible chat completions + image).
+        'vision_model' => env('XAI_VISION_MODEL', 'grok-4'),
+        // Text model for Telegram natural-language intents (shared daily AI budget; multimodal OK).
+        'text_model' => env('XAI_TEXT_MODEL', 'grok-4'),
         // Speech-to-text for Telegram voice notes (POST /v1/stt; shared daily AI budget).
         'stt_model' => env('XAI_STT_MODEL', 'grok-voice-transcribe-2.0'),
     ],

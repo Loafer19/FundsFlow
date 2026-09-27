@@ -31,7 +31,7 @@ class AnalyzeReceiptAction
     {
         $apiKey = (string) config('services.xai.api_key');
         $baseUrl = rtrim((string) config('services.xai.base_url', 'https://api.x.ai/v1'), '/');
-        $model = (string) config('services.xai.vision_model', 'grok-2-vision-1212');
+        $model = (string) config('services.xai.vision_model', 'grok-4');
 
         if ($apiKey === '') {
             Log::warning('AnalyzeReceiptAction: XAI_API_KEY is empty');
