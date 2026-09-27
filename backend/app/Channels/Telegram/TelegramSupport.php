@@ -52,7 +52,10 @@ class TelegramSupport
     {
         return "Send a message like \"-350 groceries\" to log an expense, or \"+15000 salary\" for income.\n"
             . "Prefix a date for a past entry: \"20.08 -350 groceries\" (DD.MM or DD.MM.YYYY).\n"
-            . "Or send a photo/PDF with that caption to attach a receipt.\n\n"
+            . "Or send a photo/PDF with that caption to attach a receipt.\n"
+            . "Photo without an amount: AI draft (limited per day), then Confirm.\n"
+            . "Album of photos: choose one receipt or separate transactions.\n"
+            . "Natural language: e.g. create tags groceries, coffee.\n\n"
             . 'Use the menu below, or /help for all commands.';
     }
 
@@ -81,7 +84,8 @@ class TelegramSupport
             . "+15000 salary\n"
             . "20.08 -350 groceries\n\n"
             . "Receipts\n"
-            . 'Send a photo or PDF with a caption like "-350 groceries", or without a caption to pick an amount',
+            . "Send a photo or PDF with a caption like \"-350 groceries\" for instant save. Without an amount, AI may draft a receipt (Confirm / Edit / Cancel).\n"
+            . "Albums: choose one transaction or separate. Text: create tags groceries, coffee.",
             $this->menuKeyboard(),
         );
     }
@@ -301,6 +305,159 @@ class TelegramSupport
                 ['text' => 'Cancel', 'callback_data' => 'mediacancel'],
             ]],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function receiptDraftKeyboard(): array
+    {
+        return [
+            'inline_keyboard' => [[
+                ['text' => '✅ Confirm', 'callback_data' => 'draft:ok'],
+                ['text' => '✏️ Edit amount', 'callback_data' => 'draft:edit'],
+                ['text' => 'Cancel', 'callback_data' => 'draft:cancel'],
+            ]],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function albumChoiceKeyboard(string $groupId): array
+    {
+        return [
+            'inline_keyboard' => [[
+                ['text' => 'One transaction', 'callback_data' => 'album:one:' . $groupId],
+                ['text' => 'Separate', 'callback_data' => 'album:each:' . $groupId],
+            ]],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function nlCreateTagsKeyboard(): array
+    {
+        return [
+            'inline_keyboard' => [[
+                ['text' => '✅ Confirm', 'callback_data' => 'nl:tags:ok'],
+                ['text' => 'Cancel', 'callback_data' => 'nl:tags:cancel'],
+            ]],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $draft
+     */
+    public function sendReceiptDraft(int|string $chatId, User $user, array $draft): void
+    {
+        $this->client->sendMessage(
+            $chatId,
+            $this->formatReceiptDraftCard($user, $draft),
+            $this->receiptDraftKeyboard(),
+            self::PARSE_HTML,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $draft
+     */
+    public function formatReceiptDraftCard(User $user, array $draft): string
+    {
+        $amount = $draft['amount'] ?? null;
+        $amount = is_numeric($amount) ? (float) $amount : null;
+        $emoji = ($amount !== null && $amount > 0) ? '📈' : '📉';
+        $money = $amount !== null
+            ? $this->escapeHtml(UserFormatter::formatMoney($user, $amount))
+            : '?';
+        $at = (string) ($draft['at'] ?? $user->todayDateString());
+        $date = $this->escapeHtml(UserFormatter::formatDate($user, $at));
+
+        $lines = [
+            $this->escapeHtml('🧾 Receipt draft'),
+            '',
+            "<b>{$money}</b> {$emoji}",
+            "📅 {$date}",
+        ];
+
+        $note = $draft['note'] ?? null;
+        if (is_string($note) && $note !== '') {
+            $lines[] = '📝 ' . $this->escapeHtml($note);
+        }
+
+        $titles = $draft['suggested_tag_titles'] ?? [];
+        if (is_array($titles) && $titles !== []) {
+            $matched = $this->matchSuggestedTagTitles($user, $titles);
+            if ($matched !== []) {
+                $label = implode(', ', array_map(
+                    fn (Tag $tag) => $this->escapeHtml(trim($tag->emoji . ' ' . $tag->title)),
+                    $matched,
+                ));
+                $lines[] = '🏷 ' . $label;
+            } else {
+                $hint = implode(', ', array_map(fn ($t) => $this->escapeHtml((string) $t), $titles));
+                $lines[] = '🏷 suggested: ' . $hint;
+            }
+        } else {
+            $lines[] = '🏷 —';
+        }
+
+        $lines[] = '';
+        $lines[] = 'Confirm to save with receipt, or edit the amount.';
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Match AI-suggested titles to the user's tags (case-insensitive exact title).
+     *
+     * @param list<string>|mixed $titles
+     * @return list<int>
+     */
+    public function matchSuggestedTagIds(User $user, mixed $titles): array
+    {
+        return array_map(
+            static fn (Tag $tag) => $tag->id,
+            $this->matchSuggestedTagTitles($user, $titles),
+        );
+    }
+
+    /**
+     * @param list<string>|mixed $titles
+     * @return list<Tag>
+     */
+    public function matchSuggestedTagTitles(User $user, mixed $titles): array
+    {
+        if (!is_array($titles) || $titles === []) {
+            return [];
+        }
+
+        $wanted = [];
+        foreach ($titles as $title) {
+            if (!is_string($title)) {
+                continue;
+            }
+            $normalized = mb_strtolower(trim($title));
+            if ($normalized !== '') {
+                $wanted[$normalized] = true;
+            }
+        }
+
+        if ($wanted === []) {
+            return [];
+        }
+
+        $matched = [];
+        foreach ($this->listTags->execute($user) as $tag) {
+            $key = mb_strtolower(trim((string) $tag->title));
+            if (isset($wanted[$key])) {
+                $matched[] = $tag;
+                unset($wanted[$key]);
+            }
+        }
+
+        return $matched;
     }
 
     /**

@@ -16,6 +16,7 @@ class MessageHandler
         private readonly MenuHandler $menuHandler,
         private readonly QuickAddHandler $quickAddHandler,
         private readonly MediaHandler $mediaHandler,
+        private readonly NaturalLanguageHandler $naturalLanguageHandler,
     ) {}
 
     /**
@@ -76,6 +77,12 @@ class MessageHandler
 
     private function handleDefaultText(User $user, int|string $chatId, string $text): void
     {
+        if ($this->mediaHandler->hasAwaitingDraft($chatId)) {
+            $this->mediaHandler->completeDraftAmount($user, $chatId, $text);
+
+            return;
+        }
+
         if (Cache::has("telegram_pending_media:{$chatId}") || Cache::has("telegram_pending_media_await_text:{$chatId}")) {
             $this->mediaHandler->completePendingMedia($user, $chatId, $text);
 
@@ -88,6 +95,23 @@ class MessageHandler
             return;
         }
 
-        $this->quickAddHandler->handleQuickAdd($user, $chatId, $text);
+        $parsed = $this->support->parseQuickAdd($text, $user);
+
+        if ($parsed !== null) {
+            $this->quickAddHandler->handleQuickAdd($user, $chatId, $text);
+
+            return;
+        }
+
+        if ($this->naturalLanguageHandler->tryHandle($user, $chatId, $text)) {
+            return;
+        }
+
+        $this->client->sendMessage(
+            $chatId,
+            "Didn't recognize that. Format: -350 groceries (minus is an expense, plus is income). "
+                . 'Prefix a date like "20.08 -350 groceries" to log a past day. '
+                . 'Or try: create tags groceries, coffee',
+        );
     }
 }

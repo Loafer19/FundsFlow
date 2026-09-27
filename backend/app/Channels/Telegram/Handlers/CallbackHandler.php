@@ -19,6 +19,7 @@ class CallbackHandler
         private readonly DeleteTransactionAction $deleteTransaction,
         private readonly MenuHandler $menuHandler,
         private readonly MediaHandler $mediaHandler,
+        private readonly NaturalLanguageHandler $naturalLanguageHandler,
     ) {}
 
     /**
@@ -118,6 +119,57 @@ class CallbackHandler
             return;
         }
 
+        if ($data === 'draft:ok') {
+            $this->client->answerCallbackQuery($callbackId, 'Saving…');
+            $this->mediaHandler->confirmDraft($user, $chatId);
+
+            return;
+        }
+
+        if ($data === 'draft:edit') {
+            $this->client->answerCallbackQuery($callbackId);
+            $this->mediaHandler->beginDraftAmountEdit($user, $chatId);
+
+            return;
+        }
+
+        if ($data === 'draft:cancel') {
+            $this->mediaHandler->cancelPendingMedia($chatId);
+            $this->client->answerCallbackQuery($callbackId, 'Cancelled');
+            $this->client->sendMessage($chatId, 'Cancelled');
+            $this->mediaHandler->continueAlbumQueue($user, $chatId);
+
+            return;
+        }
+
+        if (preg_match('/^album:one:(.+)$/', $data, $matches)) {
+            $this->client->answerCallbackQuery($callbackId, 'One transaction');
+            $this->mediaHandler->handleAlbumOne($user, $chatId, $matches[1]);
+
+            return;
+        }
+
+        if (preg_match('/^album:each:(.+)$/', $data, $matches)) {
+            $this->client->answerCallbackQuery($callbackId, 'Separate');
+            $this->mediaHandler->handleAlbumEach($user, $chatId, $matches[1]);
+
+            return;
+        }
+
+        if ($data === 'nl:tags:ok') {
+            $this->client->answerCallbackQuery($callbackId, 'Creating…');
+            $this->naturalLanguageHandler->confirmCreateTags($user, $chatId);
+
+            return;
+        }
+
+        if ($data === 'nl:tags:cancel') {
+            $this->client->answerCallbackQuery($callbackId, 'Cancelled');
+            $this->naturalLanguageHandler->cancelCreateTags($chatId);
+
+            return;
+        }
+
         if ($data === 'mediaamt:-100' || $data === 'mediaamt:-500') {
             $amount = (float) substr($data, strlen('mediaamt:'));
             $this->client->answerCallbackQuery($callbackId);
@@ -138,6 +190,7 @@ class CallbackHandler
             $this->mediaHandler->cancelPendingMedia($chatId);
             $this->client->answerCallbackQuery($callbackId, 'Cancelled');
             $this->client->sendMessage($chatId, 'Cancelled');
+            $this->mediaHandler->continueAlbumQueue($user, $chatId);
 
             return;
         }
