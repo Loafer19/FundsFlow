@@ -29,6 +29,7 @@ class NaturalLanguageHandler
         private readonly ListTagsAction $listTags,
         private readonly UpdateTagAction $updateTag,
         private readonly TelegramChatSession $session,
+        private readonly MenuHandler $menuHandler,
     ) {}
 
     /**
@@ -94,15 +95,52 @@ class NaturalLanguageHandler
         if ($result['intent'] === 'none' || $result['confidence'] < 0.45) {
             $this->client->sendMessage(
                 $chatId,
-                "Didn't catch an action there. Try -350 groceries, /tags, /newtag 🏷 Title, or /help.",
+                "Didn't catch an action there. Try show recent, budgets, menu, -350 groceries, or /help.",
             );
             $this->session->setSummary($identity, $chatId, "Didn't catch an action.");
 
             return true;
         }
 
+        if ($result['intent'] === 'show_menu') {
+            $this->client->sendMessage(
+                $chatId,
+                'Here is the menu — tap a button, or keep chatting in plain language.',
+                $this->support->menuKeyboard(),
+            );
+            $this->session->setSummary($identity, $chatId, 'Reply menu sent.');
+
+            return true;
+        }
+
+        if ($result['intent'] === 'list_recent') {
+            $this->menuHandler->sendRecent($user, $chatId, $identity);
+
+            return true;
+        }
+
+        if ($result['intent'] === 'list_budgets') {
+            $this->menuHandler->sendBudgets($user, $chatId, $identity);
+
+            return true;
+        }
+
+        if ($result['intent'] === 'list_recurring') {
+            $this->menuHandler->sendRecurring($user, $chatId);
+            $this->session->setSummary($identity, $chatId, 'Recurring rules listed.');
+
+            return true;
+        }
+
+        if ($result['intent'] === 'open_web') {
+            $this->support->sendMiniAppHint($chatId);
+            $this->session->setSummary($identity, $chatId, 'Web UI hint sent.');
+
+            return true;
+        }
+
         if ($result['intent'] === 'list_tags') {
-            $this->sendTagList($user, $chatId, $identity);
+            $this->menuHandler->sendTags($user, $chatId, $identity);
 
             return true;
         }
@@ -353,28 +391,6 @@ class NaturalLanguageHandler
     private function looksLikeTagRenameRequest(string $text): bool
     {
         return (bool) preg_match('/\b(rename|renaming|переймен|переназв|україн|ukrainian)\p{L}*/ui', $text);
-    }
-
-    private function sendTagList(User $user, int|string $chatId, int|string $identity): void
-    {
-        $tags = $this->listTags->execute($user);
-        $this->saveTagListSession($identity, $chatId, $tags);
-
-        if ($tags->isEmpty()) {
-            $summary = 'No tags found.';
-            $this->session->setSummary($identity, $chatId, $summary);
-            $this->client->sendMessage($chatId, 'You have no tags yet. Try: create tags groceries, coffee');
-
-            return;
-        }
-
-        $lines = [];
-        foreach ($tags->values() as $i => $tag) {
-            $lines[] = ($i + 1) . ') ' . trim($tag->emoji . ' ' . $tag->title);
-        }
-        $summary = "🏷 Your tags\n" . implode("\n", $lines);
-        $this->client->sendMessage($chatId, $summary);
-        $this->session->setSummary($identity, $chatId, $summary);
     }
 
     /**

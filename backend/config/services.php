@@ -28,9 +28,11 @@ return [
         'vision_model' => env('XAI_VISION_MODEL', 'grok-2-vision-1212'),
         // Text model for Telegram natural-language intents (shared daily AI budget).
         'text_model' => env('XAI_TEXT_MODEL', 'grok-2-1212'),
+        // Speech-to-text for Telegram voice notes (POST /v1/stt; shared daily AI budget).
+        'stt_model' => env('XAI_STT_MODEL', 'grok-voice-transcribe-2.0'),
     ],
 
-    // Shared daily AI budget for Telegram receipt vision + text intents.
+    // Shared daily AI budget for Telegram receipt vision + text intents + voice STT.
     'ai_receipt' => [
         'daily_limit' => (int) env('AI_RECEIPT_DAILY_LIMIT', 5),
     ],

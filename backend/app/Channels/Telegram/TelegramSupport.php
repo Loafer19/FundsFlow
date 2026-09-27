@@ -55,7 +55,8 @@ class TelegramSupport
             . "Or send a photo/PDF with that caption to attach a receipt.\n"
             . "Photo without an amount: AI draft (limited per day), then Confirm.\n"
             . "Album of photos: choose one receipt or separate transactions.\n"
-            . "Natural language: list, create, or rename tags (e.g. create tags groceries, coffee).\n\n"
+            . "Voice notes work too — same commands as typing (shared daily AI limit).\n"
+            . "Natural language: show recent, budgets, menu, tags; create or rename tags.\n\n"
             . 'Use the menu below, or /help for all commands.';
     }
 
@@ -85,7 +86,12 @@ class TelegramSupport
             . "20.08 -350 groceries\n\n"
             . "Receipts\n"
             . "Send a photo or PDF with a caption like \"-350 groceries\" for instant save. Without an amount, AI may draft a receipt (Confirm / Edit / Cancel).\n"
-            . "Albums: choose one transaction or separate. Text: create or rename tags; ask what I can do for capabilities.",
+            . "Albums: choose one transaction or separate.\n\n"
+            . "Voice\n"
+            . "Send a voice note for the same actions as typing (quick-add, menu, tags, help). Uses the shared daily AI budget.\n\n"
+            . "Text AI\n"
+            . "Examples: show recent, budgets, recurring, menu, web ui; list/create/rename tags; ask what I can do.\n"
+            . "Same views as the reply-menu buttons (Month is still /month or the Month button).",
             $this->menuKeyboard(),
         );
     }

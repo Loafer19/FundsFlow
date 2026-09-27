@@ -108,16 +108,23 @@ class MenuHandler
         $this->session->setSummary($identity, $chatId, $summary);
     }
 
-    public function sendRecent(User $user, int|string $chatId): void
+    public function sendRecent(User $user, int|string $chatId, int|string|null $telegramUserId = null): void
     {
+        $identity = $telegramUserId ?? $chatId;
         $payload = $this->recentListPayload($user);
 
         if ($payload === null) {
+            $this->session->setDomain($identity, $chatId, 'transactions');
+            $this->session->setLastList($identity, $chatId, []);
+            $this->session->setSummary($identity, $chatId, 'No transactions yet.');
             $this->client->sendMessage($chatId, 'No transactions yet');
 
             return;
         }
 
+        $this->session->setDomain($identity, $chatId, 'transactions');
+        $this->session->setLastList($identity, $chatId, $payload['list']);
+        $this->session->setSummary($identity, $chatId, 'Recent transactions listed.');
         $this->client->sendMessage(
             $chatId,
             $payload['text'],
@@ -127,7 +134,7 @@ class MenuHandler
     }
 
     /**
-     * @return array{text: string, reply_markup: array<string, mixed>}|null
+     * @return array{text: string, reply_markup: array<string, mixed>, list: list<array{id: int, title: string}>}|null
      */
     public function recentListPayload(User $user): ?array
     {
@@ -146,16 +153,31 @@ class MenuHandler
             'callback_data' => "open:{$transaction->id}",
         ])->all();
 
+        $list = $transactions->map(function (Transaction $transaction) use ($user): array {
+            $title = trim((string) ($transaction->note ?? ''));
+            if ($title === '') {
+                $title = UserFormatter::formatMoney($user, $transaction->amount);
+            }
+
+            return [
+                'id' => (int) $transaction->id,
+                'title' => $title,
+            ];
+        })->all();
+
         return [
             'text' => "🕘 <b>Recent</b>\n\n" . implode("\n\n", $items),
             'reply_markup' => ['inline_keyboard' => array_chunk($buttons, 5)],
+            'list' => $list,
         ];
     }
 
-    public function sendBudgets(User $user, int|string $chatId): void
+    public function sendBudgets(User $user, int|string $chatId, int|string|null $telegramUserId = null): void
     {
+        $identity = $telegramUserId ?? $chatId;
         $budgets = $this->listBudgets->execute($user);
         $blocks = [];
+        $list = [];
 
         foreach ($budgets as $budget) {
             $period = $budget->periods->first(fn (BudgetPeriod $period) => $period->ends_at === null);
@@ -181,14 +203,24 @@ class MenuHandler
                 . $this->support->escapeHtml(UserFormatter::formatMoney($user, $spent))
                 . ' / '
                 . $this->support->escapeHtml(UserFormatter::formatMoney($user, $limit));
+
+            $list[] = [
+                'id' => (int) $budget->id,
+                'title' => $label,
+            ];
         }
 
+        $this->session->setDomain($identity, $chatId, 'budgets');
+        $this->session->setLastList($identity, $chatId, $list);
+
         if ($blocks === []) {
+            $this->session->setSummary($identity, $chatId, 'No active budgets.');
             $this->client->sendMessage($chatId, 'No active budgets');
 
             return;
         }
 
+        $this->session->setSummary($identity, $chatId, 'Budgets listed.');
         $this->client->sendMessage(
             $chatId,
             "💰 <b>Budgets</b>\n\n" . implode("\n\n", $blocks),

@@ -4,6 +4,8 @@ export const updateCredentials = (data) => api.put('/account/credentials', data)
 
 export const updatePreferences = (data) => api.patch('/account/preferences', data)
 
+export const getAiQuota = () => api.get('/account/ai-quota')
+
 export const getMcpTokenStatus = () => api.get('/account/mcp-token')
 
 export const createMcpToken = () => api.post('/account/mcp-token')

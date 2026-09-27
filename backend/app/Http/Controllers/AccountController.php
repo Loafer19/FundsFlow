@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Account\ExportAccountDataAction;
+use App\Support\TelegramAiQuota;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -11,6 +12,7 @@ class AccountController extends Controller
 {
     public function __construct(
         private readonly ExportAccountDataAction $exportAccountData,
+        private readonly TelegramAiQuota $aiQuota,
     ) {}
 
     public function updateCredentials(Request $request): JsonResponse
@@ -61,6 +63,13 @@ class AccountController extends Controller
         return response()->json([
             'user' => $user->load('identities'),
         ]);
+    }
+
+    public function aiQuota(Request $request): JsonResponse
+    {
+        return response()->json(
+            $this->aiQuota->snapshot($request->user()),
+        );
     }
 
     public function export(Request $request): JsonResponse

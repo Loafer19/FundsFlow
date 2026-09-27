@@ -37,6 +37,14 @@ class TelegramBot
             return;
         }
 
+        // Voice notes (and optional audio files) → STT → same text path as typed messages.
+        // video_note skipped for MVP.
+        if (isset($message['voice']) || isset($message['audio'])) {
+            $this->messageHandler->handleVoiceMessage($message);
+
+            return;
+        }
+
         if (isset($message['text'])) {
             $this->messageHandler->handleMessage($message);
         }

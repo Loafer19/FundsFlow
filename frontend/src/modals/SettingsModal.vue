@@ -52,6 +52,20 @@
                             <option v-for="tz in timezoneOptions" :key="tz" :value="tz">{{ tz }}</option>
                         </select>
                     </div>
+
+                    <div class="p-3 rounded-box bg-base-200 mb-3">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <span class="font-medium text-sm">AI assists today</span>
+                            <span v-if="aiQuotaLoading" class="loading loading-spinner loading-xs"></span>
+                            <span v-else class="text-sm font-mono tabular-nums">
+                                {{ aiQuotaUsed }} / {{ aiQuotaLimit }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-base-content/60 leading-relaxed">
+                            Shared across Telegram receipt scan, voice, and text help.
+                            <template v-if="aiQuotaResetLabel"> Resets: {{ aiQuotaResetLabel }}</template>
+                        </p>
+                    </div>
                 </template>
 
 
@@ -315,6 +329,7 @@ import ReportDocument from '../components/ReportDocument.vue'
 import {
     createMcpToken,
     downloadAccountExport,
+    getAiQuota,
     getMcpTokenStatus,
     revokeMcpToken,
     updateCredentials,
@@ -355,6 +370,42 @@ const tabs = ref({
 const tab = ref('formatting')
 const exporting = ref(false)
 const sendingReportTelegram = ref(false)
+
+const aiQuotaLoading = ref(false)
+const aiQuotaUsed = ref(0)
+const aiQuotaLimit = ref(0)
+const aiQuotaResetAt = ref(null)
+const aiQuotaTimezone = ref('')
+
+const aiQuotaResetLabel = computed(() => {
+    if (!aiQuotaResetAt.value) return ''
+    try {
+        const dt = new Date(aiQuotaResetAt.value)
+        return new Intl.DateTimeFormat(undefined, {
+            timeZone: aiQuotaTimezone.value || settings.timezone,
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        }).format(dt)
+    } catch {
+        return aiQuotaResetAt.value
+    }
+})
+
+const refreshAiQuota = async () => {
+    aiQuotaLoading.value = true
+    try {
+        const { data } = await getAiQuota()
+        aiQuotaUsed.value = Number(data?.used ?? 0)
+        aiQuotaLimit.value = Number(data?.limit ?? 0)
+        aiQuotaResetAt.value = data?.reset_at ?? null
+        aiQuotaTimezone.value = data?.timezone ?? settings.timezone
+    } catch {
+        // Non-fatal: keep last known / zeros
+    } finally {
+        aiQuotaLoading.value = false
+    }
+}
+
 
 const formatDateFn = inject('formatDate')
 const insightDateRange = inject('insightDateRange')
@@ -527,11 +578,17 @@ const bindModalEvents = () => {
     modal.showModal = () => {
         syncFromSettings()
         if (tab.value === 'accounts') refreshMcpTokenStatus()
+        if (tab.value === 'formatting') refreshAiQuota()
         originalShow()
     }
 }
 
 onMounted(bindModalEvents)
+
+watch(tab, (next) => {
+    if (next === 'formatting') refreshAiQuota()
+})
+
 
 const formatDatePreview = computed(() => {
     const config = dateFormatMap[formatDate.value]
@@ -709,6 +766,7 @@ const saveSettings = async () => {
 
     saving.value = false
     toasts.success('Settings saved successfully!')
+    refreshAiQuota()
     settings_modal.close()
 }
 </script>

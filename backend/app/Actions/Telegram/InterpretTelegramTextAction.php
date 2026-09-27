@@ -18,9 +18,16 @@ class InterpretTelegramTextAction
      * Classify free-form Telegram text into structured intent and UI slots.
      * This action never mutates account data.
      *
+     * Menu alignment (AI must not invent callback_data / press Telegram buttons):
+     * intents map 1:1 onto MenuHandler / TelegramSupport helpers; ui-slots may only
+     * re-attach prebuilt keyboards from TelegramSupport (e.g. menuKeyboard).
+     * NL intents: help, show_menu, list_recent, list_budgets, list_recurring,
+     * open_web, list_tags, create_tags, rename_tags, none.
+     * Out of scope for now: period_summary / Month analytics.
+     *
      * @param array<string, mixed> $sessionContext
      * @return array{
-     *     intent: 'help'|'create_tags'|'list_tags'|'rename_tags'|'none',
+     *     intent: 'help'|'show_menu'|'list_recent'|'list_budgets'|'list_recurring'|'open_web'|'create_tags'|'list_tags'|'rename_tags'|'none',
      *     titles: list<string>,
      *     proposals: list<array{id: int|null, index: int|null, before: string, after: string}>,
      *     confidence: float,
@@ -49,7 +56,7 @@ class InterpretTelegramTextAction
 You classify short messages to a personal finance Telegram bot (FundsFlow).
 Reply with ONLY a JSON object (no markdown):
 {
-  "intent": "help" | "create_tags" | "list_tags" | "rename_tags" | "none",
+  "intent": "help" | "show_menu" | "list_recent" | "list_budgets" | "list_recurring" | "open_web" | "create_tags" | "list_tags" | "rename_tags" | "none",
   "titles": string[],
   "proposals": [{"id": number|null, "index": number|null, "before": string, "after": string}],
   "confidence": number,
@@ -62,6 +69,11 @@ Session context (account data is authoritative; do not invent tag ids):
 
 Rules:
 - help: asks what the bot can do, its capabilities, or how to use it.
+- show_menu: asks to show/open the reply menu or keyboard buttons (Recent, Budgets, Tags, …).
+- list_recent: asks to show recent / latest transactions (same as the Recent menu button).
+- list_budgets: asks to show budgets / budget progress (same as Budgets).
+- list_recurring: asks to show recurring rules / subscriptions (same as Recurring).
+- open_web: asks to open the website / Web UI / mini app (same as Web UI / /app).
 - list_tags: asks to show/list tags.
 - create_tags: user wants to create one or more tags/categories. Put cleaned titles in
   titles (1–10 items, no emojis unless clearly part of the name). Keep the user's wording.
@@ -74,10 +86,11 @@ Rules:
 - If a rename request identifies a tag but does not provide a new title, use ui.type="pick_one"
   only when the user must choose among last_list; otherwise use ui.type="none".
 - ui.item_ids may contain only ids explicitly present in last_list. The handler validates them.
-- needs_confirm must be true for create_tags and rename_tags. It must be false for help/list_tags/none.
+- needs_confirm must be true for create_tags and rename_tags. It must be false for
+  help/show_menu/list_*/open_web/none.
 - ui.type should be confirm for a mutation preview, pick_one when a tag selection is required,
-  and none for read-only or unclear requests.
-- none: transactions, unrelated chat, or unclear requests.
+  and none for read-only or unclear requests. Do not invent callback_data.
+- none: unrelated chat, unclear requests, or analytics/month summaries (not supported via NL yet).
 - confidence: 0–1.
 PROMPT;
 
@@ -125,7 +138,7 @@ PROMPT;
 
     /**
      * @return array{
-     *     intent: 'help'|'create_tags'|'list_tags'|'rename_tags'|'none',
+     *     intent: 'help'|'show_menu'|'list_recent'|'list_budgets'|'list_recurring'|'open_web'|'create_tags'|'list_tags'|'rename_tags'|'none',
      *     titles: list<string>,
      *     proposals: list<array{id: int|null, index: int|null, before: string, after: string}>,
      *     confidence: float,
@@ -153,7 +166,19 @@ PROMPT;
         }
 
         $intent = $decoded['intent'] ?? 'none';
-        if (!in_array($intent, ['help', 'create_tags', 'list_tags', 'rename_tags', 'none'], true)) {
+        $allowedIntents = [
+            'help',
+            'show_menu',
+            'list_recent',
+            'list_budgets',
+            'list_recurring',
+            'open_web',
+            'create_tags',
+            'list_tags',
+            'rename_tags',
+            'none',
+        ];
+        if (!in_array($intent, $allowedIntents, true)) {
             $intent = 'none';
         }
 

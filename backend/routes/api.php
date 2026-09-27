@@ -76,6 +76,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/identities/telegram/link-code', [IdentityController::class, 'telegramLinkCode']);
     Route::put('/account/credentials', [AccountController::class, 'updateCredentials']);
     Route::patch('/account/preferences', [AccountController::class, 'updatePreferences']);
+    Route::get('/account/ai-quota', [AccountController::class, 'aiQuota']);
     Route::get('/account/mcp-token', [AccountController::class, 'mcpTokenStatus']);
     Route::post('/account/mcp-token', [AccountController::class, 'createMcpToken'])
         ->middleware('throttle:10,1');
