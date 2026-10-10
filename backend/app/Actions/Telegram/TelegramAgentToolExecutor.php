@@ -3,6 +3,8 @@
 namespace App\Actions\Telegram;
 
 use App\Actions\Budgets\CalculateBudgetPeriodSpentAction;
+use App\Actions\Charts\BuildUserChartAction;
+use App\Actions\Charts\ScreenshotHtmlViaGotenbergAction;
 use App\Actions\Budgets\CreateBudgetAction;
 use App\Actions\Budgets\ListBudgetsAction;
 use App\Actions\RecurringTransactions\ListRecurringTransactionsAction;
@@ -49,6 +51,8 @@ class TelegramAgentToolExecutor
         private readonly UpdateTransactionAction $updateTransaction,
         private readonly DeleteTransactionAction $deleteTransaction,
         private readonly CreateBudgetAction $createBudget,
+        private readonly BuildUserChartAction $buildChart,
+        private readonly ScreenshotHtmlViaGotenbergAction $screenshot,
     ) {}
 
     /**
@@ -124,6 +128,18 @@ class TelegramAgentToolExecutor
             $this->fn('show_month', 'Send the standard this-month summary card (same as Month / /month).', [
                 'type' => 'object',
                 'properties' => (object) [],
+            ]),
+            $this->fn('send_chart', 'Render a chart image (PNG) from the user\'s transactions and send it to the chat with a short caption, then stop. Use for any request to show/draw a chart, graph, diagram or visual breakdown (e.g. spending by tag, income vs expenses, balance trend).', [
+                'type' => 'object',
+                'properties' => [
+                    'type' => ['type' => 'string', 'enum' => BuildUserChartAction::TYPES, 'description' => 'expenses_by_tag (donut or bar), income_vs_expenses (grouped bars), balance_trend (line)'],
+                    'style' => ['type' => 'string', 'enum' => ['donut', 'bar'], 'description' => 'Only for expenses_by_tag; default donut'],
+                    'group_by' => ['type' => 'string', 'enum' => ['day', 'week', 'month'], 'description' => 'Only for income_vs_expenses; default chosen by period length'],
+                    'period' => ['type' => 'string', 'enum' => BuildUserChartAction::PERIODS, 'description' => 'Default this_month. Ignored when from/to given.'],
+                    'from' => ['type' => 'string', 'description' => 'Explicit start YYYY-MM-DD (optional)'],
+                    'to' => ['type' => 'string', 'description' => 'Explicit end YYYY-MM-DD (optional)'],
+                ],
+                'required' => ['type'],
             ]),
             $this->fn('show_web', 'Send the Web UI / mini-app hint.', [
                 'type' => 'object',
@@ -239,6 +255,7 @@ class TelegramAgentToolExecutor
                 'show_tags' => $this->uiStop($this->doShowTags($user, $chatId, $identity)),
                 'show_recurring' => $this->uiStop($this->doShowRecurring($user, $chatId, $identity)),
                 'show_month' => $this->uiStop($this->doShowMonth($user, $chatId, $identity)),
+                'send_chart' => $this->uiStop($this->doSendChart($user, $chatId, $identity, $arguments)),
                 'show_web' => $this->uiStop($this->doShowWeb($chatId, $identity)),
                 'ask_user' => $this->askStop($this->doAskUser($chatId, $identity, $arguments)),
                 'create_tags' => $this->confirmStop($this->stageCreateTags($user, $chatId, $identity, $arguments)),
@@ -660,6 +677,30 @@ class TelegramAgentToolExecutor
         $this->menuHandler->sendMonthSummary($user, $chatId, $identity);
 
         return ['ui' => 'month', 'sent' => true];
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     * @return array<string, mixed>
+     */
+    private function doSendChart(User $user, int|string $chatId, int|string $identity, array $args): array
+    {
+        $chart = $this->buildChart->execute($user, $args);
+
+        try {
+            $png = $this->screenshot->execute($chart['html'], BuildUserChartAction::WIDTH, BuildUserChartAction::HEIGHT);
+            $this->client->sendPhoto($chatId, $png, 'chart.png', $chart['caption']);
+        } catch (Throwable $e) {
+            Log::warning('TelegramAgentToolExecutor: chart render/send failed', ['message' => $e->getMessage()]);
+            $this->client->sendMessage($chatId, "Couldn't render the chart right now.");
+            $this->session->setSummary($identity, $chatId, 'Chart rendering failed.');
+
+            return ['ui' => 'chart', 'sent' => false, 'error' => 'render_failed'];
+        }
+
+        $this->session->setSummary($identity, $chatId, mb_substr('Chart sent: ' . str_replace("\n", '; ', $chart['caption']), 0, 500));
+
+        return ['ui' => 'chart', 'sent' => true, 'summary' => $chart['summary']];
     }
 
     /**

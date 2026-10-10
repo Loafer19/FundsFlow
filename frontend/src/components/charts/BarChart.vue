@@ -14,10 +14,36 @@ const props = defineProps({
         type: Object,
         required: true,
     },
+    // Optional previous-period buckets ({ positive, negative } objects), aligned by index.
+    previous: {
+        type: Array,
+        default: null,
+    },
 })
 
 const formatDate = inject('formatDate')
 const formatMoney = inject('formatMoney')
+
+const cssVar = (name) => window.getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+
+const previousDatasets = (dates) => {
+    if (!props.previous) return []
+    const values = dates.map((_, i) => props.previous[i] || { positive: 0, negative: 0 })
+    const make = (key, color) => ({
+        label: 'Previous period',
+        stack: 'previous',
+        data: values.map((t) => t[key]),
+        backgroundColor: 'transparent',
+        borderColor: cssVar(color),
+        borderWidth: 1.5,
+        tooltip: {
+            callbacks: {
+                label: (context) => `Previous period: ${formatMoney(context.raw)}`,
+            },
+        },
+    })
+    return [make('positive', '--color-success'), make('negative', '--color-error')]
+}
 
 const chartData = computed(() => {
     const dates = Object.keys(props.balances)
@@ -25,7 +51,9 @@ const chartData = computed(() => {
     return {
         labels: dates.map((date) => formatDate(date)),
         datasets: [
+            ...previousDatasets(dates),
             {
+                stack: 'current',
                 data: Object.values(props.balances).map((t) => t.positive),
                 backgroundColor: window.getComputedStyle(document.documentElement).getPropertyValue('--color-success'),
                 tooltip: {
@@ -37,6 +65,7 @@ const chartData = computed(() => {
                 },
             },
             {
+                stack: 'current',
                 data: Object.values(props.balances).map((t) => t.negative),
                 backgroundColor: window.getComputedStyle(document.documentElement).getPropertyValue('--color-error'),
                 tooltip: {
