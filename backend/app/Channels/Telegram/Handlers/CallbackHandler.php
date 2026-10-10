@@ -120,25 +120,11 @@ class CallbackHandler
             return;
         }
 
-        if ($data === 'draft:ok') {
-            $this->client->answerCallbackQuery($callbackId, 'Saving…');
-            $this->mediaHandler->confirmDraft($user, $chatId);
-
-            return;
-        }
-
-        if ($data === 'draft:edit') {
-            $this->client->answerCallbackQuery($callbackId);
-            $this->mediaHandler->beginDraftAmountEdit($user, $chatId);
-
-            return;
-        }
-
-        if ($data === 'draft:cancel') {
-            $this->mediaHandler->cancelPendingMedia($chatId);
-            $this->client->answerCallbackQuery($callbackId, 'Cancelled');
-            $this->client->sendMessage($chatId, 'Cancelled');
-            $this->mediaHandler->continueAlbumQueue($user, $chatId);
+        // Confirm-style buttons carry a nonce for the exact card they were sent
+        // with. Each one is single-use, so its keyboard is removed once tapped.
+        if (preg_match('/^draft:(ok|edit|cancel)(?::(' . TelegramSupport::NONCE_PATTERN . '))?$/', $data, $matches)) {
+            $this->removeKeyboard($chatId, $messageId);
+            $this->handleDraftButton($user, $chatId, $callbackId, $matches[1], $matches[2] ?? '');
 
             return;
         }
@@ -157,16 +143,9 @@ class CallbackHandler
             return;
         }
 
-        if ($data === 'nl:tags:ok') {
-            $this->client->answerCallbackQuery($callbackId, 'Creating…');
-            $this->naturalLanguageHandler->confirmCreateTags($user, $chatId, $telegramUserId);
-
-            return;
-        }
-
-        if ($data === 'nl:tags:cancel') {
-            $this->client->answerCallbackQuery($callbackId, 'Cancelled');
-            $this->naturalLanguageHandler->cancelCreateTags($chatId, $telegramUserId);
+        if (preg_match('/^nl:(tags|rename|agent):(ok|cancel)(?::(' . TelegramSupport::NONCE_PATTERN . '))?$/', $data, $matches)) {
+            $this->removeKeyboard($chatId, $messageId);
+            $this->handleNlConfirmButton($user, $chatId, $callbackId, $telegramUserId, $matches[1], $matches[2], $matches[3] ?? '');
 
             return;
         }
@@ -179,34 +158,6 @@ class CallbackHandler
                 $callbackId,
                 $telegramUserId,
             );
-
-            return;
-        }
-
-        if ($data === 'nl:rename:ok') {
-            $this->client->answerCallbackQuery($callbackId, 'Renaming…');
-            $this->naturalLanguageHandler->confirmRenameTags($user, $chatId, $telegramUserId);
-
-            return;
-        }
-
-        if ($data === 'nl:rename:cancel') {
-            $this->client->answerCallbackQuery($callbackId, 'Cancelled');
-            $this->naturalLanguageHandler->cancelRenameTags($chatId, $telegramUserId);
-
-            return;
-        }
-
-        if ($data === 'nl:agent:ok') {
-            $this->client->answerCallbackQuery($callbackId, 'Applying…');
-            $this->naturalLanguageHandler->confirmAgentMutation($user, $chatId, $telegramUserId);
-
-            return;
-        }
-
-        if ($data === 'nl:agent:cancel') {
-            $this->client->answerCallbackQuery($callbackId, 'Cancelled');
-            $this->naturalLanguageHandler->cancelAgentMutation($chatId, $telegramUserId);
 
             return;
         }
@@ -249,6 +200,86 @@ class CallbackHandler
         }
 
         $this->client->answerCallbackQuery($callbackId);
+    }
+
+    private function handleDraftButton(User $user, int|string $chatId, string $callbackId, string $action, string $nonce): void
+    {
+        if ($nonce === '') {
+            // Card sent before buttons carried a nonce.
+            $this->client->answerCallbackQuery($callbackId, 'This card expired. Send the receipt again.');
+
+            return;
+        }
+
+        if ($action === 'ok') {
+            $this->client->answerCallbackQuery($callbackId, 'Saving…');
+            $this->mediaHandler->confirmDraft($user, $chatId, $nonce);
+
+            return;
+        }
+
+        $this->client->answerCallbackQuery($callbackId);
+
+        if ($action === 'edit') {
+            $this->mediaHandler->beginDraftAmountEdit($user, $chatId, $nonce);
+
+            return;
+        }
+
+        if ($this->mediaHandler->cancelDraft($chatId, $nonce)) {
+            $this->client->sendMessage($chatId, 'Cancelled');
+            $this->mediaHandler->continueAlbumQueue($user, $chatId);
+        }
+    }
+
+    private function handleNlConfirmButton(
+        User $user,
+        int|string $chatId,
+        string $callbackId,
+        int|string|null $telegramUserId,
+        string $kind,
+        string $action,
+        string $nonce,
+    ): void {
+        if ($nonce === '') {
+            // Preview sent before buttons carried a nonce.
+            $this->client->answerCallbackQuery($callbackId, 'This preview expired. Ask again.');
+
+            return;
+        }
+
+        $nl = $this->naturalLanguageHandler;
+
+        if ($action === 'cancel') {
+            $this->client->answerCallbackQuery($callbackId);
+
+            match ($kind) {
+                'tags' => $nl->cancelCreateTags($chatId, $nonce, $telegramUserId),
+                'rename' => $nl->cancelRenameTags($chatId, $nonce, $telegramUserId),
+                'agent' => $nl->cancelAgentMutation($chatId, $nonce, $telegramUserId),
+            };
+
+            return;
+        }
+
+        $this->client->answerCallbackQuery($callbackId, match ($kind) {
+            'tags' => 'Creating…',
+            'rename' => 'Renaming…',
+            'agent' => 'Applying…',
+        });
+
+        match ($kind) {
+            'tags' => $nl->confirmCreateTags($user, $chatId, $nonce, $telegramUserId),
+            'rename' => $nl->confirmRenameTags($user, $chatId, $nonce, $telegramUserId),
+            'agent' => $nl->confirmAgentMutation($user, $chatId, $nonce, $telegramUserId),
+        };
+    }
+
+    private function removeKeyboard(int|string $chatId, ?int $messageId): void
+    {
+        if ($messageId !== null) {
+            $this->client->editMessageReplyMarkup($chatId, $messageId);
+        }
     }
 
     private function handleTagToggle(

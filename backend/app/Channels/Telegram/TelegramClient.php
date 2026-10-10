@@ -76,11 +76,11 @@ class TelegramClient
      */
     public function sendPhoto(
         int|string $chatId,
-        string $contentsOrPath,
+        string $contents,
         string $filename,
         ?string $caption = null,
     ): array {
-        return $this->sendMultipart('sendPhoto', 'photo', $chatId, $contentsOrPath, $filename, $caption);
+        return $this->sendMultipart('sendPhoto', 'photo', $chatId, $contents, $filename, $caption);
     }
 
     /**
@@ -88,11 +88,11 @@ class TelegramClient
      */
     public function sendDocument(
         int|string $chatId,
-        string $contentsOrPath,
+        string $contents,
         string $filename,
         ?string $caption = null,
     ): array {
-        return $this->sendMultipart('sendDocument', 'document', $chatId, $contentsOrPath, $filename, $caption);
+        return $this->sendMultipart('sendDocument', 'document', $chatId, $contents, $filename, $caption);
     }
 
     /**
@@ -102,12 +102,13 @@ class TelegramClient
         string $method,
         string $field,
         int|string $chatId,
-        string $contentsOrPath,
+        string $contents,
         string $filename,
         ?string $caption,
     ): array {
-        $contents = $this->resolveFileContents($contentsOrPath);
-
+        // Always raw bytes. Never treat the argument as a path: callers pass
+        // user-uploaded contents, and a file whose bytes spell "/app/.env"
+        // would otherwise be read from disk and sent to the user.
         $response = Http::attach($field, $contents, $filename)
             ->post($this->baseUrl . $method, array_filter([
                 'chat_id' => $chatId,
@@ -125,26 +126,6 @@ class TelegramClient
         }
 
         return $json;
-    }
-
-    private function resolveFileContents(string $contentsOrPath): string
-    {
-        if (
-            $contentsOrPath !== ''
-            && !str_contains($contentsOrPath, "\0")
-            && is_file($contentsOrPath)
-            && is_readable($contentsOrPath)
-        ) {
-            $contents = file_get_contents($contentsOrPath);
-
-            if ($contents === false) {
-                throw new RuntimeException('Could not read file for Telegram upload.');
-            }
-
-            return $contents;
-        }
-
-        return $contentsOrPath;
     }
 
     /**

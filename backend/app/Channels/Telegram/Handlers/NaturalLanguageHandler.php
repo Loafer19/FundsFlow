@@ -21,6 +21,8 @@ class NaturalLanguageHandler
 {
     private const DEFAULT_EMOJI = '🏷';
 
+    private const OUTDATED_PREVIEW = 'This preview is outdated or was already handled. Ask again to get a fresh one.';
+
     public function __construct(
         private readonly TelegramClient $client,
         private readonly TelegramSupport $support,
@@ -192,14 +194,14 @@ class NaturalLanguageHandler
     public function confirmCreateTags(
         User $user,
         int|string $chatId,
+        string $nonce,
         int|string|null $telegramUserId = null,
     ): void {
         $identity = $telegramUserId ?? $chatId;
-        $pending = $this->session->get($identity, $chatId)['pending'];
-        $this->session->clearPending($identity, $chatId);
+        $pending = $this->takePending($identity, $chatId, 'create_tags', $nonce);
 
-        if (!is_array($pending) || ($pending['type'] ?? null) !== 'create_tags') {
-            $this->client->sendMessage($chatId, 'Nothing to confirm. Send a message like: create tags groceries, coffee');
+        if ($pending === null) {
+            $this->client->sendMessage($chatId, self::OUTDATED_PREVIEW);
 
             return;
         }
@@ -212,10 +214,17 @@ class NaturalLanguageHandler
 
     public function cancelCreateTags(
         int|string $chatId,
+        string $nonce,
         int|string|null $telegramUserId = null,
     ): void {
         $identity = $telegramUserId ?? $chatId;
-        $this->session->clearPending($identity, $chatId);
+
+        if ($this->takePending($identity, $chatId, 'create_tags', $nonce) === null) {
+            $this->client->sendMessage($chatId, self::OUTDATED_PREVIEW);
+
+            return;
+        }
+
         $this->session->setSummary($identity, $chatId, 'Tag creation cancelled.');
         $this->client->sendMessage($chatId, 'Cancelled');
     }
@@ -285,6 +294,7 @@ class NaturalLanguageHandler
             return true;
         }
 
+        $nonce = $this->support->newNonce();
         $this->session->setPending($identity, $chatId, [
             'type' => 'rename_tags',
             'proposals' => [[
@@ -292,11 +302,12 @@ class NaturalLanguageHandler
                 'before' => $tag->title,
                 'after' => $title,
             ]],
+            'nonce' => $nonce,
         ]);
         $this->client->sendMessage(
             $chatId,
             "Rename tag:\n{$tag->title} → {$title}\n\nApply this change?",
-            $this->support->nlRenameConfirmKeyboard(),
+            $this->support->nlRenameConfirmKeyboard($nonce),
         );
 
         return true;
@@ -305,14 +316,14 @@ class NaturalLanguageHandler
     public function confirmRenameTags(
         User $user,
         int|string $chatId,
+        string $nonce,
         int|string|null $telegramUserId = null,
     ): void {
         $identity = $telegramUserId ?? $chatId;
-        $pending = $this->session->get($identity, $chatId)['pending'];
-        $this->session->clearPending($identity, $chatId);
+        $pending = $this->takePending($identity, $chatId, 'rename_tags', $nonce);
 
-        if (!is_array($pending) || ($pending['type'] ?? null) !== 'rename_tags') {
-            $this->client->sendMessage($chatId, 'Nothing to confirm.');
+        if ($pending === null) {
+            $this->client->sendMessage($chatId, self::OUTDATED_PREVIEW);
 
             return;
         }
@@ -376,10 +387,17 @@ class NaturalLanguageHandler
 
     public function cancelRenameTags(
         int|string $chatId,
+        string $nonce,
         int|string|null $telegramUserId = null,
     ): void {
         $identity = $telegramUserId ?? $chatId;
-        $this->session->clearPending($identity, $chatId);
+
+        if ($this->takePending($identity, $chatId, 'rename_tags', $nonce) === null) {
+            $this->client->sendMessage($chatId, self::OUTDATED_PREVIEW);
+
+            return;
+        }
+
         $this->session->setSummary($identity, $chatId, 'Tag rename cancelled.');
         $this->client->sendMessage($chatId, 'Cancelled');
     }
@@ -387,14 +405,14 @@ class NaturalLanguageHandler
     public function confirmAgentMutation(
         User $user,
         int|string $chatId,
+        string $nonce,
         int|string|null $telegramUserId = null,
     ): void {
         $identity = $telegramUserId ?? $chatId;
-        $pending = $this->session->get($identity, $chatId)['pending'];
-        $this->session->clearPending($identity, $chatId);
+        $pending = $this->takePending($identity, $chatId, 'agent_mutation', $nonce);
 
-        if (!is_array($pending) || ($pending['type'] ?? null) !== 'agent_mutation') {
-            $this->client->sendMessage($chatId, 'Nothing to confirm.');
+        if ($pending === null) {
+            $this->client->sendMessage($chatId, self::OUTDATED_PREVIEW);
 
             return;
         }
@@ -404,12 +422,43 @@ class NaturalLanguageHandler
 
     public function cancelAgentMutation(
         int|string $chatId,
+        string $nonce,
         int|string|null $telegramUserId = null,
     ): void {
         $identity = $telegramUserId ?? $chatId;
-        $this->session->clearPending($identity, $chatId);
+
+        if ($this->takePending($identity, $chatId, 'agent_mutation', $nonce) === null) {
+            $this->client->sendMessage($chatId, self::OUTDATED_PREVIEW);
+
+            return;
+        }
+
         $this->session->setSummary($identity, $chatId, 'Agent mutation cancelled.');
         $this->client->sendMessage($chatId, 'Cancelled');
+    }
+
+    /**
+     * The pending change behind a confirm/cancel button, removed from the
+     * session. Null when the button belongs to an older preview, the type
+     * doesn't match, or the button was already used.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function takePending(int|string $identity, int|string $chatId, string $type, string $nonce): ?array
+    {
+        $pending = $this->session->get($identity, $chatId)['pending'];
+
+        if (!is_array($pending) || ($pending['type'] ?? null) !== $type || ($pending['nonce'] ?? null) !== $nonce) {
+            return null;
+        }
+
+        if (!$this->support->claimNonce($nonce)) {
+            return null;
+        }
+
+        $this->session->clearPending($identity, $chatId);
+
+        return $pending;
     }
 
     /**

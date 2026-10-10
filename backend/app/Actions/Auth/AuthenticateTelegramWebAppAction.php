@@ -34,7 +34,7 @@ class AuthenticateTelegramWebAppAction
         }
 
         $identity->update([
-            'meta' => $this->initData->identityMeta($telegramUser),
+            'meta' => $this->initData->mergeIdentityMeta($identity->meta, $telegramUser),
         ]);
 
         return [

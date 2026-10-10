@@ -32,7 +32,7 @@ class TransactionBulkUpdateRequest extends FormRequest
             'transactions.*.tags' => 'nullable|array',
             'transactions.*.tags.*' => [
                 'integer',
-                Rule::exists('tags', 'id')->where('user_id', $this->user()->id)->whereNull('deleted_at'),
+                Rule::exists('tags', 'id')->where('user_id', $this->user()->id),
             ],
         ];
     }

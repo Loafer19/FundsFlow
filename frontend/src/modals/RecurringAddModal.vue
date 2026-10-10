@@ -105,15 +105,10 @@ const computedEndsAt = computed(() => {
 const estimatedOccurrences = computed(() => {
     if (!form.value.ends_at) return 0
 
+    // Count from starts_at (not step by step) so month-end dates don't drift.
     let count = 1
-    let cursor = form.value.starts_at
 
-    while (count < 1000) {
-        const next = advanceDateStr(cursor, form.value.frequency, 1)
-
-        if (next > form.value.ends_at) break
-
-        cursor = next
+    while (count < 1000 && advanceDateStr(form.value.starts_at, form.value.frequency, count) <= form.value.ends_at) {
         count++
     }
 

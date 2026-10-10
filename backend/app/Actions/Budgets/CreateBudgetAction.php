@@ -5,7 +5,9 @@ namespace App\Actions\Budgets;
 use App\Enums\BudgetLength;
 use App\Models\Budget;
 use App\Models\User;
+use App\Support\TagIds;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 class CreateBudgetAction
 {
@@ -15,6 +17,12 @@ class CreateBudgetAction
     public function execute(User $user, array $data): Budget
     {
         Gate::forUser($user)->authorize('create', Budget::class);
+
+        $tagIds = TagIds::forSync($user, $data['tag_ids']);
+
+        if ($tagIds === []) {
+            throw ValidationException::withMessages(['tag_ids' => 'Pick at least one existing tag.']);
+        }
 
         $budget = $user->budgets()->create([
             'title' => $data['title'] ?? null,
@@ -32,7 +40,7 @@ class CreateBudgetAction
         ]);
 
 
-        $period->tags()->sync($data['tag_ids']);
+        $period->tags()->sync($tagIds);
 
         return $budget->load('periods.tags');
     }

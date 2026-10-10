@@ -27,7 +27,7 @@ class LinkTelegramWebAppAction
 
         if ($identity) {
             if ((int) $identity->user_id === (int) $user->id) {
-                $identity->update(['meta' => $meta]);
+                $identity->update(['meta' => $this->initData->mergeIdentityMeta($identity->meta, $telegramUser)]);
 
                 return $user->load('identities');
             }

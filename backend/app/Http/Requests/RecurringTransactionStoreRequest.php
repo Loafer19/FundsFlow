@@ -28,7 +28,7 @@ class RecurringTransactionStoreRequest extends FormRequest
             'tags' => 'nullable|array',
             'tags.*' => [
                 'integer',
-                Rule::exists('tags', 'id')->where('user_id', $this->user()->id)->whereNull('deleted_at'),
+                Rule::exists('tags', 'id')->where('user_id', $this->user()->id),
             ],
         ];
     }

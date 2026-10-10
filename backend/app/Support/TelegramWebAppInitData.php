@@ -147,4 +147,26 @@ class TelegramWebAppInitData
             'photo_url' => $telegramUser['photo_url'],
         ], static fn ($value) => $value !== null && $value !== '');
     }
+
+    /**
+     * Refresh the Telegram profile fields on an existing identity while keeping
+     * app-owned keys such as `muted` (set by /mute in the bot).
+     *
+     * @param array<string, mixed>|null $existing
+     * @param array{
+     *     id: int,
+     *     username: ?string,
+     *     first_name: ?string,
+     *     last_name: ?string,
+     *     language_code: ?string,
+     *     photo_url: ?string
+     * } $telegramUser
+     * @return array<string, mixed>
+     */
+    public function mergeIdentityMeta(?array $existing, array $telegramUser): array
+    {
+        $profileKeys = array_flip(['username', 'first_name', 'last_name', 'language_code', 'photo_url']);
+
+        return [...array_diff_key($existing ?? [], $profileKeys), ...$this->identityMeta($telegramUser)];
+    }
 }

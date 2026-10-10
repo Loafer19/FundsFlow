@@ -4,6 +4,7 @@ namespace App\Actions\RecurringTransactions;
 
 use App\Models\RecurringTransaction;
 use App\Models\User;
+use App\Support\TagIds;
 use Illuminate\Support\Facades\Gate;
 
 class CreateRecurringTransactionAction
@@ -15,7 +16,7 @@ class CreateRecurringTransactionAction
     {
         Gate::forUser($user)->authorize('create', RecurringTransaction::class);
 
-        $tagIds = $data['tags'] ?? [];
+        $tagIds = TagIds::forSync($user, $data['tags'] ?? []);
         unset($data['tags']);
 
         $data['next_run_at'] = $data['starts_at'];

@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 class TelegramSupport
@@ -27,6 +28,9 @@ class TelegramSupport
     public const MENU_WEB = '🌐 Web UI';
 
     public const PARSE_HTML = 'HTML';
+
+    /** Callback-data suffix tying a confirm button to the preview it was sent with. */
+    public const NONCE_PATTERN = '[a-f0-9]{8}';
 
     public const RECENT_LIMIT = 5;
 
@@ -319,13 +323,13 @@ class TelegramSupport
     /**
      * @return array<string, mixed>
      */
-    public function receiptDraftKeyboard(): array
+    public function receiptDraftKeyboard(string $nonce): array
     {
         return [
             'inline_keyboard' => [[
-                ['text' => '✅ Confirm', 'callback_data' => 'draft:ok'],
-                ['text' => '✏️ Edit amount', 'callback_data' => 'draft:edit'],
-                ['text' => 'Cancel', 'callback_data' => 'draft:cancel'],
+                ['text' => '✅ Confirm', 'callback_data' => "draft:ok:{$nonce}"],
+                ['text' => '✏️ Edit amount', 'callback_data' => "draft:edit:{$nonce}"],
+                ['text' => 'Cancel', 'callback_data' => "draft:cancel:{$nonce}"],
             ]],
         ];
     }
@@ -346,12 +350,12 @@ class TelegramSupport
     /**
      * @return array<string, mixed>
      */
-    public function nlCreateTagsKeyboard(): array
+    public function nlCreateTagsKeyboard(string $nonce): array
     {
         return [
             'inline_keyboard' => [[
-                ['text' => '✅ Confirm', 'callback_data' => 'nl:tags:ok'],
-                ['text' => 'Cancel', 'callback_data' => 'nl:tags:cancel'],
+                ['text' => '✅ Confirm', 'callback_data' => "nl:tags:ok:{$nonce}"],
+                ['text' => 'Cancel', 'callback_data' => "nl:tags:cancel:{$nonce}"],
             ]],
         ];
     }
@@ -359,12 +363,12 @@ class TelegramSupport
     /**
      * @return array<string, mixed>
      */
-    public function nlRenameConfirmKeyboard(): array
+    public function nlRenameConfirmKeyboard(string $nonce): array
     {
         return [
             'inline_keyboard' => [[
-                ['text' => '✅ Confirm', 'callback_data' => 'nl:rename:ok'],
-                ['text' => 'Cancel', 'callback_data' => 'nl:rename:cancel'],
+                ['text' => '✅ Confirm', 'callback_data' => "nl:rename:ok:{$nonce}"],
+                ['text' => 'Cancel', 'callback_data' => "nl:rename:cancel:{$nonce}"],
             ]],
         ];
     }
@@ -396,14 +400,28 @@ class TelegramSupport
      *
      * @return array<string, mixed>
      */
-    public function nlAgentConfirmKeyboard(): array
+    public function nlAgentConfirmKeyboard(string $nonce): array
     {
         return [
             'inline_keyboard' => [[
-                ['text' => '✅ Confirm', 'callback_data' => 'nl:agent:ok'],
-                ['text' => 'Cancel', 'callback_data' => 'nl:agent:cancel'],
+                ['text' => '✅ Confirm', 'callback_data' => "nl:agent:ok:{$nonce}"],
+                ['text' => 'Cancel', 'callback_data' => "nl:agent:cancel:{$nonce}"],
             ]],
         ];
+    }
+
+    public function newNonce(): string
+    {
+        return bin2hex(random_bytes(4));
+    }
+
+    /**
+     * First caller wins: a double tap or a webhook retry on the same button
+     * must not apply the change twice.
+     */
+    public function claimNonce(string $nonce): bool
+    {
+        return Cache::add('telegram_confirm_claimed:' . $nonce, true, now()->addHour());
     }
 
     /**
@@ -433,7 +451,7 @@ class TelegramSupport
         $this->client->sendMessage(
             $chatId,
             $this->formatReceiptDraftCard($user, $draft),
-            $this->receiptDraftKeyboard(),
+            $this->receiptDraftKeyboard((string) ($draft['nonce'] ?? '')),
             self::PARSE_HTML,
         );
     }

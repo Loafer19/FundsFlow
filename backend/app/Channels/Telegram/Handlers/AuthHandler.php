@@ -81,9 +81,28 @@ class AuthHandler
      */
     public function registerNewAccount(int|string $chatId, array $meta): void
     {
+        $email = "telegram-{$chatId}@fundsflow.invalid";
+        $previous = User::where('email', $email)->first();
+
+        // /unlink keeps the account, so its synthetic email still exists. Only
+        // the bot creates .invalid emails (signup and credentials require a
+        // DNS-valid domain), so this account came from this very chat: link it back.
+        if ($previous && !$previous->identities()->where('provider', 'telegram')->exists()) {
+            $previous->identities()->create([
+                'provider' => 'telegram',
+                'external_id' => (string) $chatId,
+                'meta' => $meta,
+            ]);
+
+            $this->support->sendWelcome($chatId, '✅ Linked back to your FundsFlow account');
+
+            return;
+        }
+
         $user = User::create([
             'name' => $meta['first_name'] ?: 'Telegram User',
-            'email' => "telegram-{$chatId}@fundsflow.invalid",
+            // The old account now belongs to another Telegram chat; don't collide with its email.
+            'email' => $previous ? 'telegram-' . $chatId . '-' . str()->lower(str()->random(6)) . '@fundsflow.invalid' : $email,
             'password' => str()->random(32),
         ]);
 
@@ -157,7 +176,7 @@ class AuthHandler
     {
         $identity = $this->support->resolveIdentity($chatId);
 
-        $identity->update(['meta' => [...$identity->meta, 'muted' => $muted]]);
+        $identity->update(['meta' => [...($identity->meta ?? []), 'muted' => $muted]]);
 
         $this->client->sendMessage($chatId, $muted
             ? '🔕 Notifications muted. Use /unmute to turn budget alerts, weekly digest, and recurring auto-add notifications back on'

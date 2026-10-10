@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { hostHeaderValidation } from '@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js'
+import { timingSafeEqual } from 'node:crypto'
 import express, { type Request, type Response } from 'express'
 import { z } from 'zod'
 import { oauthClientId, oauthClientSecret, oauthPublicBase, registerOAuthRoutes, unauthorizedMcp } from './oauth.ts'
@@ -151,10 +152,28 @@ function resolveUserToken(req: Request): string | null {
     return null
 }
 
+const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
+const FORWARDING_HEADERS = ['x-forwarded-for', 'forwarded', 'x-real-ip']
+
+// Direct local connection only: a reverse proxy on the same host also
+// connects from loopback, but it adds forwarding headers.
+function isDirectLoopback(req: Request): boolean {
+    const remote = req.socket.remoteAddress ?? ''
+    return LOOPBACK_ADDRESSES.has(remote) && FORWARDING_HEADERS.every((name) => !req.header(name))
+}
+
+function safeEqual(a: string, b: string): boolean {
+    const left = Buffer.from(a)
+    const right = Buffer.from(b)
+    return left.length === right.length && timingSafeEqual(left, right)
+}
+
+// Gate for the FUNDSFLOW_TOKEN fallback. Without MCP_KEY it serves only
+// direct local clients — never the public internet.
 function hasMcpKey(req: Request): boolean {
-    if (!MCP_KEY) return true
+    if (!MCP_KEY) return isDirectLoopback(req)
     const key = req.header('x-fundsflow-mcp-key') || req.query.key
-    return typeof key === 'string' && key === MCP_KEY
+    return typeof key === 'string' && safeEqual(key, MCP_KEY)
 }
 
 function createServer(token: string | null) {
@@ -1085,4 +1104,7 @@ app.listen(PORT, HOST, () => {
     console.log(`OAuth authorize: ${oauthPublicBase}/oauth/authorize`)
     console.log(`API: ${API_URL}`)
     console.log(`Tools: ${TOOL_NAMES.length}`)
+    if (ENV_TOKEN && !MCP_KEY) {
+        console.warn('FUNDSFLOW_TOKEN fallback is limited to direct loopback clients; set MCP_KEY to use it remotely.')
+    }
 })

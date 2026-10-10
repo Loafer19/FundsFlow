@@ -4,12 +4,14 @@ namespace App\Actions\RecurringTransactions;
 
 use App\Actions\Transactions\CreateTransactionAction;
 use App\Channels\Telegram\TelegramClient;
-use App\Enums\RecurringFrequency;
 use App\Enums\TransactionSource;
 use App\Models\RecurringTransaction;
 use App\Models\Transaction;
 use App\Support\UserFormatter;
-use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class GenerateRecurringTransactionsAction
 {
@@ -24,6 +26,25 @@ class GenerateRecurringTransactionsAction
     ) {}
 
     public function execute(): void
+    {
+        // Two runs at once (scheduler + manual artisan, or two replicas
+        // during a deploy) would materialize the same occurrence twice.
+        $lock = Cache::lock('recurring-transactions:generate', 30 * 60);
+
+        if (!$lock->get()) {
+            Log::warning('Recurring generation skipped: another run holds the lock.');
+
+            return;
+        }
+
+        try {
+            $this->run();
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function run(): void
     {
         $this->messagesByChat = [];
 
@@ -42,12 +63,21 @@ class GenerateRecurringTransactionsAction
                         continue;
                     }
 
-                    $this->materialize($rule, $today);
+                    // One broken rule must not stop generation for everyone else.
+                    try {
+                        $this->materialize($rule, $today);
+                    } catch (Throwable $e) {
+                        report($e);
+                    }
                 }
             });
 
         foreach ($this->messagesByChat as $chatId => $lines) {
-            $this->client->sendMessage($chatId, "🔁 Added automatically\n" . implode("\n", $lines));
+            try {
+                $this->client->sendMessage($chatId, "🔁 Added automatically\n" . implode("\n", $lines));
+            } catch (Throwable $e) {
+                report($e);
+            }
         }
     }
 
@@ -65,17 +95,26 @@ class GenerateRecurringTransactionsAction
                 return;
             }
 
-            $transaction = $this->createTransaction->execute($rule->user, [
-                'at' => $rule->next_run_at->toDateString(),
-                'amount' => $rule->amount,
-                'note' => $rule->note,
-                'tags' => $rule->tags->pluck('id')->all(),
-            ], TransactionSource::Recurring);
+            // Insert and advance together, so a crash between them can't
+            // replay the same occurrence on the next run.
+            $transaction = DB::transaction(function () use ($rule) {
+                $transaction = $this->createTransaction->execute($rule->user, [
+                    'at' => $rule->next_run_at->toDateString(),
+                    'amount' => $rule->amount,
+                    'note' => $rule->note,
+                    'tags' => $rule->tags->pluck('id')->all(),
+                ], TransactionSource::Recurring);
+
+                $rule->next_run_at = $rule->frequency->firstOnOrAfter(
+                    $rule->starts_at,
+                    $rule->next_run_at->copy()->addDay(),
+                );
+                $rule->save();
+
+                return $transaction;
+            });
 
             $this->queueNotification($rule, $transaction);
-
-            $rule->next_run_at = $this->advance($rule->next_run_at, $rule->frequency);
-            $rule->save();
             $created++;
         }
     }
@@ -102,15 +141,5 @@ class GenerateRecurringTransactionsAction
             $note,
             UserFormatter::formatDate($user, $transaction->at),
         );
-    }
-
-    private function advance(CarbonInterface $date, RecurringFrequency $frequency): CarbonInterface
-    {
-        return match ($frequency) {
-            RecurringFrequency::Daily => $date->copy()->addDay(),
-            RecurringFrequency::Weekly => $date->copy()->addWeek(),
-            RecurringFrequency::Monthly => $date->copy()->addMonthsNoOverflow(1),
-            RecurringFrequency::Yearly => $date->copy()->addYearsNoOverflow(1),
-        };
     }
 }

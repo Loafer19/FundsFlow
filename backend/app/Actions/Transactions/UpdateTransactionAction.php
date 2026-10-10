@@ -4,6 +4,7 @@ namespace App\Actions\Transactions;
 
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\TagIds;
 use Illuminate\Support\Facades\Gate;
 
 class UpdateTransactionAction
@@ -15,7 +16,7 @@ class UpdateTransactionAction
     {
         Gate::forUser($user)->authorize('update', $transaction);
 
-        $tags = $data['tags'] ?? [];
+        $tags = TagIds::forSync($user, $data['tags'] ?? [], $transaction->tags()->pluck('tags.id'));
         unset($data['tags']);
 
         $transaction->update($data);

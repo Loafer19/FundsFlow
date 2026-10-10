@@ -67,7 +67,6 @@ class RunTelegramAgentAction
 
         $tools = $this->tools->definitions();
         $quotaConsumed = false;
-        $lastControl = null;
 
         for ($round = 0; $round < self::MAX_ROUNDS; $round++) {
             try {
@@ -129,6 +128,9 @@ class RunTelegramAgentAction
                 return ['ok' => false, 'status' => 'error', 'summary' => 'Empty AI response.'];
             }
 
+            $lastControl = null;
+            $stagedInBatch = false;
+
             foreach ($toolCalls as $call) {
                 if (!is_array($call)) {
                     continue;
@@ -148,8 +150,25 @@ class RunTelegramAgentAction
                     continue;
                 }
 
+                // One pending confirmation per chat: a second staged change in the
+                // same batch would replace the first preview behind the user's back.
+                if ($stagedInBatch && in_array($name, TelegramAgentToolExecutor::STAGING_TOOLS, true)) {
+                    $messages[] = [
+                        'role' => 'tool',
+                        'tool_call_id' => $callId,
+                        'content' => json_encode([
+                            'ok' => false,
+                            'tool' => $name,
+                            'result' => ['error' => 'Not staged: only one change can wait for confirmation at a time. Ask the user to confirm the first one, then propose the next.'],
+                        ], JSON_UNESCAPED_UNICODE),
+                    ];
+                    continue;
+                }
+
                 $executed = $this->tools->execute($user, $chatId, $identity, $name, $arguments);
-                $lastControl = $executed['control'];
+                // Any stop control in the batch ends the run, not only the last call's.
+                $lastControl = $executed['control'] ?? $lastControl;
+                $stagedInBatch = $stagedInBatch || $executed['control'] === 'confirm_staged';
 
                 $payload = [
                     'ok' => $executed['ok'],

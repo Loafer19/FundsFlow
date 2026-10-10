@@ -5,6 +5,7 @@ namespace App\Actions\Transactions;
 use App\Enums\TransactionSource;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\TagIds;
 use Illuminate\Support\Facades\Gate;
 
 class CreateTransactionAction
@@ -16,7 +17,7 @@ class CreateTransactionAction
     {
         Gate::forUser($user)->authorize('create', Transaction::class);
 
-        $tags = $data['tags'] ?? [];
+        $tags = TagIds::forSync($user, $data['tags'] ?? []);
         unset($data['tags']);
 
         $data['source'] = $source;

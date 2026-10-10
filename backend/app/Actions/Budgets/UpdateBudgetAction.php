@@ -5,7 +5,9 @@ namespace App\Actions\Budgets;
 use App\Enums\BudgetLength;
 use App\Models\Budget;
 use App\Models\User;
+use App\Support\TagIds;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 class UpdateBudgetAction
 {
@@ -16,12 +18,19 @@ class UpdateBudgetAction
     {
         Gate::forUser($user)->authorize('update', $budget);
 
+        $current = $budget->currentPeriod;
+        $newTagIds = collect(TagIds::forSync($user, $data['tag_ids'], $current?->tags->pluck('id') ?? []))
+            ->sort()
+            ->values();
+
+        if ($newTagIds->isEmpty()) {
+            throw ValidationException::withMessages(['tag_ids' => 'Pick at least one existing tag.']);
+        }
+
         if (array_key_exists('title', $data)) {
             $budget->update(['title' => $data['title']]);
         }
 
-        $current = $budget->currentPeriod;
-        $newTagIds = collect($data['tag_ids'])->map(fn ($id) => (int) $id)->sort()->values();
         $length = BudgetLength::from($data['length']);
         $now = $user->nowInTimezone();
         $startsAt = ($data['align_to_calendar'] ?? false) ? $length->calendarStart($now) : $now;

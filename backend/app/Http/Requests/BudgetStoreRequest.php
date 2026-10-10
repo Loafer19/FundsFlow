@@ -26,7 +26,7 @@ class BudgetStoreRequest extends FormRequest
             'tag_ids' => 'required|array|min:1',
             'tag_ids.*' => [
                 'integer',
-                Rule::exists('tags', 'id')->where('user_id', $this->user()->id)->whereNull('deleted_at'),
+                Rule::exists('tags', 'id')->where('user_id', $this->user()->id),
             ],
         ];
     }

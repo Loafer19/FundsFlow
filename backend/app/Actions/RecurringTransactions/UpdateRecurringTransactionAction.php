@@ -2,8 +2,11 @@
 
 namespace App\Actions\RecurringTransactions;
 
+use App\Enums\RecurringFrequency;
 use App\Models\RecurringTransaction;
 use App\Models\User;
+use App\Support\TagIds;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 
 class UpdateRecurringTransactionAction
@@ -15,17 +18,34 @@ class UpdateRecurringTransactionAction
     {
         Gate::forUser($user)->authorize('update', $recurringTransaction);
 
-        $tagIds = $data['tags'] ?? [];
+        $tagIds = TagIds::forSync(
+            $user,
+            $data['tags'] ?? [],
+            $recurringTransaction->tags()->pluck('tags.id'),
+        );
         unset($data['tags']);
 
-        // Resuming a paused rule starts fresh from today instead of
-        // materializing every occurrence missed while it was inactive.
+        $startsAt = Carbon::parse($data['starts_at'] ?? $recurringTransaction->starts_at);
+        $frequency = isset($data['frequency'])
+            ? RecurringFrequency::from($data['frequency'])
+            : $recurringTransaction->frequency;
+
         $resuming = ($data['active'] ?? false) && !$recurringTransaction->active;
+        $scheduleChanged = $startsAt->toDateString() !== $recurringTransaction->starts_at->toDateString()
+            || $frequency !== $recurringTransaction->frequency;
+        $neverRan = $recurringTransaction->next_run_at->toDateString()
+            === $recurringTransaction->starts_at->toDateString();
 
-        if ($resuming) {
-            $data['next_run_at'] = $user->todayDateString();
+        if ($scheduleChanged && $neverRan && !$resuming) {
+            // Not materialized yet — behave like a fresh rule (backfills a past start).
+            $data['next_run_at'] = $startsAt->toDateString();
+        } elseif ($resuming || $scheduleChanged) {
+            // Resume or reschedule on the rule's own cadence from today, without
+            // materializing occurrences missed while it was paused.
+            $data['next_run_at'] = $frequency
+                ->firstOnOrAfter($startsAt, $user->nowInTimezone())
+                ->toDateString();
         }
-
 
         $recurringTransaction->update($data);
         $recurringTransaction->tags()->sync($tagIds);

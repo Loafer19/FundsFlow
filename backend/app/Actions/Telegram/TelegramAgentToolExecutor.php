@@ -33,6 +33,16 @@ use Throwable;
  */
 class TelegramAgentToolExecutor
 {
+    /** Tools that stage a Confirm/Cancel preview instead of acting right away. */
+    public const STAGING_TOOLS = [
+        'create_tags',
+        'rename_tags',
+        'create_transaction',
+        'update_transaction',
+        'delete_transaction',
+        'create_budget',
+    ];
+
     public const MAX_RECENT = 20;
 
     public const MAX_TRANSACTIONS_PAGE = 50;
@@ -775,15 +785,17 @@ class TelegramAgentToolExecutor
             return ['staged' => false, 'reason' => 'nothing_to_create'];
         }
 
+        $nonce = $this->support->newNonce();
         $this->session->setPending($identity, $chatId, [
             'type' => 'create_tags',
             'titles' => $titles,
+            'nonce' => $nonce,
         ]);
         $label = implode(', ', $titles);
         $this->client->sendMessage(
             $chatId,
             "Create tags: {$label}?",
-            $this->support->nlCreateTagsKeyboard(),
+            $this->support->nlCreateTagsKeyboard($nonce),
         );
         $this->session->setSummary($identity, $chatId, 'Create-tag preview shown.');
 
@@ -809,9 +821,11 @@ class TelegramAgentToolExecutor
             return ['staged' => false, 'reason' => 'no_valid_proposals'];
         }
 
+        $nonce = $this->support->newNonce();
         $this->session->setPending($identity, $chatId, [
             'type' => 'rename_tags',
             'proposals' => $proposals,
+            'nonce' => $nonce,
         ]);
         $preview = implode("\n", array_map(
             static fn (array $p): string => $p['before'] . ' → ' . $p['after'],
@@ -820,7 +834,7 @@ class TelegramAgentToolExecutor
         $this->client->sendMessage(
             $chatId,
             "Rename tags:\n{$preview}\n\nApply these changes?",
-            $this->support->nlRenameConfirmKeyboard(),
+            $this->support->nlRenameConfirmKeyboard($nonce),
         );
         $this->session->setSummary($identity, $chatId, 'Rename preview shown.');
 
@@ -981,16 +995,21 @@ class TelegramAgentToolExecutor
         array $payload,
         string $preview,
     ): void {
+        // One slot per chat: a newer preview replaces this one, and the nonce
+        // makes the older preview's buttons answer "outdated" instead of
+        // applying the newer change.
+        $nonce = $this->support->newNonce();
         $this->session->setPending($identity, $chatId, [
             'type' => 'agent_mutation',
             'action' => $action,
             'payload' => $payload,
             'preview' => $preview,
+            'nonce' => $nonce,
         ]);
         $this->client->sendMessage(
             $chatId,
             $preview . "\n\nApply this change?",
-            $this->support->nlAgentConfirmKeyboard(),
+            $this->support->nlAgentConfirmKeyboard($nonce),
         );
         $this->session->setSummary($identity, $chatId, 'Agent mutation preview shown.');
     }
@@ -1025,12 +1044,13 @@ class TelegramAgentToolExecutor
             return;
         }
 
-        $tagIds = $this->sanitizeOwnedTagIds($user, $payload['tag_ids'] ?? []);
+        // UpdateTransactionAction re-checks ownership and keeps deleted tags the
+        // transaction already carries; sanitizeOwnedTagIds() would drop them.
         $tx = $this->updateTransaction->execute($user, $tx, [
             'amount' => (float) $payload['amount'],
             'at' => (string) $payload['at'],
             'note' => $payload['note'] ?? null,
-            'tags' => $tagIds,
+            'tags' => is_array($payload['tag_ids'] ?? null) ? $payload['tag_ids'] : [],
         ]);
 
         $this->session->setSummary($identity, $chatId, 'Transaction updated via agent confirm.');

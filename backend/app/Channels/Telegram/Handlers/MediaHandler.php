@@ -22,6 +22,8 @@ class MediaHandler
 
     private const ALBUM_COLLECT_TTL_SECONDS = 60;
 
+    private const OUTDATED_DRAFT = 'This receipt card is outdated or was already handled. Use the latest one.';
+
     public function __construct(
         private readonly TelegramClient $client,
         private readonly TelegramSupport $support,
@@ -389,11 +391,10 @@ class MediaHandler
             return;
         }
 
-        $this->putDraft($chatId, $draft);
         Cache::forget($this->pendingKey($chatId));
         Cache::forget($this->awaitTextKey($chatId));
 
-        $this->support->sendReceiptDraft($chatId, $user, $draft);
+        $this->showDraft($user, $chatId, $draft);
     }
 
     /**
@@ -529,9 +530,8 @@ class MediaHandler
             $draft['awaiting_price'] = false;
             $draft['awaiting_edit_amount'] = false;
             $draft['needs_price'] = false;
-            $this->putDraft($chatId, $draft);
             Cache::forget($this->awaitTextKey($chatId));
-            $this->support->sendReceiptDraft($chatId, $user, $draft);
+            $this->showDraft($user, $chatId, $draft);
 
             return;
         }
@@ -606,18 +606,17 @@ class MediaHandler
         $draft['awaiting_price'] = false;
         $draft['awaiting_edit_amount'] = false;
         $draft['needs_price'] = false;
-        $this->putDraft($chatId, $draft);
         Cache::forget($this->awaitTextKey($chatId));
 
-        $this->support->sendReceiptDraft($chatId, $user, $draft);
+        $this->showDraft($user, $chatId, $draft);
     }
 
-    public function confirmDraft(User $user, int|string $chatId): void
+    public function confirmDraft(User $user, int|string $chatId, string $nonce): void
     {
-        $draft = $this->getDraft($chatId);
+        $draft = $this->draftForCard($chatId, $nonce);
 
-        if (!is_array($draft)) {
-            $this->client->sendMessage($chatId, 'No pending receipt draft. Send a photo again.');
+        if ($draft === null) {
+            $this->client->sendMessage($chatId, self::OUTDATED_DRAFT);
 
             return;
         }
@@ -635,8 +634,19 @@ class MediaHandler
         $amount = (float) $draft['amount'];
 
         if ($amount === 0.0) {
-            $this->client->sendMessage($chatId, "Amount can't be zero");
+            // The card's buttons are gone after a tap, so ask for the amount here.
+            $draft['awaiting_edit_amount'] = true;
+            $this->putDraft($chatId, $draft);
+            $this->client->sendMessage(
+                $chatId,
+                "Amount can't be zero. Send the amount like -350.",
+                $this->support->mediaAmountKeyboard(),
+            );
 
+            return;
+        }
+
+        if (!$this->support->claimNonce($nonce)) {
             return;
         }
 
@@ -657,12 +667,12 @@ class MediaHandler
         $this->continueAlbumQueue($user, $chatId);
     }
 
-    public function beginDraftAmountEdit(User $user, int|string $chatId): void
+    public function beginDraftAmountEdit(User $user, int|string $chatId, string $nonce): void
     {
-        $draft = $this->getDraft($chatId);
+        $draft = $this->draftForCard($chatId, $nonce);
 
-        if (!is_array($draft)) {
-            $this->client->sendMessage($chatId, 'No pending receipt draft. Send a photo again.');
+        if ($draft === null) {
+            $this->client->sendMessage($chatId, self::OUTDATED_DRAFT);
 
             return;
         }
@@ -676,6 +686,23 @@ class MediaHandler
             'Send the new amount like +120 or -50.5',
             $this->support->mediaAmountKeyboard(),
         );
+    }
+
+    /**
+     * Cancel from a draft card's button. False when the card is outdated, so
+     * a stale Cancel can't discard a newer receipt.
+     */
+    public function cancelDraft(int|string $chatId, string $nonce): bool
+    {
+        if ($this->draftForCard($chatId, $nonce) === null) {
+            $this->client->sendMessage($chatId, self::OUTDATED_DRAFT);
+
+            return false;
+        }
+
+        $this->cancelPendingMedia($chatId);
+
+        return true;
     }
 
     public function cancelPendingMedia(int|string $chatId): void
@@ -908,6 +935,29 @@ class MediaHandler
             'files' => array_values($files),
             'caption_hint' => $captionHint,
         ], now()->addMinutes(self::PENDING_TTL_MINUTES));
+    }
+
+    /**
+     * Show the draft card with a fresh nonce: buttons on any earlier card for
+     * this chat stop working, so they can't confirm a different receipt.
+     *
+     * @param array<string, mixed> $draft
+     */
+    private function showDraft(User $user, int|string $chatId, array $draft): void
+    {
+        $draft['nonce'] = $this->support->newNonce();
+        $this->putDraft($chatId, $draft);
+        $this->support->sendReceiptDraft($chatId, $user, $draft);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function draftForCard(int|string $chatId, string $nonce): ?array
+    {
+        $draft = $this->getDraft($chatId);
+
+        return is_array($draft) && ($draft['nonce'] ?? null) === $nonce ? $draft : null;
     }
 
     /**
