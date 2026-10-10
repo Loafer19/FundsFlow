@@ -21,7 +21,7 @@
 
                 <label class="label cursor-pointer justify-start gap-2 mb-4">
                     <input type="checkbox" v-model="form.align_to_calendar" class="checkbox checkbox-sm" />
-                    <span class="label-text">Start from the beginning of this {{ lengthNoun }}</span>
+                    <span class="label-text">Start from the beginning of this {{ form.length }}</span>
                 </label>
 
                 <TagPicker v-model="form.tag_ids" />
@@ -44,15 +44,13 @@
 
 <script setup>
 import { PiggyBank, Save } from 'lucide-vue-next'
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import TagPicker from '../components/TagPicker.vue'
 import { useBudgetsStore } from '../services/budgets.js'
 
 const budgetsStore = useBudgetsStore()
 
 const form = ref({ tag_ids: [] })
-
-const lengthNoun = computed(() => ({ week: 'week', month: 'month', year: 'year' })[form.value.length])
 
 watch(
     () => budgetsStore.budgetForEdit,

@@ -16,12 +16,6 @@ use Throwable;
 
 class MediaHandler
 {
-    private const PENDING_TTL_MINUTES = 15;
-
-    private const ALBUM_DEBOUNCE_SECONDS = 3;
-
-    private const ALBUM_COLLECT_TTL_SECONDS = 60;
-
     private const OUTDATED_DRAFT = 'This receipt card is outdated or was already handled. Use the latest one.';
 
     public function __construct(
@@ -149,14 +143,14 @@ class MediaHandler
             }
         }
 
-        Cache::put($bufferKey, $buffer, now()->addSeconds(self::ALBUM_COLLECT_TTL_SECONDS));
+        Cache::put($bufferKey, $buffer, now()->addSeconds((int) config('telegram.album.collect_ttl_seconds')));
 
         // First item in the group waits briefly so siblings can arrive, then asks 1-vs-several.
-        if (!Cache::add($debounceKey, true, now()->addSeconds(self::ALBUM_COLLECT_TTL_SECONDS))) {
+        if (!Cache::add($debounceKey, true, now()->addSeconds((int) config('telegram.album.collect_ttl_seconds')))) {
             return;
         }
 
-        sleep(self::ALBUM_DEBOUNCE_SECONDS);
+        sleep((int) config('telegram.album.debounce_seconds'));
 
         $this->promptAlbumChoice($user, $chatId, $groupId);
     }
@@ -204,7 +198,7 @@ class MediaHandler
         }
 
         // Keep buffer for the choice callbacks (extend TTL).
-        Cache::put($bufferKey, $buffer, now()->addMinutes(self::PENDING_TTL_MINUTES));
+        Cache::put($bufferKey, $buffer, now()->addMinutes((int) config('telegram.pending_ttl_minutes')));
 
         $this->client->sendMessage(
             $chatId,
@@ -720,10 +714,6 @@ class MediaHandler
             && (($draft['awaiting_price'] ?? false) || ($draft['awaiting_edit_amount'] ?? false));
     }
 
-    public function hasDraft(int|string $chatId): bool
-    {
-        return is_array($this->getDraft($chatId));
-    }
 
     /**
      * @param list<array{file_id: string, name: string, mime: string, file_size?: int}> $files
@@ -860,7 +850,7 @@ class MediaHandler
             'mime' => $file['mime'],
             'file_size' => $file['file_size'],
             'files' => array_values($files),
-        ], now()->addMinutes(self::PENDING_TTL_MINUTES));
+        ], now()->addMinutes((int) config('telegram.pending_ttl_minutes')));
         Cache::forget($this->awaitTextKey($chatId));
     }
 
@@ -934,7 +924,7 @@ class MediaHandler
         Cache::put($this->albumQueueKey($chatId), [
             'files' => array_values($files),
             'caption_hint' => $captionHint,
-        ], now()->addMinutes(self::PENDING_TTL_MINUTES));
+        ], now()->addMinutes((int) config('telegram.pending_ttl_minutes')));
     }
 
     /**
@@ -965,7 +955,7 @@ class MediaHandler
      */
     private function putDraft(int|string $chatId, array $draft): void
     {
-        Cache::put($this->draftKey($chatId), $draft, now()->addMinutes(self::PENDING_TTL_MINUTES));
+        Cache::put($this->draftKey($chatId), $draft, now()->addMinutes((int) config('telegram.pending_ttl_minutes')));
     }
 
     /**

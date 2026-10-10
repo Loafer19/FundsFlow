@@ -47,25 +47,6 @@ export const writeCache = (userId, name, data) => {
 
 export const persistCache = (name, data) => writeCache(currentUserId(), name, data)
 
-export const loadWithCache = async (store, { name, key, fetch, errorPrefix }) => {
-    const userId = currentUserId()
-    const cached = readCache(userId, name)
-
-    if (cached) store[key] = cached
-
-    store.isLoading = true
-
-    try {
-        store[key] = await fetch()
-        writeCache(userId, name, store[key])
-    } catch (error) {
-        if (cached) noticeCachedData()
-        else toasts.error(apiErrorMessage(error, errorPrefix))
-    } finally {
-        store.isLoading = false
-    }
-}
-
 export const clearUserCache = (userId) => {
     const keys = []
 

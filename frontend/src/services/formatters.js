@@ -1,4 +1,4 @@
-import settings from './settings'
+import settings, { normalizeTimezone } from './settings'
 
 export const formatDateOptions = {
     'Year First': ['YYYY/MM/DD'],
@@ -77,12 +77,6 @@ export const nowDateStr = () =>
         month: '2-digit',
         day: '2-digit',
     }).format(new Date())
-
-/** ICU still lists Europe/Kiev; PHP/IANA use Europe/Kyiv. */
-export const normalizeTimezone = (timezone) => {
-    if (timezone === 'Europe/Kiev') return 'Europe/Kyiv'
-    return timezone
-}
 
 const rawTimezoneOptions =
     typeof Intl.supportedValuesOf === 'function'

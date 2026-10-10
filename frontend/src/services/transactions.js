@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
-import { loadWithCache, persistCache } from './cache.js'
+import { persistCache } from './cache.js'
 import { apiErrorMessage, toLocalDateStr } from './formatters.js'
 import { isOnboardingDone, markOnboardingDone } from './onboarding.js'
 import toasts from './toasts.js'
@@ -73,15 +73,6 @@ export const useTransactionsStore = defineStore('transactions', {
 
         persist() {
             persistCache(CACHE, this.transactions)
-        },
-
-        async load() {
-            await loadWithCache(this, {
-                name: CACHE,
-                key: 'transactions',
-                fetch: async () => (await api.get('/transactions')).data,
-                errorPrefix: 'Failed to load transactions: ',
-            })
         },
 
         mergeTransaction(data) {

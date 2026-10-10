@@ -253,16 +253,6 @@ class TelegramSupport
         );
     }
 
-    public function formatTagList(Transaction $transaction): string
-    {
-        if ($transaction->tags->isEmpty()) {
-            return '🏷 No tags';
-        }
-
-        $labels = $transaction->tags->map(fn (Tag $tag) => trim($tag->emoji . ' ' . $tag->title))->all();
-
-        return '🏷 ' . implode(', ', $labels);
-    }
 
     public function sendSavedTransaction(
         int|string $chatId,
@@ -373,27 +363,6 @@ class TelegramSupport
         ];
     }
 
-    /**
-     * @param list<array{id: int, title: string, emoji?: string}> $items
-     * @return array<string, mixed>
-     */
-    public function nlRenamePickKeyboard(array $items): array
-    {
-        $buttons = [];
-        foreach ($items as $item) {
-            if (!isset($item['id'], $item['title'])) {
-                continue;
-            }
-
-            $label = trim((string) ($item['emoji'] ?? '') . ' ' . (string) $item['title']);
-            $buttons[] = [
-                'text' => $label,
-                'callback_data' => 'nl:rename:pick:' . (int) $item['id'],
-            ];
-        }
-
-        return ['inline_keyboard' => array_chunk($buttons, 2)];
-    }
 
     /**
      * Confirm keyboard for agent-staged mutations (transactions, budgets, …).

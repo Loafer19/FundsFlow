@@ -34,30 +34,3 @@ export const sendAttachmentToTelegram = async (transactionId, attachmentId, capt
         return { ok: false, error }
     }
 }
-
-/**
- * @param {Blob|File} file
- * @param {string|null} caption
- */
-export const sendFileToTelegram = async (file, caption = null) => {
-    if (!requireTelegramLinked()) {
-        return { ok: false, needsLink: true }
-    }
-
-    try {
-        const form = new FormData()
-        form.append('file', file, file.name || 'file')
-        if (caption) form.append('caption', caption)
-
-        const response = await api.post('/telegram/send-file', form, {
-            timeout: 120_000,
-            headers: { 'Content-Type': 'multipart/form-data' },
-        })
-
-        toasts.success(response.data?.message || 'Sent to Telegram successfully!')
-        return { ok: true }
-    } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Failed to send to Telegram: '))
-        return { ok: false, error }
-    }
-}

@@ -16,10 +16,6 @@ use Throwable;
  */
 class RunTelegramAgentAction
 {
-    private const MAX_ROUNDS = 6;
-
-    private const REQUEST_TIMEOUT = 60;
-
     public function __construct(
         private readonly TelegramClient $client,
         private readonly TelegramChatSession $session,
@@ -68,10 +64,11 @@ class RunTelegramAgentAction
         $tools = $this->tools->definitions();
         $quotaConsumed = false;
 
-        for ($round = 0; $round < self::MAX_ROUNDS; $round++) {
+        $maxRounds = (int) config('telegram.agent_max_rounds');
+        for ($round = 0; $round < $maxRounds; $round++) {
             try {
                 $response = Http::withToken($apiKey)
-                    ->timeout(self::REQUEST_TIMEOUT)
+                    ->timeout((int) config('telegram.timeouts.xai_chat'))
                     ->acceptJson()
                     ->post($baseUrl . '/chat/completions', [
                         'model' => $model,

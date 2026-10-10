@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
-import { loadWithCache, persistCache } from './cache.js'
+import { persistCache } from './cache.js'
 import { apiErrorMessage } from './formatters.js'
 import toasts from './toasts.js'
 
@@ -38,15 +38,6 @@ export const useTagsStore = defineStore('tags', {
     actions: {
         persist() {
             persistCache(CACHE, this.tags)
-        },
-
-        async load() {
-            await loadWithCache(this, {
-                name: CACHE,
-                key: 'tags',
-                fetch: async () => (await api.get('/tags')).data,
-                errorPrefix: 'Failed to load tags: ',
-            })
         },
 
         normalizePayload(raw) {

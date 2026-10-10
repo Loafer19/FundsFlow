@@ -56,7 +56,7 @@ class TranscribeTelegramAudioAction
         try {
             // Option fields must precede `file` in the multipart body (xAI STT requirement).
             $response = Http::withToken($apiKey)
-                ->timeout(60)
+                ->timeout((int) config('telegram.timeouts.xai_stt'))
                 ->acceptJson()
                 ->asMultipart()
                 ->post($baseUrl . '/stt', [
@@ -118,10 +118,6 @@ class TranscribeTelegramAudioAction
         $this->quota->consume($user);
     }
 
-    public function dailyLimit(): int
-    {
-        return $this->quota->dailyLimit();
-    }
 
     public function quota(): TelegramAiQuota
     {

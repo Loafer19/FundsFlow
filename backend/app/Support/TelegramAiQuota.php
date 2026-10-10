@@ -82,8 +82,9 @@ final class TelegramAiQuota
     /**
      * Short hint when remaining is low after a successful AI call. Null when remaining is high.
      */
-    public function lowRemainingHint(User $user, int $threshold = 2): ?string
+    public function lowRemainingHint(User $user, ?int $threshold = null): ?string
     {
+        $threshold ??= (int) config('telegram.low_quota_threshold');
         $snap = $this->snapshot($user);
 
         // Soft hint only while still usable; hard-fail at 0 uses exhaustedMessage().

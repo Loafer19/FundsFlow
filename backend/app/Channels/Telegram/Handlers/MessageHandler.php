@@ -215,10 +215,6 @@ class MessageHandler
             return;
         }
 
-        if ($this->naturalLanguageHandler->handlePendingRenameTitle($user, $chatId, $text, $telegramUserId)) {
-            return;
-        }
-
         if ($this->mediaHandler->hasAwaitingDraft($chatId)) {
             $this->mediaHandler->completeDraftAmount($user, $chatId, $text);
 

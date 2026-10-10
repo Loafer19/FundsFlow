@@ -20,8 +20,8 @@ class ConvertHtmlToPdfViaGotenbergAction
             throw new RuntimeException('Gotenberg URL is not configured.');
         }
 
-        $response = Http::timeout(120)
-            ->connectTimeout(10)
+        $response = Http::timeout((int) config('telegram.timeouts.gotenberg_pdf'))
+            ->connectTimeout((int) config('telegram.timeouts.gotenberg_connect'))
             ->attach('files', $html, 'index.html')
             ->post($base.'/forms/chromium/convert/html', [
                 'landscape' => 'true',

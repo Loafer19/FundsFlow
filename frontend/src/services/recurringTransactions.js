@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
-import { loadWithCache, persistCache } from './cache.js'
+import { persistCache } from './cache.js'
 import { apiErrorMessage } from './formatters.js'
 import toasts from './toasts.js'
 
@@ -16,15 +16,6 @@ export const useRecurringTransactionsStore = defineStore('recurringTransactions'
     actions: {
         persist() {
             persistCache(CACHE, this.rules)
-        },
-
-        async load() {
-            await loadWithCache(this, {
-                name: CACHE,
-                key: 'rules',
-                fetch: async () => (await api.get('/recurring-transactions')).data,
-                errorPrefix: 'Failed to load recurring transactions: ',
-            })
         },
 
         async create(payload) {

@@ -83,7 +83,7 @@ class CallbackHandler
             return;
         }
 
-        if (preg_match('/^delask:(\d+)$/', $data, $matches) || preg_match('/^del:(\d+)$/', $data, $matches)) {
+        if (preg_match('/^delask:(\d+)$/', $data, $matches)) {
             $this->handleDeleteAsk($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
 
             return;
@@ -97,13 +97,6 @@ class CallbackHandler
 
         if (preg_match('/^delno:(\d+)$/', $data, $matches)) {
             $this->handleDeleteNo($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
-
-            return;
-        }
-
-        if (preg_match('/^delrow:(\d+)$/', $data, $matches)) {
-            // Legacy recent-list delete: open confirm instead.
-            $this->handleDeleteAsk($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
 
             return;
         }
@@ -150,18 +143,6 @@ class CallbackHandler
             return;
         }
 
-        if (preg_match('/^nl:rename:pick:(\d+)$/', $data, $matches)) {
-            $this->naturalLanguageHandler->pickRenameTag(
-                $user,
-                $chatId,
-                (int) $matches[1],
-                $callbackId,
-                $telegramUserId,
-            );
-
-            return;
-        }
-
         if (preg_match('/^nl:ask:choice:(\d+)$/', $data, $matches)) {
             $this->naturalLanguageHandler->handleAskChoice(
                 $user,
@@ -183,7 +164,7 @@ class CallbackHandler
         }
 
         if ($data === 'mediaamt:other') {
-            Cache::put("telegram_pending_media_await_text:{$chatId}", true, now()->addMinutes(15));
+            Cache::put("telegram_pending_media_await_text:{$chatId}", true, now()->addMinutes((int) config('telegram.pending_ttl_minutes')));
             $this->client->answerCallbackQuery($callbackId);
             $this->client->sendMessage($chatId, 'Send amount like -350 groceries');
 

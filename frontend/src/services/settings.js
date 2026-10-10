@@ -1,7 +1,7 @@
 import { reactive } from 'vue'
 
 /** ICU lists Europe/Kiev; PHP/IANA use Europe/Kyiv. */
-const normalizeTimezone = (timezone) => (timezone === 'Europe/Kiev' ? 'Europe/Kyiv' : timezone)
+export const normalizeTimezone = (timezone) => (timezone === 'Europe/Kiev' ? 'Europe/Kyiv' : timezone)
 
 const defaults = {
     dateFormat: 'short Month with Day',

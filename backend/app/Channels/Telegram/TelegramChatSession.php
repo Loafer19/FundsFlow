@@ -12,8 +12,6 @@ use Illuminate\Support\Facades\Cache;
  */
 final class TelegramChatSession
 {
-    private const TTL_MINUTES = 20;
-
     /**
      * @return array{
      *     domain: 'tags'|'budgets'|'transactions'|null,
@@ -41,12 +39,12 @@ final class TelegramChatSession
     public function put(int|string $telegramUserId, int|string|null $chatId, array $data): array
     {
         $session = $this->normalize($data);
-        $session['expires_at'] = now()->addMinutes(self::TTL_MINUTES)->toIso8601String();
+        $session['expires_at'] = now()->addMinutes((int) config('telegram.session_ttl_minutes'))->toIso8601String();
 
         Cache::put(
             $this->key($telegramUserId, $chatId),
             $session,
-            now()->addMinutes(self::TTL_MINUTES),
+            now()->addMinutes((int) config('telegram.session_ttl_minutes')),
         );
 
         return $session;

@@ -58,7 +58,7 @@
 import { computed, ref, watch } from 'vue'
 import BarChart from '../components/charts/BarChart.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { formatMoney, formatPercentage, toLocalDateStr } from '../services/formatters.js'
+import { formatMoney, formatPercentage, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
 const transactionsStore = useTransactionsStore()
@@ -92,13 +92,8 @@ watch(
     },
 )
 
-const parseLocalDate = (value) => {
-    const [year, month, day] = toLocalDateStr(value).split('-').map(Number)
-    return new Date(year, month - 1, day)
-}
-
 const getPeriodEnd = (dateStr, groupBy) => {
-    const date = parseLocalDate(dateStr)
+    const date = parseLocalDate(toLocalDateStr(dateStr))
 
     if (groupBy === 'day') {
         return toLocalDateStr(date)

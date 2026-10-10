@@ -76,7 +76,7 @@ PROMPT;
 
         try {
             $response = Http::withToken($apiKey)
-                ->timeout(45)
+                ->timeout((int) config('telegram.timeouts.xai_vision'))
                 ->acceptJson()
                 ->post($baseUrl . '/chat/completions', [
                     'model' => $model,
@@ -129,15 +129,7 @@ PROMPT;
         }
     }
 
-    public function dailyLimit(): int
-    {
-        return $this->quota->dailyLimit();
-    }
 
-    public function remainingQuota(User $user): int
-    {
-        return $this->quota->remaining($user);
-    }
 
     public function hasQuota(User $user): bool
     {
@@ -152,10 +144,6 @@ PROMPT;
         $this->quota->consume($user);
     }
 
-    public function quotaKey(User $user): string
-    {
-        return $this->quota->key($user);
-    }
 
     public function quota(): TelegramAiQuota
     {

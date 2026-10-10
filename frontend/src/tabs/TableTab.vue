@@ -120,7 +120,7 @@
 <script setup>
 import { Bot, FileText, Image as ImageIcon, Laptop, Paperclip, Pencil, Repeat, Search, Send } from 'lucide-vue-next'
 
-import { computed, inject, ref, watch } from 'vue'
+import { computed, inject, ref } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { getTransactionSourceLabel } from '../services/formatters'
@@ -148,14 +148,6 @@ const sortConfig = ref({
 })
 
 const searchQuery = ref('')
-
-watch(
-    () => transactionsStore.tagFilterDraft,
-    () => {
-        transactionsStore.setTagFilterFromDraft()
-    },
-    { immediate: true },
-)
 
 const sortBy = (key) => {
     if (sortConfig.value.key === key) {

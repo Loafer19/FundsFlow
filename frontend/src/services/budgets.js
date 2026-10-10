@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
-import { loadWithCache, persistCache } from './cache.js'
+import { persistCache } from './cache.js'
 import { apiErrorMessage } from './formatters.js'
 import toasts from './toasts.js'
 
@@ -16,15 +16,6 @@ export const useBudgetsStore = defineStore('budgets', {
     actions: {
         persist() {
             persistCache(CACHE, this.budgets)
-        },
-
-        async load() {
-            await loadWithCache(this, {
-                name: CACHE,
-                key: 'budgets',
-                fetch: async () => (await api.get('/budgets')).data,
-                errorPrefix: 'Failed to load budgets: ',
-            })
         },
 
         async create(payload) {
