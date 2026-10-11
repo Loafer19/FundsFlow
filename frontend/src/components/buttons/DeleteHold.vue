@@ -20,6 +20,7 @@
 <script setup>
 import { Trash2 } from 'lucide-vue-next'
 import { ref } from 'vue'
+import { haptic } from '../../services/telegramWebApp.js'
 
 const emit = defineEmits(['delete'])
 
@@ -48,6 +49,7 @@ const startHold = () => {
 
     timeout = setTimeout(() => {
         stopHold()
+        haptic.warning()
         emit('delete', props.id)
     }, 900)
 }

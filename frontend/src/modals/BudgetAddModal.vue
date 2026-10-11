@@ -6,12 +6,11 @@
                 Add Budget
             </h2>
 
-            <form @submit.prevent="handleSubmit">
+            <form ref="formRef" @submit.prevent="handleSubmit">
                 <input type="text" v-model="form.title" placeholder="Title (optional)" aria-label="Title"
                     class="input w-full mb-4" maxlength="255" autofocus />
 
-                <input type="number" step="0.01" min="0.01" v-model="form.amount" placeholder="Amount"
-                    aria-label="Amount" class="input w-full mb-4" required />
+                <AmountField v-model="form.amount" :signed="false" :max="99_999_999.99" :autofocus="false" />
 
                 <select v-model="form.length" class="select w-full mb-4" required aria-label="Budget length">
                     <option value="week">Weekly</option>
@@ -27,7 +26,7 @@
                 <TagPicker v-model="form.tag_ids" />
 
                 <div class="modal-action">
-                    <button type="submit" class="btn btn-success"
+                    <button type="submit" class="btn btn-success tg-primary"
                         :disabled="budgetsStore.isLoading || !form.tag_ids.length">
                         <span v-if="budgetsStore.isLoading" class="loading loading-spinner"></span>
                         Save
@@ -45,8 +44,10 @@
 <script setup>
 import { PiggyBank, Save } from 'lucide-vue-next'
 import { ref } from 'vue'
+import AmountField from '../components/AmountField.vue'
 import TagPicker from '../components/TagPicker.vue'
 import { useBudgetsStore } from '../services/budgets.js'
+import { useTelegramPrimary } from '../services/telegramChrome.js'
 
 const budgetsStore = useBudgetsStore()
 
@@ -59,6 +60,15 @@ const createDefault = () => ({
 })
 
 const form = ref(createDefault())
+
+const formRef = ref(null)
+
+useTelegramPrimary('budgets_add_modal', {
+    text: 'Save',
+    form: formRef,
+    busy: () => Boolean(budgetsStore.isLoading),
+    enabled: () => form.value.tag_ids.length > 0,
+})
 
 const handleSubmit = async () => {
     const ok = await budgetsStore.create(form.value)

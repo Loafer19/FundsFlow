@@ -145,3 +145,8 @@ select:focus {
 .emoji-mart-emoji:hover:before {
     background: var(--color-base-300) !important;
 }
+
+/* In the Telegram Mini App the native MainButton submits the form instead. */
+html.miniapp .tg-primary {
+    display: none;
+}

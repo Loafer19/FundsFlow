@@ -248,8 +248,10 @@ import { showModal } from './services/modal.js'
 import { shouldShowOnboarding } from './services/onboarding.js'
 import { useRecurringTransactionsStore } from './services/recurringTransactions.js'
 import { useTagsStore } from './services/tags.js'
+import { installTelegramChrome } from './services/telegramChrome.js'
 import {
     getInitData,
+    haptic,
     isTelegramWebApp,
     peekStashedInitData,
     stashInitData,
@@ -276,6 +278,8 @@ const datePicker = ref(null)
 const selectedRange = ref(getDefaultRange('month'))
 const selectedTab = ref(markRaw(Analytics))
 
+watch(selectedTab, () => haptic.select())
+
 const tagFilterBadgeCount = computed(
     () => transactionsStore.selectedTagIds.length + (transactionsStore.filterUntagged ? 1 : 0),
 )
@@ -291,6 +295,7 @@ watch(
 onMounted(async () => {
     if (isTelegramWebApp()) {
         telegramReady()
+        installTelegramChrome()
 
         const initData = getInitData()
 
@@ -353,6 +358,8 @@ watch(
 )
 
 function shiftPeriod(delta) {
+    haptic.select()
+
     if (dateSelectionType.value === 'week') {
         const start = new Date(selectedRange.value[0])
         const end = new Date(selectedRange.value[1])

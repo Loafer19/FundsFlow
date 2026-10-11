@@ -1,6 +1,6 @@
 <template>
     <div class="flex flex-col gap-2 mb-4">
-        <div class="join w-full">
+        <div v-if="signed" class="join w-full">
             <button type="button" class="btn join-item" :class="isIncome ? 'btn-success' : 'btn-ghost'"
                 aria-label="Income" :aria-pressed="isIncome" @click="setType(true)">
                 Income
@@ -11,87 +11,133 @@
             </button>
         </div>
 
-        <input type="number" step="0.01" min="0.01" required placeholder="Amount" aria-label="Amount" :value="display"
-            autofocus class="input w-full font-semibold"
-            :class="isIncome ? 'input-success text-success' : 'input-error text-error'" @input="onInput" />
+        <!-- type="text" + inputmode="decimal": a decimal keypad on phones, and we parse
+             "1 500,50" / "120+35" ourselves instead of the browser silently dropping it. -->
+        <input ref="input" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" required
+            :placeholder="placeholder" aria-label="Amount" :value="display" :autofocus="autofocus"
+            :aria-invalid="Boolean(shownError)" :aria-describedby="hintId" class="input w-full font-semibold"
+            :class="signed ? (isIncome ? 'input-success text-success' : 'input-error text-error') : ''"
+            @input="onInput" @blur="onBlur" />
+
+        <p v-if="shownError" :id="hintId" class="text-error text-sm -mt-1">{{ shownError }}</p>
+        <p v-else-if="preview" :id="hintId" class="text-base-content/60 text-sm -mt-1">= {{ preview }}</p>
     </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, useId, watch, watchEffect } from 'vue'
+import { parseAmountInput, toEditableAmount } from '../services/amountInput.js'
+import { formatMoney } from '../services/formatters.js'
+import settings from '../services/settings.js'
+import { haptic } from '../services/telegramWebApp.js'
+
+const props = defineProps({
+    /** Income/Expense toggle and a signed model; false for always-positive amounts (budgets). */
+    signed: { type: Boolean, default: true },
+    /** Column limit: 9 999 999 999.99 for transactions, 99 999 999.99 for budgets/recurring. */
+    max: { type: Number, default: 9_999_999_999.99 },
+    autofocus: { type: Boolean, default: true },
+    placeholder: { type: String, default: 'Amount' },
+})
 
 const model = defineModel({ type: [Number, String], default: '' })
 
+const input = ref(null)
 const isIncome = ref(false)
-
 const display = ref('')
+const editing = ref(false)
+const hintId = useId()
+
+// What this field last wrote to the model, so the watcher below doesn't
+// reformat the text the user is still typing ("12," would become "12").
+let lastEmitted
+
+const parsed = computed(() => parseAmountInput(display.value, settings.moneyFormat))
+
+const error = computed(() => {
+    const result = parsed.value
+
+    if (result.empty) return null
+    if (result.error) return result.error
+    if (result.value > props.max) return 'Amount is too large'
+
+    return null
+})
+
+// Don't nag about "120+" while it's still being typed.
+const shownError = computed(() => (parsed.value.incomplete && editing.value ? null : error.value))
+
+const preview = computed(() => (parsed.value.expression && !error.value ? formatMoney(parsed.value.value) : null))
+
+// Native form validation blocks submit with our message.
+watchEffect(() => input.value?.setCustomValidity(error.value ?? ''))
+
+const emitModel = () => {
+    const result = parsed.value
+    const valid = !result.empty && result.value !== null && !error.value
+    const signedValue = props.signed && !isIncome.value ? -result.value : result.value
+
+    lastEmitted = valid ? signedValue : ''
+    model.value = lastEmitted
+}
 
 const applyModel = (value) => {
-    if (value === '' || value === null || value === undefined) {
+    if (value === '' || value === null || value === undefined || Number.isNaN(Number(value))) {
         display.value = ''
+
         return
     }
 
     const number = Number(value)
-    if (Number.isNaN(number)) {
-        display.value = ''
-        return
-    }
 
-    isIncome.value = number >= 0
-    display.value = number === 0 ? '0' : String(Math.abs(number))
+    if (props.signed) isIncome.value = number >= 0
+    display.value = number === 0 ? '' : toEditableAmount(number, settings.moneyFormat)
 }
 
-watch(model, applyModel, { immediate: true })
-
-const emitSigned = () => {
-    if (display.value === '' || display.value === null) {
-        model.value = ''
-        return
-    }
-
-    const absolute = Math.abs(Number(display.value))
-    if (Number.isNaN(absolute)) {
-        model.value = ''
-        return
-    }
-
-    model.value = isIncome.value ? absolute : -absolute
-}
+watch(
+    model,
+    (value) => {
+        if (value !== lastEmitted) applyModel(value)
+    },
+    { immediate: true },
+)
 
 const setType = (income) => {
+    if (isIncome.value !== income) haptic.select()
+
     isIncome.value = income
-    emitSigned()
+    emitModel()
 }
 
 const onInput = (event) => {
-    const raw = event.target.value
+    let raw = event.target.value
+    const lead = raw.match(/^\s*([+\-−–])/)
 
-    if (raw === '') {
-        display.value = ''
-        model.value = ''
-        return
+    // A leading sign picks the type and leaves the field; "+" or "-" later in
+    // the text is arithmetic ("120+35").
+    if (lead) {
+        const income = lead[1] === '+'
+
+        if (props.signed && isIncome.value !== income) {
+            isIncome.value = income
+            haptic.select()
+        }
+
+        raw = raw.slice(lead[0].length)
+        event.target.value = raw
     }
 
-    if (raw.includes('-') || Number(raw) < 0) {
-        isIncome.value = false
-        const absolute = Math.abs(Number(raw))
-        display.value = Number.isNaN(absolute) ? '' : String(absolute)
-        event.target.value = display.value
-        emitSigned()
-        return
-    }
-
-    if (raw.includes('+')) {
-        isIncome.value = true
-        const absolute = Math.abs(Number(raw.replace(/\+/g, '')))
-        display.value = Number.isNaN(absolute) || raw.replace(/\+/g, '') === '' ? '' : String(absolute)
-        event.target.value = display.value
-        emitSigned()
-        return
-    }
-
+    editing.value = true
     display.value = raw
-    emitSigned()
+    emitModel()
+}
+
+const onBlur = () => {
+    editing.value = false
+
+    // Collapse "120+35" into "155" once the user is done with the field.
+    if (parsed.value.expression && !error.value) {
+        display.value = toEditableAmount(parsed.value.value, settings.moneyFormat)
+    }
 }
 </script>

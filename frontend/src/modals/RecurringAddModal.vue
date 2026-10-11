@@ -6,8 +6,8 @@
                 Add Recurring
             </h2>
 
-            <form @submit.prevent="handleSubmit">
-                <AmountField v-model="form.amount" />
+            <form ref="formRef" @submit.prevent="handleSubmit">
+                <AmountField v-model="form.amount" :max="99_999_999.99" />
 
                 <input type="text" v-model="form.note" placeholder="Note (optional)" aria-label="Note"
                     class="input w-full mb-4" maxlength="255" />
@@ -52,7 +52,7 @@
                 <TagPicker v-model="form.tags" />
 
                 <div class="modal-action">
-                    <button type="submit" class="btn btn-success" :disabled="recurringStore.isLoading">
+                    <button type="submit" class="btn btn-success tg-primary" :disabled="recurringStore.isLoading">
                         <span v-if="recurringStore.isLoading" class="loading loading-spinner"></span>
                         Save
                         <Save :size="24" />
@@ -75,8 +75,17 @@ import { formatDate, nowDateStr } from '../services/formatters.js'
 
 import { advanceDateStr } from '../services/recurringSchedule.js'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
+import { useTelegramPrimary } from '../services/telegramChrome.js'
 
 const recurringStore = useRecurringTransactionsStore()
+
+const formRef = ref(null)
+
+useTelegramPrimary('recurring_add_modal', {
+    text: 'Save',
+    form: formRef,
+    busy: () => Boolean(recurringStore.isLoading),
+})
 
 const createDefault = () => ({
     amount: '',

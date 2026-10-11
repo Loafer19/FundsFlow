@@ -3,8 +3,8 @@
         <div class="modal-box max-w-sm">
             <h2 id="transactions_edit_modal_title" class="card-title mb-4">Edit Transaction</h2>
 
-            <form @submit.prevent="handleSubmit">
-                <input type="date" v-model="transaction.at" class="input w-full mb-4" required />
+            <form ref="formRef" @submit.prevent="handleSubmit">
+                <DateChips v-model="transaction.at" />
 
                 <AmountField v-model="transaction.amount" />
 
@@ -20,7 +20,7 @@
                     <DeleteHold v-if="transaction.id" :id="transaction.id" :disabled="transactionsStore.isLoading"
                         :isLoading="transactionsStore.isLoading === transaction.id" @delete="handleDelete" />
 
-                    <button type="submit" class="btn btn-success btn-sm" :disabled="transactionsStore.isLoading">
+                    <button type="submit" class="btn btn-success btn-sm tg-primary" :disabled="transactionsStore.isLoading">
                         <span v-if="transactionsStore.isLoading" class="loading loading-spinner"></span>
                         Update
                         <Save :size="20" />
@@ -40,11 +40,21 @@ import { computed, ref, watch } from 'vue'
 import AmountField from '../components/AmountField.vue'
 import AttachmentField from '../components/AttachmentField.vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
+import DateChips from '../components/DateChips.vue'
 import TagPicker from '../components/TagPicker.vue'
 import { toLocalDateStr } from '../services/formatters.js'
+import { useTelegramPrimary } from '../services/telegramChrome.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
 const transactionsStore = useTransactionsStore()
+
+const formRef = ref(null)
+
+useTelegramPrimary('transactions_edit_modal', {
+    text: 'Update',
+    form: formRef,
+    busy: () => Boolean(transactionsStore.isLoading),
+})
 
 const transaction = ref({
     tags: [],

@@ -3,8 +3,8 @@
         <div class="modal-box max-w-sm">
             <h2 id="transactions_add_modal_title" class="card-title mb-4">Add Transaction</h2>
 
-            <form @submit.prevent="handleSubmit">
-                <input type="date" v-model="transaction.at" class="input w-full mb-4" required />
+            <form ref="formRef" @submit.prevent="handleSubmit">
+                <DateChips v-model="transaction.at" />
 
                 <AmountField v-model="transaction.amount" />
 
@@ -16,7 +16,7 @@
                 <AttachmentField v-model:pending="pendingFiles" :busy="Boolean(transactionsStore.isLoading)" />
 
                 <div class="modal-action">
-                    <button type="submit" class="btn btn-success" :disabled="transactionsStore.isLoading">
+                    <button type="submit" class="btn btn-success tg-primary" :disabled="transactionsStore.isLoading">
                         <span v-if="transactionsStore.isLoading" class="loading loading-spinner"></span>
                         Save
                         <Save :size="20" />
@@ -35,15 +35,24 @@ import { Save } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
 import AmountField from '../components/AmountField.vue'
 import AttachmentField from '../components/AttachmentField.vue'
+import DateChips from '../components/DateChips.vue'
 import TagPicker from '../components/TagPicker.vue'
-import { nowDateStr } from '../services/formatters.js'
-
+import { today } from '../services/clock.js'
+import { useTelegramPrimary } from '../services/telegramChrome.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
 const transactionsStore = useTransactionsStore()
 
+const formRef = ref(null)
+
+useTelegramPrimary('transactions_add_modal', {
+    text: 'Save',
+    form: formRef,
+    busy: () => Boolean(transactionsStore.isLoading),
+})
+
 const createDefault = () => ({
-    at: nowDateStr(),
+    at: today.value,
 
     amount: '',
     note: '',
@@ -52,6 +61,11 @@ const createDefault = () => ({
 
 const transaction = ref(createDefault())
 const pendingFiles = ref([])
+
+// An untouched "Today" default follows the calendar; a picked date stays put.
+watch(today, (now, before) => {
+    if (transaction.value.at === before) transaction.value.at = now
+})
 
 watch(
     () => transactionsStore.transactionDraftAt,

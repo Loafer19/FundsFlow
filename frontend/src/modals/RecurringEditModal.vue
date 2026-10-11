@@ -6,8 +6,8 @@
                 Edit Recurring
             </h2>
 
-            <form @submit.prevent="handleSubmit">
-                <AmountField v-model="form.amount" />
+            <form ref="formRef" @submit.prevent="handleSubmit">
+                <AmountField v-model="form.amount" :max="99_999_999.99" />
 
                 <input type="text" v-model="form.note" placeholder="Note (optional)" aria-label="Note"
                     class="input w-full mb-4" maxlength="255" />
@@ -28,7 +28,7 @@
                     <DeleteHold v-if="form.id" :id="form.id" :disabled="recurringStore.isLoading"
                         :isLoading="recurringStore.isLoading === form.id" @delete="handleDelete" />
 
-                    <button type="submit" class="btn btn-success btn-sm" :disabled="recurringStore.isLoading">
+                    <button type="submit" class="btn btn-success btn-sm tg-primary" :disabled="recurringStore.isLoading">
                         <span v-if="recurringStore.isLoading" class="loading loading-spinner"></span>
                         Update
                         <Save :size="24" />
@@ -49,8 +49,17 @@ import AmountField from '../components/AmountField.vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import TagPicker from '../components/TagPicker.vue'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
+import { useTelegramPrimary } from '../services/telegramChrome.js'
 
 const recurringStore = useRecurringTransactionsStore()
+
+const formRef = ref(null)
+
+useTelegramPrimary('recurring_edit_modal', {
+    text: 'Update',
+    form: formRef,
+    busy: () => Boolean(recurringStore.isLoading),
+})
 
 const form = ref({ tags: [] })
 

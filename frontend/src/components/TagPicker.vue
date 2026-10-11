@@ -15,12 +15,15 @@
 
 <script setup>
 import { useTagsStore } from '../services/tags.js'
+import { haptic } from '../services/telegramWebApp.js'
 
 const tagsStore = useTagsStore()
 
 const modelValue = defineModel({ type: Array, default: () => [] })
 
 const toggle = (id) => {
+    haptic.select()
+
     const index = modelValue.value.indexOf(id)
 
     if (index === -1) {

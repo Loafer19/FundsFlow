@@ -6,7 +6,7 @@
                 Add Tag
             </h2>
 
-            <form @submit.prevent="handleSubmit">
+            <form ref="formRef" @submit.prevent="handleSubmit">
                 <input type="text" v-model="tag.title" placeholder="Title" aria-label="Title"
                     class="input w-full mb-4" maxlength="255" required autofocus />
 
@@ -32,7 +32,7 @@
                 </label>
 
                 <div class="modal-action">
-                    <button type="submit" class="btn btn-success" :disabled="tagsStore.isLoading">
+                    <button type="submit" class="btn btn-success tg-primary" :disabled="tagsStore.isLoading">
                         <span v-if="tagsStore.isLoading" class="loading loading-spinner"></span>
                         Save
                         <Save :size="24" />
@@ -53,6 +53,7 @@ import { computed, ref } from 'vue'
 import 'emoji-mart-vue-fast/css/emoji-mart.css'
 import { EmojiIndex, Picker } from 'emoji-mart-vue-fast/src'
 import { useTagsStore } from './../services/tags.js'
+import { useTelegramPrimary } from '../services/telegramChrome.js'
 
 const emojiIndex = new EmojiIndex(data, {
     exclude: ['recent', 'flags'],
@@ -63,6 +64,14 @@ const randomEmoji = Object.keys(emojiIndex._nativeEmojis)[
 ]
 
 const tagsStore = useTagsStore()
+
+const formRef = ref(null)
+
+useTelegramPrimary('tags_add_modal', {
+    text: 'Save',
+    form: formRef,
+    busy: () => Boolean(tagsStore.isLoading),
+})
 
 const tag_default = {
     title: '',
