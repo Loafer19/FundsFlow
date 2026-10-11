@@ -6,6 +6,35 @@ const CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET || ''
 const PUBLIC_BASE = (process.env.MCP_PUBLIC_URL || 'https://mcp.fundsflow.fun').replace(/\/$/, '')
 const API_URL = (process.env.FUNDSFLOW_API_URL || 'https://api.fundsflow.fun/api').replace(/\/$/, '')
 const CODE_TTL_MS = 5 * 60 * 1000
+const BACKEND_TIMEOUT_MS = 30_000
+
+// /oauth/authorize takes a password, so cap attempts per client IP (req.ip honours
+// 'trust proxy', set in index.ts). In-memory is enough for a single MCP instance.
+const AUTHORIZE_WINDOW_MS = 10 * 60 * 1000
+const AUTHORIZE_MAX_HITS = 30
+const authorizeHits = new Map<string, { count: number; resetAt: number }>()
+
+function authorizeRateLimited(req: Request, res: Response): boolean {
+    const now = Date.now()
+    const key = req.ip || req.socket.remoteAddress || 'unknown'
+    let row = authorizeHits.get(key)
+    if (!row || row.resetAt <= now) {
+        row = { count: 0, resetAt: now + AUTHORIZE_WINDOW_MS }
+        authorizeHits.set(key, row)
+    }
+    row.count++
+    if (authorizeHits.size > 10_000) {
+        for (const [k, v] of authorizeHits) if (v.resetAt <= now) authorizeHits.delete(k)
+    }
+    if (row.count <= AUTHORIZE_MAX_HITS) return false
+    res
+        .status(429)
+        .set('Retry-After', String(Math.ceil((row.resetAt - now) / 1000)))
+        .set('Cache-Control', 'no-store')
+        .type('text')
+        .send('Too many authorization attempts. Try again later.')
+    return true
+}
 
 // Callbacks of the hosted MCP clients we know about. Exact match only: a prefix or
 // host match would let any path on those hosts (or an open redirect there) receive codes.
@@ -204,6 +233,7 @@ export function registerOAuthRoutes(app: Express) {
     })
 
     app.get('/oauth/authorize', (req: Request, res: Response) => {
+        if (authorizeRateLimited(req, res)) return
         const clientId = String(req.query.client_id || CLIENT_ID)
         const redirectUri = String(req.query.redirect_uri || '')
         const responseType = String(req.query.response_type || 'code')
@@ -243,6 +273,7 @@ export function registerOAuthRoutes(app: Express) {
     })
 
     app.post('/oauth/authorize', async (req: Request, res: Response) => {
+        if (authorizeRateLimited(req, res)) return
         cleanupCodes()
 
         const clientId = String(req.body?.client_id || req.query.client_id || CLIENT_ID)
@@ -289,6 +320,7 @@ export function registerOAuthRoutes(app: Express) {
                 method: 'POST',
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
+                signal: AbortSignal.timeout(BACKEND_TIMEOUT_MS),
             })
             const payload = (await login.json().catch(() => ({}))) as { token?: string; message?: string }
             if (!login.ok || !payload.token) {

@@ -3,16 +3,14 @@
 namespace App\Actions\Identities;
 
 use App\Models\User;
-use Illuminate\Support\Facades\Cache;
+use App\Support\TelegramCode;
 
 class GenerateTelegramLinkCodeAction
 {
+    public const CACHE_PREFIX = 'telegram_deeplink';
+
     public function execute(User $user): string
     {
-        $code = (string) random_int(100000, 999999);
-
-        Cache::put("telegram_deeplink:{$code}", $user->id, now()->addMinutes(10));
-
-        return $code;
+        return TelegramCode::issue(self::CACHE_PREFIX, $user->id, now()->addMinutes(10));
     }
 }

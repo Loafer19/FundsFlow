@@ -4,6 +4,7 @@ import { hostHeaderValidation } from '@modelcontextprotocol/sdk/server/middlewar
 import { createHash, timingSafeEqual } from 'node:crypto'
 import express, { type Request, type Response } from 'express'
 import { z } from 'zod'
+import { formatApiError, nameFromContentDisposition, unwrapList } from './util.ts'
 import { oauthClientId, oauthClientSecret, oauthPublicBase, registerOAuthRoutes, unauthorizedMcp } from './oauth.ts'
 
 /** 8 MB file → ~10.7 MB base64; leave headroom for JSON-RPC envelope. */
@@ -36,45 +37,20 @@ const HOST = process.env.HOST || '127.0.0.1'
 const API_URL = (process.env.FUNDSFLOW_API_URL || 'https://api.fundsflow.fun/api').replace(/\/$/, '')
 const ENV_TOKEN = process.env.FUNDSFLOW_TOKEN || ''
 const MCP_KEY = process.env.MCP_KEY || ''
+const API_TIMEOUT_MS = 30_000
+// Dokploy puts Traefik in front (one hop); req.ip must be the client for rate limiting.
+const TRUST_PROXY = process.env.TRUST_PROXY ?? '1'
+
+// Column limits: transactions decimal(15,2), budget_periods/recurring decimal(10,2).
+// The backend has no explicit max, so larger values would only fail at the DB.
+const TX_AMOUNT_MAX = 9_999_999_999_999.99
+const RULE_AMOUNT_MAX = 99_999_999.99
+
 const ALLOWED_HOSTS = (process.env.ALLOWED_HOSTS || '127.0.0.1,localhost,mcp.fundsflow.fun')
     .split(',')
     .map((h) => h.trim())
     .filter(Boolean)
 
-const TOOL_NAMES = [
-    'get_me',
-    'get_bootstrap',
-    'list_tags',
-    'create_tag',
-    'update_tag',
-    'delete_tag',
-    'list_transactions',
-    'list_recent_transactions',
-    'create_transaction',
-    'create_transactions',
-    'update_transaction',
-    'update_transactions',
-    'delete_transaction',
-    'delete_transactions',
-    'attach_transaction_file',
-
-    'list_transaction_attachments',
-    'get_transaction_attachment',
-    'delete_transaction_attachment',
-    'list_budgets',
-
-    'create_budget',
-    'update_budget',
-    'delete_budget',
-    'pause_budget',
-    'resume_budget',
-    'list_recurring',
-    'create_recurring',
-    'update_recurring',
-    'delete_recurring',
-    'update_preferences',
-    'export_account',
-] as const
 
 async function api<T = unknown>(token: string | null, path: string, init: RequestInit = {}): Promise<T> {
     if (!token) {
@@ -86,6 +62,7 @@ async function api<T = unknown>(token: string | null, path: string, init: Reques
 
     const response = await fetch(`${API_URL}${path}`, {
         ...init,
+        signal: init.signal ?? AbortSignal.timeout(API_TIMEOUT_MS),
         headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
@@ -106,23 +83,10 @@ async function api<T = unknown>(token: string | null, path: string, init: Reques
     }
 
     if (!response.ok) {
-        const message =
-            typeof body === 'object' && body && 'message' in body
-                ? String((body as { message: unknown }).message)
-                : text || response.statusText
-        throw new Error(`FundsFlow API ${response.status}: ${message}`)
+        throw new Error(formatApiError(response.status, body, text, response.statusText))
     }
 
     return body as T
-}
-
-function unwrapList(payload: unknown): unknown[] {
-    if (Array.isArray(payload)) return payload
-    if (payload && typeof payload === 'object' && 'data' in payload) {
-        const data = (payload as { data: unknown }).data
-        if (Array.isArray(data)) return data
-    }
-    return []
 }
 
 function textResult(data: unknown) {
@@ -176,7 +140,13 @@ function hasMcpKey(req: Request): boolean {
     return typeof key === 'string' && safeEqual(key, MCP_KEY)
 }
 
-function createServer(token: string | null) {
+const signedAmount = (max: number) =>
+    z.number().min(-max).max(max).refine((value) => value !== 0, { message: 'amount must not be 0' })
+const isoDate = () => z.iso.date()
+const uniqueIds = (schema: z.ZodArray<z.ZodNumber>) =>
+    schema.refine((ids) => new Set(ids).size === ids.length, { message: 'ids must be unique' })
+
+function createServer(token: string | null, onTool?: (name: string) => void) {
     const server = new McpServer({
         name: 'fundsflow',
         version: MCP_VERSION,
@@ -185,6 +155,15 @@ function createServer(token: string | null) {
         websiteUrl: MCP_WEBSITE_URL,
         icons: MCP_ICONS,
     })
+
+    if (onTool) {
+        // Lets the discovery endpoint list tools from registration instead of a copied list.
+        const register = server.registerTool.bind(server) as (...args: unknown[]) => unknown
+        server.registerTool = ((name: string, ...rest: unknown[]) => {
+            onTool(name)
+            return register(name, ...rest)
+        }) as typeof server.registerTool
+    }
 
     server.registerTool(
         'get_me',
@@ -279,7 +258,7 @@ function createServer(token: string | null) {
         'list_transactions',
         {
             title: 'List transactions',
-            description: 'List all transactions (newest first in typical UI; API order as returned).',
+            description: 'List all transactions, newest first (by date).',
             inputSchema: {},
         },
         async () => textResult(unwrapList(await api(token, '/transactions'))),
@@ -298,8 +277,8 @@ function createServer(token: string | null) {
     )
 
     const transactionInputSchema = {
-        amount: z.number(),
-        at: z.string(),
+        amount: signedAmount(TX_AMOUNT_MAX),
+        at: isoDate(),
         note: z.string().max(255).optional(),
         tags: z.array(z.number().int()).optional(),
     }
@@ -338,8 +317,8 @@ function createServer(token: string | null) {
                 transactions: z
                     .array(
                         z.object({
-                            amount: z.number(),
-                            at: z.string(),
+                            amount: signedAmount(TX_AMOUNT_MAX),
+                            at: isoDate(),
                             note: z.string().max(255).optional(),
                             tags: z.array(z.number().int()).optional(),
                         }),
@@ -374,8 +353,8 @@ function createServer(token: string | null) {
             description: 'Update a transaction by id. For many rows prefer update_transactions.',
             inputSchema: {
                 id: z.number().int(),
-                amount: z.number(),
-                at: z.string(),
+                amount: signedAmount(TX_AMOUNT_MAX),
+                at: isoDate(),
                 note: z.string().max(255).optional(),
                 tags: z.array(z.number().int()).optional(),
             },
@@ -408,8 +387,8 @@ function createServer(token: string | null) {
                     .array(
                         z.object({
                             id: z.number().int(),
-                            amount: z.number(),
-                            at: z.string(),
+                            amount: signedAmount(TX_AMOUNT_MAX),
+                            at: isoDate(),
                             note: z.string().max(255).optional(),
                             tags: z.array(z.number().int()).optional(),
                         }),
@@ -455,7 +434,7 @@ function createServer(token: string | null) {
             description:
                 'Delete up to 50 transactions by id in one request (all-or-nothing). Unknown or foreign ids fail the whole batch.',
             inputSchema: {
-                ids: z.array(z.number().int()).min(1).max(BULK_MAX_ITEMS),
+                ids: uniqueIds(z.array(z.number().int()).min(1).max(BULK_MAX_ITEMS)),
 
             },
         },
@@ -550,7 +529,8 @@ function createServer(token: string | null) {
         'get_transaction_attachment',
         {
             title: 'Get transaction attachment',
-            description: 'Download an attachment as base64 (name, mime, content_base64).',
+            description:
+                'Download an attachment. Images come back as image content plus metadata; other files as JSON with content_base64.',
             inputSchema: {
                 transaction_id: z.number().int(),
                 attachment_id: z.number().int(),
@@ -568,6 +548,7 @@ function createServer(token: string | null) {
                         Authorization: `Bearer ${token}`,
                         'X-FundsFlow-Source': 'mcp',
                     },
+                    signal: AbortSignal.timeout(API_TIMEOUT_MS),
                 },
             )
 
@@ -578,21 +559,23 @@ function createServer(token: string | null) {
 
             const buffer = Buffer.from(await response.arrayBuffer())
             const mime = response.headers.get('content-type') || 'application/octet-stream'
-            const disposition = response.headers.get('content-disposition') || ''
-            const star = /filename\*=UTF-8''([^;]+)/i.exec(disposition)
-            const quoted = /filename="([^"]+)"/.exec(disposition)
-            const name = star?.[1]
-                ? decodeURIComponent(star[1])
-                : quoted?.[1] || `attachment-${attachment_id}`
+            const name =
+                nameFromContentDisposition(response.headers.get('content-disposition'))
+                || `attachment-${attachment_id}`
+            const meta = { id: attachment_id, transaction_id, name, mime, size: buffer.length }
 
-            return textResult({
-                id: attachment_id,
-                transaction_id,
-                name,
-                mime,
-                size: buffer.length,
-                content_base64: buffer.toString('base64'),
-            })
+            // Images go out as MCP image content so clients can show them / models can see them.
+            const imageMime = mime.split(';', 1)[0]?.trim().toLowerCase() || ''
+            if (imageMime.startsWith('image/')) {
+                return {
+                    content: [
+                        { type: 'text' as const, text: JSON.stringify(meta, null, 2) },
+                        { type: 'image' as const, data: buffer.toString('base64'), mimeType: imageMime },
+                    ],
+                }
+            }
+
+            return textResult({ ...meta, content_base64: buffer.toString('base64') })
         },
     )
 
@@ -632,7 +615,7 @@ function createServer(token: string | null) {
             title: 'Create budget',
             description: 'Create a budget. length is week|month|year. tag_ids required (at least one).',
             inputSchema: {
-                amount: z.number().positive(),
+                amount: z.number().min(0.01).max(RULE_AMOUNT_MAX),
                 length: z.enum(['week', 'month', 'year']),
                 tag_ids: z.array(z.number().int()).min(1),
                 title: z.string().max(255).optional(),
@@ -655,7 +638,7 @@ function createServer(token: string | null) {
             description: 'Update a budget by id (creates a new period version as the API defines).',
             inputSchema: {
                 id: z.number().int(),
-                amount: z.number().positive(),
+                amount: z.number().min(0.01).max(RULE_AMOUNT_MAX),
                 length: z.enum(['week', 'month', 'year']),
                 tag_ids: z.array(z.number().int()).min(1),
                 title: z.string().max(255).optional(),
@@ -717,11 +700,11 @@ function createServer(token: string | null) {
             title: 'Create recurring',
             description: 'Create a recurring rule. frequency: daily|weekly|monthly|yearly.',
             inputSchema: {
-                amount: z.number(),
+                amount: signedAmount(RULE_AMOUNT_MAX),
                 frequency: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
-                starts_at: z.string(),
+                starts_at: isoDate(),
                 note: z.string().max(255).optional(),
-                ends_at: z.string().optional(),
+                ends_at: isoDate().nullable().optional(),
                 active: z.boolean().optional(),
                 tags: z.array(z.number().int()).optional(),
             },
@@ -749,11 +732,11 @@ function createServer(token: string | null) {
             description: 'Update a recurring rule by id.',
             inputSchema: {
                 id: z.number().int(),
-                amount: z.number(),
+                amount: signedAmount(RULE_AMOUNT_MAX),
                 frequency: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
-                starts_at: z.string(),
+                starts_at: isoDate(),
                 note: z.string().max(255).optional(),
-                ends_at: z.string().optional(),
+                ends_at: isoDate().nullable().optional(),
                 active: z.boolean().optional(),
                 tags: z.array(z.number().int()).optional(),
             },
@@ -817,6 +800,7 @@ function createServer(token: string | null) {
 // Manual Express setup (not createMcpExpressApp): default express.json() is 100kb,
 // which rejects base64 attachment tool calls with 413 and looks like a hang in the client.
 const app = express()
+app.set('trust proxy', /^\d+$/.test(TRUST_PROXY) ? Number(TRUST_PROXY) : TRUST_PROXY === 'false' ? false : TRUST_PROXY)
 
 app.use(express.json({ limit: JSON_BODY_LIMIT }))
 app.use(express.urlencoded({ extended: false, limit: JSON_BODY_LIMIT }))
@@ -926,21 +910,6 @@ function mimeFromContentType(header: string | null): AttachmentMime | null {
         : null
 }
 
-function nameFromContentDisposition(header: string | null): string | null {
-    if (!header) return null
-    const star = /filename\*=(?:UTF-8''|utf-8'')([^;]+)/i.exec(header)
-    if (star?.[1]) {
-        try {
-            return decodeURIComponent(star[1].trim().replace(/^"|"$/g, ''))
-        } catch {
-            /* ignore */
-        }
-    }
-    const plain = /filename="([^"]+)"|filename=([^;]+)/i.exec(header)
-    const value = (plain?.[1] || plain?.[2] || '').trim().replace(/^"|"$/g, '')
-    return value || null
-}
-
 function nameFromUrlPath(url: URL): string {
     const base = url.pathname.split('/').filter(Boolean).pop() || 'attachment'
     try {
@@ -1006,6 +975,9 @@ async function fetchAttachmentFromUrl(sourceUrl: string): Promise<{
     throw new Error('source_url redirected too many times.')
 }
 
+
+const TOOL_NAMES: string[] = []
+createServer(null, (name) => TOOL_NAMES.push(name)).close()
 
 app.get('/', (_req, res) => {
     res.json({
@@ -1094,12 +1066,14 @@ app.post('/mcp', async (req: Request, res: Response) => {
         const transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: undefined,
         })
-        await server.connect(transport)
-        await transport.handleRequest(req, res, req.body)
+        // Register before handling: a client that disconnects mid-request would
+        // otherwise never trigger cleanup.
         res.on('close', () => {
             transport.close()
             server.close()
         })
+        await server.connect(transport)
+        await transport.handleRequest(req, res, req.body)
     } catch (error) {
         console.error('MCP request failed:', error)
         if (!res.headersSent) {

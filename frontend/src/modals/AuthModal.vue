@@ -90,9 +90,9 @@
 
                 <form @submit.prevent="submitTelegramCode">
                     <input v-model="telegramCode" type="text" inputmode="text" autocomplete="one-time-code"
-                        maxlength="8" placeholder="Code from the bot" aria-label="Code from the bot"
+                        maxlength="9" placeholder="K7QM-2XPA" aria-label="Code from the bot"
                         class="input w-full mb-4 font-mono uppercase tracking-wider" autofocus
-                        @input="telegramCode = telegramCode.toUpperCase().replace(/[^A-Z0-9]/g, '')" />
+                        @input="telegramCode = formatTelegramCode(telegramCode)" />
 
 
                     <div class="modal-action justify-between">
@@ -100,7 +100,7 @@
                             Back
                         </button>
 
-                        <button type="submit" class="btn btn-success" :disabled="authStore.isLoading || !telegramCode">
+                        <button type="submit" class="btn btn-success" :disabled="authStore.isLoading || normalizeTelegramCode(telegramCode).length !== TELEGRAM_CODE_LENGTH">
                             <span v-if="authStore.isLoading" class="loading loading-spinner"></span>
                             <LogIn :size="24" />
                             Log in
@@ -119,6 +119,7 @@
 import { LogIn, Send, User, UserPlus } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { useAuthStore } from './../services/auth.js'
+import { formatTelegramCode, normalizeTelegramCode, TELEGRAM_CODE_LENGTH } from './../services/telegramCode.js'
 import { takeStashedInitData } from './../services/telegramWebApp.js'
 import toasts from './../services/toasts.js'
 
@@ -171,12 +172,12 @@ const consumeTelegramCodeQuery = async () => {
     const fromQuery = params.get('telegram_code')
     const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     const fromHash = hashParams.get('telegram_code')
-    const raw = (fromQuery || fromHash || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+    const raw = normalizeTelegramCode(fromQuery || fromHash)
 
     if (!raw) return
 
     showTelegramLogin.value = true
-    telegramCode.value = raw.slice(0, 8)
+    telegramCode.value = formatTelegramCode(raw)
 
     // Drop the code from the URL before login so a refresh cannot reuse it in the bar
     params.delete('telegram_code')
@@ -186,7 +187,7 @@ const consumeTelegramCodeQuery = async () => {
 
     document.getElementById('auth_modal')?.showModal()
 
-    const ok = await authStore.loginWithTelegramCode(telegramCode.value)
+    const ok = await authStore.loginWithTelegramCode(raw)
     if (!ok) return
 
     await maybeLinkTelegramWebApp()
@@ -209,7 +210,7 @@ const handleSubmit = async () => {
 }
 
 const submitTelegramCode = async () => {
-    const ok = await authStore.loginWithTelegramCode(telegramCode.value.trim().toUpperCase())
+    const ok = await authStore.loginWithTelegramCode(normalizeTelegramCode(telegramCode.value))
 
     if (!ok) return
 

@@ -2,10 +2,11 @@
 
 namespace App\Channels\Telegram\Handlers;
 
+use App\Actions\Identities\GenerateTelegramLinkCodeAction;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
 use App\Models\User;
-use Illuminate\Support\Facades\Cache;
+use App\Support\TelegramCode;
 
 class AuthHandler
 {
@@ -47,7 +48,8 @@ class AuthHandler
      */
     public function linkToExistingAccount(int|string $chatId, string $code, array $meta): void
     {
-        $userId = Cache::pull("telegram_deeplink:{$code}");
+        // Deep-link payload or a typed "/start k7qm-2xpa": both normalise to the same code.
+        $userId = TelegramCode::pull(GenerateTelegramLinkCodeAction::CACHE_PREFIX, $code);
 
         if (!$userId) {
             $this->client->sendMessage(
@@ -117,42 +119,25 @@ class AuthHandler
 
     public function sendWebsiteLoginCode(User $user, int|string $chatId): void
     {
-        $code = $this->generateWebsiteLoginCode();
-
-        Cache::put("telegram_login:{$code}", $user->id, now()->addMinutes(10));
+        $code = TelegramCode::issue('telegram_login', $user->id, now()->addMinutes(10));
+        $display = TelegramCode::format($code);
 
         $frontend = rtrim((string) config('app.frontend_url'), '/');
         $loginUrl = $frontend.'/?telegram_code='.rawurlencode($code);
 
         $this->client->sendMessage(
             $chatId,
-            "Web login code:\n<code>{$code}</code>\n\nOpen FundsFlow to sign in automatically, or copy the code. Valid 10 minutes.",
+            "Web login code:\n<code>{$display}</code>\n\nOpen FundsFlow to sign in automatically, or copy the code. Valid 10 minutes.",
             [
                 'inline_keyboard' => [
                     [['text' => 'Open FundsFlow', 'url' => $loginUrl]],
-                    [['text' => 'Copy code', 'copy_text' => ['text' => $code]]],
+                    [['text' => 'Copy code', 'copy_text' => ['text' => $display]]],
                 ],
             ],
             'HTML',
         );
     }
 
-    public function generateWebsiteLoginCode(): string
-    {
-        // No 0/O/1/I — easier to type; 8 chars from 32 symbols ≈ 1e12 variants.
-        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        $length = 8;
-
-        do {
-            $code = '';
-
-            for ($i = 0; $i < $length; $i++) {
-                $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
-            }
-        } while (Cache::has("telegram_login:{$code}"));
-
-        return $code;
-    }
 
     public function handleUnlink(int|string $chatId): void
     {

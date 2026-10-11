@@ -56,7 +56,7 @@ To add another client set `OAUTH_REDIRECT_ALLOWLIST` (comma-separated full URIs,
 
 Account, tags, transactions (incl. bulk create + file attachments via base64 or `source_url`), budgets (incl. pause/resume), recurring, preferences, export.
 
-Creates are stored with `source=mcp`. Bulk (up to 50, all-or-nothing): `create_transactions`, `update_transactions`, `delete_transactions`. Attachment tools: `attach_transaction_file`, `list_transaction_attachments`, `get_transaction_attachment`, `delete_transaction_attachment` (JPEG/PNG/WebP/PDF, max 8 MB, 5 per transaction).
+Transactions created via MCP are stored with `source=mcp` (only transactions have a `source` field; tags, budgets and recurring rules are not marked). Bulk (up to 50, all-or-nothing): `create_transactions`, `update_transactions`, `delete_transactions`. Attachment tools: `attach_transaction_file`, `list_transaction_attachments`, `get_transaction_attachment`, `delete_transaction_attachment` (JPEG/PNG/WebP/PDF, max 8 MB, 5 per transaction).
 
 `attach_transaction_file` accepts **exactly one** of:
 - `content_base64` — raw base64 (no `data:` prefix); `name` + `mime` required

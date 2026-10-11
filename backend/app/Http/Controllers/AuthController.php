@@ -6,11 +6,11 @@ use App\Actions\Auth\AuthenticateTelegramWebAppAction;
 use App\Actions\Auth\LinkTelegramWebAppAction;
 use App\Models\Identity;
 use App\Models\User;
+use App\Support\TelegramCode;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -56,11 +56,11 @@ class AuthController extends Controller
     public function loginWithTelegramCode(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'code' => 'required|string|size:8|alpha_num',
+            // Users may paste the grouped form (K7QM-2XPA) or type it in lowercase.
+            'code' => 'required|string|max:32',
         ]);
 
-        $code = strtoupper($data['code']);
-        $userId = Cache::pull("telegram_login:{$code}");
+        $userId = TelegramCode::pull('telegram_login', $data['code']);
 
         if (!$userId) {
             abort(422, 'This code is invalid or has expired.');

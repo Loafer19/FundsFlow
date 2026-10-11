@@ -73,7 +73,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::apiResource('recurring-transactions', RecurringTransactionController::class)
         ->except(['show'])
         ->parameters(['recurring-transactions' => 'recurringTransaction']);
-    Route::post('/identities/telegram/link-code', [IdentityController::class, 'telegramLinkCode']);
+    Route::post('/identities/telegram/link-code', [IdentityController::class, 'telegramLinkCode'])
+        ->middleware('throttle:10,1');
     Route::put('/account/credentials', [AccountController::class, 'updateCredentials']);
     Route::patch('/account/preferences', [AccountController::class, 'updatePreferences']);
     Route::get('/account/ai-quota', [AccountController::class, 'aiQuota']);
