@@ -18,11 +18,11 @@ class UpdateRecurringTransactionAction
     {
         Gate::forUser($user)->authorize('update', $recurringTransaction);
 
-        $tagIds = TagIds::forSync(
-            $user,
-            $data['tags'] ?? [],
-            $recurringTransaction->tags()->pluck('tags.id'),
-        );
+        // PATCH without `tags` must keep the current tags; only an explicit key (even [] / null) syncs.
+        $syncTags = array_key_exists('tags', $data);
+        $tagIds = $syncTags
+            ? TagIds::forSync($user, $data['tags'] ?? [], $recurringTransaction->tags()->pluck('tags.id'))
+            : [];
         unset($data['tags']);
 
         $startsAt = Carbon::parse($data['starts_at'] ?? $recurringTransaction->starts_at);
@@ -48,7 +48,9 @@ class UpdateRecurringTransactionAction
         }
 
         $recurringTransaction->update($data);
-        $recurringTransaction->tags()->sync($tagIds);
+        if ($syncTags) {
+            $recurringTransaction->tags()->sync($tagIds);
+        }
 
         return $recurringTransaction->load('tags');
     }

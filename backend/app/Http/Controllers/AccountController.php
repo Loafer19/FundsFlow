@@ -44,19 +44,19 @@ class AccountController extends Controller
             $request->merge(['timezone' => 'Europe/Kyiv']);
         }
 
+        // PATCH semantics: callers (e.g. MCP) may send only the keys they change.
         $data = $request->validate([
-            'moneyFormat' => 'required|string|max:32',
-            'dateFormat' => 'required|string|max:64',
-            'decimals' => 'required|boolean',
-            'timezone' => 'required|string|timezone:all',
+            'moneyFormat' => 'sometimes|string|max:32',
+            'dateFormat' => 'sometimes|string|max:64',
+            'decimals' => 'sometimes|boolean',
+            'timezone' => 'sometimes|string|timezone:all',
         ]);
 
-        $user->preferences = array_merge($user->preferences ?? [], [
-            'moneyFormat' => $data['moneyFormat'],
-            'dateFormat' => $data['dateFormat'],
-            'decimals' => $data['decimals'],
-            'timezone' => $data['timezone'],
-        ]);
+        if (array_key_exists('decimals', $data)) {
+            $data['decimals'] = (bool) $data['decimals'];
+        }
+
+        $user->preferences = array_merge($user->preferences ?? [], $data);
 
         $user->save();
 

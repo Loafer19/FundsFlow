@@ -60,10 +60,7 @@ class QuickAddHandler
         }
 
         $amount = (float) str_replace(',', '.', $matches[1]);
-
-        if (!str_starts_with($matches[1], '+') && !str_starts_with($matches[1], '-')) {
-            $amount = -abs($amount);
-        }
+        $hasExplicitSign = str_starts_with($matches[1], '+') || str_starts_with($matches[1], '-');
 
         if ($amount === 0.0) {
             $this->client->sendMessage($chatId, "Amount can't be zero");
@@ -78,6 +75,11 @@ class QuickAddHandler
             $this->client->sendMessage($chatId, 'Transaction not found');
 
             return;
+        }
+
+        // A bare number is a correction of the value, not of the direction: keep income as income.
+        if (!$hasExplicitSign) {
+            $amount = (float) $transaction->amount < 0 ? -abs($amount) : abs($amount);
         }
 
         $transaction = $this->updateTransaction->execute($user, $transaction, [

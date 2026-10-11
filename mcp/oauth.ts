@@ -7,12 +7,73 @@ const PUBLIC_BASE = (process.env.MCP_PUBLIC_URL || 'https://mcp.fundsflow.fun').
 const API_URL = (process.env.FUNDSFLOW_API_URL || 'https://api.fundsflow.fun/api').replace(/\/$/, '')
 const CODE_TTL_MS = 5 * 60 * 1000
 
+// Callbacks of the hosted MCP clients we know about. Exact match only: a prefix or
+// host match would let any path on those hosts (or an open redirect there) receive codes.
+// Sources are listed in README.md ("OAuth redirect URIs"). Loopback clients (Claude Code,
+// Cursor desktop :8787, VS Code :33418, MCP Inspector, Windsurf...) are handled separately.
+export const DEFAULT_REDIRECT_ALLOWLIST = [
+    // Claude hosted apps (web, desktop, mobile, Cowork)
+    'https://claude.ai/api/mcp/auth_callback',
+    'https://claude.com/api/mcp/auth_callback',
+    // ChatGPT / Codex: stable callback (per-connection form is matched below)
+    'https://chatgpt.com/connector_platform_oauth_redirect',
+    // Cursor web / Cursor Agents
+    'https://www.cursor.com/agents/mcp/oauth/callback',
+    // Cursor desktop, legacy custom-scheme callback still sent by some builds
+    'cursor://anysphere.cursor-mcp/oauth/callback',
+    // VS Code / GitHub Copilot (web redirector; desktop uses loopback)
+    'https://vscode.dev/redirect',
+    'https://insiders.vscode.dev/redirect',
+    // Grok custom connectors (grok.com 308s the slash form to the bare one)
+    'https://grok.com/connectors-oauth-exchange-code/',
+    'https://grok.com/connectors-oauth-exchange-code',
+]
+
+// ChatGPT uses https://chatgpt.com/connector/oauth/{callback_id} when the authorization
+// server does not return `iss` on the redirect (we don't). One opaque path segment only.
+const CHATGPT_CALLBACK_ID = /^\/connector\/oauth\/[A-Za-z0-9_-]{1,128}$/
+
+const REDIRECT_ALLOWLIST = new Set([
+    ...DEFAULT_REDIRECT_ALLOWLIST,
+    ...(process.env.OAUTH_REDIRECT_ALLOWLIST || '')
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean),
+])
+
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]'])
+
+/** Parsed redirect URI when allowed, otherwise null. */
+export function allowedRedirect(redirectUri: string): URL | null {
+    let url: URL
+    try {
+        url = new URL(redirectUri)
+    } catch {
+        return null
+    }
+    if (url.hash || url.username || url.password) return null
+    // RFC 8252 §7.3: native apps listen on an ephemeral loopback port, so any port is fine,
+    // but only over plain http to the loopback host itself.
+    if (url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname)) return url
+    if (
+        url.protocol === 'https:' &&
+        url.host === 'chatgpt.com' &&
+        !url.search &&
+        CHATGPT_CALLBACK_ID.test(url.pathname) &&
+        redirectUri === url.origin + url.pathname
+    ) {
+        return url
+    }
+    // Exact string match on the raw value (works for custom schemes like cursor://, whose
+    // WHATWG parse has an opaque-ish host, without relying on normalisation).
+    return REDIRECT_ALLOWLIST.has(redirectUri) ? url : null
+}
+
 type AuthCode = {
     accessToken: string
     redirectUri: string
     clientId: string
-    codeChallenge?: string
-    codeChallengeMethod?: string
+    codeChallenge: string
     expiresAt: number
 }
 
@@ -31,10 +92,21 @@ function escapeHtml(value: string) {
         .replaceAll("'", '&#39;')
 }
 
-function verifyPkce(verifier: string, challenge: string, method = 'S256') {
-    if (method === 'plain') return verifier === challenge
+function verifyPkce(verifier: string, challenge: string) {
+    // S256 only; `plain` would let anyone who saw the authorize URL redeem the code.
+    if (!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier)) return false
     const digest = createHash('sha256').update(verifier).digest()
     return b64url(digest) === challenge
+}
+
+/** Error text for invalid authorize params, or '' when they are fine. */
+function authorizeParamsError(redirectUri: string, codeChallenge: string, codeChallengeMethod: string) {
+    if (!redirectUri) return 'redirect_uri is required.'
+    if (!allowedRedirect(redirectUri)) return 'redirect_uri is not allowed for this server.'
+    if (!codeChallenge) return 'code_challenge (PKCE) is required.'
+    if (codeChallengeMethod !== 'S256') return 'Only code_challenge_method=S256 is supported.'
+    if (!/^[A-Za-z0-9_-]{43}$/.test(codeChallenge)) return 'code_challenge is malformed.'
+    return ''
 }
 
 function cleanupCodes() {
@@ -45,6 +117,8 @@ function cleanupCodes() {
 }
 
 function authorizePage(params: Record<string, string>, error = '') {
+    const redirectHost = params.redirect_uri ? allowedRedirect(params.redirect_uri) : null
+    const redirectLabel = redirectHost ? (redirectHost.host || redirectHost.protocol + '//' + redirectHost.hostname) : ''
     const err = error
         ? `<p class="err">${escapeHtml(error)}</p>`
         : ''
@@ -89,6 +163,7 @@ function authorizePage(params: Record<string, string>, error = '') {
       <button type="submit">Authorize</button>
     </form>
     <p class="meta">Client: ${escapeHtml(params.client_id || CLIENT_ID)}</p>
+    ${redirectLabel ? `<p class="meta">After sign-in you will be sent to: <strong>${escapeHtml(redirectLabel)}</strong></p>` : ''}
   </div>
 </body>
 </html>`
@@ -102,7 +177,7 @@ export function registerOAuthRoutes(app: Express) {
             token_endpoint: `${PUBLIC_BASE}/oauth/token`,
             response_types_supported: ['code'],
             grant_types_supported: ['authorization_code'],
-            code_challenge_methods_supported: ['S256', 'plain'],
+            code_challenge_methods_supported: ['S256'],
             token_endpoint_auth_methods_supported: CLIENT_SECRET
                 ? ['client_secret_post', 'client_secret_basic']
                 : ['none', 'client_secret_post', 'client_secret_basic'],
@@ -143,8 +218,10 @@ export function registerOAuthRoutes(app: Express) {
             res.status(400).type('html').send(authorizePage({ client_id: clientId }, 'Only response_type=code is supported.'))
             return
         }
-        if (!redirectUri) {
-            res.status(400).type('html').send(authorizePage({ client_id: clientId }, 'redirect_uri is required.'))
+        // Reject before rendering the form: never collect a password for a foreign redirect.
+        const paramsError = authorizeParamsError(redirectUri, codeChallenge, codeChallengeMethod)
+        if (paramsError) {
+            res.status(400).type('html').set('Cache-Control', 'no-store').send(authorizePage({ client_id: clientId }, paramsError))
             return
         }
 
@@ -190,7 +267,19 @@ export function registerOAuthRoutes(app: Express) {
 
         console.log('oauth authorize POST', { clientId, email, redirectUri: redirectUri.slice(0, 80) })
 
-        if (!redirectUri || !email || !password) {
+        const paramsError = authorizeParamsError(redirectUri, codeChallenge, codeChallengeMethod)
+        if (paramsError) {
+            res.status(400).type('html').set('Cache-Control', 'no-store').send(authorizePage({ client_id: clientId }, paramsError))
+            return
+        }
+        if (clientId !== CLIENT_ID) {
+            res.status(400).type('html').set('Cache-Control', 'no-store').send(authorizePage({ client_id: clientId }, 'Unknown client_id.'))
+            return
+        }
+        // Validated above, so building the target cannot throw after a backend token exists.
+        const target = allowedRedirect(redirectUri) as URL
+
+        if (!email || !password) {
             res.status(400).type('html').send(authorizePage(params, 'Email and password are required.'))
             return
         }
@@ -216,12 +305,10 @@ export function registerOAuthRoutes(app: Express) {
                 accessToken: payload.token,
                 redirectUri,
                 clientId,
-                codeChallenge: codeChallenge || undefined,
-                codeChallengeMethod: codeChallenge ? codeChallengeMethod : undefined,
+                codeChallenge,
                 expiresAt: Date.now() + CODE_TTL_MS,
             })
 
-            const target = new URL(redirectUri)
             target.searchParams.set('code', code)
             if (state) target.searchParams.set('state', state)
 
@@ -239,6 +326,12 @@ export function registerOAuthRoutes(app: Express) {
         cleanupCodes()
 
         const body = (req.body || {}) as Record<string, unknown>
+        res.set('Cache-Control', 'no-store').set('Pragma', 'no-cache')
+
+        const code = String(body.code || '')
+        const row = authCodes.get(code)
+        // Single attempt per code: any failure below burns it, so a leaked code can't be retried.
+        authCodes.delete(code)
 
         let clientId = String(body.client_id || '')
         let clientSecret = String(body.client_secret || '')
@@ -255,11 +348,11 @@ export function registerOAuthRoutes(app: Express) {
             }
 
         }
+        if (clientId && clientId !== CLIENT_ID) {
+            res.status(401).json({ error: 'invalid_client' })
+            return
+        }
         if (CLIENT_SECRET) {
-            if (clientId && clientId !== CLIENT_ID) {
-                res.status(401).json({ error: 'invalid_client' })
-                return
-            }
             if (clientSecret !== CLIENT_SECRET) {
                 res.status(401).json({ error: 'invalid_client', error_description: 'client_secret mismatch' })
                 return
@@ -272,10 +365,8 @@ export function registerOAuthRoutes(app: Express) {
             return
         }
 
-        const code = String(body.code || '')
         const redirectUri = String(body.redirect_uri || '')
         const codeVerifier = String(body.code_verifier || '')
-        const row = authCodes.get(code)
 
         console.log('oauth token', {
             hasCode: !!row,
@@ -286,8 +377,11 @@ export function registerOAuthRoutes(app: Express) {
         })
 
         if (!row || row.expiresAt <= Date.now()) {
-            authCodes.delete(code)
             res.status(400).json({ error: 'invalid_grant', error_description: 'code unknown or expired' })
+            return
+        }
+        if (row.clientId !== (clientId || CLIENT_ID)) {
+            res.status(400).json({ error: 'invalid_grant', error_description: 'client_id mismatch' })
             return
         }
         if (row.redirectUri !== redirectUri) {
@@ -297,14 +391,10 @@ export function registerOAuthRoutes(app: Express) {
             })
             return
         }
-        if (row.codeChallenge) {
-            if (!codeVerifier || !verifyPkce(codeVerifier, row.codeChallenge, row.codeChallengeMethod)) {
-                res.status(400).json({ error: 'invalid_grant', error_description: 'pkce failed' })
-                return
-            }
+        if (!codeVerifier || !verifyPkce(codeVerifier, row.codeChallenge)) {
+            res.status(400).json({ error: 'invalid_grant', error_description: 'pkce failed' })
+            return
         }
-
-        authCodes.delete(code)
 
         res.json({
             access_token: row.accessToken,

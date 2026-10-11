@@ -55,6 +55,8 @@ class TranscribeTelegramAudioAction
 
         try {
             // Option fields must precede `file` in the multipart body (xAI STT requirement).
+            // No `language`: users speak Ukrainian/English/etc., so let the model auto-detect.
+            // `format=true` is dropped with it because xAI requires `language` for formatting.
             $response = Http::withToken($apiKey)
                 ->timeout((int) config('telegram.timeouts.xai_stt'))
                 ->acceptJson()
@@ -63,14 +65,6 @@ class TranscribeTelegramAudioAction
                     [
                         'name' => 'model',
                         'contents' => $model,
-                    ],
-                    [
-                        'name' => 'format',
-                        'contents' => 'true',
-                    ],
-                    [
-                        'name' => 'language',
-                        'contents' => 'en',
                     ],
                     [
                         'name' => 'keyterm',

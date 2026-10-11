@@ -16,12 +16,18 @@ class UpdateTransactionAction
     {
         Gate::forUser($user)->authorize('update', $transaction);
 
-        $tags = TagIds::forSync($user, $data['tags'] ?? [], $transaction->tags()->pluck('tags.id'));
+        // PATCH without `tags` must keep the current tags; only an explicit key (even [] / null) syncs.
+        $syncTags = array_key_exists('tags', $data);
+        $tags = $syncTags
+            ? TagIds::forSync($user, $data['tags'] ?? [], $transaction->tags()->pluck('tags.id'))
+            : [];
         unset($data['tags']);
 
         $transaction->update($data);
 
-        $transaction->tags()->sync($tags);
+        if ($syncTags) {
+            $transaction->tags()->sync($tags);
+        }
 
         // Reload from DB so the response reflects stored amount (not in-memory input).
         return $transaction->fresh()->load(['tags', 'attachments']);

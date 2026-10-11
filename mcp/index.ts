@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { hostHeaderValidation } from '@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js'
-import { timingSafeEqual } from 'node:crypto'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import express, { type Request, type Response } from 'express'
 import { z } from 'zod'
 import { oauthClientId, oauthClientSecret, oauthPublicBase, registerOAuthRoutes, unauthorizedMcp } from './oauth.ts'
@@ -259,10 +259,8 @@ function createServer(token: string | null) {
             textResult(
                 await api(token, `/tags/${id}`, {
                     method: 'PUT',
-                    body: JSON.stringify({
-                        ...body,
-                        parent_id: body.parent_id ?? null,
-                    }),
+                    // Omitted parent_id must not reset the tag to top level.
+                    body: JSON.stringify(compactPayload(body)),
                 }),
             ),
     )
@@ -385,13 +383,14 @@ function createServer(token: string | null) {
         async ({ id, amount, at, note, tags }) =>
             textResult(
                 await api(token, `/transactions/${id}`, {
-                    method: 'PUT',
+                    // PATCH + omitted tags keeps the current tags (backend syncs only when sent).
+                    method: 'PATCH',
                     body: JSON.stringify(
                         compactPayload({
                             amount,
                             at,
                             note,
-                            tags: tags ?? [],
+                            tags,
                         }),
                     ),
                 }),
@@ -762,15 +761,9 @@ function createServer(token: string | null) {
         async ({ id, ...args }) =>
             textResult(
                 await api(token, `/recurring-transactions/${id}`, {
-                    method: 'PUT',
-                    body: JSON.stringify(
-                        compactPayload({
-                            ...args,
-                            note: args.note,
-                            ends_at: args.ends_at,
-                            tags: args.tags ?? [],
-                        }),
-                    ),
+                    // PATCH + omitted keys (tags especially) leave stored values untouched.
+                    method: 'PATCH',
+                    body: JSON.stringify(compactPayload(args)),
                 }),
             ),
     )
@@ -789,18 +782,20 @@ function createServer(token: string | null) {
         'update_preferences',
         {
             title: 'Update preferences',
-            description: 'Update money/date formatting preferences (moneyFormat locale, dateFormat key, decimals).',
+            description:
+                'Update preferences (moneyFormat locale, dateFormat key, decimals, IANA timezone). Only the fields you pass change.',
             inputSchema: {
-                moneyFormat: z.string().max(32),
-                dateFormat: z.string().max(64),
-                decimals: z.boolean(),
+                moneyFormat: z.string().max(32).optional(),
+                dateFormat: z.string().max(64).optional(),
+                decimals: z.boolean().optional(),
+                timezone: z.string().max(64).optional(),
             },
         },
         async (args) =>
             textResult(
                 await api(token, '/account/preferences', {
                     method: 'PATCH',
-                    body: JSON.stringify(args),
+                    body: JSON.stringify(compactPayload(args)),
                 }),
             ),
     )
@@ -859,7 +854,7 @@ function isBlockedAttachmentHost(hostname: string): boolean {
     if (ipv4) {
         const parts = ipv4.slice(1).map(Number)
         if (parts.some((n) => n > 255)) return true
-        const [a, b] = parts
+        const [a = 0, b = 0] = parts
         if (a === 10 || a === 127 || a === 0) return true
         if (a === 169 && b === 254) return true
         if (a === 172 && b >= 16 && b <= 31) return true
@@ -1025,7 +1020,6 @@ app.get('/', (_req, res) => {
         tools: TOOL_NAMES,
         oauth: {
             client_id: oauthClientId,
-            client_secret: oauthClientSecret || null,
             authorization_endpoint: `${oauthPublicBase}/oauth/authorize`,
             token_endpoint: `${oauthPublicBase}/oauth/token`,
             scopes: ['mcp'],
@@ -1033,6 +1027,34 @@ app.get('/', (_req, res) => {
         },
     })
 })
+
+const TOKEN_CHECK_TTL_MS = 60_000
+const tokenChecks = new Map<string, { valid: boolean; expiresAt: number }>()
+
+async function isTokenValid(token: string): Promise<boolean> {
+    const key = createHash('sha256').update(token).digest('hex')
+    const now = Date.now()
+    const cached = tokenChecks.get(key)
+    if (cached && cached.expiresAt > now) return cached.valid
+
+    let valid: boolean
+    try {
+        const response = await fetch(`${API_URL}/auth/me`, {
+            headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(10_000),
+        })
+        // Only a definite 401 means "re-auth"; backend hiccups should not log users out.
+        valid = response.status !== 401
+        if (!valid || response.ok) tokenChecks.set(key, { valid, expiresAt: now + TOKEN_CHECK_TTL_MS })
+    } catch {
+        return true
+    }
+
+    if (tokenChecks.size > 5000) {
+        for (const [k, row] of tokenChecks) if (row.expiresAt <= now) tokenChecks.delete(k)
+    }
+    return valid
+}
 
 function isPublicMcpMethod(body: unknown): boolean {
     if (!body || typeof body !== 'object' || !('method' in body)) return false
@@ -1059,6 +1081,13 @@ app.post('/mcp', async (req: Request, res: Response) => {
         return
     }
 
+
+    // A revoked/expired token must surface as HTTP 401 so clients re-run OAuth,
+    // instead of every tool call failing with an opaque tool error.
+    if (userToken && !isPublicMcpMethod(req.body) && !(await isTokenValid(userToken))) {
+        unauthorizedMcp(res, req.body?.id ?? null)
+        return
+    }
 
     const server = createServer(token)
     try {

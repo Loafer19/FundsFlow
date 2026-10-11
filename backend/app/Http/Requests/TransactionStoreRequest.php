@@ -17,9 +17,12 @@ class TransactionStoreRequest extends FormRequest
      */
     public function rules(): array
     {
+        // PATCH is a partial update; POST/PUT need the full record.
+        $presence = $this->isMethod('PATCH') ? 'sometimes' : 'required';
+
         return [
-            'at' => 'required|string|date',
-            'amount' => 'required|numeric|not_in:0',
+            'at' => $presence . '|string|date',
+            'amount' => $presence . '|numeric|not_in:0',
             'note' => 'nullable|string|max:255',
             'tags' => 'nullable|array',
             'tags.*' => [

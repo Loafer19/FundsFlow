@@ -34,6 +34,24 @@ Some clients can use OAuth instead of a personal token:
 | Scopes | `mcp` |
 | Token Auth Method | `none` |
 
+PKCE with `S256` is required. `redirect_uri` must be on the allowlist (exact match), otherwise `/oauth/authorize` answers 400 before the sign-in form.
+
+### OAuth redirect URIs
+
+| Redirect URI | Client | Source |
+| --- | --- | --- |
+| `http://127.0.0.1:<any port>/…`, `http://localhost:<any port>/…`, `http://[::1]:<any port>/…` | Claude Code, Cursor desktop (`:8787/callback`), VS Code / Copilot (`:33418/` or ephemeral), MCP Inspector, Windsurf and other native clients | RFC 8252 §7.3; https://claude.com/docs/connectors/building/authentication; https://cursor.com/docs/mcp; https://code.visualstudio.com/api/extension-guides/ai/mcp |
+| `https://claude.ai/api/mcp/auth_callback` | Claude web / desktop / mobile | https://claude.com/docs/connectors/building/authentication |
+| `https://claude.com/api/mcp/auth_callback` | Claude (claude.com domain) | Anthropic docs list claude.ai only; required per Microsoft Learn (Databricks MCP) and vendor guides |
+| `https://chatgpt.com/connector_platform_oauth_redirect` | ChatGPT / Codex (stable) | https://developers.openai.com/apps-sdk/build/auth |
+| `https://chatgpt.com/connector/oauth/<callback_id>` (one `[A-Za-z0-9_-]` segment, no query) | ChatGPT when the server does not return `iss` (our case) | https://developers.openai.com/apps-sdk/build/auth |
+| `https://www.cursor.com/agents/mcp/oauth/callback` | Cursor web / Cursor Agents | https://cursor.com/docs/mcp |
+| `cursor://anysphere.cursor-mcp/oauth/callback` | Cursor desktop, legacy custom scheme | still sent by some builds (forum.cursor.com) |
+| `https://vscode.dev/redirect`, `https://insiders.vscode.dev/redirect` | VS Code / Copilot | https://code.visualstudio.com/api/extension-guides/ai/mcp; VS Code DCR metadata |
+| `https://grok.com/connectors-oauth-exchange-code/` (and without trailing slash) | Grok custom connectors | https://docs.x.com/x-ads-api/mcp ("Grok (web)") |
+
+To add another client set `OAUTH_REDIRECT_ALLOWLIST` (comma-separated full URIs, exact match including path and trailing slash) and restart. If a client fails with "redirect_uri is not allowed", the server log line `oauth authorize GET` shows the URI it sent. Built-in entries live in `DEFAULT_REDIRECT_ALLOWLIST` in `oauth.ts`.
+
 ## Tools
 
 Account, tags, transactions (incl. bulk create + file attachments via base64 or `source_url`), budgets (incl. pause/resume), recurring, preferences, export.
