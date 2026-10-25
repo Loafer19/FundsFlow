@@ -11,7 +11,7 @@ You can use FundsFlow from several places, all backed by the same account:
 
 | Where | Best for |
 | --- | --- |
-| [Web app](/docs/web/overview/) at [fundsflow.fun](https://fundsflow.fun/) | Analytics, calendar, budgets, editing, reports, settings |
+| [Web app](/docs/web/overview/) at [fundsflow.fun](https://fundsflow.fun/) | Analytics, calendar, budgets, editing, reports, settings, and an [AI assistant](/docs/web/assistant/) panel |
 | [Telegram bot](/docs/telegram/overview/) | Logging expenses on the go: text, receipt photos, voice notes, AI questions |
 | [Mini App](/docs/mini-app/) | The web app opened inside Telegram |
 | [MCP server](/docs/ai/mcp/) | Letting an AI assistant (Claude, ChatGPT, Cursor, VS Code, Grok) read and update your data |

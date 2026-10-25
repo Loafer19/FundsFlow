@@ -42,3 +42,5 @@ See [Quick add](/docs/telegram/quick-add/).
 - Switch the period (**Week / Month / Year**) and use the arrows to move between periods.
 - Use **Filter tags** to focus on specific tags or on untagged transactions.
 - Browse the tabs: [Analytics, Calendar, Budgets, Tags, Flow, Trend, List](/docs/web/tabs/).
+- Open ✨ **Assistant** in the header and ask a question like “how much did I spend this month?” — see
+  [AI assistant](/docs/web/assistant/).

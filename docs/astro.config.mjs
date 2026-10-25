@@ -50,6 +50,7 @@ export default defineConfig({
                     label: 'Web app',
                     items: [
                         { slug: 'web/overview' },
+                        { slug: 'web/assistant' },
                         { slug: 'web/transactions' },
                         { slug: 'web/tabs' },
                         { slug: 'web/tags' },

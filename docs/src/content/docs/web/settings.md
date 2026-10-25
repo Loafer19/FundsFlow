@@ -23,7 +23,8 @@ Click **Save** to apply.
 - **Google**, **GitHub**, **Telegram** — linked status. For Telegram, **Open Bot** links your chat
   ([details](/docs/telegram/overview/#link-telegram-to-an-existing-account)).
 - **MCP** — generate a personal token for AI clients. See [MCP](/docs/ai/connect-clients/#personal-token).
-- **AI assists today** — used / limit and the reset time for the Telegram [daily AI limit](/docs/telegram/ai-assistant/#daily-ai-limit).
+- **AI assists today** — used / limit and the reset time for the [daily AI limit](/docs/telegram/ai-assistant/#daily-ai-limit), shared
+  by the Telegram bot and the web [AI assistant](/docs/web/assistant/).
 - **Login credentials** — set an email and password, so you can log in without Telegram, Google, or GitHub. This is also
   what MCP OAuth sign-in uses.
 

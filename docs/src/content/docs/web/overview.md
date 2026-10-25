@@ -14,6 +14,7 @@ The web app lives at [fundsflow.fun](https://fundsflow.fun/).
 | 🏷 **Tags** | [Manage tags](/docs/web/tags/) |
 | ⚙️ **Settings** | [Settings](/docs/web/settings/) |
 | ❓ **Docs** | This documentation |
+| ✨ **Assistant** | [AI assistant](/docs/web/assistant/) chat panel |
 | **Logout** | Sign out |
 
 ## Period and filters

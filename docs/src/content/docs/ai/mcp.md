@@ -21,6 +21,12 @@ groceries last month?”, “add yesterday's receipts”, “create a monthly bu
 
 See [Connect AI clients](/docs/ai/connect-clients/) for step-by-step setup.
 
+:::tip[No setup needed?]
+FundsFlow also has a built-in assistant — the ✨ **Assistant** panel in the [web app](/docs/web/assistant/) and the
+[Telegram bot](/docs/telegram/ai-assistant/). It uses your daily AI assists instead of your own AI client. Use MCP
+when you want to work with FundsFlow from Claude, ChatGPT, Cursor, or another assistant you already use.
+:::
+
 :::note[Signed up with Telegram, Google, or GitHub?]
 OAuth sign-in uses email and password. Set them first in **Settings → Accounts → Login credentials**, or use a
 personal token instead.

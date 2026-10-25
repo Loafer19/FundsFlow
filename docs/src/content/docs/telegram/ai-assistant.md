@@ -19,6 +19,11 @@ Examples:
 The assistant keeps a short conversation context for about 20 minutes, so follow-up questions like “and last month?”
 work. If something is ambiguous it asks a clarifying question, sometimes with suggested reply buttons.
 
+:::tip[Also in the web app]
+The same assistant is in the web app: click ✨ **Assistant** in the header. It streams answers, draws interactive
+charts, and shares the same daily AI limit. See [AI assistant in the web app](/docs/web/assistant/).
+:::
+
 ## What it can do
 
 The assistant works by calling tools on your account.
@@ -72,7 +77,7 @@ AI features share one daily budget of **AI assists**:
 
 - reading a receipt photo with AI,
 - transcribing a voice message,
-- each message handled by the AI assistant (in Telegram or in the web app's **Assistant** panel).
+- each message handled by the AI assistant (in Telegram or in the web app's [Assistant](/docs/web/assistant/) panel).
 
 The default limit is **5 assists per day** (configurable by the operator). The counter resets at **midnight in your
 timezone**. When only a couple are left the bot warns you, and when you run out it tells you that the limit resets at

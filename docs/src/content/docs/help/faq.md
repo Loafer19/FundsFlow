@@ -6,7 +6,8 @@ description: Frequently asked questions about FundsFlow.
 ### Does FundsFlow connect to my bank?
 
 No. You add transactions yourself — in the web app, through the Telegram bot (text, receipt photos, voice), through
-recurring rules, or with an AI assistant over [MCP](/docs/ai/mcp/).
+recurring rules, the built-in [AI assistant](/docs/web/assistant/), or with your own AI client over
+[MCP](/docs/ai/mcp/).
 
 ### Which currency does it use?
 
@@ -23,11 +24,17 @@ Send `/website` to the bot and enter the code on the site, or open the **Web UI*
 OAuth sign-in for AI clients uses FundsFlow email and password. If you signed up with Telegram, Google, or GitHub, set
 them in **Settings → Accounts → Login credentials**, or use a [personal token](/docs/ai/connect-clients/#personal-token).
 
-### The bot says I've used my AI assists for today.
+### Can I ask an AI about my finances in the web app?
 
-The AI limit is shared by receipt reading, voice messages, and the AI assistant, and resets at midnight in your
-timezone. Meanwhile, quick add (`-350 groceries`), receipts with the amount in the caption, commands, and menu buttons
-still work.
+Yes. Click ✨ **Assistant** in the header. It answers questions, draws charts, and proposes changes that you confirm.
+See [AI assistant](/docs/web/assistant/).
+
+### The bot or the web Assistant says I've used my AI assists for today.
+
+The [AI limit](/docs/telegram/ai-assistant/#daily-ai-limit) is shared by receipt reading, voice messages, and the AI
+assistant in Telegram and in the web app, and resets at midnight in your timezone. Meanwhile, quick add
+(`-350 groceries`), receipts with the amount in the caption, commands, and menu buttons still work in Telegram, and the
+**+** button and all tabs still work on the web.
 
 ### The receipt was read wrong.
 
