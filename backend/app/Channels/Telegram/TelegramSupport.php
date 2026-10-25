@@ -3,15 +3,15 @@
 namespace App\Channels\Telegram;
 
 use App\Actions\Tags\ListTagsAction;
+use App\Actions\Tags\MatchTagTitlesAction;
 use App\Models\Identity;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\QuickAddParser;
 use App\Support\UserFormatter;
-use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Throwable;
 
 class TelegramSupport
 {
@@ -41,6 +41,8 @@ class TelegramSupport
     public function __construct(
         private readonly TelegramClient $client,
         private readonly ListTagsAction $listTags,
+        private readonly QuickAddParser $quickAdd,
+        private readonly MatchTagTitlesAction $matchTags,
     ) {}
 
     public function sendWelcome(int|string $chatId, string $headline): void
@@ -494,35 +496,7 @@ class TelegramSupport
      */
     public function matchSuggestedTagTitles(User $user, mixed $titles): array
     {
-        if (!is_array($titles) || $titles === []) {
-            return [];
-        }
-
-        $wanted = [];
-        foreach ($titles as $title) {
-            if (!is_string($title)) {
-                continue;
-            }
-            $normalized = mb_strtolower(trim($title));
-            if ($normalized !== '') {
-                $wanted[$normalized] = true;
-            }
-        }
-
-        if ($wanted === []) {
-            return [];
-        }
-
-        $matched = [];
-        foreach ($this->listTags->execute($user) as $tag) {
-            $key = mb_strtolower(trim((string) $tag->title));
-            if (isset($wanted[$key])) {
-                $matched[] = $tag;
-                unset($wanted[$key]);
-            }
-        }
-
-        return $matched;
+        return $this->matchTags->execute($user, $titles);
     }
 
     /**
@@ -606,19 +580,7 @@ class TelegramSupport
 
     public function parseDate(string $raw): ?string
     {
-        $normalized = substr_count($raw, '.') === 1 ? $raw . '.' . now()->format('Y') : $raw;
-
-        try {
-            $date = Carbon::createFromFormat('d.m.Y', $normalized);
-        } catch (Throwable) {
-            return null;
-        }
-
-        if (!$date || $date->format('d.m.Y') !== $normalized) {
-            return null;
-        }
-
-        return $date->toDateString();
+        return $this->quickAdd->parseDate($raw);
     }
 
     /**
@@ -626,43 +588,6 @@ class TelegramSupport
      */
     public function parseQuickAdd(string $text, ?User $user = null): ?array
     {
-        $date = $user?->todayDateString() ?? now()->toDateString();
-
-        if (preg_match('/^(\d{1,2}\.\d{1,2}(?:\.\d{4})?)\s+(.+)$/u', $text, $dateMatch)) {
-            $parsedDate = $this->parseDate($dateMatch[1]);
-
-            if ($parsedDate === null) {
-                return ['error' => "Couldn't parse that date. Use DD.MM or DD.MM.YYYY"];
-            }
-
-            $date = $parsedDate;
-            $text = $dateMatch[2];
-        }
-
-        if (!preg_match('/^([+-]?\d+(?:[.,]\d{1,2})?)\s*(.*)$/u', $text, $matches)) {
-            return null;
-        }
-
-        $amount = (float) str_replace(',', '.', $matches[1]);
-
-        if (!str_starts_with($matches[1], '+') && !str_starts_with($matches[1], '-')) {
-            $amount = -abs($amount);
-        }
-
-        if ($amount === 0.0) {
-            return ['error' => "Amount can't be zero"];
-        }
-
-        $note = trim($matches[2]);
-
-        if (mb_strlen($note) > 255) {
-            return ['error' => 'Note is too long (255 characters max)'];
-        }
-
-        return [
-            'at' => $date,
-            'amount' => $amount,
-            'note' => $note !== '' ? $note : null,
-        ];
+        return $this->quickAdd->parseQuickAdd($text, $user);
     }
 }

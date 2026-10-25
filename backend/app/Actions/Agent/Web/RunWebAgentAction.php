@@ -14,7 +14,9 @@ use Closure;
  * One web chat turn: quota gate (shared with Telegram), ask_user continuation,
  * agent loop with streaming, then quota + done events.
  *
- * Events emitted: meta, delta, tool, answer, notice, show, chart, ask, confirm, quota, error, done.
+ * Messages with receipt photos (and replies to a receipt question) go to RunWebReceiptAction.
+ *
+ * Events emitted: meta, user, delta, tool, answer, notice, show, chart, ask, confirm, quota, error, done.
  */
 final class RunWebAgentAction
 {
@@ -24,13 +26,16 @@ final class RunWebAgentAction
         private readonly BuildUserChartAction $buildChart,
         private readonly TelegramAiQuota $quota,
         private readonly BuildUserReportAction $buildReport,
+        private readonly RunWebReceiptAction $receipt,
+        private readonly WebAgentUploads $uploads,
     ) {}
 
     /**
      * @param Closure(string, array<string, mixed>): void $emit
      * @param array<string, mixed> $context validated screen context (tab, period, tag filter)
+     * @param list<array{id: string, name: string, mime: string, file_size: int}> $files receipt photos (WebAgentUploads refs)
      */
-    public function execute(User $user, string $message, ?string $conversationId, Closure $emit, array $context = []): void
+    public function execute(User $user, string $message, ?string $conversationId, Closure $emit, array $context = [], array $files = []): void
     {
         $session = new WebAgentSession($user);
         $currentId = $session->conversationId();
@@ -42,6 +47,23 @@ final class RunWebAgentAction
         $message = trim($message);
         $pending = $session->get()['pending'];
         $askContext = null;
+
+        // New photos start a fresh receipt flow: whatever card was waiting (a question or a
+        // Confirm, like stage() does for a new preview) is superseded and its photos dropped.
+        if ($files !== [] && is_array($pending)) {
+            $this->uploads->delete($user, WebAgentUploads::refsIn($pending));
+            $session->setPending(null);
+            $session->patchItems(
+                static fn (array $item): bool => ($item['kind'] ?? null) === 'ask' && ($item['status'] ?? null) === 'pending',
+                ['status' => 'answered'],
+            );
+            $session->patchItems(
+                static fn (array $item): bool => ($item['kind'] ?? null) === 'confirm' && ($item['status'] ?? null) === 'pending',
+                ['status' => 'outdated'],
+            );
+            $pending = null;
+        }
+
         if (is_array($pending) && ($pending['type'] ?? null) === 'agent_ask') {
             $askContext = ['prior_question' => (string) ($pending['prior_question'] ?? '')];
             $session->setPending(null);
@@ -54,7 +76,24 @@ final class RunWebAgentAction
         $history = $session->historyMessages(dropTrailingAsk: $askContext !== null);
 
         $channel = new WebAgentChannel($this->quota, $this->tools, $this->buildChart, $session, $emit, $history, $context, $this->buildReport);
-        $channel->push('user', ['role' => 'user', 'kind' => 'text', 'text' => $message]);
+        $channel->push('user', ['role' => 'user', 'kind' => 'text', 'text' => $message] + ($files !== [] ? ['photos' => count($files)] : []));
+
+        // Receipt photos: the shared receipt flow (quota is checked per analysis, like Telegram).
+        if ($files !== []) {
+            $status = $this->receipt->start($user, $channel, $session, $files, $message);
+            $this->finish($user, $session, $emit, $status);
+
+            return;
+        }
+
+        if (RunWebReceiptAction::isReceiptPending($pending)) {
+            $status = $this->receipt->continue($user, $channel, $session, $pending, $message);
+            if ($status !== null) {
+                $this->finish($user, $session, $emit, $status);
+
+                return;
+            }
+        }
 
         if ((string) config('services.xai.api_key') === '') {
             $this->fail($channel, $emit, 'unavailable', 'AI is not configured on this server.');

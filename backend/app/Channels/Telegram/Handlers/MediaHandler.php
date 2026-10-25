@@ -9,6 +9,7 @@ use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
 use App\Enums\TransactionSource;
 use App\Models\User;
+use App\Support\ReceiptFiles;
 use App\Support\TransactionAttachmentRules;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
@@ -878,24 +879,7 @@ class MediaHandler
      */
     private function pickBestAlbumFile(array $files): array
     {
-        $best = $files[0];
-        $bestScore = -1;
-
-        foreach ($files as $file) {
-            $mime = (string) ($file['mime'] ?? '');
-            $size = (int) ($file['file_size'] ?? 0);
-            $mimeBonus = match ($mime) {
-                'image/jpeg' => 1_000_000_000,
-                'image/png' => 900_000_000,
-                'image/webp' => 800_000_000,
-                default => 0,
-            };
-            $score = $mimeBonus + $size;
-            if ($score > $bestScore) {
-                $bestScore = $score;
-                $best = $file;
-            }
-        }
+        $best = ReceiptFiles::pickBest($files);
 
         return [
             'file_id' => (string) $best['file_id'],

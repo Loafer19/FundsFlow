@@ -115,7 +115,11 @@ export const useAgentStore = defineStore('agent', {
                     break
                 case 'user': {
                     const index = this.items.findIndex((item) => item.id === localUserId)
-                    if (index !== -1 && data.item) this.items[index] = data.item
+                    // Keep the in-memory thumbnails of the photos just sent (the server only stores a count).
+                    if (index !== -1 && data.item) {
+                        const { localImages } = this.items[index]
+                        this.items[index] = localImages ? { ...data.item, localImages } : data.item
+                    }
                     break
                 }
                 case 'delta':
@@ -165,12 +169,20 @@ export const useAgentStore = defineStore('agent', {
             }
         },
 
-        async send(text) {
+        // images: [{ file: Blob (downscaled JPEG), name, url (object URL for the bubble thumbnail) }]
+        async send(text, images = []) {
             const message = String(text ?? '').trim()
-            if (!message || this.isStreaming) return
+            const photos = Array.isArray(images) ? images.filter((image) => image?.file) : []
+            if ((!message && !photos.length) || this.isStreaming) return
 
             const localUserId = `local-${crypto.randomUUID()}`
-            this.items.push({ id: localUserId, role: 'user', kind: 'text', text: message })
+            this.items.push({
+                id: localUserId,
+                role: 'user',
+                kind: 'text',
+                text: message,
+                ...(photos.length ? { photos: photos.length, localImages: photos.map((image) => image.url) } : {}),
+            })
             this.isStreaming = true
             this.draft = ''
             this.status = 'Thinking…'
@@ -178,18 +190,32 @@ export const useAgentStore = defineStore('agent', {
 
             try {
                 const token = localStorage.getItem('token')
-                const response = await fetch(`${apiBase()}/agent/chat`, {
-                    method: 'POST',
-                    headers: {
-                        Accept: 'text/event-stream',
-                        'Content-Type': 'application/json',
-                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                    },
-                    body: JSON.stringify({
+                const headers = {
+                    Accept: 'text/event-stream',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                }
+                let body
+
+                if (photos.length) {
+                    // multipart: the browser sets the boundary, so no Content-Type here.
+                    body = new FormData()
+                    body.append('message', message)
+                    if (this.conversationId) body.append('conversation_id', this.conversationId)
+                    if (this.screenContext) body.append('context', JSON.stringify(this.screenContext))
+                    for (const image of photos) body.append('images[]', image.file, image.name || 'receipt.jpg')
+                } else {
+                    headers['Content-Type'] = 'application/json'
+                    body = JSON.stringify({
                         message,
                         conversation_id: this.conversationId,
                         ...(this.screenContext ? { context: this.screenContext } : {}),
-                    }),
+                    })
+                }
+
+                const response = await fetch(`${apiBase()}/agent/chat`, {
+                    method: 'POST',
+                    headers,
+                    body,
                     signal: controller.signal,
                 })
 
@@ -208,10 +234,11 @@ export const useAgentStore = defineStore('agent', {
                     }
 
                     if (response.status === 429) detail = 'Too many messages. Wait a minute and try again.'
+                    if (response.status === 413) detail = 'Those photos are too large. Try fewer or smaller ones.'
 
                     this.items = this.items.filter((item) => item.id !== localUserId)
                     toasts.error(detail || `Assistant request failed (${response.status}).`)
-                    return
+                    return false
                 }
 
                 const reader = response.body.getReader()
@@ -227,8 +254,10 @@ export const useAgentStore = defineStore('agent', {
 
                 buffer += decoder.decode()
                 parseEvents(`${buffer}\n\n`, (event, data) => this.handleEvent(event, data, localUserId))
+                return true
             } catch (error) {
                 if (error?.name !== 'AbortError') toasts.error('Lost connection to the assistant. Try again.')
+                return true
             } finally {
                 if (this.draft.trim()) {
                     // Stream ended without a final answer event (connection cut): keep what arrived.

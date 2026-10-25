@@ -59,6 +59,7 @@ final class WebAgentChannel implements AgentChannel
         'pause_recurring' => 'Preparing recurring pause',
         'resume_recurring' => 'Preparing recurring resume',
         'delete_recurring' => 'Preparing recurring delete',
+        'read_receipt' => 'Reading receipt',
     ];
 
     /** Web app tabs the drawer may report as screen context. */
@@ -484,8 +485,26 @@ PROMPT;
     }
 
     /**
+     * Progress line in the drawer ("Reading receipt 2 of 3") without a model tool call.
+     */
+    public function status(string $name, string $label): void
+    {
+        ($this->emit)('tool', ['name' => $name, 'label' => $label]);
+    }
+
+    /**
+     * Stage a Confirm card outside the model loop (receipt photos).
+     *
+     * @param array{payload: array<string, mixed>, preview: string} $prepared
+     */
+    public function stageConfirm(string $action, array $prepared): void
+    {
+        $this->stage($action, $prepared);
+    }
+
+    /**
      * One pending slot per conversation: a newer preview replaces the older one,
-     * whose card turns "outdated".
+     * whose card turns "outdated" (and whose receipt photos are deleted).
      *
      * @param array{payload: array<string, mixed>, preview: string} $prepared
      * @return array{ok: bool, control: 'confirm_staged', result: array<string, mixed>}
@@ -493,6 +512,11 @@ PROMPT;
     private function stage(string $action, array $prepared): array
     {
         $pendingId = bin2hex(random_bytes(8));
+
+        $previous = WebAgentUploads::refsIn($this->session->get()['pending']);
+        if ($previous !== []) {
+            app(WebAgentUploads::class)->delete($this->session->user(), $previous);
+        }
 
         $this->session->patchItems(
             static fn (array $item): bool => ($item['kind'] ?? null) === 'confirm' && ($item['status'] ?? null) === 'pending',

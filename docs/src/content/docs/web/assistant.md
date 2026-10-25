@@ -1,6 +1,6 @@
 ---
 title: AI assistant
-description: Ask about your finances in the web app's Assistant panel — streamed answers, charts, cards, and changes you confirm.
+description: Ask about your finances in the web app's Assistant panel — streamed answers, charts, cards, receipt photos, and changes you confirm.
 ---
 
 The web app has a built-in AI assistant: the same finance agent as the
@@ -41,6 +41,12 @@ Answers **stream in** as they're written. While the assistant looks things up yo
 (*Reading tags*, *Building chart*, …). Replies can use light formatting — bold text, lists, inline code — and links
 open in a new tab.
 
+The chat follows new messages only while you're at the bottom of it. Scroll up to reread something and it stays put
+while the answer streams in. A **↓ New messages** button appears above the message box instead (**Jump to latest**
+when nothing new has arrived). Click it to scroll back down, and the chat follows new messages again. Sending a
+message or opening the panel always jumps to the latest message. If your system asks for reduced motion, the jump is
+instant instead of animated.
+
 ## What it can do
 
 The assistant works by calling tools on your account — the same ones as in Telegram, except the Telegram-only menu,
@@ -73,6 +79,38 @@ help, and *open the web app* tools.
 
 Savings goals aren't a FundsFlow feature yet; if you ask, the assistant says so and advises from your real numbers.
 
+## Receipt photos
+
+Send a photo of a receipt and the assistant reads it into a transaction, like
+[receipts in Telegram](/docs/telegram/receipts/):
+
+- **Attach** photos with the 📎 button next to the message box (inside the Telegram mini app it opens your gallery or
+  camera), **drag and drop** them onto the panel, or **paste** an image with **Ctrl+V** (**⌘V**).
+- Up to **5 photos** per message, JPEG, PNG, WebP, or HEIC, up to 10 MB each. Before uploading, each photo is resized
+  to at most 1600 px on its long side and converted to JPEG. HEIC works only where the browser can open it (Safari,
+  for example). Otherwise, send that photo as JPEG.
+- Thumbnails appear above the message box. Remove one with its **✕** before sending.
+- The text you send with the photos works like a Telegram photo caption:
+  - **With an amount** (`-350 groceries`, `12.10 -40 taxi`), the transaction is prepared from that, with no AI and no
+    assist used.
+  - **Without an amount** (`lunch with Anna`), the AI reads the photo and uses your text as a hint.
+- The AI reads the total, the date, and the shop, and suggests tags matched to your existing ones. A **Confirm** card
+  shows the result, for example *🧾 Receipt · -350.00 on 2026-10-25 · Note: Silpo · Tags: 🛒 Groceries · 📎 1 photo*.
+  Nothing is saved until you press **Confirm**. The transaction is then saved with the photos attached, so they show
+  in the transaction's attachments.
+- **Several photos** get a question first: **One transaction** (one long receipt, or a receipt plus its card slip) or
+  **Separate** (a transaction per photo).
+  - **One transaction**: the clearest photo is read (JPEG first, then the largest) and every photo is attached.
+  - **Separate**: each photo is read and one card lists all the transactions, which **Confirm** saves together.
+    A photo without a readable total is skipped and named on the card.
+- **No clear total** (a food photo, a blurry receipt), or no AI assists left: the assistant asks for the amount, with
+  **-100** / **-500** buttons. Type it (`-350`, or `-350 lunch`) or press **Cancel**.
+- In the chat your message shows the photo thumbnails. After a page reload the conversation shows *📷 1 photo* in their
+  place, because the chat history doesn't keep the images. The photos themselves are saved only on the transaction
+  you confirm.
+- Photos are uploaded privately and kept only until you confirm or cancel the card. If you don't, they're deleted when
+  the conversation expires, or when you start a **New chat**.
+
 ## It knows what you're looking at
 
 With each message the panel tells the assistant which tab you're on, the period selected in the date picker, and your
@@ -87,7 +125,7 @@ The assistant never changes your data on its own. A proposed change appears as a
 
 - Nothing is saved until you press **Confirm**. The card then shows the result (for example
   *✅ Saved: -350.00 · 2026-10-25 · 🛒 Groceries*) and the web app refreshes its data.
-- Transactions added this way are marked with the **Web** source.
+- Transactions added this way, including from receipt photos, are marked with the **Web** source.
 - Only the newest proposal can be confirmed. A newer proposal marks the previous card as *outdated*, and each card
   works only once.
 
@@ -101,18 +139,23 @@ The assistant never changes your data on its own. A proposed change appears as a
   waiting for Confirm.
 - While an answer is streaming, the **send** button turns into **stop**. Stop ends the stream in the panel.
 - The assistant answers one message at a time. You can send up to 20 messages per minute; a message can be up to
-  2000 characters.
+  2000 characters, plus up to 5 photos.
 
 ## Daily AI limit
 
 The web assistant shares the [daily AI limit](/docs/telegram/ai-assistant/#daily-ai-limit) with Telegram (receipt
 reading, voice messages, and the Telegram assistant): each message you send counts as one **AI assist**, however many
-lookups it takes. The counter resets at **midnight in your timezone**.
+lookups it takes. Receipt photos count the way they do in Telegram:
+
+- one assist per photo the AI reads (one for **One transaction**, one per photo for **Separate**);
+- nothing when the text has an amount or the AI couldn't read the photo.
+
+The counter resets at **midnight in your timezone**.
 
 The panel header shows how many assists are left today and when they reset, for example **3/5 · resets 00:00** (the
 time is in your timezone and your device's 12/24-hour format). Hover it for a countdown, for example *Resets at
 midnight (Europe/Kyiv), in 4h 12m*. The badge turns yellow when you're running low and red when you're out; at zero the
-message box is disabled and shows *AI assists reset in 4h 12m*. If you were already out when you sent a message, the
+message box and the 📎 button are disabled and the box shows *AI assists reset in 4h 12m*. If you were already out when you sent a message, the
 assistant replies:
 
 > You've used all 5 AI assists for today. They reset at midnight (Europe/Kyiv). Until then, you can still add

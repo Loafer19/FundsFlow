@@ -18,6 +18,11 @@ final class WebAgentSession implements AgentSession
         private readonly User $user,
     ) {}
 
+    public function user(): User
+    {
+        return $this->user;
+    }
+
     /**
      * Full stored state.
      *
@@ -83,6 +88,7 @@ final class WebAgentSession implements AgentSession
 
     /**
      * Append a chat item (role user|assistant, kind text|confirm|ask|chart|show|notice).
+     * A user text item may carry `photos` (count of receipt photos sent with it).
      *
      * @param array<string, mixed> $item
      */
@@ -136,8 +142,10 @@ final class WebAgentSession implements AgentSession
 
         $out = [];
         foreach ($items as $item) {
+            $photos = (int) ($item['photos'] ?? 0);
             $text = match ($item['kind'] ?? 'text') {
-                'text', 'notice' => (string) ($item['text'] ?? ''),
+                'text' => (string) ($item['text'] ?? '') . ($photos > 0 ? " [sent {$photos} receipt photo(s)]" : ''),
+                'notice' => (string) ($item['text'] ?? ''),
                 'ask' => (string) ($item['question'] ?? ''),
                 'confirm' => 'Proposed change (' . ($item['status'] ?? 'pending') . '): ' . (string) ($item['preview'] ?? ''),
                 'chart' => 'Chart shown: ' . (string) ($item['caption'] ?? ''),

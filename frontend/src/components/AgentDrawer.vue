@@ -5,8 +5,9 @@
         <div class="drawer-side z-[60]">
             <label for="agent_drawer" aria-label="Close assistant" class="drawer-overlay" />
 
-            <aside ref="panel" class="bg-base-100 h-dvh w-full sm:w-[28rem] flex flex-col shadow-xl" role="dialog"
-                aria-modal="true" aria-labelledby="agent_drawer_title" @keydown="trapFocus">
+            <aside ref="panel" class="relative bg-base-100 h-dvh w-full sm:w-[28rem] flex flex-col shadow-xl"
+                role="dialog" aria-modal="true" aria-labelledby="agent_drawer_title" @keydown="trapFocus"
+                @dragenter="onDragEnter" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
                 <header class="flex items-center gap-2 px-4 py-3 border-b border-base-300">
                     <Sparkles :size="20" class="text-primary shrink-0" />
                     <h2 id="agent_drawer_title" class="font-semibold">Assistant</h2>
@@ -31,10 +32,12 @@
                     </div>
                 </header>
 
+                <div class="relative flex-1 min-h-0">
                 <!-- role=log is a polite live region; aria-busy holds announcements until a reply is complete. -->
-                <div ref="scroller" class="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-3" role="log"
+                <div ref="scroller" class="h-full overflow-y-auto px-3 py-4" role="log"
                     aria-live="polite" aria-relevant="additions" aria-label="Assistant conversation"
-                    :aria-busy="agent.isStreaming || agent.isLoadingHistory">
+                    :aria-busy="agent.isStreaming || agent.isLoadingHistory" @scroll.passive="onScroll">
+                    <div ref="content" class="flex flex-col gap-3">
                     <div v-if="agent.isLoadingHistory && !agent.items.length" class="flex justify-center py-10">
                         <span class="loading loading-dots" />
                     </div>
@@ -59,7 +62,15 @@
 
                     <template v-for="item in agent.items" :key="item.id">
                         <div v-if="item.role === 'user'" class="chat chat-end">
-                            <div class="chat-bubble chat-bubble-primary whitespace-pre-wrap break-words">{{ item.text }}
+                            <div class="chat-bubble chat-bubble-primary break-words flex flex-col gap-1.5">
+                                <div v-if="item.localImages?.length" class="grid gap-1"
+                                    :class="item.localImages.length > 1 ? 'grid-cols-3' : 'grid-cols-1'">
+                                    <img v-for="(src, index) in item.localImages" :key="src" :src="src"
+                                        :alt="`Receipt photo ${index + 1}`" class="rounded-md object-cover"
+                                        :class="item.localImages.length > 1 ? 'size-20' : 'max-h-48 max-w-full'" />
+                                </div>
+                                <span v-else-if="item.photos" class="text-sm opacity-90">📷 {{ photoLabel(item.photos) }}</span>
+                                <span v-if="item.text" class="whitespace-pre-wrap">{{ item.text }}</span>
                             </div>
                         </div>
 
@@ -129,35 +140,93 @@
                         <span class="loading loading-dots loading-sm" />
                         <span>{{ agent.status || 'Thinking…' }}</span>
                     </div>
+                    </div>
+                </div>
+
+                <!-- Shown while scrolled up; new content no longer yanks the view down. -->
+                <button v-if="showJump" type="button"
+                    class="btn btn-sm rounded-full shadow-lg absolute bottom-3 left-1/2 -translate-x-1/2 gap-1"
+                    :class="hasNew ? 'btn-primary' : 'btn-neutral'"
+                    :aria-label="hasNew ? 'New messages: jump to latest' : 'Jump to latest message'"
+                    @click="jumpToLatest">
+                    <ArrowDown :size="16" aria-hidden="true" />
+                    {{ hasNew ? 'New messages' : 'Jump to latest' }}
+                </button>
                 </div>
 
                 <p class="sr-only" role="status">{{ agent.isStreaming ? agent.status || 'Thinking…' : '' }}</p>
 
-                <form class="border-t border-base-300 p-3 flex gap-2 items-end" @submit.prevent="send(input)">
+                <div v-if="attachments.length || preparing" class="border-t border-base-300 px-3 pt-3 flex flex-wrap gap-2"
+                    role="list" aria-label="Photos to send">
+                    <div v-for="(image, index) in attachments" :key="image.url" class="relative" role="listitem">
+                        <img :src="image.url" :alt="`Photo ${index + 1} to send`"
+                            class="size-16 rounded-lg object-cover border border-base-300" />
+                        <button type="button" class="btn btn-xs btn-circle btn-neutral absolute -top-2 -right-2"
+                            :aria-label="`Remove photo ${index + 1}`" @click="removeAttachment(index)">
+                            <X :size="12" aria-hidden="true" />
+                        </button>
+                    </div>
+                    <div v-for="n in preparing" :key="`preparing-${n}`" class="size-16 rounded-lg skeleton" role="listitem"
+                        aria-label="Preparing photo" />
+                </div>
+
+                <form class="p-3 flex gap-2 items-end" :class="{ 'border-t border-base-300': !attachments.length && !preparing }"
+                    @submit.prevent="send(input)">
+                    <input ref="fileInput" type="file" class="hidden" multiple :accept="ACCEPT" tabindex="-1"
+                        aria-hidden="true" @change="onFilePicked" />
+                    <button type="button" class="btn btn-square btn-ghost tooltip tooltip-top" :data-tip="attachTip"
+                        :aria-label="attachTip" :disabled="attachDisabled" @click="fileInput?.click()">
+                        <Paperclip :size="18" aria-hidden="true" />
+                    </button>
                     <textarea ref="textarea" v-model="input" rows="1" maxlength="2000"
                         class="textarea flex-1 min-h-10 max-h-40 resize-none leading-snug" :placeholder="inputPlaceholder"
                         :disabled="agent.quotaExhausted" aria-label="Message the assistant"
-                        @keydown.enter.exact.prevent="send(input)" @input="autoGrow" />
+                        @keydown.enter.exact.prevent="send(input)" @input="autoGrow" @paste="onPaste" />
                     <button v-if="agent.isStreaming" type="button" class="btn btn-square btn-ghost"
                         aria-label="Stop" @click="agent.stop()">
                         <Square :size="18" />
                     </button>
                     <button v-else type="submit" class="btn btn-square btn-primary" aria-label="Send"
-                        :disabled="!input.trim() || agent.quotaExhausted">
+                        :disabled="(!input.trim() && !attachments.length) || agent.quotaExhausted || preparing > 0">
                         <SendHorizontal :size="18" />
                     </button>
                 </form>
+
+                <div v-if="dragging" class="absolute inset-0 z-10 m-2 rounded-box border-2 border-dashed border-primary
+                    bg-base-100/90 flex flex-col items-center justify-center gap-2 pointer-events-none" aria-hidden="true">
+                    <ImagePlus :size="32" class="text-primary" />
+                    <p class="font-medium">Drop receipt photos</p>
+                    <p class="text-xs text-base-content/60">JPEG, PNG, WebP or HEIC · up to {{ MAX_IMAGES }}</p>
+                </div>
             </aside>
         </div>
     </div>
 </template>
 
 <script setup>
-import { RotateCcw, SendHorizontal, ShieldQuestion, Sparkles, Square, X } from 'lucide-vue-next'
+import {
+    ArrowDown,
+    ImagePlus,
+    Paperclip,
+    RotateCcw,
+    SendHorizontal,
+    ShieldQuestion,
+    Sparkles,
+    Square,
+    X,
+} from 'lucide-vue-next'
 import { computed, defineAsyncComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAgentStore } from '../services/agent.js'
 import { renderMarkdown } from '../services/markdown.js'
+import {
+    ACCEPT,
+    isSupportedImage,
+    MAX_IMAGES,
+    MAX_INPUT_BYTES,
+    prepareReceiptImage,
+} from '../services/receiptImages.js'
 import settings from '../services/settings.js'
+import toasts from '../services/toasts.js'
 import AgentShowCard from './AgentShowCard.vue'
 
 // Chart.js stays out of the main bundle: it loads with the first chart in the chat.
@@ -171,6 +240,8 @@ const agent = useAgentStore()
 
 const input = ref('')
 const scroller = ref(null)
+const content = ref(null)
+const fileInput = ref(null)
 const textarea = ref(null)
 const panel = ref(null)
 const closeButton = ref(null)
@@ -218,6 +289,7 @@ const examples = computed(() => TAB_EXAMPLES[agent.screenContext?.tab] ?? DEFAUL
 
 const ACTION_LABELS = {
     create_transaction: 'New transaction',
+    create_transactions: 'New transactions',
     update_transaction: 'Update transaction',
     delete_transaction: 'Delete transaction',
     create_budget: 'New budget',
@@ -333,13 +405,12 @@ const quotaAriaLabel = computed(() => {
     return `${quota.remaining} of ${quota.limit} AI assists left today${reset}`
 })
 
-const inputPlaceholder = computed(() =>
-    agent.quotaExhausted
-        ? countdown.value
-            ? `AI assists reset in ${countdown.value}`
-            : 'No AI assists left today'
-        : 'Ask anything about your finances…',
-)
+const inputPlaceholder = computed(() => {
+    if (agent.quotaExhausted) {
+        return countdown.value ? `AI assists reset in ${countdown.value}` : 'No AI assists left today'
+    }
+    return attachments.value.length ? 'Note or amount (optional), e.g. -350' : 'Ask anything about your finances…'
+})
 
 // Once midnight passes, pull the fresh counter instead of showing a stale "0 left".
 let refreshedFor = null
@@ -357,22 +428,210 @@ const autoGrow = () => {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
 }
 
-const send = (text) => {
+// --- Receipt photos: paperclip, drag & drop, paste; downscaled to JPEG before upload ---
+
+const attachments = ref([])
+const preparing = ref(0)
+
+const attachDisabled = computed(() => agent.quotaExhausted || attachments.value.length + preparing.value >= MAX_IMAGES)
+
+const attachTip = computed(() => {
+    if (agent.quotaExhausted) return 'No AI assists left today'
+    if (attachments.value.length + preparing.value >= MAX_IMAGES) return `Up to ${MAX_IMAGES} photos per message`
+    return 'Attach receipt photos'
+})
+
+const photoLabel = (count) => `${count} photo${count === 1 ? '' : 's'}`
+
+const addFiles = async (list) => {
+    const files = [...(list ?? [])]
+    if (!files.length) return
+    if (agent.quotaExhausted) {
+        toasts.info('No AI assists left today: photos can be sent again after the reset.')
+        return
+    }
+
+    const images = files.filter(isSupportedImage)
+    if (images.length < files.length) toasts.error('Only JPEG, PNG, WebP or HEIC photos can be attached.')
+
+    const room = MAX_IMAGES - attachments.value.length - preparing.value
+    if (images.length > room) toasts.error(`Up to ${MAX_IMAGES} photos per message.`)
+
+    for (const file of images.slice(0, Math.max(0, room))) {
+        const name = file.name || 'Photo'
+        if (file.size > MAX_INPUT_BYTES) {
+            toasts.error(`${name} is larger than 10 MB.`)
+            continue
+        }
+
+        preparing.value++
+        try {
+            attachments.value.push(await prepareReceiptImage(file))
+        } catch {
+            const heic = /hei[cf]$/i.test(file.type) || /\.hei[cf]$/i.test(name)
+            toasts.error(
+                heic
+                    ? `This browser cannot open HEIC photos (${name}). Send it as JPEG or PNG.`
+                    : `Couldn't read ${name}.`,
+            )
+        } finally {
+            preparing.value--
+        }
+    }
+}
+
+const removeAttachment = (index) => {
+    const [removed] = attachments.value.splice(index, 1)
+    if (removed?.url) URL.revokeObjectURL(removed.url)
+    nextTick(() => textarea.value?.focus())
+}
+
+const onFilePicked = (event) => {
+    addFiles(event.target.files)
+    // Same file can be picked again after removing it.
+    event.target.value = ''
+}
+
+const onPaste = (event) => {
+    const files = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith('image/'))
+    if (!files.length) return
+    event.preventDefault()
+    addFiles(files)
+}
+
+const dragging = ref(false)
+let dragDepth = 0
+const hasFiles = (event) => [...(event.dataTransfer?.types ?? [])].includes('Files')
+
+const onDragEnter = (event) => {
+    if (!hasFiles(event)) return
+    event.preventDefault()
+    dragDepth++
+    dragging.value = !attachDisabled.value
+}
+
+const onDragOver = (event) => {
+    if (!hasFiles(event)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = attachDisabled.value ? 'none' : 'copy'
+}
+
+// Leave and drop always unwind the overlay (some browsers report no types on dragleave).
+const onDragLeave = () => {
+    if (!dragDepth) return
+    dragDepth--
+    if (!dragDepth) dragging.value = false
+}
+
+const onDrop = (event) => {
+    dragDepth = 0
+    dragging.value = false
+    if (!hasFiles(event)) return
+    event.preventDefault()
+    if (!attachDisabled.value) addFiles(event.dataTransfer.files)
+}
+
+// --- Smart auto-scroll: follow new content only while the reader is at the bottom ---
+
+const NEAR_BOTTOM_PX = 80
+let stick = true
+let jumping = false
+let lastHeight = 0
+const showJump = ref(false)
+const hasNew = ref(false)
+
+const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+
+const distanceFromBottom = (el) => el.scrollHeight - el.scrollTop - el.clientHeight
+
+const scrollToBottom = (smooth = false) => {
+    const el = scroller.value
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'auto' })
+}
+
+const onScroll = () => {
+    const el = scroller.value
+    if (!el) return
+    if (distanceFromBottom(el) <= NEAR_BOTTOM_PX) {
+        stick = true
+        jumping = false
+        showJump.value = false
+        hasNew.value = false
+        return
+    }
+    // A smooth jump passes through "not at the bottom" positions: keep following until it lands.
+    if (jumping) return
+    stick = false
+    showJump.value = true
+}
+
+// Content grew (new item, streamed text, chart or photo loaded) or the list got shorter:
+// follow it or flag it.
+const onContentResize = () => {
+    const el = scroller.value
+    if (!el) return
+    const grew = el.scrollHeight > lastHeight
+    lastHeight = el.scrollHeight
+    if (stick) {
+        scrollToBottom()
+        return
+    }
+    if (grew && distanceFromBottom(el) > NEAR_BOTTOM_PX) {
+        hasNew.value = true
+        showJump.value = true
+    }
+}
+
+// The user just sent something or opened the drawer: always go to the latest.
+const stickToBottom = () => {
+    stick = true
+    showJump.value = false
+    hasNew.value = false
+    nextTick(() => scrollToBottom())
+}
+
+const jumpToLatest = () => {
+    stick = true
+    jumping = true
+    showJump.value = false
+    hasNew.value = false
+    scrollToBottom(true)
+    nextTick(() => textarea.value?.focus({ preventScroll: true }))
+}
+
+let resizeObserver = null
+
+watch(
+    () => agent.isOpen,
+    (open) => {
+        if (open) stickToBottom()
+    },
+)
+
+// Fallback where ResizeObserver is missing: the old "on every change" behaviour, gated by stick.
+watch(
+    () => [agent.items.length, agent.draft, agent.status],
+    () => {
+        if (!resizeObserver) nextTick(onContentResize)
+    },
+)
+
+const send = async (text) => {
     const message = String(text ?? '').trim()
-    if (!message || agent.isStreaming) return
-    if (text === input.value) input.value = ''
+    const fromComposer = text === input.value
+    const images = fromComposer ? [...attachments.value] : []
+    if ((!message && !images.length) || agent.isStreaming || (images.length && preparing.value)) return
+    if (fromComposer) {
+        input.value = ''
+        attachments.value = []
+    }
     nextTick(autoGrow)
-    agent.send(message)
+    stickToBottom()
+    const ok = await agent.send(message, images)
+    // Rejected before streaming (422 / 409 / 429): give the photos back instead of losing them.
+    if (ok === false && images.length && !attachments.value.length) attachments.value = images
 }
-
-const scrollToBottom = () => {
-    nextTick(() => {
-        const el = scroller.value
-        if (el) el.scrollTop = el.scrollHeight
-    })
-}
-
-watch(() => [agent.items.length, agent.draft, agent.status, agent.isOpen], scrollToBottom)
 
 // --- Keyboard: "/" or Cmd/Ctrl+K opens and focuses the input, Esc closes and restores focus ---
 
@@ -468,10 +727,19 @@ watch(
     },
 )
 
-onMounted(() => document.addEventListener('keydown', onGlobalKeydown))
+onMounted(() => {
+    document.addEventListener('keydown', onGlobalKeydown)
+    if (typeof ResizeObserver !== 'undefined' && content.value) {
+        resizeObserver = new ResizeObserver(onContentResize)
+        resizeObserver.observe(content.value)
+        // The list also shrinks when the composer grows (photo previews, a taller textarea).
+        if (scroller.value) resizeObserver.observe(scroller.value)
+    }
+})
 
 onBeforeUnmount(() => {
     document.removeEventListener('keydown', onGlobalKeydown)
+    resizeObserver?.disconnect()
     clearTimeout(focusTimer)
     stopTicker()
 })

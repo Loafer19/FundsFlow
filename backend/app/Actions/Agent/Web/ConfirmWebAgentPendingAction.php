@@ -4,10 +4,13 @@ namespace App\Actions\Agent\Web;
 
 use App\Actions\Agent\AgentPlanningTools;
 use App\Actions\Agent\AgentToolExecutor;
+use App\Actions\Transactions\StoreTransactionAttachmentAction;
 use App\Enums\TransactionSource;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Support\UserFormatter;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -22,6 +25,8 @@ final class ConfirmWebAgentPendingAction
 
     public function __construct(
         private readonly AgentToolExecutor $tools,
+        private readonly WebAgentUploads $uploads,
+        private readonly StoreTransactionAttachmentAction $storeAttachment,
     ) {}
 
     /**
@@ -45,8 +50,11 @@ final class ConfirmWebAgentPendingAction
         }
 
         $session->setPending(null);
+        // Receipt photos are only needed until the card is resolved (copied as attachments on confirm).
+        $photos = WebAgentUploads::refsIn($pending);
 
         if ($action === 'cancel') {
+            $this->uploads->delete($user, $photos);
             $this->markCard($session, $pendingId, 'cancelled');
             $session->setSummary('Agent mutation cancelled.');
 
@@ -61,6 +69,7 @@ final class ConfirmWebAgentPendingAction
                 'create_tags' => $this->createTags($user, $session, $payload),
                 'rename_tags' => $this->renameTags($user, $session, $payload),
                 'create_transaction' => $this->createTransaction($user, $payload),
+                'create_transactions' => $this->createTransactions($user, $payload),
                 'update_transaction' => $this->updateTransaction($user, $payload),
                 'delete_transaction' => $this->deleteTransaction($user, $payload),
                 'create_budget' => $this->createBudget($user, $payload),
@@ -74,6 +83,8 @@ final class ConfirmWebAgentPendingAction
                 'message' => $e->getMessage(),
             ]);
             [$ok, $message, $summary] = [false, 'Could not apply that change; nothing was saved.', 'Agent mutation failed.'];
+        } finally {
+            $this->uploads->delete($user, $photos);
         }
 
         $this->markCard($session, $pendingId, $ok ? 'confirmed' : 'failed');
@@ -133,9 +144,71 @@ final class ConfirmWebAgentPendingAction
      */
     private function createTransaction(User $user, array $payload): array
     {
-        $tx = $this->tools->applyCreateTransaction($user, $payload, TransactionSource::Web);
+        $tx = DB::transaction(function () use ($user, $payload): Transaction {
+            $tx = $this->tools->applyCreateTransaction($user, $payload, TransactionSource::Web);
+            $this->attachPhotos($user, $tx, $payload['files'] ?? []);
 
-        return [true, $this->txLine($user, '✅ Saved', $tx), 'Transaction created via agent confirm.'];
+            return $tx;
+        });
+
+        return [true, $this->txLine($user, '✅ Saved', $tx) . $this->photoSuffix($tx), 'Transaction created via agent confirm.'];
+    }
+
+    /**
+     * Several receipts at once ("Separate" photos): all or nothing.
+     *
+     * @param array<string, mixed> $payload
+     * @return array{0: bool, 1: string, 2: string}
+     */
+    private function createTransactions(User $user, array $payload): array
+    {
+        $rows = array_values(array_filter(is_array($payload['transactions'] ?? null) ? $payload['transactions'] : [], 'is_array'));
+        if ($rows === []) {
+            return [false, 'Nothing to confirm.', 'Nothing to confirm.'];
+        }
+
+        $created = DB::transaction(function () use ($user, $rows): array {
+            $out = [];
+            foreach ($rows as $row) {
+                $tx = $this->tools->applyCreateTransaction($user, $row, TransactionSource::Web);
+                $this->attachPhotos($user, $tx, $row['files'] ?? []);
+                $out[] = $tx;
+            }
+
+            return $out;
+        });
+
+        $lines = array_map(fn (Transaction $tx): string => '• ' . substr($this->txLine($user, '•', $tx), strlen('•: ')) . $this->photoSuffix($tx), $created);
+
+        return [true, '✅ Saved ' . count($created) . " transactions:\n" . implode("\n", $lines), 'Transactions created via agent confirm.'];
+    }
+
+    /**
+     * Copy staged receipt photos onto the transaction (same rules as any attachment).
+     */
+    private function attachPhotos(User $user, Transaction $tx, mixed $refs): void
+    {
+        foreach (is_array($refs) ? $refs : [] as $ref) {
+            if (!is_array($ref)) {
+                continue;
+            }
+            $contents = $this->uploads->read($user, $ref);
+            if ($contents === null) {
+                continue; // expired / pruned: save the transaction without it
+            }
+            $this->storeAttachment->execute($user, $tx, [
+                'name' => (string) ($ref['name'] ?? 'receipt'),
+                'mime' => (string) ($ref['mime'] ?? ''),
+                'contents' => $contents,
+            ]);
+        }
+    }
+
+    private function photoSuffix(Transaction $tx): string
+    {
+        $count = $tx->attachments()->count();
+
+        return $count > 0 ? ' · 📎 ' . $count : '';
     }
 
     /**

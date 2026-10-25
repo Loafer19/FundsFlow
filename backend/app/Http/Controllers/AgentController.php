@@ -6,6 +6,7 @@ use App\Actions\Agent\Web\ConfirmWebAgentPendingAction;
 use App\Actions\Agent\Web\RunWebAgentAction;
 use App\Actions\Agent\Web\WebAgentChannel;
 use App\Actions\Agent\Web\WebAgentSession;
+use App\Actions\Agent\Web\WebAgentUploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -23,15 +24,33 @@ class AgentController extends Controller
     public function __construct(
         private readonly RunWebAgentAction $run,
         private readonly ConfirmWebAgentPendingAction $confirm,
+        private readonly WebAgentUploads $uploads,
     ) {}
 
     /**
      * POST /api/agent/chat — Server-Sent Events stream of one assistant turn.
+     *
+     * JSON, or multipart/form-data when receipt photos are attached: `images[]` (up to
+     * WebAgentUploads::MAX_FILES, JPEG/PNG/WebP sniffed from the bytes, 8 MB each), the
+     * message is then optional (it works like a Telegram photo caption) and `context`
+     * may be a JSON string.
      */
     public function chat(Request $request): StreamedResponse|JsonResponse
     {
+        if (is_string($request->input('context'))) {
+            $decoded = json_decode((string) $request->input('context'), true);
+            $request->merge(['context' => is_array($decoded) ? $decoded : null]);
+        }
+
         $data = $request->validate([
-            'message' => ['required', 'string', 'max:' . max(1, (int) config('agent.web_message_max_chars'))],
+            'message' => ['nullable', 'string', 'max:' . max(1, (int) config('agent.web_message_max_chars'))],
+            'images' => ['nullable', 'array', 'max:' . WebAgentUploads::MAX_FILES],
+            'images.*' => [
+                'bail',
+                'file',
+                'max:' . intdiv(WebAgentUploads::MAX_BYTES, 1024),
+                'mimetypes:' . implode(',', array_keys(WebAgentUploads::MIMES)),
+            ],
             'conversation_id' => ['nullable', 'string', 'max:64'],
             'context' => ['nullable', 'array'],
             'context.tab' => ['nullable', 'string', 'in:' . implode(',', WebAgentChannel::CONTEXT_TABS)],
@@ -41,24 +60,45 @@ class AgentController extends Controller
             'context.tag_ids' => ['nullable', 'array', 'max:50'],
             'context.tag_ids.*' => ['integer', 'min:1'],
             'context.untagged' => ['nullable', 'boolean'],
+        ], [
+            'images.max' => 'Send up to ' . WebAgentUploads::MAX_FILES . ' photos at a time.',
+            'images.*.file' => 'That photo could not be uploaded. Try again.',
+            'images.*.uploaded' => 'Each photo must be ' . intdiv(WebAgentUploads::MAX_BYTES, 1024 * 1024) . ' MB or smaller.',
+            'images.*.max' => 'Each photo must be ' . intdiv(WebAgentUploads::MAX_BYTES, 1024 * 1024) . ' MB or smaller.',
+            'images.*.mimetypes' => 'Only JPEG, PNG and WebP photos are supported.',
         ]);
 
         $user = $request->user();
         $context = $this->screenContext(is_array($data['context'] ?? null) ? $data['context'] : []);
-        $message = trim((string) $data['message']);
-        if ($message === '') {
+        $message = trim((string) ($data['message'] ?? ''));
+        $images = $request->file('images', []);
+        $images = is_array($images) ? array_values($images) : [];
+        if ($message === '' && $images === []) {
             return response()->json(['message' => 'The message field is required.'], 422);
+        }
+
+        // Private temp copies; the receipt flow attaches them on Confirm and deletes them.
+        $files = [];
+        try {
+            foreach ($images as $image) {
+                $files[] = $this->uploads->store($user, $image);
+            }
+        } catch (Throwable $e) {
+            $this->uploads->delete($user, $files);
+            throw $e;
         }
 
         // One running turn per user (double submit / several tabs).
         $lock = Cache::lock('web_agent_run:' . $user->id, self::RUN_LOCK_SECONDS);
         if (!$lock->get()) {
+            $this->uploads->delete($user, $files);
+
             return response()->json(['message' => 'The assistant is still answering your previous message.'], 409);
         }
 
         $conversationId = isset($data['conversation_id']) ? (string) $data['conversation_id'] : null;
 
-        return response()->stream(function () use ($user, $message, $conversationId, $context, $lock): void {
+        return response()->stream(function () use ($user, $message, $conversationId, $context, $lock, $files): void {
             ignore_user_abort(true);
             @set_time_limit(self::RUN_LOCK_SECONDS);
 
@@ -80,7 +120,7 @@ class AgentController extends Controller
                 }
                 flush();
 
-                $this->run->execute($user, $message, $conversationId, $emit(...), $context);
+                $this->run->execute($user, $message, $conversationId, $emit(...), $context, $files);
             } catch (Throwable $e) {
                 Log::error('AgentController: chat stream failed', ['message' => $e->getMessage()]);
                 $emit('error', ['code' => 'server_error', 'message' => 'Something went wrong. Please try again.']);
@@ -165,6 +205,7 @@ class AgentController extends Controller
         $user = $request->user();
         $session = new WebAgentSession($user);
         $session->clear();
+        $this->uploads->deleteAll($user);
 
         return response()->json([
             'ok' => true,
