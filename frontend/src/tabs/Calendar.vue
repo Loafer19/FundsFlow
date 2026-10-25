@@ -36,24 +36,11 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-3 items-start">
+        <div class="grid grid-cols-1 gap-3 items-start" :class="{ 'lg:grid-cols-[1fr_300px]': dateSelectionType !== 'year' }">
             <div class="card card-border border-base-300 bg-base-100">
                 <div class="card-body p-3 sm:p-6">
-                    <div v-if="dateSelectionType === 'year'" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                        <button v-for="m in yearMonths" :key="m.month" type="button"
-                            class="card card-border border-base-300 text-left p-3 hover:border-primary"
-                            :aria-label="monthName(m.start)" @click="jumpToMonth(m)">
-                            <div class="font-semibold mb-1">{{ monthName(m.start) }}</div>
-                            <div v-if="m.income || m.expense" class="text-sm">
-                                <span v-if="m.income" class="text-success">+{{ formatMoney(m.income) }}</span>
-                                <span v-if="m.expense" class="text-error"> −{{ formatMoney(m.expense) }}</span>
-                            </div>
-                            <div v-else class="text-sm text-base-content/60">No activity</div>
-                            <div v-if="m.upcomingCount" class="text-xs text-base-content/60 mt-1">
-                                {{ m.upcomingCount }} upcoming
-                            </div>
-                        </button>
-                    </div>
+                    <CalendarYearMonths v-if="dateSelectionType === 'year'" :months="yearMonths"
+                        @pick="jumpToMonth" />
 
                     <template v-else>
                         <div class="grid grid-cols-7 gap-0.5 sm:gap-1 mb-1 text-[10px] sm:text-xs font-medium text-base-content/60 text-center">
@@ -189,6 +176,7 @@
 <script setup>
 import { FileText, Image as ImageIcon, Plus } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
+import CalendarYearMonths from '../components/CalendarYearMonths.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { formatDate, formatMoney, nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 
@@ -375,23 +363,30 @@ const yearMonths = computed(() => {
     if (props.dateSelectionType !== 'year') return []
 
     const year = new Date(props.dateRange.currentStart).getFullYear()
+    const today = parseLocalDate(todayStr.value)
+    const sum = (items, sign) =>
+        items.filter((i) => Math.sign(i.amount) === sign).reduce((s, i) => s + Math.abs(i.amount), 0)
 
     return Array.from({ length: 12 }, (_, month) => {
         const start = new Date(year, month, 1)
         const end = new Date(year, month + 1, 0)
         const items = itemsInRange(start, end)
+        const actual = items.filter((i) => i.actual)
+        const upcoming = items.filter((i) => !i.actual)
 
         return {
             month,
             start,
-            income: items.filter((i) => i.actual && i.amount > 0).reduce((sum, i) => sum + i.amount, 0),
-            expense: items.filter((i) => i.actual && i.amount < 0).reduce((sum, i) => sum - i.amount, 0),
-            upcomingCount: items.filter((i) => !i.actual).length,
+            income: sum(actual, 1),
+            expense: sum(actual, -1),
+            upcomingIncome: sum(upcoming, 1),
+            upcomingExpense: sum(upcoming, -1),
+            upcomingCount: upcoming.length,
+            isCurrent: year === today.getFullYear() && month === today.getMonth(),
+            isFuture: start > today,
         }
     })
 })
-
-const monthName = (date) => date.toLocaleDateString('en-US', { month: 'long' })
 
 const itemAriaLabel = (item) => {
     const amount = `${item.amount > 0 ? '+' : ''}${formatMoney(item.amount)}`
