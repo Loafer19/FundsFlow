@@ -42,5 +42,7 @@ When you send several photos as one album, the bot waits a few seconds to collec
 - **One transaction** — all photos (up to 5) are attached to a single transaction. If the album caption has an amount,
   it is saved immediately; otherwise AI reads the best photo and shows a draft.
 - **Separate** — each photo is processed as its own receipt, one after another (*Processing 1 of N…*).
+  A photo the bot can't download is skipped with a message naming it (*Photo 2 couldn't be read and was skipped…*),
+  and the next one is processed.
 
 Pending receipts and drafts expire after about 15 minutes; send the photo again if a card says it is outdated.

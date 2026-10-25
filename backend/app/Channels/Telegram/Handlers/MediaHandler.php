@@ -274,11 +274,11 @@ class MediaHandler
             : null;
 
         if ($files !== []) {
-            $this->putAlbumQueue($chatId, $files, $hint);
+            $this->putAlbumQueue($chatId, $files, $hint, $total);
         }
 
         $this->client->sendMessage($chatId, "Processing 1 of {$total}…");
-        $this->handleReceiptWithoutAmount($user, $chatId, $first, $hint);
+        $this->handleReceiptWithoutAmount($user, $chatId, $first, $hint, albumPhoto: 1);
     }
 
     /**
@@ -302,14 +302,15 @@ class MediaHandler
 
         $next = array_shift($files);
         $hint = isset($queue['caption_hint']) && is_string($queue['caption_hint']) ? $queue['caption_hint'] : null;
+        $total = (int) ($queue['total'] ?? 0);
+        $remaining = count($files);
 
         if ($files === []) {
             Cache::forget($this->albumQueueKey($chatId));
         } else {
-            $this->putAlbumQueue($chatId, $files, $hint);
+            $this->putAlbumQueue($chatId, $files, $hint, $total);
         }
 
-        $remaining = count($files);
         $this->client->sendMessage(
             $chatId,
             $remaining > 0
@@ -317,12 +318,20 @@ class MediaHandler
                 : 'Last receipt from the album…',
         );
 
-        $this->handleReceiptWithoutAmount($user, $chatId, $next, $hint);
+        $this->handleReceiptWithoutAmount(
+            $user,
+            $chatId,
+            $next,
+            $hint,
+            albumPhoto: $total > $remaining ? $total - $remaining : null,
+        );
     }
 
     /**
      * @param array{file_id: string, name: string, mime: string, file_size: int} $file
      * @param list<array{file_id: string, name: string, mime: string, file_size?: int}>|null $allFiles
+     * @param int|null $albumPhoto 1-based number of this photo in a "Separate" album: a photo that can't be
+     *        downloaded is then skipped with a message naming it, and the next one is processed
      */
     private function handleReceiptWithoutAmount(
         User $user,
@@ -330,6 +339,7 @@ class MediaHandler
         array $file,
         ?string $captionHint,
         ?array $allFiles = null,
+        ?int $albumPhoto = null,
     ): void {
         $attachmentFiles = $allFiles ?? [$file];
 
@@ -351,9 +361,15 @@ class MediaHandler
 
         $this->client->sendMessage($chatId, 'Reading receipt…');
 
-        $downloaded = $this->downloadTelegramFile($chatId, $file);
+        $downloaded = $this->downloadTelegramFile($chatId, $file, notify: $albumPhoto === null);
 
         if ($downloaded === null) {
+            if ($albumPhoto !== null) {
+                // Otherwise the rest of the album would wait for a Confirm that never comes.
+                $this->client->sendMessage($chatId, "Photo {$albumPhoto} couldn't be read and was skipped. Send it again with the amount, like -350 groceries.");
+                $this->continueAlbumQueue($user, $chatId);
+            }
+
             return;
         }
 
@@ -903,11 +919,12 @@ class MediaHandler
     /**
      * @param list<array{file_id: string, name: string, mime: string, file_size?: int}> $files
      */
-    private function putAlbumQueue(int|string $chatId, array $files, ?string $captionHint): void
+    private function putAlbumQueue(int|string $chatId, array $files, ?string $captionHint, int $total = 0): void
     {
         Cache::put($this->albumQueueKey($chatId), [
             'files' => array_values($files),
             'caption_hint' => $captionHint,
+            'total' => $total,
         ], now()->addMinutes((int) config('telegram.pending_ttl_minutes')));
     }
 

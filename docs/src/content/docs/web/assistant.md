@@ -114,7 +114,8 @@ Send a photo of a receipt and the assistant reads it into a transaction, like
   **Separate** (a transaction per photo).
   - **One transaction**: the clearest photo is read (JPEG first, then the largest) and every photo is attached.
   - **Separate**: each photo is read and one card lists all the transactions, which **Confirm** saves together.
-    A photo without a readable total is skipped and named on the card.
+    A photo that can't be read or has no clear total is skipped, and the assistant says so before the card, for
+    example *Photo 2 couldn't be read and was skipped. Send it again with the amount, like -350 groceries.*
 - **No clear total** (a food photo, a blurry receipt), or no AI assists left: the assistant asks for the amount, with
   **-100** / **-500** buttons. Type it (`-350`, or `-350 lunch`) or press **Cancel**.
 - In the chat your message shows the photo thumbnails. After a page reload the conversation shows *📷 1 photo* in their

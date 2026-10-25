@@ -227,7 +227,8 @@ final class RunWebReceiptAction
 
     /**
      * "Separate": vision on every photo, one staged transaction each. Photos without a readable
-     * total (or past the quota) are skipped and named in the preview.
+     * total (or past the quota) are skipped, and a notice before the Confirm card names them
+     * ("Photo 2 couldn't be read and was skipped").
      *
      * @param list<array<string, mixed>> $files
      */
@@ -273,21 +274,26 @@ final class RunWebReceiptAction
             $rows[$n] = $prepared['payload'] + ['files' => [$file]];
         }
 
-        $skippedText = $skipped === [] ? '' : "\nSkipped: " . implode('; ', array_map(
-            static fn (int $n, string $why): string => "photo {$n} ({$why})",
-            array_keys($skipped),
-            $skipped,
-        )) . '. Send those again with the amount, like -350 groceries.';
-
         if ($rows === []) {
-            $message = !$this->analyze->hasQuota($user)
-                ? $this->analyze->quota()->exhaustedMessage($user, 'Until then, send each photo with the amount in the message, like -350 groceries.')
-                : "Couldn't read a total on these photos. Send them one by one with the amount, like -350 groceries.";
+            $message = self::skippedText($skipped) . ' ' . ($this->analyze->hasQuota($user)
+                ? 'Send them one by one with the amount, like -350 groceries.'
+                : $this->analyze->quota()->exhaustedMessage($user, 'Until then, send each photo with the amount in the message, like -350 groceries.'));
 
             return $this->notice($channel, $session, $message, 'error');
         }
 
-        if (count($rows) === 1 && $skipped === []) {
+        // Skipped photos are said in the reply (not only on the card), before the Confirm card.
+        if ($skipped !== []) {
+            $channel->push('notice', [
+                'role' => 'assistant',
+                'kind' => 'notice',
+                'tone' => 'warning',
+                'text' => self::skippedText($skipped) . ' Send ' . (count($skipped) === 1 ? 'it' : 'them')
+                    . ' again with the amount, like -350 groceries.',
+            ]);
+        }
+
+        if (count($rows) === 1) {
             $row = array_values($rows)[0];
 
             return $this->stageOne($user, $channel, (float) $row['amount'], (string) $row['at'], $row['note'], $row['tag_ids'], $row['files']);
@@ -300,10 +306,37 @@ final class RunWebReceiptAction
 
         $channel->stageConfirm('create_transactions', [
             'payload' => ['transactions' => array_values($rows)],
-            'preview' => '🧾 ' . count($rows) . " receipts:\n" . implode("\n", $lines) . $skippedText,
+            'preview' => '🧾 ' . count($rows) . " receipts:\n" . implode("\n", $lines),
         ]);
 
         return 'confirm_staged';
+    }
+
+    /**
+     * "Photo 2 couldn't be read and was skipped. Photos 3 and 4 have no clear total and were skipped."
+     *
+     * @param array<int, string> $skipped photo number => reason
+     */
+    public static function skippedText(array $skipped): string
+    {
+        $byReason = [];
+        foreach ($skipped as $n => $why) {
+            $byReason[$why][] = (int) $n;
+        }
+
+        $sentences = [];
+        foreach ($byReason as $why => $numbers) {
+            $one = count($numbers) === 1;
+            $last = array_pop($numbers);
+            $label = ($one ? 'Photo ' : 'Photos ') . ($numbers === [] ? $last : implode(', ', $numbers) . ' and ' . $last);
+            $sentences[] = $label . match ($why) {
+                'no clear total' => $one ? ' has no clear total and was skipped.' : ' have no clear total and were skipped.',
+                'no AI assists left' => ($one ? ' was' : ' were') . ' skipped: no AI assists left today.',
+                default => $one ? " couldn't be read and was skipped." : " couldn't be read and were skipped.",
+            };
+        }
+
+        return implode(' ', $sentences);
     }
 
     /**

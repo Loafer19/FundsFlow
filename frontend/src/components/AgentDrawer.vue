@@ -361,6 +361,7 @@ const noticeClass = (tone) =>
     ({
         error: 'alert-error',
         success: 'alert-success',
+        warning: 'alert-warning',
         muted: '',
     })[tone] ?? 'alert-info'
 
