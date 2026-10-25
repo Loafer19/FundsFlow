@@ -47,9 +47,14 @@
     }
     </script>
 
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="preconnect" href="%VITE_API_URL%" crossorigin>
+
+    <!-- defer keeps the order (SDK before main.js) without blocking HTML parsing on telegram.org. -->
+    <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
     <script type="module" src="/src/main.js"></script>
-    <script src="/theme-init.js"></script>
+    <!-- Inline so the theme is set before first paint without a render-blocking request.
+         The CSP allows it by hash, computed at image build time (docker/csp-hashes.mjs). -->
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'bumblebee')</script>
 </head>
 
 <body class="bg-base-200">

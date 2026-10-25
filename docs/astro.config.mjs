@@ -2,8 +2,8 @@
 import starlight from '@astrojs/starlight'
 import { defineConfig } from 'astro/config'
 
-// Served by the frontend nginx container at https://fundsflow.fun/docs/
-// (see docker/frontend and docker/nginx.conf).
+// Served by the frontend Caddy container at https://fundsflow.fun/docs/
+// (see docker/frontend and docker/Caddyfile.frontend).
 export default defineConfig({
     site: 'https://fundsflow.fun',
     base: '/docs',

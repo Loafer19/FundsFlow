@@ -14,6 +14,10 @@ RUN bun i
 
 RUN bun run prod
 
+# CSP hashes of inline scripts, then brotli/gzip and content-hash ETag sidecars for Caddy's file_server.
+COPY docker/csp-hashes.mjs docker/precompress.mjs /tmp/
+RUN bun /tmp/csp-hashes.mjs /app/dist /app/csp.env APP_SCRIPT_HASHES && bun /tmp/precompress.mjs /app/dist
+
 FROM oven/bun:latest AS docs
 
 WORKDIR /docs
@@ -26,13 +30,29 @@ COPY docs /docs
 
 RUN bun run build
 
-FROM nginx:alpine
+# CSP hashes of Starlight's inline scripts, then the same sidecars as the app.
+COPY docker/csp-hashes.mjs docker/precompress.mjs /tmp/
+RUN bun /tmp/csp-hashes.mjs /docs/dist /docs/csp.env DOCS_SCRIPT_HASHES && bun /tmp/precompress.mjs /docs/dist
 
-COPY docker/nginx.conf /etc/nginx/nginx.conf
-COPY docker/security-headers.conf /etc/nginx/security-headers.conf
-COPY docker/security-headers-docs.conf /etc/nginx/security-headers-docs.conf
+FROM caddy:2.11-alpine
 
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY --from=docs /docs/dist /usr/share/nginx/html/docs
+ARG VITE_API_URL
+
+COPY docker/Caddyfile.frontend /etc/caddy/Caddyfile
+COPY --from=builder /app/csp.env /tmp/app-csp.env
+COPY --from=docs /docs/csp.env /tmp/docs-csp.env
+
+# connect-src gets the origin of VITE_API_URL, so the CSP always matches the API the bundle calls.
+RUN cat /tmp/app-csp.env /tmp/docs-csp.env > /etc/caddy/csp.env && rm /tmp/app-csp.env /tmp/docs-csp.env \
+    && printf 'API_ORIGIN=%s\n' "$(printf '%s' "$VITE_API_URL" | sed -E 's#^(https?://[^/]+).*#\1#')" >> /etc/caddy/csp.env \
+    && caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile --envfile /etc/caddy/csp.env
+
+COPY --from=builder /app/dist /srv
+COPY --from=docs /docs/dist /srv/docs
 
 EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget -q --spider http://127.0.0.1/ || exit 1
+
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile", "--envfile", "/etc/caddy/csp.env"]
