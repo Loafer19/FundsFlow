@@ -148,9 +148,13 @@ The assistant never changes your data on its own. A proposed change appears as a
 - The chat keeps your conversation for **60 minutes after your last message**, so follow-ups like “and last month?”
   work. The assistant uses the last 12 messages as context. Reopening the panel (or the site on another device) shows
   the same conversation.
-- The web chat is separate from your Telegram conversation.
+- The assistant's memory is shared with your private chat with the [Telegram bot](/docs/telegram/ai-assistant/):
+  it sees recent Telegram messages too, including quick adds and receipts saved there (the panel shows only what you
+  wrote here), so you can start in Telegram and continue here. A proposal waiting for Confirm in Telegram can only be
+  confirmed there; ask here and the assistant proposes it again.
 - **New chat** (the ↺ button in the panel header) clears the conversation, including any proposal that's still
-  waiting for Confirm.
+  waiting for Confirm, and the memory shared with Telegram. `/reset` in Telegram clears the shared memory too (the
+  messages in this panel stay visible).
 - While an answer is streaming, the **send** button turns into **stop**. Stop ends the stream in the panel.
 - The assistant answers one message at a time. You can send up to 20 messages per minute; a message can be up to
   2000 characters, plus up to 5 photos.

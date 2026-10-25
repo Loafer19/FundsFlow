@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Agent\AgentHistory;
 use App\Actions\Agent\Web\ConfirmWebAgentPendingAction;
 use App\Actions\Agent\Web\RunWebAgentAction;
 use App\Actions\Agent\Web\WebAgentChannel;
@@ -260,13 +261,16 @@ class AgentController extends Controller
     }
 
     /**
-     * DELETE /api/agent/conversation — forget the conversation (pending previews included).
+     * DELETE /api/agent/conversation — forget the conversation (pending previews included) and the
+     * assistant memory shared with Telegram. Telegram's own pending previews stay.
      */
     public function reset(Request $request): JsonResponse
     {
         $user = $request->user();
         $session = new WebAgentSession($user);
         $session->clear();
+        // "New chat" also clears the memory shared with the Telegram assistant.
+        app(AgentHistory::class)->clear($user);
         $this->uploads->deleteAll($user);
 
         return response()->json([

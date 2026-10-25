@@ -2,7 +2,9 @@
 
 namespace App\Channels\Telegram;
 
+use App\Support\TelegramHtml;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class TelegramClient
@@ -29,6 +31,103 @@ class TelegramClient
             'parse_mode' => $parseMode,
             'reply_markup' => $replyMarkup ? json_encode($replyMarkup) : null,
         ]));
+    }
+
+
+    /**
+     * sendMessage that reports back: the decoded response, or ok:false on a network error.
+     * $replyTo makes it a reply (still sent if that message is gone).
+     *
+     * @param array<string, mixed>|null $replyMarkup
+     * @return array<string, mixed>
+     */
+    public function sendMessageResult(
+        int|string $chatId,
+        string $text,
+        ?array $replyMarkup = null,
+        ?string $parseMode = null,
+        ?int $replyTo = null,
+    ): array {
+        try {
+            $response = Http::post($this->baseUrl . 'sendMessage', array_filter([
+                'chat_id' => $chatId,
+                'text' => $text,
+                'parse_mode' => $parseMode,
+                'reply_markup' => $replyMarkup ? json_encode($replyMarkup) : null,
+                'reply_parameters' => $replyTo !== null
+                    ? json_encode(['message_id' => $replyTo, 'allow_sending_without_reply' => true])
+                    : null,
+            ]));
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'description' => $e->getMessage()];
+        }
+
+        $json = $response->json();
+
+        return is_array($json) ? $json : ['ok' => false, 'error_code' => $response->status()];
+    }
+
+    /**
+     * Send the assistant's light-Markdown text as Telegram HTML, split at paragraph / line
+     * boundaries into messages under 4096 characters. Only the first part replies to
+     * $replyTo, only the last carries $replyMarkup. A part Telegram can't parse
+     * (400 "can't parse entities") is resent as plain text.
+     *
+     * @param array<string, mixed>|null $replyMarkup
+     */
+    public function sendFormatted(int|string $chatId, string $markdown, ?array $replyMarkup = null, ?int $replyTo = null): void
+    {
+        $parts = TelegramHtml::split($markdown);
+        $last = count($parts) - 1;
+
+        foreach ($parts as $i => $html) {
+            $markup = $i === $last ? $replyMarkup : null;
+            $reply = $i === 0 ? $replyTo : null;
+            $result = $this->sendMessageResult($chatId, $html, $markup, 'HTML', $reply);
+            if (($result['ok'] ?? false) === true) {
+                continue;
+            }
+
+            Log::warning('TelegramClient: formatted send failed, retrying as plain text', [
+                'error_code' => $result['error_code'] ?? null,
+                'description' => mb_substr((string) ($result['description'] ?? ''), 0, 200),
+            ]);
+            if (($result['error_code'] ?? null) === 400) {
+                $this->sendMessageResult($chatId, mb_substr(TelegramHtml::toPlain($html), 0, TelegramHtml::LIMIT), $markup, null, $reply);
+            }
+        }
+    }
+
+    /**
+     * "typing…" (or another action) in the chat header for ~5 seconds or until the next message.
+     */
+    public function sendChatAction(int|string $chatId, string $action = 'typing'): void
+    {
+        try {
+            Http::timeout(5)->post($this->baseUrl . 'sendChatAction', [
+                'chat_id' => $chatId,
+                'action' => $action,
+            ]);
+        } catch (\Throwable) {
+            // Cosmetic only.
+        }
+    }
+
+    /**
+     * Bot API 9.5 draft streaming (private chats): shows $text as a message being typed.
+     * The same non-zero $draftId updates it; the real message still has to be sent after.
+     */
+    public function sendMessageDraft(int|string $chatId, int $draftId, string $text): bool
+    {
+        try {
+            return (bool) Http::timeout(5)->post($this->baseUrl . 'sendMessageDraft', [
+                'chat_id' => $chatId,
+                'draft_id' => $draftId,
+                'text' => $text,
+            ])->json('ok');
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
 

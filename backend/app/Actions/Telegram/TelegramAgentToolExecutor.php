@@ -205,10 +205,11 @@ class TelegramAgentToolExecutor
 
     /**
      * Apply a staged agent_mutation pending payload (after user Confirm).
+     * False when it failed (the user was told nothing was saved).
      *
      * @param array<string, mixed> $pending
      */
-    public function applyAgentMutation(User $user, int|string $chatId, int|string $identity, array $pending): void
+    public function applyAgentMutation(User $user, int|string $chatId, int|string $identity, array $pending): bool
     {
         $action = (string) ($pending['action'] ?? '');
         $payload = is_array($pending['payload'] ?? null) ? $pending['payload'] : [];
@@ -230,7 +231,11 @@ class TelegramAgentToolExecutor
             ]);
             $this->client->sendMessage($chatId, 'Could not apply that change; nothing was saved.');
             $this->session->setSummary($identity, $chatId, 'Agent mutation failed.');
+
+            return false;
         }
+
+        return true;
     }
 
     /**

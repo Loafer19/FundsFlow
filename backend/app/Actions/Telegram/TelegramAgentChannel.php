@@ -3,6 +3,7 @@
 namespace App\Actions\Telegram;
 
 use App\Actions\Agent\AgentChannel;
+use App\Actions\Agent\AgentHistory;
 use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
 use App\Models\User;
@@ -10,7 +11,11 @@ use App\Support\TelegramAiQuota;
 
 /**
  * Telegram transport for RunAgentAction: tools send Telegram cards/keyboards
- * themselves, the final answer is one chat message.
+ * themselves, the final answer is a formatted (HTML) reply to the user's message.
+ *
+ * In a private chat the conversation memory is shared with the web assistant
+ * (AgentHistory): $history holds the prior turns, and this channel records the
+ * answer, questions, proposals and shown cards. Group chats pass no history.
  */
 final class TelegramAgentChannel implements AgentChannel
 {
@@ -24,7 +29,38 @@ final class TelegramAgentChannel implements AgentChannel
         private readonly TelegramAgentToolExecutor $tools,
         private readonly int|string $chatId,
         private readonly int|string $identity,
-    ) {}
+        private readonly ?AgentHistory $history = null,
+        private readonly ?int $userId = null,
+        /** @var list<array{role: 'user'|'assistant', content: string}> */
+        private readonly array $priorTurns = [],
+        private readonly ?int $replyTo = null,
+    ) {
+        $this->draftId = random_int(1, 2_000_000_000);
+    }
+
+    private float $lastTyping = 0.0;
+
+    private int $draftId;
+
+    private string $draft = '';
+
+    private float $lastDraft = 0.0;
+
+    private bool $draftsFailed = false;
+
+    /**
+     * "typing…" in the chat header. Telegram shows it for ~5 s, so it is refreshed
+     * at most every 4 s: at the start and before each tool call.
+     */
+    public function typing(bool $force = false): void
+    {
+        $now = microtime(true);
+        if (!$force && $now - $this->lastTyping < 4.0) {
+            return;
+        }
+        $this->lastTyping = $now;
+        $this->client->sendChatAction($this->chatId);
+    }
 
     public function systemPrompt(User $user): string
     {
@@ -60,13 +96,17 @@ Rules:
 - If you need a missing detail, call ask_user (optional English suggestions). Then stop.
 - Quick-add like "-350 groceries" is handled outside you; focus on questions, analysis, lists, and proposed mutations.
 - Cap: tools already limit list sizes. Do not dump huge raw JSON to the user; summarize.
+- Formatting: light Markdown is rendered — **bold**, *italic*, `code`, short "- " bullet lists, [links](https://…). No tables, no # headings, no HTML. Keep answers short; never write more than ~3000 characters.
+- Earlier turns tagged [via web] happened in the FundsFlow web assistant; the user may continue them here. A "Proposed change … via web" can only be confirmed in the web chat: to do it here, propose it again with the tool.
+- "(Replying to your earlier message: …)" quotes the bot message the user replied to; treat it as what "this"/"it" refers to.
 PROMPT;
     }
 
     public function historyMessages(): array
     {
-        // Telegram keeps context via the session summary + last_list only.
-        return [];
+        // Shared with the web assistant in private chats; group chats keep context via
+        // the session summary + last_list only.
+        return $this->priorTurns;
     }
 
     public function toolDefinitions(): array
@@ -81,7 +121,10 @@ PROMPT;
 
     public function executeTool(User $user, string $name, array $arguments): array
     {
-        return $this->tools->execute($user, $this->chatId, $this->identity, $name, $arguments);
+        $executed = $this->tools->execute($user, $this->chatId, $this->identity, $name, $arguments);
+        $this->record($executed);
+
+        return $executed;
     }
 
     public function controlNote(string $control): ?string
@@ -94,19 +137,46 @@ PROMPT;
         };
     }
 
+    /**
+     * Draft streaming (Bot API 9.5 sendMessageDraft): on by default (TELEGRAM_STREAM_DRAFTS),
+     * private chats only. Group chats (or streaming off) see "typing…" and then the whole answer.
+     */
     public function streams(): bool
     {
-        return false;
+        return (bool) config('telegram.stream_drafts') && $this->isPrivate();
     }
 
-    public function onDelta(string $text): void {}
+    public function onDelta(string $text): void
+    {
+        if ($this->draftsFailed) {
+            return;
+        }
+        $this->draft .= $text;
 
-    public function onToolCall(string $name, array $arguments): void {}
+        $now = microtime(true);
+        if ($now - $this->lastDraft < 1.0) {
+            return;
+        }
+        $this->lastDraft = $now;
+
+        // Raw text while streaming: half-written Markdown can't be turned into valid HTML.
+        if (!$this->client->sendMessageDraft($this->chatId, $this->draftId, mb_substr($this->draft, 0, 4000))) {
+            $this->draftsFailed = true;
+        }
+    }
+
+    public function onToolCall(string $name, array $arguments): void
+    {
+        // Text streamed before a tool call is a preamble, not the answer.
+        $this->draft = '';
+        $this->typing();
+    }
 
     public function onAnswer(string $text): void
     {
-        $this->client->sendMessage($this->chatId, mb_substr($text, 0, 4000));
+        $this->client->sendFormatted($this->chatId, $text, replyTo: $this->replyTo);
         $this->session->setSummary($this->identity, $this->chatId, mb_substr($text, 0, 500));
+        $this->remember($text);
     }
 
     public function onMaxRounds(): void
@@ -121,5 +191,63 @@ PROMPT;
     public function quotaExhaustedMessage(User $user): string
     {
         return $this->quota->exhaustedMessage($user, self::WITHOUT_AI);
+    }
+
+    private function isPrivate(): bool
+    {
+        return (string) $this->chatId === (string) $this->identity;
+    }
+
+    /**
+     * @param array{kind?: string, ref?: string|null} $meta
+     */
+    private function remember(string $text, array $meta = []): void
+    {
+        if ($this->history !== null && $this->userId !== null) {
+            $this->history->add($this->userId, AgentHistory::TELEGRAM, 'assistant', $text, $meta);
+        }
+    }
+
+    /**
+     * What a stopping tool showed, as text for the shared memory.
+     *
+     * @param array{ok: bool, control: ?string, result: array<string, mixed>} $executed
+     */
+    private function record(array $executed): void
+    {
+        if ($this->history === null || $this->userId === null || !$executed['ok']) {
+            return;
+        }
+        $result = $executed['result'];
+
+        switch ($executed['control']) {
+            case 'ask_user':
+                $this->remember((string) ($result['question'] ?? ''), ['kind' => 'ask']);
+                break;
+
+            case 'confirm_staged':
+                $pending = $this->session->get($this->identity, $this->chatId)['pending'] ?? null;
+                if (($result['staged'] ?? false) !== true || !is_array($pending) || !is_string($pending['nonce'] ?? null)) {
+                    break;
+                }
+                $preview = match ($pending['type'] ?? null) {
+                    'create_tags' => 'Create tags: ' . implode(', ', array_map('strval', (array) ($pending['titles'] ?? []))),
+                    'rename_tags' => "Rename tags:\n" . implode("\n", array_map(
+                        static fn ($p): string => is_array($p) ? ($p['before'] ?? '?') . ' → ' . ($p['after'] ?? '?') : '',
+                        (array) ($pending['proposals'] ?? []),
+                    )),
+                    default => (string) ($pending['preview'] ?? ''),
+                };
+                $this->history->addProposal($this->userId, AgentHistory::TELEGRAM, $preview, $pending['nonce']);
+                break;
+
+            case 'ui_sent':
+                $ui = (string) ($result['ui'] ?? 'card');
+                $summary = is_string($result['summary'] ?? null) ? ': ' . $result['summary'] : '';
+                if (($result['sent'] ?? true) !== false) {
+                    $this->remember("Shown in Telegram: {$ui}{$summary}");
+                }
+                break;
+        }
     }
 }

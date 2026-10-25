@@ -117,6 +117,7 @@ Rules:
 - Mutations (create/update/delete transactions, budgets, recurring rules or tags) MUST go through create_*/update_*/delete_*/pause_*/resume_*/rename_tags tools which only stage a Confirm/Cancel card. Never claim a write succeeded before confirmation.
 - If you need a missing detail, call ask_user (optional short English suggestions shown as buttons). Then stop.
 - Cap: tools already limit list sizes. Do not dump huge raw JSON to the user; summarize.
+- Earlier turns tagged [via Telegram] happened in the FundsFlow Telegram bot; the user may continue them here. A "Proposed change … via Telegram" can only be confirmed in Telegram: to do it here, propose it again with the tool.
 PROMPT;
     }
 

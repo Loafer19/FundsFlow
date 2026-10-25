@@ -6,6 +6,7 @@ use App\Actions\Telegram\AnalyzeReceiptAction;
 use App\Actions\Transactions\CreateTransactionAction;
 use App\Actions\Transactions\StoreTransactionAttachmentAction;
 use App\Channels\Telegram\TelegramClient;
+use App\Channels\Telegram\TelegramHistory;
 use App\Channels\Telegram\TelegramSupport;
 use App\Enums\TransactionSource;
 use App\Models\User;
@@ -25,6 +26,7 @@ class MediaHandler
         private readonly CreateTransactionAction $createTransaction,
         private readonly StoreTransactionAttachmentAction $storeAttachment,
         private readonly AnalyzeReceiptAction $analyzeReceipt,
+        private readonly TelegramHistory $history,
     ) {}
 
     /**
@@ -46,6 +48,9 @@ class MediaHandler
 
             return;
         }
+
+        $caption = trim((string) ($message['caption'] ?? ''));
+        $this->history->input($chatId, $user, 'Sent a receipt ' . (isset($message['document']) ? 'file' : 'photo') . ($caption !== '' ? ": {$caption}" : ''));
 
         $this->handleSingleMedia($user, $chatId, $message);
     }
@@ -171,6 +176,9 @@ class MediaHandler
         if ($n === 0) {
             return;
         }
+
+        $caption = is_string($buffer['caption_hint'] ?? null) ? $buffer['caption_hint'] : '';
+        $this->history->input($chatId, $user, "Sent {$n} receipt photo" . ($n === 1 ? '' : 's') . ($caption !== '' ? ": {$caption}" : ''));
 
         if ($n === 1) {
             Cache::forget($bufferKey);
@@ -367,6 +375,7 @@ class MediaHandler
             if ($albumPhoto !== null) {
                 // Otherwise the rest of the album would wait for a Confirm that never comes.
                 $this->client->sendMessage($chatId, "Photo {$albumPhoto} couldn't be read and was skipped. Send it again with the amount, like -350 groceries.");
+                $this->history->outcome($chatId, $user, "Receipt photo {$albumPhoto} skipped (couldn't be read).");
                 $this->continueAlbumQueue($user, $chatId);
             }
 

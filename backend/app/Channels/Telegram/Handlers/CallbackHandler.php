@@ -5,6 +5,7 @@ namespace App\Channels\Telegram\Handlers;
 use App\Actions\Transactions\DeleteTransactionAction;
 use App\Actions\Transactions\UpdateTransactionAction;
 use App\Channels\Telegram\TelegramClient;
+use App\Channels\Telegram\TelegramHistory;
 use App\Channels\Telegram\TelegramSupport;
 use App\Models\Transaction;
 use App\Models\User;
@@ -20,6 +21,7 @@ class CallbackHandler
         private readonly MenuHandler $menuHandler,
         private readonly MediaHandler $mediaHandler,
         private readonly NaturalLanguageHandler $naturalLanguageHandler,
+        private readonly TelegramHistory $history,
     ) {}
 
     /**
@@ -209,6 +211,7 @@ class CallbackHandler
 
         if ($this->mediaHandler->cancelDraft($chatId, $nonce)) {
             $this->client->sendMessage($chatId, 'Cancelled');
+            $this->history->outcome($chatId, $user, 'Receipt draft cancelled (nothing saved).');
             $this->mediaHandler->continueAlbumQueue($user, $chatId);
         }
     }
@@ -235,9 +238,9 @@ class CallbackHandler
             $this->client->answerCallbackQuery($callbackId);
 
             match ($kind) {
-                'tags' => $nl->cancelCreateTags($chatId, $nonce, $telegramUserId),
-                'rename' => $nl->cancelRenameTags($chatId, $nonce, $telegramUserId),
-                'agent' => $nl->cancelAgentMutation($chatId, $nonce, $telegramUserId),
+                'tags' => $nl->cancelCreateTags($chatId, $nonce, $telegramUserId, $user),
+                'rename' => $nl->cancelRenameTags($chatId, $nonce, $telegramUserId, $user),
+                'agent' => $nl->cancelAgentMutation($chatId, $nonce, $telegramUserId, $user),
             };
 
             return;
@@ -332,6 +335,7 @@ class CallbackHandler
         }
 
         $this->client->answerCallbackQuery($callbackId, 'Saved ✅');
+        $this->history->outcome($chatId, $user, 'Tags set: ' . TelegramHistory::transactionLine($user, $transaction->load('tags')));
 
         if ($messageId) {
             $this->client->editMessageText(
@@ -355,7 +359,7 @@ class CallbackHandler
         }
 
         $this->client->answerCallbackQuery($callbackId);
-        $this->support->sendSavedTransaction($chatId, $user, $transaction, 'Transaction');
+        $this->support->sendSavedTransaction($chatId, $user, $transaction, 'Transaction', remember: false);
     }
 
     private function handleDeleteAsk(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
@@ -397,8 +401,10 @@ class CallbackHandler
         }
 
         $line = $this->support->formatTransactionLine($user, $transaction);
+        $remembered = TelegramHistory::transactionLine($user, $transaction);
 
         $this->deleteTransaction->execute($user, $transaction);
+        $this->history->outcome($chatId, $user, 'Deleted: ' . $remembered);
 
         $this->client->answerCallbackQuery($callbackId, 'Deleted 🗑');
 

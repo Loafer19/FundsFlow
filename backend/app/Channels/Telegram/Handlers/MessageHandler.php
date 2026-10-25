@@ -2,9 +2,12 @@
 
 namespace App\Channels\Telegram\Handlers;
 
+use App\Actions\Agent\AgentHistory;
+use App\Actions\Telegram\RunTelegramAgentAction;
 use App\Actions\Telegram\TranscribeTelegramAudioAction;
 use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
+use App\Channels\Telegram\TelegramHistory;
 use App\Channels\Telegram\TelegramSupport;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
@@ -25,6 +28,8 @@ class MessageHandler
         private readonly NaturalLanguageHandler $naturalLanguageHandler,
         private readonly TelegramChatSession $session,
         private readonly TranscribeTelegramAudioAction $transcribeAudio,
+        private readonly AgentHistory $history,
+        private readonly TelegramHistory $notes,
     ) {}
 
     /**
@@ -40,7 +45,31 @@ class MessageHandler
             return;
         }
 
-        $this->handleIncomingText($chatId, $telegramUserId, $text);
+        $this->handleIncomingText($chatId, $telegramUserId, $text, replyTo: $this->messageId($message), quoted: $this->quotedBotText($message));
+    }
+
+    /**
+     * @param array<string, mixed> $message
+     */
+    private function messageId(array $message): ?int
+    {
+        return is_int($message['message_id'] ?? null) ? $message['message_id'] : null;
+    }
+
+    /**
+     * Text of the bot message the user replied to (context for the assistant), cut short.
+     *
+     * @param array<string, mixed> $message
+     */
+    private function quotedBotText(array $message): ?string
+    {
+        $replied = $message['reply_to_message'] ?? null;
+        if (!is_array($replied) || ($replied['from']['is_bot'] ?? false) !== true) {
+            return null;
+        }
+        $text = trim((string) ($replied['text'] ?? $replied['caption'] ?? ''));
+
+        return $text !== '' ? mb_substr($text, 0, 500) : null;
     }
 
     /**
@@ -129,7 +158,15 @@ class MessageHandler
         $this->client->sendMessage($chatId, 'Heard: ' . $transcript);
 
         // Caption-style: if the voice was sent with a caption, ignore it — transcript is the command.
-        $this->handleIncomingText($chatId, $telegramUserId, $transcript, skipAuthGate: true, user: $user);
+        $this->handleIncomingText(
+            $chatId,
+            $telegramUserId,
+            $transcript,
+            skipAuthGate: true,
+            user: $user,
+            replyTo: $this->messageId($message),
+            quoted: $this->quotedBotText($message),
+        );
 
         // If NL also ran and consumed, it already sent a low-remaining hint.
         // Otherwise hint here when STT alone left the budget low.
@@ -150,6 +187,8 @@ class MessageHandler
         string $text,
         bool $skipAuthGate = false,
         ?User $user = null,
+        ?int $replyTo = null,
+        ?string $quoted = null,
     ): void {
         if (str_starts_with($text, '/start')) {
             $this->authHandler->handleStart([
@@ -193,6 +232,19 @@ class MessageHandler
 
         $this->session->touch($telegramUserId, $chatId);
 
+        // Menu views: one line each in the assistant memory shared with the web chat.
+        $view = match (true) {
+            $text === '/month' || $text === '/analytics' || $text === TelegramSupport::MENU_MONTH => 'Month summary',
+            $text === '/recent' || $text === TelegramSupport::MENU_RECENT => 'Recent transactions',
+            $text === '/tags' || $text === TelegramSupport::MENU_TAGS => 'Tags',
+            $text === '/budgets' || $text === TelegramSupport::MENU_BUDGETS => 'Budgets',
+            $text === '/recurring' || $text === TelegramSupport::MENU_RECURRING => 'Recurring rules',
+            default => null,
+        };
+        if ($view !== null) {
+            $this->notes->outcome($chatId, $user, "Shown in Telegram: {$view}");
+        }
+
         match (true) {
             $text === '/month' || $text === '/analytics' || $text === TelegramSupport::MENU_MONTH => $this->menuHandler->sendMonthSummary($user, $chatId, $telegramUserId),
             $text === '/recent' || $text === TelegramSupport::MENU_RECENT => $this->menuHandler->sendRecent($user, $chatId, $telegramUserId),
@@ -204,30 +256,58 @@ class MessageHandler
             $text === '/mute' => $this->authHandler->handleMute($chatId, true),
             $text === '/unmute' => $this->authHandler->handleMute($chatId, false),
             $text === '/unlink' => $this->authHandler->handleUnlink($chatId),
+            (bool) preg_match('/^\/(reset|new)(@\w+)?$/', $text) => $this->resetConversation($user, $chatId, $telegramUserId),
             str_starts_with($text, '/newtag') => $this->menuHandler->handleNewTag($user, $chatId, $text),
-            default => $this->handleDefaultText($user, $chatId, $text, $telegramUserId),
+            default => $this->handleDefaultText($user, $chatId, $text, $telegramUserId, $replyTo, $quoted),
         };
     }
 
-    private function handleDefaultText(User $user, int|string $chatId, string $text, int|string $telegramUserId): void
+    /**
+     * /reset, /new: forget this chat's assistant session (pending question / preview,
+     * summary) and, in a private chat, the conversation memory shared with the web assistant.
+     */
+    private function resetConversation(User $user, int|string $chatId, int|string $telegramUserId): void
     {
-        if ($this->naturalLanguageHandler->handlePendingAskAnswer($user, $chatId, $text, $telegramUserId)) {
+        $this->session->clear($telegramUserId, $chatId);
+
+        if (RunTelegramAgentAction::isPrivate($chatId, $telegramUserId)) {
+            $this->history->clear($user);
+            $this->client->sendMessage($chatId, 'Started a new conversation. The assistant forgot earlier messages here and in the web chat.');
+
+            return;
+        }
+
+        $this->client->sendMessage($chatId, 'Started a new conversation in this chat.');
+    }
+
+    private function handleDefaultText(
+        User $user,
+        int|string $chatId,
+        string $text,
+        int|string $telegramUserId,
+        ?int $replyTo = null,
+        ?string $quoted = null,
+    ): void {
+        if ($this->naturalLanguageHandler->handlePendingAskAnswer($user, $chatId, $text, $telegramUserId, $replyTo, $quoted)) {
             return;
         }
 
         if ($this->mediaHandler->hasAwaitingDraft($chatId)) {
+            $this->notes->input($chatId, $user, $text);
             $this->mediaHandler->completeDraftAmount($user, $chatId, $text);
 
             return;
         }
 
         if (Cache::has("telegram_pending_media:{$chatId}") || Cache::has("telegram_pending_media_await_text:{$chatId}")) {
+            $this->notes->input($chatId, $user, $text);
             $this->mediaHandler->completePendingMedia($user, $chatId, $text);
 
             return;
         }
 
         if (Cache::has("telegram_edit_amount:{$chatId}")) {
+            $this->notes->input($chatId, $user, $text);
             $this->quickAddHandler->handleEditAmountReply($user, $chatId, $text);
 
             return;
@@ -236,12 +316,13 @@ class MessageHandler
         $parsed = $this->support->parseQuickAdd($text, $user);
 
         if ($parsed !== null) {
+            $this->notes->input($chatId, $user, $text);
             $this->quickAddHandler->handleQuickAdd($user, $chatId, $text);
 
             return;
         }
 
-        if ($this->naturalLanguageHandler->tryHandle($user, $chatId, $text, $telegramUserId)) {
+        if ($this->naturalLanguageHandler->tryHandle($user, $chatId, $text, $telegramUserId, $replyTo, $quoted)) {
             return;
         }
 

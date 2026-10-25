@@ -4,7 +4,10 @@ description: Ask the FundsFlow bot about your finances in plain language, draw c
 ---
 
 Anything you send that isn't a command or a [quick add](/docs/telegram/quick-add/) and contains words is handled by the
-AI assistant. Write in any language. The bot replies *Thinking…* and then answers or acts.
+AI assistant. Write in any language. While it works the chat shows *typing…*, and in your private chat the answer
+appears as it's being written; then the finished answer arrives (in a group chat it comes in one go). Answers reply
+to your message and can use simple formatting (bold, italic, code, bullet lists, links). A very long answer comes as
+several messages.
 
 Examples:
 
@@ -19,8 +22,21 @@ Examples:
 - “what charges are coming up this week?”, “add a monthly -15 Netflix subscription from the 5th”
 - “compare this quarter with last quarter”, “send me a PDF report for last month”
 
-The assistant keeps a short conversation context for about 20 minutes, so follow-up questions like “and last month?”
-work. If something is ambiguous it asks a clarifying question, sometimes with suggested reply buttons.
+If something is ambiguous it asks a clarifying question, sometimes with suggested reply buttons.
+
+## Conversation memory and /reset
+
+- In your private chat with the bot the assistant remembers the conversation for **60 minutes after the last
+  message**, so follow-ups like “and last month?” work. It uses the last 12 messages as context.
+- This memory is **shared with the [web assistant](/docs/web/assistant/)**: you can ask something in Telegram and
+  continue in the web app, or the other way round. A proposal still waiting for **Confirm** can only be confirmed
+  where it was shown; the other side knows about it and can propose it again.
+- To ask about a specific bot message, **reply** to it: the assistant gets that message as context.
+- `/reset` (or `/new`) starts a new conversation: it forgets the earlier messages (here and in the web assistant) and
+  any question or preview still waiting in this chat. The web app's **New chat** clears the shared memory too.
+- Quick add, menu views and receipts are noted in the memory as one line each (for example *Saved: -350.00 ₴
+  groceries (Food)*), so you can ask “change the tag of the one I just added” here or in the web app.
+- In a group chat the assistant doesn't use the shared memory; `/reset` there clears only that chat.
 
 :::tip[Also in the web app]
 The same assistant is in the web app: click ✨ **Assistant** in the header. It streams answers, draws interactive

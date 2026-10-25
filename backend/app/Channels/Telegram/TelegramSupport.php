@@ -84,6 +84,7 @@ class TelegramSupport
             . "/mute — mute budget alerts, weekly digest, recurring notifications\n"
             . "/unmute — turn notifications back on\n"
             . "/unlink — unlink Telegram (account stays on the website)\n"
+            . "/reset — start a new AI conversation (alias /new)\n"
             . "/help — this list\n\n"
             . "Reply menu\n"
             . "Month · Recent · Tags · Budgets · Recurring · Web UI\n\n"
@@ -98,7 +99,8 @@ class TelegramSupport
             . "Send a voice note for the same actions as typing (quick-add, menu, tags, help, month summary). Uses the shared daily AI budget.\n\n"
             . "Text AI\n"
             . "Ask free-form questions about your finances (any language). Examples: show recent, budgets, menu, tags; rename tags; month summary; what do you think about my finances.\n"
-            . "Same views as the reply-menu buttons when you ask to show them.\n\n"
+            . "Same views as the reply-menu buttons when you ask to show them.\n"
+            . "Reply to a bot message to ask about it. The assistant remembers the last hour of chat, shared with the web assistant; /reset clears it.\n\n"
             . "AI limit\n"
             . "Receipt AI, voice, and text AI share a daily limit. Settings in the Web UI shows used/limit and reset time; the bot tells you when you're out.",
             $this->menuKeyboard(),
@@ -256,11 +258,16 @@ class TelegramSupport
     }
 
 
+    /**
+     * $remember: also note it in the assistant memory ("Saved: …", "Receipt saved: …"); off when
+     * the card only re-shows an existing transaction.
+     */
     public function sendSavedTransaction(
         int|string $chatId,
         User $user,
         Transaction $transaction,
         string $headline = '✅ Saved',
+        bool $remember = true,
     ): void {
         $this->client->sendMessage(
             $chatId,
@@ -268,6 +275,16 @@ class TelegramSupport
             $this->postSaveKeyboard($transaction),
             self::PARSE_HTML,
         );
+
+        if ($remember) {
+            $label = trim(preg_replace('/^[^\p{L}]+/u', '', $headline) ?? $headline);
+            $label = match (true) {
+                str_contains($label, 'receipt') => 'Receipt saved',
+                $label === 'Saved without file' => 'Receipt saved (file not attached)',
+                default => $label,
+            };
+            app(TelegramHistory::class)->outcome($chatId, $user, $label . ': ' . TelegramHistory::transactionLine($user, $transaction));
+        }
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Channels\Telegram\Handlers;
 
+use App\Actions\Agent\AgentHistory;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Telegram\RunTelegramAgentAction;
 use App\Actions\Telegram\TelegramAgentSession;
@@ -25,17 +26,23 @@ class NaturalLanguageHandler
         private readonly TelegramAiQuota $quota,
         private readonly AgentToolExecutor $agentTools,
         private readonly TelegramChatSession $session,
+        private readonly AgentHistory $history,
     ) {}
 
     /**
      * Try AI agent handling. Returns true when the message was consumed
      * (including unavailable / quota exhausted responses).
+     *
+     * @param int|null $replyTo The user's message id (the answer replies to it).
+     * @param string|null $quoted The bot message the user replied to, if any.
      */
     public function tryHandle(
         User $user,
         int|string $chatId,
         string $text,
         int|string|null $telegramUserId = null,
+        ?int $replyTo = null,
+        ?string $quoted = null,
     ): bool {
         $identity = $telegramUserId ?? $chatId;
         $this->session->touch($identity, $chatId);
@@ -58,9 +65,8 @@ class NaturalLanguageHandler
             return true;
         }
 
-        $this->client->sendMessage($chatId, 'Thinking…');
-
-        $result = $this->agent->execute($user, $chatId, $identity, $text);
+        // The agent shows "typing…" while it works (no separate "Thinking…" message).
+        $result = $this->agent->execute($user, $chatId, $identity, $text, null, $replyTo, $quoted);
 
         if (!$result['ok'] && ($result['status'] ?? '') === 'unavailable') {
             $this->client->sendMessage(
@@ -95,6 +101,8 @@ class NaturalLanguageHandler
         int|string $chatId,
         string $text,
         int|string|null $telegramUserId = null,
+        ?int $replyTo = null,
+        ?string $quoted = null,
     ): bool {
         $identity = $telegramUserId ?? $chatId;
         $pending = $this->session->get($identity, $chatId)['pending'];
@@ -121,11 +129,9 @@ class NaturalLanguageHandler
             return true;
         }
 
-        $this->client->sendMessage($chatId, 'Thinking…');
-
         $result = $this->agent->execute($user, $chatId, $identity, $text, [
             'prior_question' => $question,
-        ]);
+        ], $replyTo, $quoted);
 
         if (!$result['ok'] && ($result['status'] ?? '') === 'unavailable') {
             $this->client->sendMessage(
@@ -196,12 +202,14 @@ class NaturalLanguageHandler
             ? array_values(array_filter($pending['titles'], 'is_string'))
             : [];
         $this->createTags($user, $chatId, $identity, $this->agentTools->filterNewTagTitles($user, $titles));
+        $this->markProposal($user, $chatId, $identity, $nonce, 'confirmed');
     }
 
     public function cancelCreateTags(
         int|string $chatId,
         string $nonce,
         int|string|null $telegramUserId = null,
+        ?User $user = null,
     ): void {
         $identity = $telegramUserId ?? $chatId;
 
@@ -213,9 +221,8 @@ class NaturalLanguageHandler
 
         $this->session->setSummary($identity, $chatId, 'Tag creation cancelled.');
         $this->client->sendMessage($chatId, 'Cancelled');
+        $this->markProposal($user, $chatId, $identity, $nonce, 'cancelled');
     }
-
-
 
     public function confirmRenameTags(
         User $user,
@@ -245,6 +252,7 @@ class NaturalLanguageHandler
         } catch (Throwable) {
             $this->client->sendMessage($chatId, 'Could not apply the rename preview; no changes were saved.');
             $this->session->setSummary($identity, $chatId, 'Rename failed because a tag changed or could not be updated.');
+            $this->markProposal($user, $chatId, $identity, $nonce, 'failed');
 
             return;
         }
@@ -256,12 +264,14 @@ class NaturalLanguageHandler
         ));
         $this->session->setSummary($identity, $chatId, 'Tags renamed.');
         $this->client->sendMessage($chatId, "✅ Renamed tags:\n" . $preview);
+        $this->markProposal($user, $chatId, $identity, $nonce, 'confirmed');
     }
 
     public function cancelRenameTags(
         int|string $chatId,
         string $nonce,
         int|string|null $telegramUserId = null,
+        ?User $user = null,
     ): void {
         $identity = $telegramUserId ?? $chatId;
 
@@ -273,6 +283,7 @@ class NaturalLanguageHandler
 
         $this->session->setSummary($identity, $chatId, 'Tag rename cancelled.');
         $this->client->sendMessage($chatId, 'Cancelled');
+        $this->markProposal($user, $chatId, $identity, $nonce, 'cancelled');
     }
 
     public function confirmAgentMutation(
@@ -290,13 +301,29 @@ class NaturalLanguageHandler
             return;
         }
 
-        $this->toolExecutor->applyAgentMutation($user, $chatId, $identity, $pending);
+        $applied = $this->toolExecutor->applyAgentMutation($user, $chatId, $identity, $pending);
+        $this->markProposal($user, $chatId, $identity, $nonce, $applied ? 'confirmed' : 'failed');
+    }
+
+    /**
+     * Update the proposal's status in the memory shared with the web assistant (private chats only).
+     */
+    private function markProposal(?User $user, int|string $chatId, int|string $identity, string $nonce, string $status): void
+    {
+        if (!RunTelegramAgentAction::isPrivate($chatId, $identity)) {
+            return;
+        }
+        $user ??= $this->support->resolveUser($chatId);
+        if ($user !== null) {
+            $this->history->setStatus($user, $nonce, $status, AgentHistory::TELEGRAM);
+        }
     }
 
     public function cancelAgentMutation(
         int|string $chatId,
         string $nonce,
         int|string|null $telegramUserId = null,
+        ?User $user = null,
     ): void {
         $identity = $telegramUserId ?? $chatId;
 
@@ -308,6 +335,7 @@ class NaturalLanguageHandler
 
         $this->session->setSummary($identity, $chatId, 'Agent mutation cancelled.');
         $this->client->sendMessage($chatId, 'Cancelled');
+        $this->markProposal($user, $chatId, $identity, $nonce, 'cancelled');
     }
 
     /**

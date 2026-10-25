@@ -2,6 +2,7 @@
 
 namespace App\Actions\Agent\Web;
 
+use App\Actions\Agent\AgentHistory;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Agent\RunAgentAction;
 use App\Actions\Charts\BuildUserChartAction;
@@ -82,7 +83,8 @@ final class RunWebAgentAction
             );
         }
 
-        $history = $session->historyMessages(dropTrailingAsk: $askContext !== null);
+        // Model context: the conversation memory shared with Telegram (web turns + private-chat Telegram turns).
+        $history = app(AgentHistory::class)->messages($user, AgentHistory::WEB, dropTrailingAsk: $askContext !== null);
 
         $channel = new WebAgentChannel($this->quota, $this->tools, $this->buildChart, $session, $emit, $history, $context, $this->buildReport);
         // reply_to lets an edit / regenerate of this turn restore its question (agent_ask) or refuse

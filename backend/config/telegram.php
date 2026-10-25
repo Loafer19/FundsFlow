@@ -19,6 +19,10 @@ return [
     // Max tool-calling rounds per agent turn.
     'agent_max_rounds' => (int) env('TELEGRAM_AGENT_MAX_ROUNDS', 6),
 
+    // Stream assistant answers as a live draft (Bot API 9.5 sendMessageDraft, private chats);
+    // the formatted answer is sent when it's done. Set false to show only "typing…" until then.
+    'stream_drafts' => (bool) env('TELEGRAM_STREAM_DRAFTS', true),
+
     // Soft "few AI requests left" hint shows when remaining <= this.
     'low_quota_threshold' => (int) env('TELEGRAM_LOW_QUOTA_THRESHOLD', 2),
 

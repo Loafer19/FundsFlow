@@ -2,6 +2,7 @@
 
 namespace App\Actions\Agent\Web;
 
+use App\Actions\Agent\AgentHistory;
 use App\Actions\Agent\AgentSession;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
@@ -11,6 +12,9 @@ use Illuminate\Support\Str;
  * Cache-backed web chat conversation for one user: agent context (domain,
  * last_list, one pending slot, summary) plus the visible transcript.
  * Sliding TTL: config('agent.web_session_ttl_minutes').
+ *
+ * Every transcript item is also written, as text, to the conversation memory shared with
+ * the Telegram assistant (AgentHistory); that memory is what the model sees as history.
  */
 final class WebAgentSession implements AgentSession
 {
@@ -101,7 +105,13 @@ final class WebAgentSession implements AgentSession
         $item['id'] ??= (string) Str::uuid();
         $item['at'] ??= now()->toIso8601String();
 
-        $this->update(function (array $s) use ($item): array {
+        $turnId = ($item['role'] ?? null) === 'user' ? $item['id'] : null;
+
+        $this->update(function (array $s) use ($item, &$turnId): array {
+            if ($turnId === null) {
+                $index = self::lastTurnIndex($s['transcript']);
+                $turnId = $index !== null ? ($s['transcript'][$index]['id'] ?? null) : null;
+            }
             $s['transcript'][] = $item;
             $max = max(1, (int) config('agent.web_transcript_max'));
             if (count($s['transcript']) > $max) {
@@ -110,6 +120,45 @@ final class WebAgentSession implements AgentSession
 
             return $s;
         });
+
+        $this->mirror($item, is_string($turnId) ? $turnId : null);
+    }
+
+    /**
+     * The item as text in the shared memory, tagged with its turn (the user item's id) so an
+     * edit / regenerate drops it there too.
+     *
+     * @param array<string, mixed> $item
+     */
+    private function mirror(array $item, ?string $turnId): void
+    {
+        $photos = (int) ($item['photos'] ?? 0);
+        $kind = (string) ($item['kind'] ?? 'text');
+        $text = trim(match ($kind) {
+            'text' => (string) ($item['text'] ?? '') . ($photos > 0 ? " [sent {$photos} receipt photo(s)]" : ''),
+            'notice' => (string) ($item['text'] ?? ''),
+            'ask' => (string) ($item['question'] ?? ''),
+            'confirm' => (string) ($item['preview'] ?? ''),
+            'chart' => 'Chart shown: ' . (string) ($item['caption'] ?? ''),
+            'show' => 'Card shown: ' . (string) ($item['title'] ?? ''),
+            default => '',
+        });
+        if ($text === '') {
+            return;
+        }
+
+        $meta = ['turn_id' => $turnId];
+        if ($kind === 'ask') {
+            $meta['kind'] = 'ask';
+        } elseif ($kind === 'confirm') {
+            $meta += [
+                'kind' => 'proposal',
+                'ref' => is_string($item['pending_id'] ?? null) ? $item['pending_id'] : null,
+                'status' => (string) ($item['status'] ?? 'pending'),
+            ];
+        }
+
+        app(AgentHistory::class)->add($this->user, AgentHistory::WEB, (string) ($item['role'] ?? 'assistant'), $text, $meta);
     }
 
     /**
@@ -120,55 +169,27 @@ final class WebAgentSession implements AgentSession
      */
     public function patchItems(callable $match, array $patch): void
     {
-        $this->update(function (array $s) use ($match, $patch): array {
+        $resolved = [];
+        $this->update(function (array $s) use ($match, $patch, &$resolved): array {
             foreach ($s['transcript'] as $i => $item) {
                 if ($match($item)) {
                     $s['transcript'][$i] = array_replace($item, $patch);
+                    if (($item['kind'] ?? null) === 'confirm' && is_string($item['pending_id'] ?? null)) {
+                        $resolved[] = $item['pending_id'];
+                    }
                 }
             }
 
             return $s;
         });
-    }
 
-    /**
-     * Prior text turns for the model (oldest first), excluding the trailing pending ask question.
-     *
-     * @return list<array{role: 'user'|'assistant', content: string}>
-     */
-    public function historyMessages(bool $dropTrailingAsk = false): array
-    {
-        $items = $this->state()['transcript'];
-
-        if ($dropTrailingAsk && $items !== [] && ($items[count($items) - 1]['kind'] ?? null) === 'ask') {
-            array_pop($items);
-        }
-
-        $out = [];
-        foreach ($items as $item) {
-            $photos = (int) ($item['photos'] ?? 0);
-            $text = match ($item['kind'] ?? 'text') {
-                'text' => (string) ($item['text'] ?? '') . ($photos > 0 ? " [sent {$photos} receipt photo(s)]" : ''),
-                'notice' => (string) ($item['text'] ?? ''),
-                'ask' => (string) ($item['question'] ?? ''),
-                'confirm' => 'Proposed change (' . ($item['status'] ?? 'pending') . '): ' . (string) ($item['preview'] ?? ''),
-                'chart' => 'Chart shown: ' . (string) ($item['caption'] ?? ''),
-                'show' => 'Card shown: ' . (string) ($item['title'] ?? ''),
-                default => '',
-            };
-            $text = trim($text);
-            if ($text === '') {
-                continue;
+        // Confirm card resolved (confirmed / cancelled / failed / outdated): same status in the shared memory.
+        if ($resolved !== [] && is_string($patch['status'] ?? null)) {
+            $history = app(AgentHistory::class);
+            foreach ($resolved as $ref) {
+                $history->setStatus($this->user, $ref, $patch['status'], AgentHistory::WEB);
             }
-            $out[] = [
-                'role' => ($item['role'] ?? 'assistant') === 'user' ? 'user' : 'assistant',
-                'content' => mb_substr($text, 0, 1500),
-            ];
         }
-
-        $turns = max(0, (int) config('agent.web_history_turns'));
-
-        return $turns === 0 ? [] : array_slice($out, -$turns);
     }
 
     /**
@@ -216,6 +237,7 @@ final class WebAgentSession implements AgentSession
             $state['pending'] = null;
         }
         $this->put($state);
+        app(AgentHistory::class)->dropTurn($this->user, AgentHistory::WEB, $turnId);
 
         return [
             'ok' => true,

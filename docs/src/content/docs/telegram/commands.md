@@ -33,6 +33,7 @@ Below the message field the bot shows six buttons:
 | `/mute` | Mute budget alerts, the weekly digest, and recurring notifications |
 | `/unmute` | Turn those notifications back on |
 | `/unlink` | Unlink this chat; the account stays on the website |
+| `/reset` | Start a new AI conversation (alias `/new`); see [AI assistant](/docs/telegram/ai-assistant/) |
 | `/help` | List commands and the quick-add format |
 
 ### `/newtag`
