@@ -70,31 +70,45 @@
 
         <main>
             <div class="flex gap-2 mb-3 items-center flex-wrap">
-                <select class="select w-24 sm:w-30 border-base-300 focus:border-base-content cursor-pointer"
-                    v-model="dateSelectionType" aria-label="Date range type">
-                    <option value="week">Week</option>
-                    <option value="month">Month</option>
-                    <option value="year">Year</option>
-                </select>
-
-                <button type="button" class="btn btn-square border-base-300" @click="shiftPeriod(-1)"
-                    aria-label="Previous period">
-                    <ChevronLeft :size="20" />
-                </button>
-
-                <div class="w-32 sm:w-40 min-w-0 flex-1 sm:flex-none" aria-label="Selected period">
-                    <VueDatePicker v-model="selectedRange" hide-offset-dates :enable-time-picker="false" auto-apply
-                        :transitions="false" :week-picker="dateSelectionType === 'week'"
-                        :month-picker="dateSelectionType === 'month'" :year-picker="dateSelectionType === 'year'"
-                        :week-numbers="{ type: 'local' }" :min-date="new Date('2000-01-05')" :clearable="false"
-                        prevent-min-max-navigation :year-range="[2020, 2040]" :hide-input-icon="true" ref="datePicker">
-                    </VueDatePicker>
+                <div class="join" role="radiogroup" aria-label="Date range type">
+                    <button v-for="option in periodTypes" :key="option.value" type="button" role="radio"
+                        class="join-item btn btn-square border-base-300 tooltip tooltip-bottom"
+                        :class="dateSelectionType === option.value ? 'btn-primary' : 'bg-base-100'"
+                        :data-tip="option.label" :aria-label="option.label"
+                        :aria-checked="dateSelectionType === option.value" @click="setDateSelectionType(option.value)">
+                        <component :is="option.icon" :size="18" />
+                    </button>
                 </div>
 
-                <button type="button" class="btn btn-square border-base-300" @click="shiftPeriod(1)"
-                    aria-label="Next period">
-                    <ChevronRight :size="20" />
-                </button>
+                <div class="flex items-center gap-1 min-w-0 max-sm:flex-1">
+                    <button type="button" class="btn btn-ghost btn-square" @click="shiftPeriod(-1)"
+                        aria-label="Previous period">
+                        <ChevronLeft :size="20" />
+                    </button>
+
+                    <div class="min-w-0 flex-1 sm:flex-none" aria-label="Selected period">
+                        <VueDatePicker v-model="selectedRange" hide-offset-dates :enable-time-picker="false" auto-apply
+                            :transitions="false" :week-picker="dateSelectionType === 'week'"
+                            :month-picker="dateSelectionType === 'month'" :year-picker="dateSelectionType === 'year'"
+                            :week-numbers="{ type: 'local' }" :min-date="new Date('2000-01-05')" :clearable="false"
+                            prevent-min-max-navigation :year-range="[2020, 2040]" :hide-input-icon="true" ref="datePicker">
+                            <template #dp-input="{ isMenuOpen }">
+                                <button type="button"
+                                    class="btn btn-ghost w-full sm:w-52 px-2 text-base sm:text-lg font-semibold gap-1 flex-nowrap"
+                                    :aria-expanded="isMenuOpen" aria-haspopup="dialog">
+                                    <span class="truncate">{{ periodLabel }}</span>
+                                    <ChevronDown :size="16" class="shrink-0 opacity-50 transition-transform"
+                                        :class="{ 'rotate-180': isMenuOpen }" />
+                                </button>
+                            </template>
+                        </VueDatePicker>
+                    </div>
+
+                    <button type="button" class="btn btn-ghost btn-square" @click="shiftPeriod(1)"
+                        aria-label="Next period">
+                        <ChevronRight :size="20" />
+                    </button>
+                </div>
 
                 <div class="dropdown max-md:basis-full md:basis-auto">
                     <button type="button" tabindex="0"
@@ -118,6 +132,20 @@
                             Clear
                         </button>
                     </div>
+                </div>
+
+                <div v-if="tagFilterChips.length" class="flex flex-wrap items-center gap-1.5 max-md:basis-full">
+                    <span v-for="chip in tagFilterChips" :key="chip.key" class="badge badge-info gap-1 pl-2 pr-0.5">
+                        {{ chip.emoji }} {{ chip.title }}
+                        <button type="button" class="btn btn-ghost btn-xs btn-circle" :aria-label="`Remove ${chip.title} filter`"
+                            @click="chip.remove()">
+                            <X :size="12" />
+                        </button>
+                    </span>
+                    <button v-if="tagFilterChips.length > 1" type="button" class="btn btn-ghost btn-xs"
+                        @click="transactionsStore.clearTagFilter()">
+                        Clear
+                    </button>
                 </div>
             </div>
 
@@ -220,7 +248,11 @@ import VueDatePicker from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import {
     ArrowLeftRight,
+    Calendar,
     CalendarDays,
+    CalendarFold,
+    CalendarRange,
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
     CircleHelp,
@@ -236,6 +268,7 @@ import {
     Tag,
     Tags,
     TrendingUp,
+    X,
 } from 'lucide-vue-next'
 import { computed, markRaw, onMounted, provide, ref, watch } from 'vue'
 import AgentDrawer from './components/AgentDrawer.vue'
@@ -296,6 +329,45 @@ const selectedRange = ref(getDefaultRange('month'))
 const selectedTab = ref(markRaw(Analytics))
 
 watch(selectedTab, () => haptic.select())
+
+const periodTypes = [
+    { value: 'week', label: 'Week', icon: markRaw(CalendarRange) },
+    { value: 'month', label: 'Month', icon: markRaw(Calendar) },
+    { value: 'year', label: 'Year', icon: markRaw(CalendarFold) },
+]
+
+function setDateSelectionType(type) {
+    if (dateSelectionType.value === type) return
+
+    haptic.select()
+    dateSelectionType.value = type
+}
+
+const tagFilterChips = computed(() => {
+    const chips = tagsStore.tags
+        .filter((tag) => transactionsStore.selectedTagIds.includes(tag.id))
+        .map((tag) => ({
+            key: tag.id,
+            emoji: tag.emoji,
+            title: tag.title,
+            remove: () => {
+                transactionsStore.selectedTagIds = transactionsStore.selectedTagIds.filter((id) => id !== tag.id)
+            },
+        }))
+
+    if (transactionsStore.filterUntagged) {
+        chips.unshift({
+            key: 'untagged',
+            emoji: '🏷️',
+            title: 'Untagged',
+            remove: () => {
+                transactionsStore.filterUntagged = false
+            },
+        })
+    }
+
+    return chips
+})
 
 const tagFilterBadgeCount = computed(
     () => transactionsStore.selectedTagIds.length + (transactionsStore.filterUntagged ? 1 : 0),
@@ -468,6 +540,24 @@ const getDateRange = computed(() => {
     return { currentStart, currentEnd, previousStart, previousEnd }
 })
 provide('insightDateRange', getDateRange)
+
+const periodLabel = computed(() => {
+    const { currentStart: start, currentEnd: end } = getDateRange.value
+
+    if (dateSelectionType.value === 'year') return String(start.getFullYear())
+    if (dateSelectionType.value === 'month') {
+        return start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    }
+
+    const sameYear = start.getFullYear() === end.getFullYear()
+    const sameMonth = sameYear && start.getMonth() === end.getMonth()
+    const month = (d) => d.toLocaleDateString('en-US', { month: 'short' })
+
+    if (sameMonth) return `${month(start)} ${start.getDate()}–${end.getDate()}, ${end.getFullYear()}`
+    if (sameYear) return `${month(start)} ${start.getDate()} – ${month(end)} ${end.getDate()}, ${end.getFullYear()}`
+
+    return `${month(start)} ${start.getDate()}, ${start.getFullYear()} – ${month(end)} ${end.getDate()}, ${end.getFullYear()}`
+})
 provide('insightDateSelectionType', dateSelectionType)
 </script>
 
