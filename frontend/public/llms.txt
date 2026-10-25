@@ -6,7 +6,7 @@ FundsFlow is a web app (Vue) with a Laravel API. Users authenticate via email/pa
 
 ## Main capabilities
 
-- Transactions with date, amount, tags, note, and source (web / telegram / recurring)
+- Transactions with date, amount, tags, note, and source (web / telegram / recurring / mcp)
 - Hierarchical tags with emojis
 - Budgets per tag with pause/resume and period history
 - Recurring rules (daily / weekly / monthly / yearly)
@@ -18,6 +18,8 @@ FundsFlow is a web app (Vue) with a Laravel API. Users authenticate via email/pa
 ## Site
 
 - App: https://fundsflow.fun/
+- Docs: https://fundsflow.fun/docs/ (user guide: web app, Telegram bot, Mini App, MCP server for AI clients, FAQ, privacy)
+- MCP server: https://mcp.fundsflow.fun/mcp (setup and tool list: https://fundsflow.fun/docs/ai/mcp/)
 - Optional feedback: https://t.me/Loafer19
 
 ## Notes for agents

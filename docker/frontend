@@ -14,11 +14,25 @@ RUN bun i
 
 RUN bun run prod
 
+FROM oven/bun:latest AS docs
+
+WORKDIR /docs
+
+COPY docs/package.json docs/bun.lock /docs/
+
+RUN bun install --frozen-lockfile
+
+COPY docs /docs
+
+RUN bun run build
+
 FROM nginx:alpine
 
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/security-headers.conf /etc/nginx/security-headers.conf
+COPY docker/security-headers-docs.conf /etc/nginx/security-headers-docs.conf
 
 COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=docs /docs/dist /usr/share/nginx/html/docs
 
 EXPOSE 80

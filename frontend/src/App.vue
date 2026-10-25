@@ -18,6 +18,11 @@
 
     <div class="container mx-auto p-4">
         <header class="flex gap-2 justify-end mb-4 flex-wrap">
+            <a href="/docs/" target="_blank" rel="noopener" class="btn btn-ghost btn-square tooltip tooltip-bottom"
+                data-tip="Docs" aria-label="Docs (opens in a new tab)">
+                <CircleHelp :size="24" />
+            </a>
+
             <template v-if="authStore.isAuthenticated">
                 <button type="button" @click="showModal('transactions_add_modal')"
                     class="btn btn-primary max-sm:btn-square" aria-label="Add Transaction">
@@ -211,6 +216,7 @@ import {
     CalendarDays,
     ChevronLeft,
     ChevronRight,
+    CircleHelp,
     LogIn,
     LogOut,
     PiggyBank,

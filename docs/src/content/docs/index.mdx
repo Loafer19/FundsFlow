@@ -1,0 +1,45 @@
+---
+title: FundsFlow Docs
+description: Learn how to track spending with FundsFlow — web app, Telegram bot, Mini App, and MCP for AI assistants.
+template: splash
+hero:
+  tagline: Personal finance tracker with tags, budgets, recurring payments, a Telegram bot, and an MCP server for AI assistants.
+  image:
+    file: ../../assets/logo-hero.webp
+    alt: FundsFlow logo
+  actions:
+    - text: Get started
+      link: /docs/getting-started/introduction/
+      icon: right-arrow
+    - text: Open FundsFlow
+      link: https://fundsflow.fun/
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components'
+
+<CardGrid>
+    <Card title="Web app" icon="laptop">
+        Analytics, calendar, budgets, tag distribution, money flow, balance trend, and a searchable list of every
+        transaction.
+    </Card>
+    <Card title="Telegram bot" icon="telegram">
+        Log an expense in two seconds with `-350 groceries`, snap a receipt, send a voice note, or just ask a question.
+    </Card>
+    <Card title="Mini App" icon="seti:html">
+        The full web app inside Telegram, signed in automatically from your linked chat.
+    </Card>
+    <Card title="MCP for AI assistants" icon="puzzle">
+        Connect Claude, ChatGPT, Cursor, VS Code, or Grok to your FundsFlow data at `https://mcp.fundsflow.fun/mcp`.
+    </Card>
+</CardGrid>
+
+## Popular pages
+
+<CardGrid>
+    <LinkCard title="Sign in" href="/docs/getting-started/sign-in/" description="Email, Google, GitHub, or a one-time code from the Telegram bot." />
+    <LinkCard title="Quick add syntax" href="/docs/telegram/quick-add/" description="-350 groceries, +15000 salary, 20.08 -350 groceries." />
+    <LinkCard title="Bot commands" href="/docs/telegram/commands/" description="Every /command and reply-menu button." />
+    <LinkCard title="Connect an AI client" href="/docs/ai/connect-clients/" description="OAuth or personal token setup for MCP clients." />
+</CardGrid>
