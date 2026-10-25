@@ -25,7 +25,7 @@
                                 @click="sortBy('at')" @keydown.enter.prevent="sortBy('at')"
                                 @keydown.space.prevent="sortBy('at')">
                                 Date
-                                <span v-if="sortConfig.key === 'at'">
+                                <span v-if="sortConfig.key === 'at'" class="report-hide">
                                     {{ sortConfig.direction === 'asc' ? '↑' : '↓' }}
                                 </span>
                             </th>
@@ -34,7 +34,7 @@
                                 @click="sortBy('amount')" @keydown.enter.prevent="sortBy('amount')"
                                 @keydown.space.prevent="sortBy('amount')">
                                 Amount
-                                <span v-if="sortConfig.key === 'amount'">
+                                <span v-if="sortConfig.key === 'amount'" class="report-hide">
                                     {{ sortConfig.direction === 'asc' ? '↑' : '↓' }}
                                 </span>
                             </th>
@@ -42,7 +42,7 @@
                             <th>Note</th>
                             <th class="w-0">
                                 <span class="sr-only">Files</span>
-                                <Paperclip :size="14" aria-hidden="true" />
+                                <Paperclip :size="14" aria-hidden="true" class="report-hide" />
                             </th>
                             <th class="table-actions-col">Actions</th>
                         </tr>

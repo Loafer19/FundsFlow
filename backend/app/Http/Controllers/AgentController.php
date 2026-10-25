@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Agent\Web\ConfirmWebAgentPendingAction;
 use App\Actions\Agent\Web\RunWebAgentAction;
+use App\Actions\Agent\Web\WebAgentChannel;
 use App\Actions\Agent\Web\WebAgentSession;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,9 +33,18 @@ class AgentController extends Controller
         $data = $request->validate([
             'message' => ['required', 'string', 'max:' . max(1, (int) config('agent.web_message_max_chars'))],
             'conversation_id' => ['nullable', 'string', 'max:64'],
+            'context' => ['nullable', 'array'],
+            'context.tab' => ['nullable', 'string', 'in:' . implode(',', WebAgentChannel::CONTEXT_TABS)],
+            'context.period_type' => ['nullable', 'string', 'in:week,month,year'],
+            'context.from' => ['nullable', 'date_format:Y-m-d'],
+            'context.to' => ['nullable', 'date_format:Y-m-d'],
+            'context.tag_ids' => ['nullable', 'array', 'max:50'],
+            'context.tag_ids.*' => ['integer', 'min:1'],
+            'context.untagged' => ['nullable', 'boolean'],
         ]);
 
         $user = $request->user();
+        $context = $this->screenContext(is_array($data['context'] ?? null) ? $data['context'] : []);
         $message = trim((string) $data['message']);
         if ($message === '') {
             return response()->json(['message' => 'The message field is required.'], 422);
@@ -48,7 +58,7 @@ class AgentController extends Controller
 
         $conversationId = isset($data['conversation_id']) ? (string) $data['conversation_id'] : null;
 
-        return response()->stream(function () use ($user, $message, $conversationId, $lock): void {
+        return response()->stream(function () use ($user, $message, $conversationId, $context, $lock): void {
             ignore_user_abort(true);
             @set_time_limit(self::RUN_LOCK_SECONDS);
 
@@ -70,7 +80,7 @@ class AgentController extends Controller
                 }
                 flush();
 
-                $this->run->execute($user, $message, $conversationId, $emit(...));
+                $this->run->execute($user, $message, $conversationId, $emit(...), $context);
             } catch (Throwable $e) {
                 Log::error('AgentController: chat stream failed', ['message' => $e->getMessage()]);
                 $emit('error', ['code' => 'server_error', 'message' => 'Something went wrong. Please try again.']);
@@ -83,6 +93,35 @@ class AgentController extends Controller
             'Cache-Control' => 'no-cache, no-store, no-transform',
             'X-Accel-Buffering' => 'no',
         ]);
+    }
+
+    /**
+     * Keep only the known, validated screen-context keys (tag ownership is checked when used).
+     *
+     * @param array<string, mixed> $raw
+     * @return array<string, mixed>
+     */
+    private function screenContext(array $raw): array
+    {
+        $ctx = [];
+        if (isset($raw['tab'])) {
+            $ctx['tab'] = (string) $raw['tab'];
+        }
+        if (isset($raw['period_type'])) {
+            $ctx['period_type'] = (string) $raw['period_type'];
+        }
+        if (isset($raw['from'], $raw['to']) && (string) $raw['from'] <= (string) $raw['to']) {
+            $ctx['from'] = (string) $raw['from'];
+            $ctx['to'] = (string) $raw['to'];
+        }
+        if (is_array($raw['tag_ids'] ?? null) && $raw['tag_ids'] !== []) {
+            $ctx['tag_ids'] = array_values(array_unique(array_map('intval', $raw['tag_ids'])));
+        }
+        if (filter_var($raw['untagged'] ?? false, FILTER_VALIDATE_BOOL)) {
+            $ctx['untagged'] = true;
+        }
+
+        return $ctx;
     }
 
     /**

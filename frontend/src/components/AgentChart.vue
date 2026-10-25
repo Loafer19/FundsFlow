@@ -8,6 +8,19 @@
 
             <template v-if="chart.type === 'expenses_by_tag'">
                 <p v-if="!tagRows.length" class="text-sm text-base-content/60">No expenses in this period.</p>
+                <ul v-else-if="chart.style === 'compare'" class="flex flex-col gap-2">
+                    <li v-for="row in tagRows" :key="row.id" class="text-xs">
+                        <div class="flex justify-between gap-2">
+                            <span class="truncate">{{ row.emoji }} {{ row.title }}</span>
+                            <span class="tabular-nums shrink-0">
+                                {{ formatMoney(row.amount) }}
+                                <span class="text-base-content/50">vs {{ formatMoney(row.previous) }}</span>
+                            </span>
+                        </div>
+                        <progress class="progress progress-error w-full h-1.5" :value="row.amount" :max="maxTag" />
+                        <progress class="progress w-full h-1.5 opacity-40" :value="row.previous" :max="maxTag" />
+                    </li>
+                </ul>
                 <TagDonutChart v-else-if="chart.style !== 'bar'" :tags-with-amount="tagRows" />
                 <ul v-else class="flex flex-col gap-1.5">
                     <li v-for="row in tagRows" :key="row.id" class="text-xs">
@@ -34,6 +47,13 @@
                 <span>Expenses <span class="text-error tabular-nums">{{ formatMoney(chart.expenses ?? 0) }}</span></span>
                 <span>Net <span class="tabular-nums">{{ formatMoney(chart.net ?? 0) }}</span></span>
             </div>
+            <div v-if="chart.previous" class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-base-content/50">
+                <span class="w-full">{{ chart.previous.period_label }}<template v-if="chart.previous.partial_current"> ·
+                        current period still in progress</template></span>
+                <span>Income <span class="tabular-nums">{{ formatMoney(chart.previous.income ?? 0) }}</span></span>
+                <span>Expenses <span class="tabular-nums">{{ formatMoney(chart.previous.expenses ?? 0) }}</span></span>
+                <span>Net <span class="tabular-nums">{{ formatMoney(chart.previous.net ?? 0) }}</span></span>
+            </div>
         </div>
     </div>
 </template>
@@ -59,11 +79,12 @@ const tagRows = computed(() =>
         emoji: row.emoji ?? '',
         title: row.title ?? row.label ?? '',
         amount: Number(row.value ?? 0),
+        previous: Number(row.previous ?? 0),
         count: row.count ?? 0,
     })),
 )
 
-const maxTag = computed(() => Math.max(1, ...tagRows.value.map((row) => row.amount)))
+const maxTag = computed(() => Math.max(1, ...tagRows.value.map((row) => Math.max(row.amount, row.previous))))
 
 const hasBuckets = computed(() =>
     (props.chart.buckets ?? []).some((bucket) => Number(bucket.income) !== 0 || Number(bucket.expenses) !== 0),

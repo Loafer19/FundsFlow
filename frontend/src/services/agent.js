@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import api from './api.js'
 import { bootstrapStores } from './bootstrap.js'
 import { apiErrorMessage } from './formatters.js'
+import { reportErrorMessage, requestReport } from './report.js'
 import toasts from './toasts.js'
 
 // Kept outside Pinia state: a reactive proxy of AbortSignal is rejected by fetch().
@@ -48,6 +49,9 @@ export const useAgentStore = defineStore('agent', {
         historyLoaded: false,
         quota: null,
         busyPendingId: null,
+        // What the user is looking at (published by App.vue): { tab, period_type, from, to, tag_ids, untagged }.
+        screenContext: null,
+        reportBusy: '',
     }),
 
     getters: {
@@ -181,7 +185,11 @@ export const useAgentStore = defineStore('agent', {
                         'Content-Type': 'application/json',
                         ...(token ? { Authorization: `Bearer ${token}` } : {}),
                     },
-                    body: JSON.stringify({ message, conversation_id: this.conversationId }),
+                    body: JSON.stringify({
+                        message,
+                        conversation_id: this.conversationId,
+                        ...(this.screenContext ? { context: this.screenContext } : {}),
+                    }),
                     signal: controller.signal,
                 })
 
@@ -261,6 +269,30 @@ export const useAgentStore = defineStore('agent', {
                 }
             } finally {
                 this.busyPendingId = null
+            }
+        },
+
+        setScreenContext(context) {
+            this.screenContext = context && typeof context === 'object' ? context : null
+        },
+
+        // Report card buttons: 'download' / 'print' return the PDF blob, 'telegram' sends it to the linked chat.
+        async fetchReport(request, delivery = 'download') {
+            if (!request || this.reportBusy) return null
+            this.reportBusy = delivery
+
+            try {
+                if (delivery === 'telegram') {
+                    toasts.success(await requestReport(request, 'telegram', '/agent/report'))
+                    return null
+                }
+
+                return await requestReport(request, 'download', '/agent/report')
+            } catch (error) {
+                toasts.error(await reportErrorMessage(error))
+                return null
+            } finally {
+                this.reportBusy = ''
             }
         },
 

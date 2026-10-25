@@ -50,6 +50,8 @@ class AccountController extends Controller
             'dateFormat' => 'sometimes|string|max:64',
             'decimals' => 'sometimes|boolean',
             'timezone' => 'sometimes|string|timezone:all',
+            // App theme (DaisyUI name); used by server-rendered report PDFs (Telegram send_report).
+            'theme' => ['sometimes', 'string', 'regex:/^[a-z0-9-]{1,32}$/'],
         ]);
 
         if (array_key_exists('decimals', $data)) {

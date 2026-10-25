@@ -2,9 +2,11 @@
 
 namespace App\Actions\Telegram;
 
+use App\Actions\Agent\AgentPlanningTools;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Charts\BuildUserChartAction;
 use App\Actions\Charts\ScreenshotHtmlViaGotenbergAction;
+use App\Actions\Report\RenderReportPdfAction;
 use App\Channels\Telegram\Handlers\MenuHandler;
 use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
@@ -37,6 +39,7 @@ class TelegramAgentToolExecutor
         private readonly AgentToolExecutor $tools,
         private readonly BuildUserChartAction $buildChart,
         private readonly ScreenshotHtmlViaGotenbergAction $screenshot,
+        private readonly RenderReportPdfAction $renderReport,
     ) {}
 
     /**
@@ -61,6 +64,7 @@ class TelegramAgentToolExecutor
             $this->tools->definition('list_budgets'),
             $this->tools->definition('list_recurring'),
             $this->tools->definition('period_summary'),
+            ...$this->planningDefinitions(read: true),
             $fn('show_menu', 'Send the standard reply-keyboard menu (Month, Recent, Tags, Budgets, Recurring, Web UI).', [
                 'type' => 'object',
                 'properties' => (object) [],
@@ -90,6 +94,7 @@ class TelegramAgentToolExecutor
                 'properties' => (object) [],
             ]),
             $fn('send_chart', 'Render a chart image (PNG) from the user\'s transactions and send it to the chat with a short caption, then stop. Use for any request to show/draw a chart, graph, diagram or visual breakdown (e.g. spending by tag, income vs expenses, balance trend).', self::chartParameters()),
+            $fn('send_report', 'Generate a PDF finance report (summary vs previous period, expenses/income by tag, budgets, transaction list) for a period and optional tag filter, send it to this chat as a document, then stop.', AgentPlanningTools::reportParameters()),
             $fn('show_web', 'Send the Web UI / mini-app hint.', [
                 'type' => 'object',
                 'properties' => (object) [],
@@ -101,7 +106,21 @@ class TelegramAgentToolExecutor
             $this->tools->definition('update_transaction'),
             $this->tools->definition('delete_transaction'),
             $this->tools->definition('create_budget'),
+            ...$this->planningDefinitions(read: false),
         ];
+    }
+
+    /**
+     * Shared planning tools (budget status/edits, recurring, comparison): reads or staging ones.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function planningDefinitions(bool $read): array
+    {
+        return array_values(array_filter(
+            $this->tools->planning->definitions(),
+            fn (array $def): bool => AgentPlanningTools::isRead($def['function']['name']) === $read,
+        ));
     }
 
     /**
@@ -120,6 +139,7 @@ class TelegramAgentToolExecutor
                 'period' => ['type' => 'string', 'enum' => BuildUserChartAction::PERIODS, 'description' => 'Default this_month. Ignored when from/to given.'],
                 'from' => ['type' => 'string', 'description' => 'Explicit start YYYY-MM-DD (optional)'],
                 'to' => ['type' => 'string', 'description' => 'Explicit end YYYY-MM-DD (optional)'],
+                'compare' => ['type' => 'boolean', 'description' => 'Only expenses_by_tag and income_vs_expenses: also show the previous period (previous month/quarter/year, or the same number of days before from/to) side by side'],
             ],
             'required' => ['type'],
         ];
@@ -139,6 +159,13 @@ class TelegramAgentToolExecutor
         $session = new TelegramAgentSession($this->session, $identity, $chatId);
 
         try {
+            if (AgentPlanningTools::isRead($name)) {
+                return AgentToolExecutor::ok($this->tools->planning->read($user, $session, $name, $arguments));
+            }
+            if (AgentPlanningTools::isStaging($name)) {
+                return AgentToolExecutor::confirmStop($this->stageMutation($identity, $chatId, $name, $this->tools->planning->prepare($user, $name, $arguments)));
+            }
+
             return match ($name) {
                 'get_me' => AgentToolExecutor::ok($this->tools->getMe($user)),
                 'list_tags' => AgentToolExecutor::ok($this->tools->listTags($user, $session)),
@@ -155,6 +182,7 @@ class TelegramAgentToolExecutor
                 'show_recurring' => AgentToolExecutor::uiStop($this->doShowRecurring($user, $chatId, $identity)),
                 'show_month' => AgentToolExecutor::uiStop($this->doShowMonth($user, $chatId, $identity)),
                 'send_chart' => AgentToolExecutor::uiStop($this->doSendChart($user, $chatId, $identity, $arguments)),
+                'send_report' => AgentToolExecutor::uiStop($this->doSendReport($user, $chatId, $identity, $arguments)),
                 'show_web' => AgentToolExecutor::uiStop($this->doShowWeb($chatId, $identity)),
                 'ask_user' => AgentToolExecutor::askStop($this->doAskUser($chatId, $session, $arguments)),
                 'create_tags' => AgentToolExecutor::confirmStop($this->stageCreateTags($user, $chatId, $identity, $arguments)),
@@ -191,7 +219,9 @@ class TelegramAgentToolExecutor
                 'update_transaction' => $this->applyUpdateTransaction($user, $chatId, $identity, $payload),
                 'delete_transaction' => $this->applyDeleteTransaction($user, $chatId, $identity, $payload),
                 'create_budget' => $this->applyCreateBudget($user, $chatId, $identity, $payload),
-                default => $this->client->sendMessage($chatId, 'Nothing to confirm.'),
+                default => AgentPlanningTools::isStaging($action)
+                    ? $this->applyPlanning($user, $chatId, $identity, $action, $payload)
+                    : $this->client->sendMessage($chatId, 'Nothing to confirm.'),
             };
         } catch (Throwable $e) {
             Log::warning('TelegramAgentToolExecutor: apply mutation failed', [
@@ -302,6 +332,29 @@ class TelegramAgentToolExecutor
         $this->session->setSummary($identity, $chatId, mb_substr('Chart sent: ' . str_replace("\n", '; ', $chart['caption']), 0, 500));
 
         return ['ui' => 'chart', 'sent' => true, 'summary' => $chart['summary']];
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     * @return array<string, mixed>
+     */
+    private function doSendReport(User $user, int|string $chatId, int|string $identity, array $args): array
+    {
+        try {
+            // Same PDF as the web report (SPA print page in the user's saved theme; server HTML fallback).
+            $report = $this->renderReport->execute($user, $args);
+            $this->client->sendDocument($chatId, $report['pdf'], $report['filename'], $report['caption']);
+        } catch (Throwable $e) {
+            Log::warning('TelegramAgentToolExecutor: report render/send failed', ['message' => $e->getMessage()]);
+            $this->client->sendMessage($chatId, "Couldn't build the PDF report right now.");
+            $this->session->setSummary($identity, $chatId, 'Report PDF failed.');
+
+            return ['ui' => 'report', 'sent' => false, 'error' => 'render_failed'];
+        }
+
+        $this->session->setSummary($identity, $chatId, mb_substr('Report PDF sent: ' . str_replace("\n", '; ', $report['caption']), 0, 500));
+
+        return ['ui' => 'report', 'sent' => true, 'summary' => $report['summary']];
     }
 
     /**
@@ -487,5 +540,15 @@ class TelegramAgentToolExecutor
         $this->session->setSummary($identity, $chatId, 'Budget created via agent confirm.');
         $label = $budget->title ?: ('Budget #' . $budget->id);
         $this->client->sendMessage($chatId, '✅ Budget created: ' . $label);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function applyPlanning(User $user, int|string $chatId, int|string $identity, string $action, array $payload): void
+    {
+        $result = $this->tools->planning->apply($user, $action, $payload);
+        $this->session->setSummary($identity, $chatId, $result['summary']);
+        $this->client->sendMessage($chatId, $result['message']);
     }
 }

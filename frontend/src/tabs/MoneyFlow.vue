@@ -23,7 +23,7 @@
                 </div>
             </template>
 
-            <label class="label text-sm cursor-pointer ml-auto">
+            <label class="label text-sm cursor-pointer ml-auto report-hide">
                 <input v-model="compare" type="checkbox" class="toggle toggle-sm" />
                 Compare with previous period
             </label>

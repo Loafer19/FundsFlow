@@ -7,6 +7,7 @@ use App\Http\Controllers\BootstrapController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\IdentityController;
 use App\Http\Controllers\RecurringTransactionController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\Telegram\TelegramWebhookController;
 use App\Http\Controllers\TelegramSendController;
@@ -65,8 +66,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->middleware('throttle:30,1');
     Route::post('/telegram/send-file', [TelegramSendController::class, 'sendFile'])
         ->middleware('throttle:20,1');
-    Route::post('/telegram/send-report', [TelegramSendController::class, 'sendReport'])
-        ->middleware('throttle:10,1');
+    // Report PDF (one renderer for Settings and the assistant card; see RenderReportPdfAction).
+    // Own limiter keys (3rd arg): unprefixed throttle:N,M counters are shared per user across routes,
+    // and every render also calls print-data, so the report must not eat the app-wide budget.
+    Route::post('/report', [ReportController::class, 'store'])
+        ->middleware('throttle:10,1,report:');
+    // The only route a one-time `report:print` token is accepted on (App\Support\ReportPrintToken).
+    Route::get('/report/print-data', [ReportController::class, 'printData'])
+        ->name('report.print-data')
+        ->middleware('throttle:30,1,report-print:');
     Route::apiResource('budgets', BudgetController::class)->except(['show']);
 
     Route::post('/budgets/{budget}/pause', [BudgetController::class, 'pause']);
@@ -90,6 +98,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->middleware('throttle:20,1');
     Route::post('/agent/confirm', [AgentController::class, 'confirm'])
         ->middleware('throttle:30,1');
+    Route::post('/agent/report', [ReportController::class, 'store'])
+        ->middleware('throttle:10,1,report:');
     Route::get('/agent/history', [AgentController::class, 'history'])
         ->middleware('throttle:60,1');
     Route::delete('/agent/conversation', [AgentController::class, 'reset'])

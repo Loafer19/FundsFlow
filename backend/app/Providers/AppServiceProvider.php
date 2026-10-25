@@ -10,9 +10,12 @@ use App\Policies\BudgetPolicy;
 use App\Policies\RecurringTransactionPolicy;
 use App\Policies\TagPolicy;
 use App\Policies\TransactionPolicy;
+use App\Support\ReportPrintToken;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,5 +32,11 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Transaction::class, TransactionPolicy::class);
         Gate::policy(Budget::class, BudgetPolicy::class);
         Gate::policy(RecurringTransaction::class, RecurringTransactionPolicy::class);
+
+        // Scoped tokens are closed by default: a one-time `report:print` token authenticates
+        // only GET report.print-data; full tokens (`*`: login, MCP) are unaffected.
+        Sanctum::authenticateAccessTokensUsing(
+            fn (PersonalAccessToken $token, bool $isValid): bool => $isValid && ReportPrintToken::allows($token, request()),
+        );
     }
 }

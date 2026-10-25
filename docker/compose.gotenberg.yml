@@ -1,6 +1,8 @@
-# Optional local/Dokploy helper for Gotenberg (Chromium HTML→PDF).
+# Optional local/Dokploy helper for Gotenberg (Chromium HTML/URL → PDF, chart screenshots).
 # Dokploy: add a service from image gotenberg/gotenberg:8, same network as backend,
 # then set GOTENBERG_URL=http://<service-name>:3000 on the backend.
+# Report PDFs: also set REPORT_RENDER_URL=https://<frontend domain> on the backend; Gotenberg
+# must reach that frontend and the API origin (JavaScript must stay enabled, see below).
 services:
   gotenberg:
     image: gotenberg/gotenberg:8

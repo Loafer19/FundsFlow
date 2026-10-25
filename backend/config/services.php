@@ -21,6 +21,12 @@ return [
         'url' => env('GOTENBERG_URL', 'http://127.0.0.1:3000'),
     ],
 
+    // Report PDFs: base URL of the built SPA that Gotenberg opens in print mode
+    // (<url>/?print=report#t=<one-time token>). Empty = server HTML report only.
+    'report' => [
+        'render_url' => env('REPORT_RENDER_URL'),
+    ],
+
     'xai' => [
         'api_key' => env('XAI_API_KEY'),
         'base_url' => env('XAI_BASE_URL', 'https://api.x.ai/v1'),

@@ -128,7 +128,7 @@
 
 
                         <button type="button"
-                            class="card border-2 border-dashed border-base-300 p-2 items-center justify-center text-base-content/60 cursor-pointer hover:border-primary hover:text-primary"
+                            class="card border-2 border-dashed border-base-300 p-2 items-center report-hide justify-center text-base-content/60 cursor-pointer hover:border-primary hover:text-primary"
                             @click="addForSelectedDate">
                             <Plus :size="20" />
                             <span class="text-xs mt-1">Add</span>
@@ -136,7 +136,7 @@
                     </div>
                 </div>
 
-                <div>
+                <div :class="{ 'report-hide': !upcoming.length }">
                     <h3 class="font-semibold text-base mb-2">Upcoming</h3>
 
                     <EmptyState v-if="!upcoming.length" icon="🔁" title="Nothing upcoming"

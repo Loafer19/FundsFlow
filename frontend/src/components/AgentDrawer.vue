@@ -175,7 +175,7 @@ const textarea = ref(null)
 const panel = ref(null)
 const closeButton = ref(null)
 
-const examples = [
+const DEFAULT_EXAMPLES = [
     'How much did I spend this month?',
     'Chart of spending by tag this month',
     'Show my budgets',
@@ -183,11 +183,53 @@ const examples = [
     'Add -350 groceries today',
 ]
 
+// Starter prompts for the tab the user is on (screen context comes from App.vue).
+const TAB_EXAMPLES = {
+    analytics: [
+        'Compare this period with the previous one',
+        'What changed most in my spending?',
+        'PDF report for this period',
+    ],
+    calendar: [
+        'What recurring charges are coming up this week?',
+        'Which day did I spend the most here?',
+        'Add -350 groceries today',
+    ],
+    budgets: ['How are my budgets doing?', 'How much can I spend per day?', 'Pause my budget'],
+    tags: ['Compare spending by tag with last month', 'Which tag grew the most?', 'Chart of spending by tag'],
+    money_flow: [
+        'Income vs expenses compared with the previous period',
+        'Where did my money go here?',
+        'PDF report for this period',
+    ],
+    balance_trend: [
+        'How did my balance change in this period?',
+        'Upcoming charges for the next 30 days',
+        'Compare this quarter with last',
+    ],
+    table: [
+        'Summarize the transactions in this period',
+        'Biggest expenses in this period',
+        'PDF report for this period',
+    ],
+}
+
+const examples = computed(() => TAB_EXAMPLES[agent.screenContext?.tab] ?? DEFAULT_EXAMPLES)
+
 const ACTION_LABELS = {
     create_transaction: 'New transaction',
     update_transaction: 'Update transaction',
     delete_transaction: 'Delete transaction',
     create_budget: 'New budget',
+    update_budget: 'Update budget',
+    pause_budget: 'Pause budget',
+    resume_budget: 'Resume budget',
+    delete_budget: 'Delete budget',
+    create_recurring: 'New recurring rule',
+    update_recurring: 'Update recurring rule',
+    pause_recurring: 'Pause recurring rule',
+    resume_recurring: 'Resume recurring rule',
+    delete_recurring: 'Delete recurring rule',
     create_tags: 'New tags',
     rename_tags: 'Rename tags',
 }

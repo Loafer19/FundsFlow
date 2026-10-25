@@ -2,6 +2,7 @@
 
 namespace App\Actions\Agent\Web;
 
+use App\Actions\Agent\AgentPlanningTools;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Enums\TransactionSource;
 use App\Models\User;
@@ -63,7 +64,9 @@ final class ConfirmWebAgentPendingAction
                 'update_transaction' => $this->updateTransaction($user, $payload),
                 'delete_transaction' => $this->deleteTransaction($user, $payload),
                 'create_budget' => $this->createBudget($user, $payload),
-                default => [false, 'Nothing to confirm.', 'Nothing to confirm.'],
+                default => AgentPlanningTools::isStaging($kind)
+                    ? $this->planning($user, $kind, $payload)
+                    : [false, 'Nothing to confirm.', 'Nothing to confirm.'],
             };
         } catch (Throwable $e) {
             Log::warning('ConfirmWebAgentPendingAction: apply failed', [
@@ -176,6 +179,19 @@ final class ConfirmWebAgentPendingAction
         $label = $budget->title ?: ('Budget #' . $budget->id);
 
         return [true, '✅ Budget created: ' . $label, 'Budget created via agent confirm.'];
+    }
+
+    /**
+     * Budget edits / recurring rules (shared with Telegram).
+     *
+     * @param array<string, mixed> $payload
+     * @return array{0: bool, 1: string, 2: string}
+     */
+    private function planning(User $user, string $kind, array $payload): array
+    {
+        $result = $this->tools->planning->apply($user, $kind, $payload);
+
+        return [(bool) $result['ok'], (string) $result['message'], (string) $result['summary']];
     }
 
     private function txLine(User $user, string $prefix, \App\Models\Transaction $tx): string

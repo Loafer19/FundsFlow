@@ -28,5 +28,5 @@ The Mini App uses Telegram's native controls:
 
 A few things that need a regular browser are hidden in the Mini App:
 
-- **Settings → Data → Download JSON** (export) and **Settings → Report → Print / Save PDF**. Use **Send to Telegram** in
+- **Settings → Data → Download JSON** (export) and **Settings → Report → Download PDF**. Use **Send to Telegram** in
   the Report tab instead, or open [fundsflow.fun](https://fundsflow.fun/) in a browser.

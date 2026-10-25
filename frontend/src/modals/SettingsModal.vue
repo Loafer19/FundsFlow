@@ -285,16 +285,18 @@ recurring_transactions</pre>
 
                     <div class="flex flex-wrap justify-end gap-2">
                         <button type="button" class="btn btn-outline btn-sm"
-                            :disabled="!reportHasSection || sendingReportTelegram"
+                            :disabled="!reportHasSection || reportBusy !== ''"
                             @click="sendReportToTelegram">
-                            <span v-if="sendingReportTelegram" class="loading loading-spinner loading-xs"></span>
+                            <span v-if="reportBusy === 'telegram'" class="loading loading-spinner loading-xs"></span>
                             <Send v-else :size="20" />
                             Send to Telegram
                         </button>
-                        <button v-if="!inTelegram" type="button" class="btn btn-primary btn-sm" :disabled="!reportHasSection"
-                            @click="printReport">
-                            <Download :size="20" />
-                            Print / Save PDF
+                        <button v-if="!inTelegram" type="button" class="btn btn-primary btn-sm"
+                            :disabled="!reportHasSection || reportBusy !== ''"
+                            @click="downloadReport">
+                            <span v-if="reportBusy === 'download'" class="loading loading-spinner loading-xs"></span>
+                            <Download v-else :size="20" />
+                            Download PDF
                         </button>
                     </div>
                 </template>
@@ -313,20 +315,11 @@ recurring_transactions</pre>
         </form>
     </dialog>
 
-    <!-- Rendered only while a report is being exported: it mounts every tab plus four Chart.js canvases. -->
-    <Teleport to="body">
-        <component :is="reportComponent" v-if="reportComponent && reportActive"
-            :sections="reportSections"
-            :date-range="insightDateRange"
-            :date-selection-type="reportDateSelectionType"
-            :tag-filter-label="selectedTagTitles.length ? selectedTagTitles.join(', ') : 'All tags'"
-        />
-    </Teleport>
 </template>
 
 <script setup>
 import { Bot, Download, KeyRound, Save, Send } from 'lucide-vue-next'
-import { computed, inject, markRaw, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import {
     createMcpToken,
     downloadAccountExport,
@@ -344,9 +337,10 @@ import {
     formatMoneyOptions,
     nowDateStr,
     timezoneOptions,
+    toLocalDateStr,
 } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
-import { sendReportPdfToTelegram } from '../services/reportPdf.js'
+import { reportErrorMessage, requestReport, saveBlob } from '../services/report.js'
 import settings, {
     updateDateFormat,
     updateDecimals,
@@ -370,7 +364,7 @@ const tabs = ref({
 })
 const tab = ref('formatting')
 const exporting = ref(false)
-const sendingReportTelegram = ref(false)
+const reportBusy = ref('')
 
 const aiQuotaLoading = ref(false)
 const aiQuotaUsed = ref(0)
@@ -454,66 +448,47 @@ const reportPeriodLabel = computed(() => {
     if (!tags.length) return `${period} · All tags`
     return `${period} · ${tags.join(', ')}`
 })
-// ReportDocument (and the chart tabs it renders) is its own chunk, loaded on the first export.
-const reportComponent = shallowRef(null)
-const reportActive = ref(false)
-
-const mountReport = async () => {
-    if (!reportComponent.value) {
-        reportComponent.value = markRaw((await import('../components/ReportDocument.vue')).default)
+// The PDF is rendered by the backend from the same ReportDocument (SPA print mode via Gotenberg),
+// in the current theme, period type, dates and tag filter.
+const reportRequest = () => {
+    const range = insightDateRange?.value ?? insightDateRange
+    return {
+        from: toLocalDateStr(range.currentStart),
+        to: toLocalDateStr(range.currentEnd),
+        period_type: reportDateSelectionType.value,
+        sections: { ...reportSections.value },
+        tag_ids: [...(transactionsStore.selectedTagIds || [])],
+        untagged: Boolean(transactionsStore.filterUntagged),
     }
-    reportActive.value = true
-    await nextTick()
 }
 
-const unmountReport = () => {
-    reportActive.value = false
-}
-
-const printReport = async () => {
+const runReport = async (delivery) => {
+    if (!reportHasSection.value || reportBusy.value) return null
+    reportBusy.value = delivery
     try {
-        await mountReport()
-    } catch {
-        toasts.error('Failed to load the report. Check your connection and try again.')
-        return
+        return await requestReport(reportRequest(), delivery)
+    } catch (error) {
+        if (error?.response?.status === 422 && error.response.data?.needs_link) {
+            toasts.info('Link Telegram first, then send the report again.')
+            tab.value = 'accounts'
+        } else {
+            toasts.error(await reportErrorMessage(error))
+        }
+        return null
+    } finally {
+        reportBusy.value = ''
     }
-    // Let Chart.js paint canvases in the off-screen report before printing.
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-    await new Promise((resolve) => setTimeout(resolve, 300))
+}
 
-    const root = document.documentElement
-    let cleaned = false
-    const cleanup = () => {
-        if (cleaned) return
-        cleaned = true
-        root.classList.remove('printing-report')
-        window.removeEventListener('afterprint', cleanup)
-        unmountReport()
-    }
-    root.classList.add('printing-report')
-    window.addEventListener('afterprint', cleanup)
-    window.print()
-    // Safari may not fire afterprint reliably
-    setTimeout(cleanup, 1000)
+const downloadReport = async () => {
+    const request = reportRequest()
+    const blob = await runReport('download')
+    if (blob) saveBlob(blob, `fundsflow-report-${request.from}_${request.to}.pdf`)
 }
 
 const sendReportToTelegram = async () => {
-    if (!reportHasSection.value || sendingReportTelegram.value) return
-
-    sendingReportTelegram.value = true
-    try {
-        await mountReport()
-        const caption = `FundsFlow report · ${reportPeriodLabel.value || 'Report'}`
-        const result = await sendReportPdfToTelegram(caption)
-        if (result?.needsLink) {
-            tab.value = 'accounts'
-        }
-    } catch (error) {
-        toasts.error(error?.message || 'Failed to build report PDF!')
-    } finally {
-        sendingReportTelegram.value = false
-        unmountReport()
-    }
+    const message = await runReport('telegram')
+    if (message) toasts.success(message)
 }
 
 const formatDate = ref(settings.dateFormat)
@@ -780,6 +755,7 @@ const saveSettings = async () => {
                 dateFormat: formatDate.value,
                 decimals: decimals.value,
                 timezone: timezone.value,
+                theme: themeSelected.value,
             })
 
             if (response.data?.user) {

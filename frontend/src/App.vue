@@ -575,6 +575,37 @@ const periodLabel = computed(() => {
     return `${month(start)} ${start.getDate()}, ${start.getFullYear()} – ${month(end)} ${end.getDate()}, ${end.getFullYear()}`
 })
 provide('insightDateSelectionType', dateSelectionType)
+
+// Screen context for the assistant drawer: which tab, period and tag filter the user is looking at.
+const AGENT_TAB_KEYS = new Map([
+    [Analytics, 'analytics'],
+    [CalendarTab, 'calendar'],
+    [Budgets, 'budgets'],
+    [TagDistribution, 'tags'],
+    [MoneyFlow, 'money_flow'],
+    [BalanceTrend, 'balance_trend'],
+    [TableTab, 'table'],
+])
+const ymd = (date) => {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+const agentScreenContext = computed(() => {
+    const { currentStart, currentEnd } = getDateRange.value
+    const from = ymd(currentStart)
+    const to = ymd(currentEnd)
+    const tagIds = (transactionsStore.selectedTagIds ?? []).filter((id) => Number.isInteger(id)).slice(0, 50)
+
+    return {
+        tab: AGENT_TAB_KEYS.get(selectedTab.value) ?? null,
+        period_type: dateSelectionType.value,
+        ...(from && to ? { from, to } : {}),
+        ...(tagIds.length ? { tag_ids: tagIds } : {}),
+        ...(transactionsStore.filterUntagged ? { untagged: true } : {}),
+    }
+})
+watch(agentScreenContext, (context) => agentStore.setScreenContext(context), { immediate: true })
 </script>
 
 <style scoped>

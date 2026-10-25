@@ -5,6 +5,7 @@ namespace App\Actions\Charts;
 use App\Actions\Transactions\ListTransactionsAction;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\PeriodRange;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -19,7 +20,19 @@ class BuildUserChartAction
 {
     public const TYPES = ['expenses_by_tag', 'income_vs_expenses', 'balance_trend'];
 
-    public const PERIODS = ['this_month', 'last_month', 'last_7_days', 'last_30_days', 'this_year'];
+    public const PERIODS = PeriodRange::PRESETS;
+
+    /** Chart types that support `compare` (current vs previous period). */
+    public const COMPARABLE_TYPES = ['expenses_by_tag', 'income_vs_expenses'];
+
+    /** Short labels kept for the original presets (Telegram captions unchanged). */
+    private const LEGACY_LABELS = [
+        'this_month' => 'This month',
+        'last_month' => 'Last month',
+        'last_7_days' => 'Last 7 days',
+        'last_30_days' => 'Last 30 days',
+        'this_year' => 'This year',
+    ];
 
     public const WIDTH = 1000;
 
@@ -44,20 +57,15 @@ class BuildUserChartAction
             throw new InvalidArgumentException('Unknown chart type: ' . $type);
         }
 
-        [$from, $to, $periodLabel] = $this->resolvePeriod($user, $args);
+        $period = PeriodRange::resolve($user, $args);
+        [$from, $to] = [$period->from, $period->to];
+        $periodLabel = $period->preset !== null ? (self::LEGACY_LABELS[$period->preset] ?? $period->label) : $period->label;
         $fromKey = $from->toDateString();
         $toKey = $to->toDateString();
 
         // ListTransactionsAction is scoped by the user (authorized + $user->transactions()).
         $all = $this->listTransactions->execute($user);
-        $inRange = $all->filter(function (Transaction $tx) use ($fromKey, $toKey): bool {
-            if (!$tx->at) {
-                return false;
-            }
-            $d = $tx->at->format('Y-m-d');
-
-            return $d >= $fromKey && $d <= $toKey;
-        });
+        $inRange = $this->between($all, $fromKey, $toKey);
 
         $income = (float) $inRange->filter(fn (Transaction $tx) => $tx->amount > 0)->sum('amount');
         $expenses = (float) $inRange->filter(fn (Transaction $tx) => $tx->amount < 0)->sum('amount');
@@ -66,8 +74,57 @@ class BuildUserChartAction
         $range = UserFormatter::formatDate($user, $from) . ' – ' . UserFormatter::formatDate($user, $to);
 
         $data = [];
+        $previous = null;
+        $compare = filter_var($args['compare'] ?? false, FILTER_VALIDATE_BOOL) && in_array($type, self::COMPARABLE_TYPES, true);
 
-        switch ($type) {
+        if ($compare) {
+            $prevIn = $this->between($all, $period->previousFrom->toDateString(), $period->previousTo->toDateString());
+            $prevIncome = (float) $prevIn->filter(fn (Transaction $tx) => $tx->amount > 0)->sum('amount');
+            $prevExpenses = (float) $prevIn->filter(fn (Transaction $tx) => $tx->amount < 0)->sum('amount');
+            $previous = [
+                'from' => $period->previousFrom->toDateString(),
+                'to' => $period->previousTo->toDateString(),
+                'period_label' => $period->previousLabel,
+                'income' => $prevIncome,
+                'expenses' => $prevExpenses,
+                'net' => $prevIncome + $prevExpenses,
+                'partial_current' => $period->isPartial(),
+            ];
+        }
+
+        switch ($compare ? $type . '_compare' : $type) {
+            case 'expenses_by_tag_compare':
+                $rows = $this->compareByTag($inRange, $prevIn);
+                $title = 'Expenses by tag: ' . $periodLabel . ' vs ' . $period->previousLabel;
+                $svg = $this->svgCompareBars($rows, $money, $periodLabel, $period->previousLabel);
+                $caption = "Expenses by tag · {$periodLabel} vs {$period->previousLabel}\n"
+                    . 'Now: ' . $money($expenses) . ' · Before: ' . $money($previous['expenses'])
+                    . $this->deltaText($expenses, $previous['expenses']);
+                if ($period->isPartial()) {
+                    $caption .= "\nCurrent period is still in progress.";
+                }
+                $summary = ['rows' => count($rows), 'compare' => true];
+                $data = ['style' => 'compare', 'rows' => $rows];
+                break;
+
+            case 'income_vs_expenses_compare':
+                $buckets = [
+                    ['label' => mb_strimwidth($period->previousLabel, 0, 24, '…'), 'date' => $previous['from'], 'income' => $previous['income'], 'expenses' => abs($previous['expenses'])],
+                    ['label' => mb_strimwidth($periodLabel, 0, 24, '…'), 'date' => $fromKey, 'income' => $income, 'expenses' => abs($expenses)],
+                ];
+                $title = 'Income vs expenses: ' . $periodLabel . ' vs ' . $period->previousLabel;
+                $svg = $this->svgGroupedBars($buckets, $money);
+                $caption = "Income vs expenses · {$periodLabel} vs {$period->previousLabel}\n"
+                    . 'Income: ' . $money($income) . ' (before ' . $money($previous['income']) . ')'
+                    . "\nExpenses: " . $money($expenses) . ' (before ' . $money($previous['expenses']) . ')'
+                    . "\nNet: " . $money($net) . ' (before ' . $money($previous['net']) . ')';
+                if ($period->isPartial()) {
+                    $caption .= "\nCurrent period is still in progress.";
+                }
+                $summary = ['buckets' => 2, 'group_by' => 'period', 'compare' => true];
+                $data = ['group_by' => 'period', 'buckets' => $buckets];
+                break;
+
             case 'expenses_by_tag':
                 $style = ($args['style'] ?? 'donut') === 'bar' ? 'bar' : 'donut';
                 $rows = $this->expensesByTag($inRange);
@@ -122,8 +179,8 @@ class BuildUserChartAction
                 'income' => $income,
                 'expenses' => $expenses,
                 'net' => $net,
-            ]),
-            'summary' => array_merge($summary, [
+            ], $previous !== null ? ['previous' => $previous] : []),
+            'summary' => array_merge($summary, $previous !== null ? ['previous' => $previous] : [], [
                 'type' => $type,
                 'from' => $fromKey,
                 'to' => $toKey,
@@ -136,35 +193,90 @@ class BuildUserChartAction
     }
 
     /**
-     * @param array<string, mixed> $args
-     * @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: string}
+     * @param iterable<Transaction> $all
+     * @return \Illuminate\Support\Collection<int, Transaction>
      */
-    private function resolvePeriod(User $user, array $args): array
+    private function between(iterable $all, string $fromKey, string $toKey): \Illuminate\Support\Collection
     {
-        $tz = $user->timezone();
-        $today = CarbonImmutable::parse($user->todayDateString(), $tz)->startOfDay();
-        $isDate = fn ($v) => is_string($v) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) === 1;
-
-        if ($isDate($args['from'] ?? null) || $isDate($args['to'] ?? null)) {
-            $from = $isDate($args['from'] ?? null) ? CarbonImmutable::parse($args['from'], $tz) : $today->startOfMonth();
-            $to = $isDate($args['to'] ?? null) ? CarbonImmutable::parse($args['to'], $tz) : $today;
-            if ($from->gt($to)) {
-                [$from, $to] = [$to, $from];
+        return collect($all)->filter(function (Transaction $tx) use ($fromKey, $toKey): bool {
+            if (!$tx->at) {
+                return false;
             }
-            if ($from->diffInDays($to) > 366 * 3) {
-                $from = $to->subYears(3);
-            }
+            $d = $tx->at->format('Y-m-d');
 
-            return [$from, $to, 'Custom period'];
+            return $d >= $fromKey && $d <= $toKey;
+        })->values();
+    }
+
+    /**
+     * Expense totals per tag for both periods (top 7 by the larger side + Other).
+     *
+     * @param iterable<Transaction> $current
+     * @param iterable<Transaction> $previous
+     * @return list<array{label: string, value: float, previous: float, id: int|string, emoji: string, title: string, count: int}>
+     */
+    private function compareByTag(iterable $current, iterable $previous): array
+    {
+        $rows = [];
+        foreach (['value' => $current, 'previous' => $previous] as $side => $transactions) {
+            foreach ($this->expensesByTagAll($transactions) as $key => $row) {
+                $rows[$key] ??= ['label' => $row['label'], 'value' => 0.0, 'previous' => 0.0, 'id' => $row['id'], 'emoji' => $row['emoji'], 'title' => $row['title'], 'count' => 0];
+                $rows[$key][$side] += $row['value'];
+                if ($side === 'value') {
+                    $rows[$key]['count'] += $row['count'];
+                }
+            }
         }
 
-        return match ($args['period'] ?? 'this_month') {
-            'last_month' => [$today->subMonthNoOverflow()->startOfMonth(), $today->subMonthNoOverflow()->endOfMonth()->startOfDay(), 'Last month'],
-            'last_7_days' => [$today->subDays(6), $today, 'Last 7 days'],
-            'last_30_days' => [$today->subDays(29), $today, 'Last 30 days'],
-            'this_year' => [$today->startOfYear(), $today, 'This year'],
-            default => [$today->startOfMonth(), $today, 'This month'],
-        };
+        $rows = collect($rows)->sortByDesc(fn (array $r) => max($r['value'], $r['previous']))->values();
+        if ($rows->count() > 8) {
+            $rest = $rows->slice(7);
+            $rows = $rows->take(7)->push([
+                'label' => 'Other', 'value' => (float) $rest->sum('value'), 'previous' => (float) $rest->sum('previous'),
+                'id' => 'other', 'emoji' => '', 'title' => 'Other', 'count' => (int) $rest->sum('count'),
+            ]);
+        }
+
+        return $rows->all();
+    }
+
+    /**
+     * @param iterable<Transaction> $transactions
+     * @return array<int|string, array{label: string, value: float, id: int|string, emoji: string, title: string, count: int}>
+     */
+    private function expensesByTagAll(iterable $transactions): array
+    {
+        $byTag = [];
+        foreach ($transactions as $tx) {
+            if ($tx->amount >= 0) {
+                continue;
+            }
+            $amount = abs((float) $tx->amount);
+            if ($tx->tags->isEmpty()) {
+                $byTag['untagged'] ??= ['label' => 'Untagged', 'value' => 0.0, 'id' => 'untagged', 'emoji' => '🏷️', 'title' => 'Untagged', 'count' => 0];
+                $byTag['untagged']['value'] += $amount;
+                $byTag['untagged']['count']++;
+                continue;
+            }
+            foreach ($tx->tags as $tag) {
+                $byTag[$tag->id] ??= ['label' => trim(((string) $tag->emoji) . ' ' . $tag->title), 'value' => 0.0, 'id' => (int) $tag->id, 'emoji' => (string) $tag->emoji, 'title' => (string) $tag->title, 'count' => 0];
+                $byTag[$tag->id]['value'] += $amount;
+                $byTag[$tag->id]['count']++;
+            }
+        }
+
+        return $byTag;
+    }
+
+    /** " (+12% vs before)" for expense totals (negative numbers). */
+    private function deltaText(float $now, float $before): string
+    {
+        if (abs($before) < 0.005) {
+            return '';
+        }
+        $pct = (int) round((abs($now) - abs($before)) / abs($before) * 100);
+
+        return ' (' . ($pct >= 0 ? '+' : '') . $pct . '%)';
     }
 
     private function defaultGrouping(CarbonImmutable $from, CarbonImmutable $to): string
@@ -366,6 +478,40 @@ class BuildUserChartAction
             $out .= sprintf('<rect x="265" y="%d" width="%.1f" height="%d" rx="6" fill="%s"/>', $y + 8, $w, $rowH - 16, $color);
             $out .= sprintf('<text x="%.1f" y="%d" font-size="18" fill="#475569">%s</text>', 275 + $w, $y + $rowH / 2 + 6, $this->e($money(-$row['value'])));
         }
+
+        return $out;
+    }
+
+    /**
+     * Paired horizontal bars per tag: current period (colored) vs previous (grey).
+     *
+     * @param list<array{label: string, value: float, previous: float}> $rows
+     */
+    private function svgCompareBars(array $rows, callable $money, string $currentLabel, string $previousLabel): string
+    {
+        $max = 0.0;
+        foreach ($rows as $row) {
+            $max = max($max, $row['value'], $row['previous']);
+        }
+        if ($max <= 0) {
+            return $this->emptySvg();
+        }
+        $out = '';
+        $rowH = min(56, intdiv(470, max(1, count($rows))));
+        $barH = max(6, intdiv($rowH - 12, 2));
+        foreach ($rows as $i => $row) {
+            $y = 10 + $i * $rowH;
+            $color = self::PALETTE[$i % count(self::PALETTE)];
+            $wc = $row['value'] > 0 ? max(2, ($row['value'] / $max) * 470) : 0;
+            $wp = $row['previous'] > 0 ? max(2, ($row['previous'] / $max) * 470) : 0;
+            $out .= sprintf('<text x="250" y="%d" font-size="19" text-anchor="end" fill="#1e293b">%s</text>', $y + $barH + 6, $this->e(mb_strimwidth($row['label'], 0, 22, '…')));
+            $out .= sprintf('<rect x="265" y="%d" width="%.1f" height="%d" rx="4" fill="%s"/>', $y + 2, $wc, $barH, $color);
+            $out .= sprintf('<rect x="265" y="%d" width="%.1f" height="%d" rx="4" fill="#cbd5e1"/>', $y + 4 + $barH, $wp, $barH);
+            $out .= sprintf('<text x="%.1f" y="%d" font-size="15" fill="#334155">%s</text>', 273 + $wc, $y + $barH, $this->e($money(-$row['value'])));
+            $out .= sprintf('<text x="%.1f" y="%d" font-size="15" fill="#94a3b8">%s</text>', 273 + $wp, $y + 2 + 2 * $barH, $this->e($money(-$row['previous'])));
+        }
+        $out .= '<rect x="265" y="500" width="16" height="16" rx="3" fill="#6366f1"/><text x="289" y="514" font-size="17" fill="#334155">' . $this->e(mb_strimwidth($currentLabel, 0, 30, '…')) . '</text>';
+        $out .= '<rect x="600" y="500" width="16" height="16" rx="3" fill="#cbd5e1"/><text x="624" y="514" font-size="17" fill="#334155">' . $this->e(mb_strimwidth($previousLabel, 0, 30, '…')) . '</text>';
 
         return $out;
     }

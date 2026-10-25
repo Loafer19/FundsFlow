@@ -5,6 +5,7 @@ namespace App\Actions\Agent\Web;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Agent\RunAgentAction;
 use App\Actions\Charts\BuildUserChartAction;
+use App\Actions\Report\BuildUserReportAction;
 use App\Models\User;
 use App\Support\TelegramAiQuota;
 use Closure;
@@ -22,12 +23,14 @@ final class RunWebAgentAction
         private readonly AgentToolExecutor $tools,
         private readonly BuildUserChartAction $buildChart,
         private readonly TelegramAiQuota $quota,
+        private readonly BuildUserReportAction $buildReport,
     ) {}
 
     /**
      * @param Closure(string, array<string, mixed>): void $emit
+     * @param array<string, mixed> $context validated screen context (tab, period, tag filter)
      */
-    public function execute(User $user, string $message, ?string $conversationId, Closure $emit): void
+    public function execute(User $user, string $message, ?string $conversationId, Closure $emit, array $context = []): void
     {
         $session = new WebAgentSession($user);
         $currentId = $session->conversationId();
@@ -50,7 +53,7 @@ final class RunWebAgentAction
 
         $history = $session->historyMessages(dropTrailingAsk: $askContext !== null);
 
-        $channel = new WebAgentChannel($this->quota, $this->tools, $this->buildChart, $session, $emit, $history);
+        $channel = new WebAgentChannel($this->quota, $this->tools, $this->buildChart, $session, $emit, $history, $context, $this->buildReport);
         $channel->push('user', ['role' => 'user', 'kind' => 'text', 'text' => $message]);
 
         if ((string) config('services.xai.api_key') === '') {

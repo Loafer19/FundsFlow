@@ -38,6 +38,7 @@ class AgentToolExecutor
         'update_transaction',
         'delete_transaction',
         'create_budget',
+        ...AgentPlanningTools::STAGING_TOOLS,
     ];
 
     public const MAX_RECENT = 20;
@@ -58,6 +59,8 @@ class AgentToolExecutor
         private readonly CreateBudgetAction $createBudget,
         private readonly CreateTagAction $createTag,
         private readonly UpdateTagAction $updateTag,
+        /** Budgets status/edits, recurring rules, upcoming charges, period comparison. */
+        public readonly AgentPlanningTools $planning,
     ) {}
 
     /**
@@ -169,7 +172,7 @@ class AgentToolExecutor
                 ],
                 'required' => ['id'],
             ]),
-            'create_budget' => self::fn('create_budget', 'Propose creating a budget. Stages Confirm/Cancel. length: week|month|year. tag_ids required.', [
+            'create_budget' => self::fn('create_budget', 'Propose creating a budget. Stages Confirm/Cancel. length: week|month|year. tag_ids required. align_to_calendar defaults to true (period starts at the current calendar week/month/year, so spending already made this period counts); set false only if the user wants the period to start today.', [
                 'type' => 'object',
                 'properties' => [
                     'title' => ['type' => 'string'],
@@ -672,7 +675,7 @@ class AgentToolExecutor
         }
 
         $title = is_string($args['title'] ?? null) ? mb_substr(trim((string) $args['title']), 0, 255) : null;
-        $align = (bool) ($args['align_to_calendar'] ?? false);
+        $align = array_key_exists('align_to_calendar', $args) ? filter_var($args['align_to_calendar'], FILTER_VALIDATE_BOOL) : true;
 
         $payload = [
             'title' => $title !== '' ? $title : null,
@@ -685,7 +688,8 @@ class AgentToolExecutor
         $preview = 'Create budget:' . "\n"
             . ($title ? "{$title}\n" : '')
             . UserFormatter::formatMoney($user, $amount) . " / {$length}\n"
-            . 'Tags: ' . $this->tagLabels($user, $tagIds);
+            . 'Tags: ' . $this->tagLabels($user, $tagIds) . "\n"
+            . ($align ? "Period: calendar {$length} (counts spending since its start)" : 'Period: starts today');
 
         return ['payload' => $payload, 'preview' => $preview];
     }

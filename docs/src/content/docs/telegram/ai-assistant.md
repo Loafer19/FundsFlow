@@ -15,6 +15,9 @@ Examples:
 - “create tags groceries, coffee”
 - “rename tag Food to Eating out”
 - “add -250 taxi yesterday”, “delete the last transaction”
+- “how is my groceries budget?”, “how much can I still spend per day?”, “pause my travel budget”
+- “what charges are coming up this week?”, “add a monthly -15 Netflix subscription from the 5th”
+- “compare this quarter with last quarter”, “send me a PDF report for last month”
 
 The assistant keeps a short conversation context for about 20 minutes, so follow-up questions like “and last month?”
 work. If something is ambiguous it asks a clarifying question, sometimes with suggested reply buttons.
@@ -39,6 +42,9 @@ The assistant works by calling tools on your account.
 | `list_budgets` | Budgets with the current-period limit, spent amount, and progress |
 | `list_recurring` | Recurring rules |
 | `period_summary` | Income, expenses, net, and top expense tags for a month |
+| `budget_status` | For each active budget (or one): spent, left, days left, per-day allowance, average daily spend, and the projected total at the current pace (*on track*, *at risk*, or *over*) |
+| `upcoming_recurring` | Recurring charges and income due in the next N days (default 7, up to 90) with totals |
+| `compare_periods` | Income, expenses, and net for a period vs the previous one, plus per-tag spending changes. If the current period isn't over yet, it also compares with the same number of days of the previous period |
 
 **Show** (sends the same cards as the menu buttons): `show_menu`, `show_help`, `show_recent`, `show_budgets`,
 `show_tags`, `show_recurring`, `show_month`, `show_web`.
@@ -51,7 +57,16 @@ The assistant works by calling tools on your account.
 | `income_vs_expenses` | Grouped bars by day, week, or month |
 | `balance_trend` | Line chart of your balance over time |
 
-Periods: this month (default), last month, last 7 days, last 30 days, this year, or an explicit date range.
+Periods: this month (default), last month, this or last week, last 7 days, last 30 days, this or last quarter, this
+or last year, or an explicit date range.
+
+Ask for a comparison (“spending by tag this month vs last month”) and `expenses_by_tag` or `income_vs_expenses` is
+drawn side by side with the previous period (the previous month, quarter, or year; for a custom range, the same number
+of days just before it).
+
+**Report** — `send_report` builds a PDF report and sends it to the chat as a document: income, expenses, and net vs the
+previous period, spending and income by tag, your budgets, and the transaction list. Ask for any of the periods above
+and, optionally, some tags (“PDF report for groceries and coffee this year”).
 
 **Ask** — `ask_user` asks you a clarifying question.
 
@@ -65,6 +80,13 @@ Periods: this month (default), last month, last 7 days, last 30 days, this year,
 | `update_transaction` | Change a transaction |
 | `delete_transaction` | Delete a transaction |
 | `create_budget` | Create a weekly, monthly, or yearly budget for some tags |
+| `update_budget` | Change a budget's amount, period, tags, title, or alignment (applies to the current period and later) |
+| `pause_budget` / `resume_budget` | Pause or resume a budget |
+| `delete_budget` | Delete a budget |
+| `create_recurring` | Add a recurring transaction (daily, weekly, monthly, or yearly). If the start date is in the past, the preview tells you how many past transactions will be added |
+| `update_recurring` | Change a recurring rule's amount, frequency, dates, note, or tags |
+| `pause_recurring` / `resume_recurring` | Pause or resume a recurring rule |
+| `delete_recurring` | Delete a recurring rule (transactions it already created stay) |
 
 :::caution[Changes need Confirm]
 The assistant never changes your data silently. Every write shows a preview with **✅ Confirm** and **Cancel**;
@@ -88,7 +110,11 @@ You can always see *AI assists today* (used / limit and reset time) in **Setting
 Quick add, commands, menu buttons, and receipts with an amount in the caption **don't** use AI and keep working when
 the limit is reached.
 
+Savings goals aren't a FundsFlow feature yet. If you ask about one, the assistant says so and gives advice from your
+real numbers (month summary, budget status) instead.
+
 ## PDF reports in Telegram
 
-The bot itself doesn't build PDF reports, but the web app can send one to your chat: **Settings → Report → Send to
-Telegram**. See [Reports](/docs/web/reports/).
+Ask the assistant: “send me a PDF report for last month” (or any period, optionally for some tags) and it sends the
+PDF to the chat. The web app can send its own report too: **Settings → Report → Send to Telegram**. See
+[Reports](/docs/web/reports/).

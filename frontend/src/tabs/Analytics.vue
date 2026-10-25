@@ -99,7 +99,8 @@
             </div>
         </div>
 
-        <div class="card card-border border-base-300 bg-base-100 md:col-span-2 min-w-0 overflow-hidden">
+        <div v-if="!inReport || balancesByTags.length"
+            class="card card-border border-base-300 bg-base-100 md:col-span-2 min-w-0 overflow-hidden">
             <div class="card-body gap-3">
                 <h2 class="card-title flex-wrap text-base sm:text-lg min-w-0">
                     <span class="tooltip tooltip-right" data-tip="All-time. Parent tags include child tags">
@@ -137,6 +138,8 @@ const tagsStore = useTagsStore()
 const transactionsStore = useTransactionsStore()
 const formatMoney = inject('formatMoney')
 const formatPercentage = inject('formatPercentage')
+// Provided by ReportDocument: the PDF lists only the filtered tags with a non-zero balance (the app tab is unchanged).
+const inReport = inject('inReport', false)
 const openAdd = () => transactions_add_modal.showModal()
 
 const props = defineProps({
@@ -185,8 +188,9 @@ const computeMetrics = (transactions, startDate, endDate) => {
 
 const balancesByTags = computed(() => {
     const grouped = transactionsStore.groupedByTags()
+    const selected = transactionsStore.tagFilterActive ? new Set(transactionsStore.selectedTagIds) : null
 
-    return tagsStore.forBalances().map((tag) => {
+    const rows = tagsStore.forBalances().map((tag) => {
         const ids = tagsStore.descendantIds(tag.id)
         const seen = new Set()
         const transactions = []
@@ -205,6 +209,9 @@ const balancesByTags = computed(() => {
             txns: transactions.length,
         }
     })
+
+    if (!inReport) return rows
+    return rows.filter((tag) => tag.balance !== 0 && (!selected || selected.has(tag.id)))
 })
 
 const filteredTransactions = computed(() =>

@@ -15,7 +15,7 @@
 
         <section v-if="sections.calendar" class="report-section">
             <h2 class="report-tab-title">Calendar</h2>
-            <CalendarTab :dateRange="dateRange" :dateSelectionType="dateSelectionType" />
+            <CalendarTab :dateRange="dateRange" :dateSelectionType="tabSelectionType" />
         </section>
 
         <section v-if="sections.budgets" class="report-section">
@@ -35,7 +35,7 @@
 
         <section v-if="sections.flow" class="report-section">
             <h2 class="report-tab-title">Flow</h2>
-            <MoneyFlow :dateRange="dateRange" :dateSelectionType="dateSelectionType" />
+            <MoneyFlow :dateRange="dateRange" :dateSelectionType="tabSelectionType" />
         </section>
 
         <section v-if="sections.trend" class="report-section">
@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { computed, inject } from 'vue'
+import { computed, inject, provide } from 'vue'
 import { useAuthStore } from '../services/auth'
 import Analytics from '../tabs/Analytics.vue'
 import BalanceTrend from '../tabs/BalanceTrend.vue'
@@ -81,6 +81,8 @@ const props = defineProps({
 })
 
 const formatDate = inject('formatDate')
+// Tabs rendered inside the report can adapt (see Analytics.vue Balances Per Tag); `.report-hide` covers pure CSS hiding.
+provide('inReport', true)
 const authStore = useAuthStore()
 
 const accountName = computed(() => authStore.user?.name || authStore.user?.email || 'Account')
@@ -88,8 +90,11 @@ const periodTypeLabel = computed(() => {
     const type = props.dateSelectionType
     if (type === 'week') return 'Week'
     if (type === 'year') return 'Year'
+    if (type === 'custom') return 'Period'
     return 'Month'
 })
+// Tabs know week / month / year; a custom range (assistant "last 30 days") lays out like a month.
+const tabSelectionType = computed(() => (props.dateSelectionType === 'custom' ? 'month' : props.dateSelectionType))
 const periodLabel = computed(() => {
     const range = props.dateRange
     if (!range?.currentStart || !range?.currentEnd) return ''
@@ -100,6 +105,22 @@ const dateRange = computed(() => props.dateRange)
 </script>
 
 <style>
+/* Print mode (PrintReport.vue, rendered by Gotenberg): laid out on screen at the printable
+   width of A4 landscape (297mm − 2×6mm), so the charts never resize between layout and print. */
+html.report-print-page,
+html.report-print-page body {
+    margin: 0;
+    background: var(--color-base-200);
+}
+
+html.report-print-page #fundsflow-report {
+    position: static;
+    left: auto;
+    width: 285mm;
+    padding: 0;
+    pointer-events: auto;
+}
+
 /* Off-screen but laid out so Chart.js can paint (not display:none). */
 .fundsflow-report {
     position: absolute;
@@ -151,6 +172,10 @@ const dateRange = computed(() => props.dateRange)
     margin-bottom: 28px;
 }
 
+.fundsflow-report .report-hide {
+    display: none !important;
+}
+
 .fundsflow-report .report-tab-title {
     font-size: 1.1rem;
     font-weight: 700;
@@ -184,6 +209,12 @@ const dateRange = computed(() => props.dateRange)
         color: var(--color-base-content) !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+    }
+
+    /* Gotenberg lays the page out with print media on a narrow (800px) viewport, so width:100% above
+       would size the charts to it and leave them at ~70% of the page. Keep the printable width instead. */
+    html.report-print-page #fundsflow-report {
+        width: 285mm !important;
     }
 
     /* Balances Per Tag card: full page width in PDF */
@@ -296,6 +327,17 @@ const dateRange = computed(() => props.dateRange)
         page-break-inside: avoid;
         background-color: var(--color-base-100) !important;
         border-color: var(--color-base-300) !important;
+    }
+
+    /* Long tables (List, tag lists) flow across pages instead of jumping to a fresh page; rows stay whole */
+    html.printing-report #fundsflow-report .card:has(table.table) {
+        break-inside: auto;
+        page-break-inside: auto;
+    }
+
+    html.printing-report #fundsflow-report table.table tr {
+        break-inside: avoid;
+        page-break-inside: avoid;
     }
 
     html.printing-report #fundsflow-report .overflow-x-auto {

@@ -16,10 +16,18 @@ window.addEventListener('vite:preloadError', (event) => {
     window.location.reload()
 })
 
-createApp(App)
-    .use(createPinia())
-    .provide('toasts', toasts)
-    .provide('formatDate', formatDate)
-    .provide('formatMoney', formatMoney)
-    .provide('formatPercentage', formatPercentage)
-    .mount('body')
+const mount = (root) =>
+    createApp(root)
+        .use(createPinia())
+        .provide('toasts', toasts)
+        .provide('formatDate', formatDate)
+        .provide('formatMoney', formatMoney)
+        .provide('formatPercentage', formatPercentage)
+        .mount('body')
+
+// /?print=report#t=… is the report page Gotenberg prints to PDF (see PrintReport.vue).
+if (new URLSearchParams(window.location.search).get('print') === 'report') {
+    import('./PrintReport.vue').then((module) => mount(module.default))
+} else {
+    mount(App)
+}

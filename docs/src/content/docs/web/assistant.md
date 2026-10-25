@@ -22,7 +22,9 @@ The button is only shown while you're signed in.
 Type a question and press **Enter** (**Shift+Enter** adds a new line). Write in any language — the assistant answers
 in Ukrainian if you write in Ukrainian, otherwise in English.
 
-An empty chat suggests a few prompts to start with:
+An empty chat suggests a few prompts to start with. They depend on the tab you're on — for example *How are my
+budgets doing?* on **Budgets** or *Compare this period with the previous one* on **Analytics**. Before a tab is
+known it suggests:
 
 - “How much did I spend this month?”
 - “Chart of spending by tag this month”
@@ -32,7 +34,8 @@ An empty chat suggests a few prompts to start with:
 
 More ideas: “what do you think about my finances?”, “how much did I spend on coffee in September?”,
 “покажи витрати по тегах за місяць”, “create tags groceries, coffee”, “rename tag Food to Eating out”,
-“delete the last transaction”.
+“delete the last transaction”, “how much can I still spend per day?”, “what charges are coming up this week?”,
+“compare this quarter with last”, “PDF report for this period”.
 
 Answers **stream in** as they're written. While the assistant looks things up you see what it's doing
 (*Reading tags*, *Building chart*, …). Replies can use light formatting — bold text, lists, inline code — and links
@@ -54,9 +57,28 @@ help, and *open the web app* tools.
 
   Periods: this month (default), last month, last 7 days, last 30 days, this year, or an explicit date range. Each
   chart also shows income, expenses, and net for the period.
+- **Budget status** — for each budget: spent, left, days left, how much you can spend per day, and the projected total
+  at your current pace (*On track*, *At risk*, or *Over*), as an answer or a card.
+- **Upcoming charges** — recurring transactions due in the next days (7 by default, up to 90) with totals.
+- **Compare periods** — income, expenses, and net vs the previous period, plus which tags changed most. Charts of
+  spending by tag and income vs expenses can also be drawn side by side with the previous period. More periods are
+  available: this or last week, this or last quarter, and last year.
+- **Reports** — ask for a report and a card appears with **Download PDF**, **Open / Print** (opens the PDF in a new
+  tab, where you can print it), and **Send to Telegram** (when Telegram is linked). Inside the Telegram mini app only
+  **Send to Telegram** is shown.
 - **Ask you** a clarifying question when something is missing, often with reply buttons — tap one or type your own
   answer.
-- **Propose changes** — add, edit, or delete a transaction, create a budget, create tags, or rename tags.
+- **Propose changes** — add, edit, or delete a transaction; create, edit, pause, resume, or delete a budget; create,
+  edit, pause, resume, or delete a recurring rule; create tags, or rename tags.
+
+Savings goals aren't a FundsFlow feature yet; if you ask, the assistant says so and advises from your real numbers.
+
+## It knows what you're looking at
+
+With each message the panel tells the assistant which tab you're on, the period selected in the date picker, and your
+tag filter. So “compare this with the previous period”, “report for this period”, or “what are these expenses?” use
+the period and tags you see. If you name a period yourself, that wins. Only these settings are sent, not the screen
+contents.
 
 ## Changes need Confirm
 
