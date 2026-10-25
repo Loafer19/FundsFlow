@@ -18,7 +18,7 @@ export default defineConfig({
             logo: { src: './src/assets/logo-header.webp', alt: 'FundsFlow' },
             favicon: '/favicon-32.png',
             head: [
-                // Sharper tab/bookmark icon on high-DPI screens (generated from frontend/public/logo-hires.png).
+                // Sharper tab/bookmark icon on high-DPI screens (generated from the original 1024px logo, see git history).
                 { tag: 'link', attrs: { rel: 'icon', type: 'image/png', sizes: '96x96', href: '/docs/favicon-96.png' } },
                 { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/docs/apple-touch-icon.png', sizes: '180x180' } },
                 { tag: 'meta', attrs: { property: 'og:image', content: 'https://fundsflow.fun/og.png' } },
