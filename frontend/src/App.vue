@@ -25,8 +25,8 @@
             </a>
 
             <button v-if="authStore.isAuthenticated" type="button" @click="agentStore.toggle()"
-                class="btn btn-ghost btn-square tooltip tooltip-bottom" data-tip="Assistant" aria-label="Assistant"
-                :aria-expanded="agentStore.isOpen">
+                class="btn btn-ghost btn-square tooltip tooltip-bottom" data-tip="Assistant (/)" aria-label="Assistant"
+                aria-keyshortcuts="/ Control+K Meta+K" :aria-expanded="agentStore.isOpen" data-agent-toggle>
                 <Sparkles :size="24" />
             </button>
 
@@ -270,7 +270,7 @@ import {
     TrendingUp,
     X,
 } from 'lucide-vue-next'
-import { computed, markRaw, onMounted, provide, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, markRaw, onMounted, provide, ref, watch } from 'vue'
 import AgentDrawer from './components/AgentDrawer.vue'
 import TagPicker from './components/TagPicker.vue'
 import Toasts from './components/Toasts.vue'
@@ -309,12 +309,28 @@ import {
 } from './services/telegramWebApp.js'
 import { useTransactionsStore } from './services/transactions.js'
 import Analytics from './tabs/Analytics.vue'
-import BalanceTrend from './tabs/BalanceTrend.vue'
-import Budgets from './tabs/Budgets.vue'
-import CalendarTab from './tabs/Calendar.vue'
-import MoneyFlow from './tabs/MoneyFlow.vue'
-import TableTab from './tabs/TableTab.vue'
-import TagDistribution from './tabs/TagDistribution.vue'
+import TabLoadError from './tabs/TabLoadError.vue'
+import TabLoading from './tabs/TabLoading.vue'
+
+// Analytics is the default tab (no charts) and ships in the main bundle; every other tab is
+// its own chunk, so Chart.js only loads with Tags / Flow / Trend (or a chart in the assistant).
+const lazyTab = (loader) =>
+    markRaw(
+        defineAsyncComponent({
+            loader,
+            loadingComponent: TabLoading,
+            errorComponent: TabLoadError,
+            delay: 120,
+            timeout: 30000,
+        }),
+    )
+
+const BalanceTrend = lazyTab(() => import('./tabs/BalanceTrend.vue'))
+const Budgets = lazyTab(() => import('./tabs/Budgets.vue'))
+const CalendarTab = lazyTab(() => import('./tabs/Calendar.vue'))
+const MoneyFlow = lazyTab(() => import('./tabs/MoneyFlow.vue'))
+const TableTab = lazyTab(() => import('./tabs/TableTab.vue'))
+const TagDistribution = lazyTab(() => import('./tabs/TagDistribution.vue'))
 
 const authStore = useAuthStore()
 const agentStore = useAgentStore()

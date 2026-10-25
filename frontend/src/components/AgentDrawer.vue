@@ -5,15 +5,16 @@
         <div class="drawer-side z-[60]">
             <label for="agent_drawer" aria-label="Close assistant" class="drawer-overlay" />
 
-            <aside class="bg-base-100 h-dvh w-full sm:w-[28rem] flex flex-col shadow-xl" aria-label="Assistant">
+            <aside ref="panel" class="bg-base-100 h-dvh w-full sm:w-[28rem] flex flex-col shadow-xl" role="dialog"
+                aria-modal="true" aria-labelledby="agent_drawer_title" @keydown="trapFocus">
                 <header class="flex items-center gap-2 px-4 py-3 border-b border-base-300">
-                    <Sparkles :size="20" class="text-primary" />
-                    <h2 class="font-semibold">Assistant</h2>
+                    <Sparkles :size="20" class="text-primary shrink-0" />
+                    <h2 id="agent_drawer_title" class="font-semibold">Assistant</h2>
 
-                    <span v-if="agent.quota" class="badge badge-sm tooltip tooltip-bottom"
-                        :class="agent.quotaExhausted ? 'badge-error' : agent.quota.hint ? 'badge-warning' : 'badge-ghost'"
-                        :data-tip="quotaTip">
-                        {{ agent.quota.remaining }}/{{ agent.quota.limit }} left
+                    <span v-if="agent.quota" class="badge badge-sm tooltip tooltip-bottom whitespace-nowrap tabular-nums"
+                        :class="quotaBadgeClass" :data-tip="quotaTip" :aria-label="quotaAriaLabel" tabindex="0">
+                        {{ agent.quota.remaining }}/{{ agent.quota.limit }}<template v-if="resetTimeLabel"> · resets
+                            {{ resetTimeLabel }}</template>
                     </span>
 
                     <div class="ml-auto flex gap-1">
@@ -22,14 +23,18 @@
                             @click="agent.reset()">
                             <RotateCcw :size="18" />
                         </button>
-                        <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Close assistant"
+                        <button ref="closeButton" type="button" class="btn btn-ghost btn-sm btn-square tooltip tooltip-left"
+                            data-tip="Close (Esc)" aria-label="Close assistant" aria-keyshortcuts="Escape"
                             @click="agent.close()">
                             <X :size="20" />
                         </button>
                     </div>
                 </header>
 
-                <div ref="scroller" class="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-3">
+                <!-- role=log is a polite live region; aria-busy holds announcements until a reply is complete. -->
+                <div ref="scroller" class="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-3" role="log"
+                    aria-live="polite" aria-relevant="additions" aria-label="Assistant conversation"
+                    :aria-busy="agent.isStreaming || agent.isLoadingHistory">
                     <div v-if="agent.isLoadingHistory && !agent.items.length" class="flex justify-center py-10">
                         <span class="loading loading-dots" />
                     </div>
@@ -45,7 +50,8 @@
                         </div>
                         <div class="flex flex-wrap justify-center gap-2">
                             <button v-for="prompt in examples" :key="prompt" type="button"
-                                class="btn btn-sm btn-outline rounded-full font-normal" @click="send(prompt)">
+                                class="btn btn-sm btn-outline rounded-full font-normal" :disabled="agent.quotaExhausted"
+                                @click="send(prompt)">
                                 {{ prompt }}
                             </button>
                         </div>
@@ -73,7 +79,7 @@
                                 <div v-if="item.status === 'pending' && item.suggestions?.length"
                                     class="flex flex-wrap gap-1.5">
                                     <button v-for="option in item.suggestions" :key="option" type="button"
-                                        class="btn btn-xs btn-outline" :disabled="agent.isStreaming"
+                                        class="btn btn-xs btn-outline" :disabled="agent.isStreaming || agent.quotaExhausted"
                                         @click="send(option)">
                                         {{ option }}
                                     </button>
@@ -125,17 +131,19 @@
                     </div>
                 </div>
 
+                <p class="sr-only" role="status">{{ agent.isStreaming ? agent.status || 'Thinking…' : '' }}</p>
+
                 <form class="border-t border-base-300 p-3 flex gap-2 items-end" @submit.prevent="send(input)">
                     <textarea ref="textarea" v-model="input" rows="1" maxlength="2000"
-                        class="textarea flex-1 min-h-10 max-h-40 resize-none leading-snug"
-                        placeholder="Ask anything about your finances…" aria-label="Message the assistant"
+                        class="textarea flex-1 min-h-10 max-h-40 resize-none leading-snug" :placeholder="inputPlaceholder"
+                        :disabled="agent.quotaExhausted" aria-label="Message the assistant"
                         @keydown.enter.exact.prevent="send(input)" @input="autoGrow" />
                     <button v-if="agent.isStreaming" type="button" class="btn btn-square btn-ghost"
                         aria-label="Stop" @click="agent.stop()">
                         <Square :size="18" />
                     </button>
                     <button v-else type="submit" class="btn btn-square btn-primary" aria-label="Send"
-                        :disabled="!input.trim()">
+                        :disabled="!input.trim() || agent.quotaExhausted">
                         <SendHorizontal :size="18" />
                     </button>
                 </form>
@@ -146,17 +154,26 @@
 
 <script setup>
 import { RotateCcw, SendHorizontal, ShieldQuestion, Sparkles, Square, X } from 'lucide-vue-next'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAgentStore } from '../services/agent.js'
 import { renderMarkdown } from '../services/markdown.js'
-import AgentChart from './AgentChart.vue'
+import settings from '../services/settings.js'
 import AgentShowCard from './AgentShowCard.vue'
+
+// Chart.js stays out of the main bundle: it loads with the first chart in the chat.
+const AgentChart = defineAsyncComponent({
+    loader: () => import('./AgentChart.vue'),
+    loadingComponent: { render: () => h('div', { class: 'skeleton h-56 w-full' }) },
+    delay: 0,
+})
 
 const agent = useAgentStore()
 
 const input = ref('')
 const scroller = ref(null)
 const textarea = ref(null)
+const panel = ref(null)
+const closeButton = ref(null)
 
 const examples = [
     'How much did I spend this month?',
@@ -192,11 +209,103 @@ const noticeClass = (tone) =>
         muted: '',
     })[tone] ?? 'alert-info'
 
+// --- Quota badge: remaining, reset time (user timezone) and a live countdown ---
+
+const now = ref(Date.now())
+let ticker = null
+
+const stopTicker = () => {
+    clearInterval(ticker)
+    ticker = null
+}
+
+watch(
+    () => agent.isOpen,
+    (open) => {
+        stopTicker()
+        if (!open) return
+        now.value = Date.now()
+        ticker = setInterval(() => {
+            now.value = Date.now()
+        }, 30000)
+    },
+    { immediate: true },
+)
+
+const quotaTimezone = computed(() => agent.quota?.timezone || settings.timezone)
+
+const resetsAt = computed(() => {
+    const iso = agent.quota?.resets_at ?? agent.quota?.reset_at
+    const date = iso ? new Date(iso) : null
+    return date && !Number.isNaN(date.getTime()) ? date : null
+})
+
+// Wall-clock time in the user's timezone, in the browser's own 12/24h format ("00:00" or "12:00 AM").
+const resetTimeLabel = computed(() => {
+    if (!resetsAt.value) return ''
+    try {
+        return new Intl.DateTimeFormat(undefined, {
+            timeZone: quotaTimezone.value,
+            hour: '2-digit',
+            minute: '2-digit',
+        }).format(resetsAt.value)
+    } catch {
+        return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(resetsAt.value)
+    }
+})
+
+const countdown = computed(() => {
+    if (!resetsAt.value) return ''
+    const minutes = Math.max(1, Math.ceil((resetsAt.value.getTime() - now.value) / 60000))
+    const hours = Math.floor(minutes / 60)
+    const rest = minutes % 60
+    return hours ? `${hours}h ${rest}m` : `${rest}m`
+})
+
+const quotaLow = computed(() => {
+    const quota = agent.quota
+    if (!quota || quota.limit <= 0 || agent.quotaExhausted) return false
+    if (quota.low_threshold != null) return quota.remaining <= quota.low_threshold
+    return Boolean(quota.hint)
+})
+
+const quotaBadgeClass = computed(() => {
+    if (agent.quotaExhausted) return 'badge-error'
+    if (quotaLow.value) return 'badge-warning'
+    return 'badge-ghost'
+})
+
 const quotaTip = computed(() => {
     const quota = agent.quota
     if (!quota) return ''
-    const reset = quota.reset_at ? new Date(quota.reset_at).toLocaleString() : ''
-    return `AI requests today: ${quota.used}/${quota.limit} (shared with Telegram)${reset ? `. Resets ${reset}` : ''}`
+    const reset = resetsAt.value ? `Resets at midnight (${quotaTimezone.value}), in ${countdown.value}` : ''
+    return [reset, `${quota.used}/${quota.limit} AI assists used today, shared with Telegram`]
+        .filter(Boolean)
+        .join(' · ')
+})
+
+const quotaAriaLabel = computed(() => {
+    const quota = agent.quota
+    if (!quota) return ''
+    const reset = resetTimeLabel.value ? `, resets at ${resetTimeLabel.value} (in ${countdown.value})` : ''
+    return `${quota.remaining} of ${quota.limit} AI assists left today${reset}`
+})
+
+const inputPlaceholder = computed(() =>
+    agent.quotaExhausted
+        ? countdown.value
+            ? `AI assists reset in ${countdown.value}`
+            : 'No AI assists left today'
+        : 'Ask anything about your finances…',
+)
+
+// Once midnight passes, pull the fresh counter instead of showing a stale "0 left".
+let refreshedFor = null
+watch(now, (value) => {
+    const at = resetsAt.value?.getTime()
+    if (!at || value < at || refreshedFor === at) return
+    refreshedFor = at
+    agent.refreshQuota()
 })
 
 const autoGrow = () => {
@@ -223,12 +332,107 @@ const scrollToBottom = () => {
 
 watch(() => [agent.items.length, agent.draft, agent.status, agent.isOpen], scrollToBottom)
 
+// --- Keyboard: "/" or Cmd/Ctrl+K opens and focuses the input, Esc closes and restores focus ---
+
+let returnFocus = null
+
+// The drawer stays visibility:hidden for ~0.1s after opening (DaisyUI transition delay) and hidden
+// elements cannot take focus, so retry briefly until it lands.
+let focusTimer = null
+const focusInput = (attempts = 12) => {
+    clearTimeout(focusTimer)
+    const target = textarea.value && !textarea.value.disabled ? textarea.value : closeButton.value
+    if (!target || !agent.isOpen) return
+    target.focus()
+    if (document.activeElement !== target && attempts > 0) {
+        focusTimer = setTimeout(() => focusInput(attempts - 1), 50)
+    }
+}
+
+const isTypingTarget = (el) =>
+    el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
+
+// A native modal <dialog> sits in the top layer above the drawer: leave its keys alone.
+const modalOpen = () => Boolean(document.querySelector('dialog[open]'))
+
+const openAndFocus = () => {
+    if (agent.isOpen) focusInput()
+    else agent.open()
+}
+
+const onGlobalKeydown = (event) => {
+    if (event.defaultPrevented || event.isComposing || event.repeat) return
+
+    const isCmdK =
+        (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k'
+    // event.code covers layouts where the "/" key types something else (e.g. "." on Ukrainian).
+    const isSlash =
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        (event.key === '/' || (event.code === 'Slash' && !event.shiftKey))
+
+    if (isCmdK || (isSlash && !isTypingTarget(event.target))) {
+        if (modalOpen()) return
+        event.preventDefault()
+        openAndFocus()
+        return
+    }
+
+    if (event.key === 'Escape' && agent.isOpen && !modalOpen()) {
+        event.preventDefault()
+        agent.close()
+    }
+}
+
+const FOCUSABLE =
+    'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+// Keep Tab / Shift+Tab inside the open panel.
+const trapFocus = (event) => {
+    if (event.key !== 'Tab' || !panel.value) return
+    const nodes = [...panel.value.querySelectorAll(FOCUSABLE)].filter((el) => el.getClientRects().length)
+    if (!nodes.length) return
+
+    const first = nodes[0]
+    const last = nodes[nodes.length - 1]
+    const active = document.activeElement
+    const inside = panel.value.contains(active)
+
+    if (event.shiftKey && (active === first || !inside)) {
+        event.preventDefault()
+        last.focus()
+    } else if (!event.shiftKey && (active === last || !inside)) {
+        event.preventDefault()
+        first.focus()
+    }
+}
+
 watch(
     () => agent.isOpen,
     (open) => {
-        if (open) nextTick(() => textarea.value?.focus())
+        if (open) {
+            const active = document.activeElement
+            returnFocus = active && active !== document.body && !panel.value?.contains(active) ? active : null
+            nextTick(() => focusInput())
+            return
+        }
+
+        const active = document.activeElement
+        if (active && active !== document.body && !panel.value?.contains(active)) return
+        const target = returnFocus?.isConnected ? returnFocus : document.querySelector('[data-agent-toggle]')
+        returnFocus = null
+        nextTick(() => target?.focus())
     },
 )
+
+onMounted(() => document.addEventListener('keydown', onGlobalKeydown))
+
+onBeforeUnmount(() => {
+    document.removeEventListener('keydown', onGlobalKeydown)
+    clearTimeout(focusTimer)
+    stopTicker()
+})
 </script>
 
 <style scoped>

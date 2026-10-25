@@ -23,8 +23,7 @@
                     </div>
                 </div>
 
-                <Picker :data="emojiIndex" :native="true" @select="setEmoji" :show-preview="false"
-                    :show-categories="false" :emoji-tooltip="true" class="mb-4" />
+                <LazyEmojiPicker v-if="hasOpened" class="mb-4" @select="setEmoji" />
 
                 <label class="label">
                     <input v-model="tag.calc_balance" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
@@ -47,21 +46,17 @@
 </template>
 
 <script setup>
-import data from 'emoji-mart-vue-fast/data/apple.json'
 import { Save, Tag } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
-import 'emoji-mart-vue-fast/css/emoji-mart.css'
-import { EmojiIndex, Picker } from 'emoji-mart-vue-fast/src'
+import LazyEmojiPicker from '../components/LazyEmojiPicker.js'
+import { useDialogOpen } from '../services/dialogOpen.js'
+import { randomEmoji as pickRandomEmoji } from '../services/emojiDefaults.js'
 import { useTagsStore } from './../services/tags.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
 
-const emojiIndex = new EmojiIndex(data, {
-    exclude: ['recent', 'flags'],
-})
+const randomEmoji = pickRandomEmoji()
 
-const randomEmoji = Object.keys(emojiIndex._nativeEmojis)[
-    (Math.random() * Object.keys(emojiIndex._nativeEmojis).length) | 0
-]
+const { hasOpened } = useDialogOpen('tags_add_modal')
 
 const tagsStore = useTagsStore()
 

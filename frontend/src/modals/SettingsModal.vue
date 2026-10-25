@@ -313,8 +313,9 @@ recurring_transactions</pre>
         </form>
     </dialog>
 
+    <!-- Rendered only while a report is being exported: it mounts every tab plus four Chart.js canvases. -->
     <Teleport to="body">
-        <ReportDocument
+        <component :is="reportComponent" v-if="reportComponent && reportActive"
             :sections="reportSections"
             :date-range="insightDateRange"
             :date-selection-type="reportDateSelectionType"
@@ -325,8 +326,7 @@ recurring_transactions</pre>
 
 <script setup>
 import { Bot, Download, KeyRound, Save, Send } from 'lucide-vue-next'
-import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
-import ReportDocument from '../components/ReportDocument.vue'
+import { computed, inject, markRaw, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
 import {
     createMcpToken,
     downloadAccountExport,
@@ -454,16 +454,41 @@ const reportPeriodLabel = computed(() => {
     if (!tags.length) return `${period} · All tags`
     return `${period} · ${tags.join(', ')}`
 })
-const printReport = async () => {
+// ReportDocument (and the chart tabs it renders) is its own chunk, loaded on the first export.
+const reportComponent = shallowRef(null)
+const reportActive = ref(false)
+
+const mountReport = async () => {
+    if (!reportComponent.value) {
+        reportComponent.value = markRaw((await import('../components/ReportDocument.vue')).default)
+    }
+    reportActive.value = true
     await nextTick()
+}
+
+const unmountReport = () => {
+    reportActive.value = false
+}
+
+const printReport = async () => {
+    try {
+        await mountReport()
+    } catch {
+        toasts.error('Failed to load the report. Check your connection and try again.')
+        return
+    }
     // Let Chart.js paint canvases in the off-screen report before printing.
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
     await new Promise((resolve) => setTimeout(resolve, 300))
 
     const root = document.documentElement
+    let cleaned = false
     const cleanup = () => {
+        if (cleaned) return
+        cleaned = true
         root.classList.remove('printing-report')
         window.removeEventListener('afterprint', cleanup)
+        unmountReport()
     }
     root.classList.add('printing-report')
     window.addEventListener('afterprint', cleanup)
@@ -477,7 +502,7 @@ const sendReportToTelegram = async () => {
 
     sendingReportTelegram.value = true
     try {
-        await nextTick()
+        await mountReport()
         const caption = `FundsFlow report · ${reportPeriodLabel.value || 'Report'}`
         const result = await sendReportPdfToTelegram(caption)
         if (result?.needsLink) {
@@ -487,6 +512,7 @@ const sendReportToTelegram = async () => {
         toasts.error(error?.message || 'Failed to build report PDF!')
     } finally {
         sendingReportTelegram.value = false
+        unmountReport()
     }
 }
 

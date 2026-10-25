@@ -108,10 +108,19 @@ final class RunWebAgentAction
     }
 
     /**
+     * Quota snapshot for the drawer badge. `resets_at` is the next midnight in the user's timezone
+     * (ISO 8601 with offset); `low_threshold` is when the badge turns into a warning.
+     *
      * @return array<string, mixed>
      */
     public function quotaPayload(User $user): array
     {
-        return $this->quota->snapshot($user) + ['hint' => $this->quota->lowRemainingHint($user)];
+        $snapshot = $this->quota->snapshot($user);
+
+        return $snapshot + [
+            'resets_at' => $snapshot['reset_at'],
+            'low_threshold' => max(0, (int) config('telegram.low_quota_threshold')),
+            'hint' => $this->quota->lowRemainingHint($user),
+        ];
     }
 }

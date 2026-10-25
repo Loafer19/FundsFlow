@@ -5,6 +5,17 @@ import App from './App.vue'
 import { formatDate, formatMoney, formatPercentage } from './services/formatters'
 import toasts from './services/toasts'
 
+// After a deploy the old hashed chunks are gone: a lazy tab/picker import then fails.
+// Reload once to pick up the new index.html (guarded so a real outage cannot loop).
+window.addEventListener('vite:preloadError', (event) => {
+    const key = 'chunk-reload-at'
+    const last = Number(sessionStorage.getItem(key) || 0)
+    if (Date.now() - last < 10000) return
+    sessionStorage.setItem(key, String(Date.now()))
+    event.preventDefault()
+    window.location.reload()
+})
+
 createApp(App)
     .use(createPinia())
     .provide('toasts', toasts)

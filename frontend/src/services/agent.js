@@ -85,6 +85,17 @@ export const useAgentStore = defineStore('agent', {
             }
         },
 
+        // Quota only (after the daily reset passes while the drawer is open). Non-fatal on failure.
+        async refreshQuota() {
+            try {
+                const { data } = await api.get('/account/ai-quota', { timeout: 15000 })
+                if (!data || typeof data !== 'object') return
+                this.quota = { ...this.quota, ...data, resets_at: data.resets_at ?? data.reset_at, hint: null }
+            } catch {
+                // keep the last known quota
+            }
+        },
+
         upsert(item) {
             if (!item || typeof item !== 'object') return
             const index = this.items.findIndex((existing) => existing.id === item.id)

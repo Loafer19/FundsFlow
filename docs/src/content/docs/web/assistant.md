@@ -9,7 +9,11 @@ The web app has a built-in AI assistant: the same finance agent as the
 ## Open it
 
 Sign in, then click the ✨ **Assistant** button in the header, next to ❓ **Docs**. A chat panel slides in from the
-right (on a phone it takes the full screen). Close it with **✕** or by clicking outside the panel.
+right (on a phone it takes the full screen). Close it with **✕**, **Esc**, or by clicking outside the panel.
+
+Keyboard shortcuts: press **/** (when you're not typing in a field) or **Ctrl+K** (**⌘K** on a Mac) to open the panel
+with the message box focused. **Esc** closes it and puts focus back where you were; **Tab** stays inside the panel
+while it's open.
 
 The button is only shown while you're signed in.
 
@@ -83,8 +87,11 @@ The web assistant shares the [daily AI limit](/docs/telegram/ai-assistant/#daily
 reading, voice messages, and the Telegram assistant): each message you send counts as one **AI assist**, however many
 lookups it takes. The counter resets at **midnight in your timezone**.
 
-The panel header shows how many assists are left today, for example **3/5 left** (hover it for the reset time). The
-badge turns yellow when you're running low and red when you're out. When the limit is used up, the assistant replies:
+The panel header shows how many assists are left today and when they reset, for example **3/5 · resets 00:00** (the
+time is in your timezone and your device's 12/24-hour format). Hover it for a countdown, for example *Resets at
+midnight (Europe/Kyiv), in 4h 12m*. The badge turns yellow when you're running low and red when you're out; at zero the
+message box is disabled and shows *AI assists reset in 4h 12m*. If you were already out when you sent a message, the
+assistant replies:
 
 > You've used all 5 AI assists for today. They reset at midnight (Europe/Kyiv). Until then, you can still add
 > transactions with the + button and explore your tabs and analytics.
