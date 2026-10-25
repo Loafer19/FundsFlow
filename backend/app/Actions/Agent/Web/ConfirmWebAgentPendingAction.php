@@ -306,7 +306,7 @@ final class ConfirmWebAgentPendingAction
             'kind' => 'notice',
             'tone' => $ok ? ($status === 'cancelled' ? 'muted' : 'success') : 'error',
             'text' => $message,
-        ]);
+        ] + ($ok && $status === 'applied' ? ['applied' => true] : []));
         $items = $session->state()['transcript'];
 
         return [

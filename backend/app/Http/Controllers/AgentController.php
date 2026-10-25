@@ -7,6 +7,8 @@ use App\Actions\Agent\Web\RunWebAgentAction;
 use App\Actions\Agent\Web\WebAgentChannel;
 use App\Actions\Agent\Web\WebAgentSession;
 use App\Actions\Agent\Web\WebAgentUploads;
+use App\Models\User;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -21,6 +23,9 @@ class AgentController extends Controller
 {
     private const RUN_LOCK_SECONDS = 180;
 
+    /** Short lock around transcript surgery (rewind) and Confirm, so neither overwrites the other. */
+    private const EDIT_LOCK_SECONDS = 10;
+
     public function __construct(
         private readonly RunWebAgentAction $run,
         private readonly ConfirmWebAgentPendingAction $confirm,
@@ -34,6 +39,11 @@ class AgentController extends Controller
      * WebAgentUploads::MAX_FILES, JPEG/PNG/WebP sniffed from the bytes, 8 MB each), the
      * message is then optional (it works like a Telegram photo caption) and `context`
      * may be a JSON string.
+     *
+     * `rewind` = replace_last (edit: `message` replaces the last user message) or regenerate (re-run
+     * the last user message; `message` is ignored) drops the last turn first, see
+     * WebAgentSession::rewindLastTurn. `turn_id` is the id of that user message; a stale one gets 409.
+     * Photos can't be combined with a rewind.
      */
     public function chat(Request $request): StreamedResponse|JsonResponse
     {
@@ -52,6 +62,8 @@ class AgentController extends Controller
                 'mimetypes:' . implode(',', array_keys(WebAgentUploads::MIMES)),
             ],
             'conversation_id' => ['nullable', 'string', 'max:64'],
+            'rewind' => ['nullable', 'string', 'in:' . WebAgentSession::REWIND_REPLACE . ',' . WebAgentSession::REWIND_REGENERATE],
+            'turn_id' => ['required_with:rewind', 'nullable', 'string', 'max:64'],
             'context' => ['nullable', 'array'],
             'context.tab' => ['nullable', 'string', 'in:' . implode(',', WebAgentChannel::CONTEXT_TABS)],
             'context.period_type' => ['nullable', 'string', 'in:week,month,year'],
@@ -73,7 +85,11 @@ class AgentController extends Controller
         $message = trim((string) ($data['message'] ?? ''));
         $images = $request->file('images', []);
         $images = is_array($images) ? array_values($images) : [];
-        if ($message === '' && $images === []) {
+        $rewind = isset($data['rewind']) ? (string) $data['rewind'] : null;
+        if ($rewind !== null && $images !== []) {
+            return response()->json(['message' => "Photos can't be attached when editing or regenerating a message."], 422);
+        }
+        if ($message === '' && $images === [] && $rewind !== WebAgentSession::REWIND_REGENERATE) {
             return response()->json(['message' => 'The message field is required.'], 422);
         }
 
@@ -97,8 +113,22 @@ class AgentController extends Controller
         }
 
         $conversationId = isset($data['conversation_id']) ? (string) $data['conversation_id'] : null;
+        $rewoundAsk = null;
 
-        return response()->stream(function () use ($user, $message, $conversationId, $context, $lock, $files): void {
+        if ($rewind !== null) {
+            $rewound = $this->rewind($user, $rewind, (string) $data['turn_id'], $conversationId);
+            if (!$rewound['ok']) {
+                $lock->release();
+
+                return response()->json(['message' => $rewound['message'], 'reason' => $rewound['reason']], 409);
+            }
+            if ($rewind === WebAgentSession::REWIND_REGENERATE) {
+                $message = $rewound['text'];
+            }
+            $rewoundAsk = $rewound['ask_context'];
+        }
+
+        return response()->stream(function () use ($user, $message, $conversationId, $context, $lock, $files, $rewoundAsk): void {
             ignore_user_abort(true);
             @set_time_limit(self::RUN_LOCK_SECONDS);
 
@@ -120,7 +150,7 @@ class AgentController extends Controller
                 }
                 flush();
 
-                $this->run->execute($user, $message, $conversationId, $emit(...), $context, $files);
+                $this->run->execute($user, $message, $conversationId, $emit(...), $context, $files, $rewoundAsk);
             } catch (Throwable $e) {
                 Log::error('AgentController: chat stream failed', ['message' => $e->getMessage()]);
                 $emit('error', ['code' => 'server_error', 'message' => 'Something went wrong. Please try again.']);
@@ -133,6 +163,32 @@ class AgentController extends Controller
             'Cache-Control' => 'no-cache, no-store, no-transform',
             'X-Accel-Buffering' => 'no',
         ]);
+    }
+
+    /**
+     * Drop the last turn for an edit / regenerate (under the edit lock, so a Confirm can't land in between).
+     *
+     * @return array{ok: true, text: string, ask_context: array{prior_question: string}|null}|array{ok: false, reason: string, message: string}
+     */
+    private function rewind(User $user, string $mode, string $turnId, ?string $conversationId): array
+    {
+        $session = new WebAgentSession($user);
+        if ($conversationId === null || $conversationId !== $session->conversationId()) {
+            return ['ok' => false, 'reason' => 'outdated', 'message' => 'This chat has changed. Send it as a new message instead.'];
+        }
+
+        try {
+            $result = Cache::lock('web_agent_edit:' . $user->id, self::EDIT_LOCK_SECONDS)
+                ->block(5, static fn (): array => $session->rewindLastTurn($turnId, $mode));
+        } catch (LockTimeoutException) {
+            return ['ok' => false, 'reason' => 'busy', 'message' => 'The assistant is busy. Try again in a moment.'];
+        }
+
+        if ($result['ok'] && is_array($result['dropped_pending'])) {
+            $this->uploads->delete($user, WebAgentUploads::refsIn($result['dropped_pending']));
+        }
+
+        return $result;
     }
 
     /**
@@ -174,7 +230,13 @@ class AgentController extends Controller
             'action' => ['required', 'string', 'in:confirm,cancel'],
         ]);
 
-        $result = $this->confirm->execute($request->user(), (string) $data['pending_id'], (string) $data['action']);
+        $user = $request->user();
+        try {
+            $result = Cache::lock('web_agent_edit:' . $user->id, self::EDIT_LOCK_SECONDS)
+                ->block(5, fn (): array => $this->confirm->execute($user, (string) $data['pending_id'], (string) $data['action']));
+        } catch (LockTimeoutException) {
+            return response()->json(['message' => 'The assistant is busy. Try again in a moment.'], 423);
+        }
 
         return response()->json($result, $result['status'] === 'outdated' ? 409 : 200, [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }

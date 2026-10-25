@@ -55,3 +55,58 @@ export const bootstrapStores = async () => {
         recurringStore.isLoading = false
     }
 }
+
+// Background refresh after a change made outside the stores (assistant Confirm): no cache read-back
+// and no isLoading flag, so the open tab and any open modal keep working while it loads. Calls within
+// REFRESH_DEBOUNCE_MS share one fetch; a call while a fetch is running queues exactly one more.
+const REFRESH_DEBOUNCE_MS = 300
+let refreshTimer = null
+let refreshRunning = null
+let refreshQueued = false
+let refreshWaiters = []
+
+const runRefresh = async () => {
+    const waiters = refreshWaiters
+    refreshWaiters = []
+
+    try {
+        const { data } = await api.get('/bootstrap', { timeout: 60000 })
+        const tagsStore = useTagsStore()
+        const transactionsStore = useTransactionsStore()
+        const budgetsStore = useBudgetsStore()
+        const recurringStore = useRecurringTransactionsStore()
+
+        tagsStore.tags = data.tags ?? []
+        transactionsStore.transactions = data.transactions ?? []
+        budgetsStore.budgets = data.budgets ?? []
+        recurringStore.rules = data.recurring_transactions ?? []
+
+        persistCache('tags', tagsStore.tags)
+        persistCache('transactions', transactionsStore.transactions)
+        persistCache('budgets', budgetsStore.budgets)
+        persistCache('recurring', recurringStore.rules)
+    } catch (error) {
+        toasts.error(apiErrorMessage(error, 'Saved, but failed to refresh the data: '))
+    } finally {
+        for (const resolve of waiters) resolve()
+    }
+}
+
+export const refreshStores = () =>
+    new Promise((resolve) => {
+        refreshWaiters.push(resolve)
+        clearTimeout(refreshTimer)
+        refreshTimer = setTimeout(async () => {
+            refreshTimer = null
+            if (refreshRunning) {
+                refreshQueued = true
+                return
+            }
+            do {
+                refreshQueued = false
+                refreshRunning = runRefresh()
+                await refreshRunning
+            } while (refreshQueued)
+            refreshRunning = null
+        }, REFRESH_DEBOUNCE_MS)
+    })

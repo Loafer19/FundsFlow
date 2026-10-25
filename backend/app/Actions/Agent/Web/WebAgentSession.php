@@ -14,6 +14,10 @@ use Illuminate\Support\Str;
  */
 final class WebAgentSession implements AgentSession
 {
+    public const REWIND_REPLACE = 'replace_last';
+
+    public const REWIND_REGENERATE = 'regenerate';
+
     public function __construct(
         private readonly User $user,
     ) {}
@@ -165,6 +169,137 @@ final class WebAgentSession implements AgentSession
         $turns = max(0, (int) config('agent.web_history_turns'));
 
         return $turns === 0 ? [] : array_slice($out, -$turns);
+    }
+
+    /**
+     * Edit (replace_last) or regenerate the last turn: the last user message and everything after it
+     * are dropped so the new run doesn't see the old exchange twice. Only that turn, and only while
+     * nothing from it was saved:
+     *
+     * - never when a change from the turn was confirmed (a confirmed card or a success notice in it),
+     *   or when the message answered a receipt question (the receipt flow already used it);
+     * - regenerate also needs a plain text turn: no receipt photos and no Confirm card at all
+     *   (a pending one would just be staged again; re-asking is the honest way).
+     *
+     * `$turnId` is the id of the user item the client saw last, so a retry or a second tab gets
+     * `outdated` instead of dropping one more turn. The pending slot is cleared only when it belongs
+     * to the dropped turn (its question or Confirm card), and returned so its photos can be deleted.
+     *
+     * @return array{ok: true, text: string, ask_context: array{prior_question: string}|null, dropped_pending: array<string, mixed>|null}|array{ok: false, reason: 'outdated'|'not_allowed', message: string}
+     */
+    public function rewindLastTurn(string $turnId, string $mode): array
+    {
+        $state = $this->state();
+        $items = $state['transcript'];
+        $index = self::lastTurnIndex($items);
+
+        if ($index === null || ($items[$index]['id'] ?? null) !== $turnId) {
+            return [
+                'ok' => false,
+                'reason' => 'outdated',
+                'message' => 'That message is no longer the last one in this chat. Send it as a new message instead.',
+            ];
+        }
+
+        $turn = array_slice($items, $index);
+        $blocker = self::turnBlocker($turn, $mode);
+        if ($blocker !== null) {
+            return ['ok' => false, 'reason' => 'not_allowed', 'message' => $blocker];
+        }
+
+        $pending = $state['pending'];
+        $dropPending = is_array($pending) && self::turnOwnsPending($turn, $pending);
+        $user = $items[$index];
+
+        $state['transcript'] = array_slice($items, 0, $index);
+        if ($dropPending) {
+            $state['pending'] = null;
+        }
+        $this->put($state);
+
+        return [
+            'ok' => true,
+            'text' => (string) ($user['text'] ?? ''),
+            'ask_context' => ($user['reply_to'] ?? null) === 'agent_ask'
+                ? ['prior_question' => (string) ($user['prior_question'] ?? '')]
+                : null,
+            'dropped_pending' => $dropPending ? $pending : null,
+        ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $items
+     */
+    public static function lastTurnIndex(array $items): ?int
+    {
+        for ($i = count($items) - 1; $i >= 0; $i--) {
+            if (($items[$i]['role'] ?? null) === 'user') {
+                return $i;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Why the turn (its user item first) can't be rewound in this mode, or null when it can.
+     *
+     * @param list<array<string, mixed>> $turn
+     */
+    public static function turnBlocker(array $turn, string $mode): ?string
+    {
+        $user = $turn[0] ?? [];
+        if (($user['reply_to'] ?? null) === 'receipt') {
+            return "That message answered a receipt question, so it can't be replaced. Send a new message instead.";
+        }
+
+        foreach ($turn as $item) {
+            $kind = $item['kind'] ?? null;
+            $applied = ($kind === 'confirm' && ($item['status'] ?? null) === 'confirmed')
+                || ($kind === 'notice' && (($item['applied'] ?? false) === true || ($item['tone'] ?? null) === 'success'));
+            if ($applied) {
+                return "A change from that turn was already saved, so it can't be replaced. Send a new message instead.";
+            }
+        }
+
+        if ($mode === self::REWIND_REGENERATE) {
+            if ((int) ($user['photos'] ?? 0) > 0) {
+                return "Receipt photo messages can't be regenerated. Send the photos again instead.";
+            }
+            foreach ($turn as $item) {
+                if (($item['kind'] ?? null) === 'confirm') {
+                    return "That answer proposed a change, so it can't be regenerated. Ask again instead.";
+                }
+            }
+            if (trim((string) ($user['text'] ?? '')) === '') {
+                return 'There is no message to regenerate.';
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $turn
+     * @param array<string, mixed> $pending
+     */
+    private static function turnOwnsPending(array $turn, array $pending): bool
+    {
+        foreach ($turn as $item) {
+            $kind = $item['kind'] ?? null;
+            $status = $item['status'] ?? null;
+            if ($kind === 'ask' && $status === 'pending') {
+                return true;
+            }
+            if (
+                $kind === 'confirm' && $status === 'pending'
+                && is_string($pending['nonce'] ?? null) && ($item['pending_id'] ?? null) === $pending['nonce']
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function clear(): void

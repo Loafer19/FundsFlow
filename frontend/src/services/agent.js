@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import api from './api.js'
-import { bootstrapStores } from './bootstrap.js'
+import { refreshStores } from './bootstrap.js'
 import { apiErrorMessage } from './formatters.js'
 import { reportErrorMessage, requestReport } from './report.js'
 import toasts from './toasts.js'
@@ -37,6 +37,37 @@ const parseEvents = (buffer, onEvent) => {
     return rest
 }
 
+// A change from the turn was saved: its Confirm card went through (the success notice may land later
+// in the transcript when an older card is confirmed, so it counts too).
+const isApplied = (item) =>
+    (item.kind === 'confirm' && item.status === 'confirmed') ||
+    (item.kind === 'notice' && (item.applied === true || item.tone === 'success'))
+
+export const lastTurnIndex = (items) => {
+    for (let index = items.length - 1; index >= 0; index--) {
+        if (items[index]?.role === 'user') return index
+    }
+    return -1
+}
+
+// Why the last turn can't be edited ('replace_last') or regenerated, or null when it can.
+// Mirrors WebAgentSession::turnBlocker (the server decides; this only hides buttons that would fail).
+export const rewindBlocker = (items, mode) => {
+    const index = lastTurnIndex(items)
+    if (index === -1) return 'none'
+    const user = items[index]
+    if (String(user.id).startsWith('local-')) return 'unsent'
+    if (user.reply_to === 'receipt') return 'receipt'
+    const turn = items.slice(index)
+    if (turn.some(isApplied)) return 'applied'
+    if (mode === 'regenerate') {
+        if (user.photos) return 'photos'
+        if (turn.some((item) => item.kind === 'confirm')) return 'confirm'
+        if (!String(user.text ?? '').trim()) return 'empty'
+    }
+    return null
+}
+
 export const useAgentStore = defineStore('agent', {
     state: () => ({
         isOpen: false,
@@ -56,6 +87,16 @@ export const useAgentStore = defineStore('agent', {
 
     getters: {
         quotaExhausted: (state) => state.quota != null && state.quota.limit > 0 && state.quota.remaining < 1,
+        // Id of the last item when Regenerate applies to it (an assistant answer or error ending the turn).
+        regenerateTargetId(state) {
+            if (state.isStreaming || this.quotaExhausted) return null
+            const last = state.items[state.items.length - 1]
+            if (!last || last.role === 'user') return null
+            const answer =
+                ['text', 'chart', 'show'].includes(last.kind) || (last.kind === 'notice' && last.tone === 'error')
+            if (!answer || rewindBlocker(state.items, 'regenerate') !== null) return null
+            return last.id
+        },
     },
 
     actions: {
@@ -170,10 +211,21 @@ export const useAgentStore = defineStore('agent', {
         },
 
         // images: [{ file: Blob (downscaled JPEG), name, url (object URL for the bubble thumbnail) }]
-        async send(text, images = []) {
+        // rewind: { mode: 'replace_last' | 'regenerate', turnId } drops the last turn (here and on the
+        // server) before sending; photos are never re-sent with it.
+        async send(text, images = [], rewind = null) {
             const message = String(text ?? '').trim()
-            const photos = Array.isArray(images) ? images.filter((image) => image?.file) : []
+            const photos = rewind ? [] : Array.isArray(images) ? images.filter((image) => image?.file) : []
             if ((!message && !photos.length) || this.isStreaming) return
+
+            let dropped = null
+            if (rewind) {
+                const index = lastTurnIndex(this.items)
+                if (index === -1 || this.items[index].id !== rewind.turnId || rewindBlocker(this.items, rewind.mode)) {
+                    return false
+                }
+                dropped = this.items.splice(index)
+            }
 
             const localUserId = `local-${crypto.randomUUID()}`
             this.items.push({
@@ -208,6 +260,7 @@ export const useAgentStore = defineStore('agent', {
                     body = JSON.stringify({
                         message,
                         conversation_id: this.conversationId,
+                        ...(rewind ? { rewind: rewind.mode, turn_id: rewind.turnId } : {}),
                         ...(this.screenContext ? { context: this.screenContext } : {}),
                     })
                 }
@@ -237,7 +290,9 @@ export const useAgentStore = defineStore('agent', {
                     if (response.status === 413) detail = 'Those photos are too large. Try fewer or smaller ones.'
 
                     this.items = this.items.filter((item) => item.id !== localUserId)
-                    toasts.error(detail || `Assistant request failed (${response.status}).`)
+                    if (dropped) this.items.push(...dropped)
+                    if (rewind && response.status === 409 && detail) toasts.info(detail)
+                    else toasts.error(detail || `Assistant request failed (${response.status}).`)
                     return false
                 }
 
@@ -274,6 +329,13 @@ export const useAgentStore = defineStore('agent', {
             controller?.abort()
         },
 
+        // Re-run the last user message; the server drops the old answer from the session history.
+        regenerate() {
+            if (!this.regenerateTargetId) return
+            const user = this.items[lastTurnIndex(this.items)]
+            return this.send(user.text, [], { mode: 'regenerate', turnId: user.id })
+        },
+
         async resolve(item, action) {
             if (!item?.pending_id || this.busyPendingId) return
             this.busyPendingId = item.pending_id
@@ -287,7 +349,8 @@ export const useAgentStore = defineStore('agent', {
                 item.status = action === 'cancel' ? 'cancelled' : data.ok ? 'confirmed' : 'failed'
                 this.upsert(data.item)
 
-                if (data.refresh) await bootstrapStores()
+                // Background: the tabs pick the change up without a reload; several confirms share one fetch.
+                if (data.refresh) refreshStores()
             } catch (error) {
                 if (error?.response?.status === 409) {
                     item.status = 'outdated'

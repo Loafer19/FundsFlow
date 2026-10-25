@@ -34,9 +34,18 @@ final class RunWebAgentAction
      * @param Closure(string, array<string, mixed>): void $emit
      * @param array<string, mixed> $context validated screen context (tab, period, tag filter)
      * @param list<array{id: string, name: string, mime: string, file_size: int}> $files receipt photos (WebAgentUploads refs)
+     * @param array{prior_question: string}|null $rewoundAsk the question an edited / regenerated turn answered
+     *        (WebAgentSession::rewindLastTurn already dropped that turn)
      */
-    public function execute(User $user, string $message, ?string $conversationId, Closure $emit, array $context = [], array $files = []): void
-    {
+    public function execute(
+        User $user,
+        string $message,
+        ?string $conversationId,
+        Closure $emit,
+        array $context = [],
+        array $files = [],
+        ?array $rewoundAsk = null,
+    ): void {
         $session = new WebAgentSession($user);
         $currentId = $session->conversationId();
         $emit('meta', [
@@ -46,7 +55,7 @@ final class RunWebAgentAction
 
         $message = trim($message);
         $pending = $session->get()['pending'];
-        $askContext = null;
+        $askContext = $rewoundAsk;
 
         // New photos start a fresh receipt flow: whatever card was waiting (a question or a
         // Confirm, like stage() does for a new preview) is superseded and its photos dropped.
@@ -76,7 +85,14 @@ final class RunWebAgentAction
         $history = $session->historyMessages(dropTrailingAsk: $askContext !== null);
 
         $channel = new WebAgentChannel($this->quota, $this->tools, $this->buildChart, $session, $emit, $history, $context, $this->buildReport);
-        $channel->push('user', ['role' => 'user', 'kind' => 'text', 'text' => $message] + ($files !== [] ? ['photos' => count($files)] : []));
+        // reply_to lets an edit / regenerate of this turn restore its question (agent_ask) or refuse
+        // (receipt, set below once the receipt flow took the answer).
+        $replyTo = $files === [] && $askContext !== null
+            ? ['reply_to' => 'agent_ask', 'prior_question' => $askContext['prior_question']]
+            : [];
+        $userItem = $channel->push('user', ['role' => 'user', 'kind' => 'text', 'text' => $message]
+            + ($files !== [] ? ['photos' => count($files)] : [])
+            + $replyTo);
 
         // Receipt photos: the shared receipt flow (quota is checked per analysis, like Telegram).
         if ($files !== []) {
@@ -89,6 +105,10 @@ final class RunWebAgentAction
         if (RunWebReceiptAction::isReceiptPending($pending)) {
             $status = $this->receipt->continue($user, $channel, $session, $pending, $message);
             if ($status !== null) {
+                $session->patchItems(
+                    static fn (array $item): bool => ($item['id'] ?? null) === ($userItem['id'] ?? false),
+                    ['reply_to' => 'receipt'],
+                );
                 $this->finish($user, $session, $emit, $status);
 
                 return;

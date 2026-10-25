@@ -47,6 +47,18 @@ when nothing new has arrived). Click it to scroll back down, and the chat follow
 message or opening the panel always jumps to the latest message. If your system asks for reduced motion, the jump is
 instant instead of animated.
 
+Under each answer:
+
+- **Copy** copies the answer's text (with its Markdown formatting) and briefly shows *Copied*.
+- **Regenerate** (on the last answer only) asks the same question again and replaces the answer. It counts as one
+  AI assist, like a new message. It isn't offered when the answer proposed a change (a Confirm card) or for receipt
+  photos.
+
+Press **↑** in an empty message box to bring back your last message and edit it. Sending it replaces that message
+and its answer, so the assistant doesn't see both versions. Press **Esc** to cancel. Only the last message can be
+edited, and photos aren't sent again. If a change from that turn was already confirmed, or the message answered a
+receipt question, the text is sent as a new message instead.
+
 ## What it can do
 
 The assistant works by calling tools on your account — the same ones as in Telegram, except the Telegram-only menu,
@@ -124,7 +136,8 @@ The assistant never changes your data on its own. A proposed change appears as a
 **Confirm** / **Cancel**:
 
 - Nothing is saved until you press **Confirm**. The card then shows the result (for example
-  *✅ Saved: -350.00 · 2026-10-25 · 🛒 Groceries*) and the web app refreshes its data.
+  *✅ Saved: -350.00 · 2026-10-25 · 🛒 Groceries*). The open tab updates right away, without a page reload: the
+  table and list, analytics, budgets, tags, and the calendar's upcoming charges.
 - Transactions added this way, including from receipt photos, are marked with the **Web** source.
 - Only the newest proposal can be confirmed. A newer proposal marks the previous card as *outdated*, and each card
   works only once.

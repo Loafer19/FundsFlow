@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
     // Strict only on credential entry — not on /me/logout (those fire on every refresh).
-    Route::middleware('throttle:20,1')->group(function () {
+    Route::middleware('throttle:20,1,auth-login:')->group(function () {
         Route::post('/login', [AuthController::class, 'login']);
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/telegram-code', [AuthController::class, 'loginWithTelegramCode']);
@@ -30,44 +30,44 @@ Route::prefix('auth')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/telegram-webapp/link', [AuthController::class, 'linkTelegramWebApp'])
-            ->middleware('throttle:20,1');
+            ->middleware('throttle:20,1,tg-webapp-link:');
     });
 
-    Route::middleware('throttle:30,1')->group(function () {
+    Route::middleware('throttle:30,1,auth-oauth:')->group(function () {
         Route::get('/{provider}', [AuthController::class, 'redirectToProvider']);
         Route::get('/{provider}/callback', [AuthController::class, 'handleProviderCallback']);
     });
 });
 
 Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle'])
-    ->middleware('throttle:60,1');
+    ->middleware('throttle:60,1,tg-webhook:');
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/bootstrap', BootstrapController::class);
 
     Route::apiResource('tags', TagController::class)->except(['show']);
     Route::post('/transactions/bulk', [TransactionController::class, 'storeBulk'])
-        ->middleware('throttle:30,1');
+        ->middleware('throttle:30,1,tx-bulk:');
     Route::put('/transactions/bulk', [TransactionController::class, 'updateBulk'])
-        ->middleware('throttle:30,1');
+        ->middleware('throttle:30,1,tx-bulk:');
     Route::patch('/transactions/bulk', [TransactionController::class, 'updateBulk'])
-        ->middleware('throttle:30,1');
+        ->middleware('throttle:30,1,tx-bulk:');
     Route::delete('/transactions/bulk', [TransactionController::class, 'destroyBulk'])
-        ->middleware('throttle:30,1');
+        ->middleware('throttle:30,1,tx-bulk:');
     Route::apiResource('transactions', TransactionController::class)->except(['show']);
     Route::post('/transactions/{transaction}/attachments', [TransactionAttachmentController::class, 'store'])
-        ->middleware('throttle:60,1');
+        ->middleware('throttle:60,1,attach-upload:');
 
     Route::post('/transactions/{transaction}/attachments/base64', [TransactionAttachmentController::class, 'storeBase64'])
-        ->middleware('throttle:60,1');
+        ->middleware('throttle:60,1,attach-upload:');
     Route::get('/transactions/{transaction}/attachments/{attachment}', [TransactionAttachmentController::class, 'show']);
     Route::delete('/transactions/{transaction}/attachments/{attachment}', [TransactionAttachmentController::class, 'destroy']);
     Route::post('/transactions/{transaction}/attachments/{attachment}/telegram', [TransactionAttachmentController::class, 'sendToTelegram'])
-        ->middleware('throttle:30,1');
+        ->middleware('throttle:30,1,attach-tg:');
     Route::post('/telegram/send-file', [TelegramSendController::class, 'sendFile'])
-        ->middleware('throttle:20,1');
+        ->middleware('throttle:20,1,tg-send-file:');
     // Report PDF (one renderer for Settings and the assistant card; see RenderReportPdfAction).
-    // Own limiter keys (3rd arg): unprefixed throttle:N,M counters are shared per user across routes,
+    // Every throttle has its own limiter key (3rd arg): unprefixed throttle:N,M counters are shared per user across routes,
     // and every render also calls print-data, so the report must not eat the app-wide budget.
     Route::post('/report', [ReportController::class, 'store'])
         ->middleware('throttle:10,1,report:');
@@ -83,25 +83,25 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->except(['show'])
         ->parameters(['recurring-transactions' => 'recurringTransaction']);
     Route::post('/identities/telegram/link-code', [IdentityController::class, 'telegramLinkCode'])
-        ->middleware('throttle:10,1');
+        ->middleware('throttle:10,1,tg-link-code:');
     Route::put('/account/credentials', [AccountController::class, 'updateCredentials']);
     Route::patch('/account/preferences', [AccountController::class, 'updatePreferences']);
     Route::get('/account/ai-quota', [AccountController::class, 'aiQuota']);
     Route::get('/account/mcp-token', [AccountController::class, 'mcpTokenStatus']);
     Route::post('/account/mcp-token', [AccountController::class, 'createMcpToken'])
-        ->middleware('throttle:10,1');
+        ->middleware('throttle:10,1,mcp-token:');
     Route::delete('/account/mcp-token', [AccountController::class, 'revokeMcpToken']);
     Route::get('/account/export', [AccountController::class, 'export'])
-        ->middleware('throttle:10,1');
+        ->middleware('throttle:10,1,export:');
 
     Route::post('/agent/chat', [AgentController::class, 'chat'])
-        ->middleware('throttle:20,1');
+        ->middleware('throttle:20,1,agent-chat:');
     Route::post('/agent/confirm', [AgentController::class, 'confirm'])
-        ->middleware('throttle:30,1');
+        ->middleware('throttle:30,1,agent-confirm:');
     Route::post('/agent/report', [ReportController::class, 'store'])
         ->middleware('throttle:10,1,report:');
     Route::get('/agent/history', [AgentController::class, 'history'])
-        ->middleware('throttle:60,1');
+        ->middleware('throttle:60,1,agent-history:');
     Route::delete('/agent/conversation', [AgentController::class, 'reset'])
-        ->middleware('throttle:30,1');
+        ->middleware('throttle:30,1,agent-reset:');
 });

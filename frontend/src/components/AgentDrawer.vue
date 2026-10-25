@@ -77,6 +77,19 @@
                         <div v-else-if="item.kind === 'text'" class="chat chat-start">
                             <!-- renderMarkdown escapes all HTML first; only its own tags reach v-html. -->
                             <div class="chat-bubble agent-md break-words" v-html="renderMarkdown(item.text)" />
+                            <div class="chat-footer flex gap-0.5 pt-0.5">
+                                <button type="button" class="btn btn-ghost btn-xs btn-square tooltip tooltip-right"
+                                    :data-tip="copiedId === item.id ? 'Copied' : 'Copy'"
+                                    :aria-label="copiedId === item.id ? 'Copied' : 'Copy answer'" @click="copyAnswer(item)">
+                                    <Check v-if="copiedId === item.id" :size="14" class="text-success" aria-hidden="true" />
+                                    <Copy v-else :size="14" aria-hidden="true" />
+                                </button>
+                                <button v-if="item.id === agent.regenerateTargetId" type="button"
+                                    class="btn btn-ghost btn-xs btn-square tooltip tooltip-right" :data-tip="REGENERATE_TIP"
+                                    :aria-label="REGENERATE_TIP" @click="regenerate">
+                                    <RefreshCw :size="14" aria-hidden="true" />
+                                </button>
+                            </div>
                         </div>
 
                         <div v-else-if="item.kind === 'notice'" role="status" class="alert alert-soft text-sm py-2"
@@ -131,6 +144,16 @@
                         <AgentShowCard v-else-if="item.kind === 'show'" :item="item" />
                     </template>
 
+                    <!-- Regenerate for a turn that ended in a chart / card / error rather than text. -->
+                    <div v-if="agent.regenerateTargetId && agent.items[agent.items.length - 1]?.kind !== 'text'"
+                        class="flex">
+                        <button type="button" class="btn btn-ghost btn-xs gap-1 tooltip tooltip-bottom"
+                            :data-tip="REGENERATE_TIP" :aria-label="REGENERATE_TIP" @click="regenerate">
+                            <RefreshCw :size="14" aria-hidden="true" />
+                            Regenerate
+                        </button>
+                    </div>
+
                     <div v-if="agent.draft" class="chat chat-start">
                         <div class="chat-bubble agent-md break-words" v-html="renderMarkdown(agent.draft)" />
                     </div>
@@ -155,6 +178,18 @@
                 </div>
 
                 <p class="sr-only" role="status">{{ agent.isStreaming ? agent.status || 'Thinking…' : '' }}</p>
+                <p class="sr-only" role="status">{{ copiedId ? 'Answer copied to the clipboard' : '' }}</p>
+
+                <div v-if="editing" class="border-t border-base-300 px-3 pt-2 flex items-center gap-2 text-xs"
+                    role="status">
+                    <Pencil :size="14" class="shrink-0 text-base-content/60" aria-hidden="true" />
+                    <span class="flex-1 text-base-content/70">
+                        {{ editNote }}
+                    </span>
+                    <button type="button" class="btn btn-ghost btn-xs" aria-keyshortcuts="Escape" @click="cancelEdit">
+                        Cancel
+                    </button>
+                </div>
 
                 <div v-if="attachments.length || preparing" class="border-t border-base-300 px-3 pt-3 flex flex-wrap gap-2"
                     role="list" aria-label="Photos to send">
@@ -170,7 +205,8 @@
                         aria-label="Preparing photo" />
                 </div>
 
-                <form class="p-3 flex gap-2 items-end" :class="{ 'border-t border-base-300': !attachments.length && !preparing }"
+                <form class="p-3 flex gap-2 items-end"
+                    :class="{ 'border-t border-base-300': !attachments.length && !preparing && !editing }"
                     @submit.prevent="send(input)">
                     <input ref="fileInput" type="file" class="hidden" multiple :accept="ACCEPT" tabindex="-1"
                         aria-hidden="true" @change="onFilePicked" />
@@ -181,7 +217,8 @@
                     <textarea ref="textarea" v-model="input" rows="1" maxlength="2000"
                         class="textarea flex-1 min-h-10 max-h-40 resize-none leading-snug" :placeholder="inputPlaceholder"
                         :disabled="agent.quotaExhausted" aria-label="Message the assistant"
-                        @keydown.enter.exact.prevent="send(input)" @input="autoGrow" @paste="onPaste" />
+                        aria-keyshortcuts="ArrowUp" @keydown.enter.exact.prevent="send(input)"
+                        @keydown.up.exact="editLast" @keydown.esc="onComposerEscape" @input="autoGrow" @paste="onPaste" />
                     <button v-if="agent.isStreaming" type="button" class="btn btn-square btn-ghost"
                         aria-label="Stop" @click="agent.stop()">
                         <Square :size="18" />
@@ -206,8 +243,12 @@
 <script setup>
 import {
     ArrowDown,
+    Check,
+    Copy,
     ImagePlus,
     Paperclip,
+    Pencil,
+    RefreshCw,
     RotateCcw,
     SendHorizontal,
     ShieldQuestion,
@@ -216,7 +257,7 @@ import {
     X,
 } from 'lucide-vue-next'
 import { computed, defineAsyncComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useAgentStore } from '../services/agent.js'
+import { lastTurnIndex, rewindBlocker, useAgentStore } from '../services/agent.js'
 import { renderMarkdown } from '../services/markdown.js'
 import {
     ACCEPT,
@@ -622,15 +663,125 @@ const send = async (text) => {
     const fromComposer = text === input.value
     const images = fromComposer ? [...attachments.value] : []
     if ((!message && !images.length) || agent.isStreaming || (images.length && preparing.value)) return
+    // Only a composer send of the prefilled edit replaces the turn; suggestion chips etc. are new messages.
+    const rewind =
+        fromComposer && editing.value?.replace && !images.length
+            ? { mode: 'replace_last', turnId: editing.value.id }
+            : null
+    editing.value = null
     if (fromComposer) {
         input.value = ''
         attachments.value = []
     }
     nextTick(autoGrow)
     stickToBottom()
-    const ok = await agent.send(message, images)
-    // Rejected before streaming (422 / 409 / 429): give the photos back instead of losing them.
+    const ok = await agent.send(message, images, rewind)
+    // Rejected before streaming (422 / 409 / 429): give the photos / edited text back instead of losing them.
     if (ok === false && images.length && !attachments.value.length) attachments.value = images
+    if (ok === false && rewind && !input.value) {
+        input.value = message
+        nextTick(autoGrow)
+    }
+}
+
+// --- Answer actions: copy, ↑ to edit the last message, regenerate ---
+
+const REGENERATE_TIP = 'Regenerate answer (uses 1 AI assist)'
+
+const copiedId = ref(null)
+let copiedTimer = null
+
+const copyText = async (text) => {
+    try {
+        await navigator.clipboard.writeText(text)
+        return true
+    } catch {
+        // Older browsers / non-secure contexts.
+        const el = document.createElement('textarea')
+        el.value = text
+        el.setAttribute('readonly', '')
+        el.style.position = 'fixed'
+        el.style.opacity = '0'
+        document.body.appendChild(el)
+        el.select()
+        const ok = document.execCommand('copy')
+        el.remove()
+        return ok
+    }
+}
+
+// Copies the markdown source (what the assistant wrote), not the rendered HTML.
+const copyAnswer = async (item) => {
+    if (!(await copyText(String(item.text ?? '')))) {
+        toasts.error('Could not copy to the clipboard.')
+        return
+    }
+    copiedId.value = item.id
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => {
+        copiedId.value = null
+    }, 1500)
+}
+
+// { id: last user item id, replace: whether sending replaces that turn (else it goes as a new message) }
+const editing = ref(null)
+
+const editNote = computed(() => {
+    if (!editing.value) return ''
+    if (editing.value.replace) return 'Editing your last message: sending replaces it and its answer.'
+    if (editing.value.blocker === 'receipt')
+        return 'That message answered a receipt question, so this goes as a new message.'
+    if (editing.value.blocker === 'applied') return 'A change from that turn was saved, so this goes as a new message.'
+    return 'This goes as a new message.'
+})
+
+const editLast = (event) => {
+    if (input.value || attachments.value.length || agent.isStreaming || agent.quotaExhausted) return
+    const index = lastTurnIndex(agent.items)
+    const user = agent.items[index]
+    if (!user?.text) return
+    event.preventDefault()
+    const blocker = rewindBlocker(agent.items, 'replace_last')
+    editing.value = { id: user.id, replace: blocker === null, blocker }
+    input.value = user.text
+    nextTick(() => {
+        autoGrow()
+        textarea.value?.setSelectionRange(input.value.length, input.value.length)
+    })
+}
+
+const cancelEdit = () => {
+    editing.value = null
+    input.value = ''
+    nextTick(autoGrow)
+    textarea.value?.focus()
+}
+
+const onComposerEscape = (event) => {
+    if (!editing.value) return
+    // Esc cancels the edit first; the next Esc closes the drawer.
+    event.stopPropagation()
+    event.preventDefault()
+    cancelEdit()
+}
+
+// The edit is void once the text is cleared, photos are added, or the conversation moves on.
+watch(
+    () => [
+        input.value === '',
+        attachments.value.length,
+        agent.items[lastTurnIndex(agent.items)]?.id,
+        agent.isStreaming,
+    ],
+    ([empty, photos, lastId, streaming]) => {
+        if (!editing.value) return
+        if (empty || photos || streaming || lastId !== editing.value.id) editing.value = null
+    },
+)
+
+const regenerate = () => {
+    stickToBottom()
+    agent.regenerate()
 }
 
 // --- Keyboard: "/" or Cmd/Ctrl+K opens and focuses the input, Esc closes and restores focus ---
