@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AgentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BootstrapController;
 use App\Http\Controllers\BudgetController;
@@ -84,4 +85,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/account/mcp-token', [AccountController::class, 'revokeMcpToken']);
     Route::get('/account/export', [AccountController::class, 'export'])
         ->middleware('throttle:10,1');
+
+    Route::post('/agent/chat', [AgentController::class, 'chat'])
+        ->middleware('throttle:20,1');
+    Route::post('/agent/confirm', [AgentController::class, 'confirm'])
+        ->middleware('throttle:30,1');
+    Route::get('/agent/history', [AgentController::class, 'history'])
+        ->middleware('throttle:60,1');
+    Route::delete('/agent/conversation', [AgentController::class, 'reset'])
+        ->middleware('throttle:30,1');
 });

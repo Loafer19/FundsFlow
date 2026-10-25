@@ -12,7 +12,11 @@
 
 :80 {
     root * public
-    encode gzip
+
+    # The agent chat is a Server-Sent Events stream: compressing it would buffer
+    # the events until the response ends, so keep it out of encode.
+    @compressible not path /api/agent/chat
+    encode @compressible gzip
 
     {$CADDY_SERVER_EXTRA_DIRECTIVES}
 

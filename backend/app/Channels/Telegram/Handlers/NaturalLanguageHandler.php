@@ -2,25 +2,19 @@
 
 namespace App\Channels\Telegram\Handlers;
 
-use App\Actions\Tags\CreateTagAction;
-use App\Actions\Tags\ListTagsAction;
-use App\Actions\Tags\UpdateTagAction;
+use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Telegram\RunTelegramAgentAction;
+use App\Actions\Telegram\TelegramAgentSession;
 use App\Actions\Telegram\TelegramAgentToolExecutor;
 use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
-use App\Models\Tag;
 use App\Models\User;
 use App\Support\TelegramAiQuota;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class NaturalLanguageHandler
 {
-    private const DEFAULT_EMOJI = '🏷';
-
     private const OUTDATED_PREVIEW = 'This preview is outdated or was already handled. Ask again to get a fresh one.';
 
     public function __construct(
@@ -29,9 +23,7 @@ class NaturalLanguageHandler
         private readonly RunTelegramAgentAction $agent,
         private readonly TelegramAgentToolExecutor $toolExecutor,
         private readonly TelegramAiQuota $quota,
-        private readonly CreateTagAction $createTag,
-        private readonly ListTagsAction $listTags,
-        private readonly UpdateTagAction $updateTag,
+        private readonly AgentToolExecutor $agentTools,
         private readonly TelegramChatSession $session,
     ) {}
 
@@ -59,10 +51,7 @@ class NaturalLanguageHandler
         if (!$this->quota->hasQuota($user)) {
             $this->client->sendMessage(
                 $chatId,
-                $this->quota->exhaustedMessage(
-                    $user,
-                    'Use the menu buttons, type a quick-add, or try again after the reset. Settings in the Web UI shows your quota.',
-                ),
+                $this->agent->quotaExhaustedMessage($user, $chatId, $identity),
             );
             $this->session->setSummary($identity, $chatId, 'AI quota exhausted.');
 
@@ -126,10 +115,7 @@ class NaturalLanguageHandler
         if (!$this->quota->hasQuota($user)) {
             $this->client->sendMessage(
                 $chatId,
-                $this->quota->exhaustedMessage(
-                    $user,
-                    'Use the menu buttons, type a quick-add, or try again after the reset. Settings in the Web UI shows your quota.',
-                ),
+                $this->agent->quotaExhaustedMessage($user, $chatId, $identity),
             );
 
             return true;
@@ -209,7 +195,7 @@ class NaturalLanguageHandler
         $titles = is_array($pending['titles'] ?? null)
             ? array_values(array_filter($pending['titles'], 'is_string'))
             : [];
-        $this->createTags($user, $chatId, $identity, $this->filterNewTagTitles($user, $titles));
+        $this->createTags($user, $chatId, $identity, $this->agentTools->filterNewTagTitles($user, $titles));
     }
 
     public function cancelCreateTags(
@@ -246,20 +232,7 @@ class NaturalLanguageHandler
             return;
         }
 
-        $rawProposals = is_array($pending['proposals'] ?? null) ? $pending['proposals'] : [];
-        $proposals = [];
-        foreach ($rawProposals as $proposal) {
-            if (!is_array($proposal)) {
-                continue;
-            }
-            $id = is_numeric($proposal['id'] ?? null) ? (int) $proposal['id'] : 0;
-            $before = is_string($proposal['before'] ?? null) ? (string) $proposal['before'] : '';
-            $after = is_string($proposal['after'] ?? null) ? (string) $proposal['after'] : '';
-            if ($id < 1 || $after === '') {
-                continue;
-            }
-            $proposals[] = ['id' => $id, 'before' => $before, 'after' => $after];
-        }
+        $proposals = $this->agentTools->normalizeRenameProposals($pending['proposals'] ?? null);
 
         if ($proposals === []) {
             $this->client->sendMessage($chatId, 'The rename preview is stale or has no valid changes.');
@@ -268,25 +241,7 @@ class NaturalLanguageHandler
         }
 
         try {
-            DB::transaction(function () use ($user, $proposals): void {
-                foreach ($proposals as $proposal) {
-                    $tag = Tag::query()
-                        ->where('user_id', $user->id)
-                        ->whereKey($proposal['id'])
-                        ->first();
-
-                    if (!$tag || mb_strtolower(trim($tag->title)) !== mb_strtolower(trim($proposal['before']))) {
-                        throw new \RuntimeException('A tag changed while the preview was waiting.');
-                    }
-
-                    $this->updateTag->execute($user, $tag, [
-                        'title' => $proposal['after'],
-                        'emoji' => $tag->emoji,
-                        'calc_balance' => $tag->calc_balance,
-                        'parent_id' => $tag->parent_id,
-                    ]);
-                }
-            });
+            $this->agentTools->renameTags($user, $proposals);
         } catch (Throwable) {
             $this->client->sendMessage($chatId, 'Could not apply the rename preview; no changes were saved.');
             $this->session->setSummary($identity, $chatId, 'Rename failed because a tag changed or could not be updated.');
@@ -294,7 +249,7 @@ class NaturalLanguageHandler
             return;
         }
 
-        $this->saveTagListSession($identity, $chatId, $this->listTags->execute($user));
+        $this->agentTools->saveTagListSession($user, new TelegramAgentSession($this->session, $identity, $chatId));
         $preview = implode("\n", array_map(
             static fn (array $proposal): string => $proposal['before'] . ' → ' . $proposal['after'],
             $proposals,
@@ -400,30 +355,6 @@ class NaturalLanguageHandler
 
     /**
      * @param list<string> $titles
-     * @return list<string>
-     */
-    private function filterNewTagTitles(User $user, array $titles): array
-    {
-        $existing = [];
-        foreach ($this->listTags->execute($user) as $tag) {
-            $existing[mb_strtolower(trim((string) $tag->title))] = true;
-        }
-
-        $out = [];
-        foreach ($titles as $title) {
-            $key = mb_strtolower(trim($title));
-            if ($key === '' || isset($existing[$key])) {
-                continue;
-            }
-            $existing[$key] = true;
-            $out[] = mb_substr(trim($title), 0, 255);
-        }
-
-        return $out;
-    }
-
-    /**
-     * @param list<string> $titles
      */
     private function createTags(User $user, int|string $chatId, int|string $identity, array $titles): void
     {
@@ -433,35 +364,11 @@ class NaturalLanguageHandler
             return;
         }
 
-        $created = [];
-        foreach ($titles as $title) {
-            $tag = $this->createTag->execute($user, [
-                'title' => $title,
-                'emoji' => self::DEFAULT_EMOJI,
-                'parent_id' => null,
-                'calc_balance' => true,
-            ]);
-            $created[] = trim($tag->emoji . ' ' . $tag->title);
-        }
+        $created = $this->agentTools->createTags($user, $titles);
 
-        $this->saveTagListSession($identity, $chatId, $this->listTags->execute($user));
+        $this->agentTools->saveTagListSession($user, new TelegramAgentSession($this->session, $identity, $chatId));
         $summary = '✅ Created tags: ' . implode(', ', $created);
         $this->session->setSummary($identity, $chatId, $summary);
         $this->client->sendMessage($chatId, $summary);
-    }
-
-    /**
-     * @param Collection<int, Tag> $tags
-     */
-    private function saveTagListSession(int|string $identity, int|string $chatId, Collection $tags): void
-    {
-        $this->session->setDomain($identity, $chatId, 'tags');
-        $this->session->setLastList($identity, $chatId, $tags->map(
-            static fn (Tag $tag): array => [
-                'id' => (int) $tag->id,
-                'title' => (string) $tag->title,
-                'emoji' => (string) $tag->emoji,
-            ],
-        )->values()->all());
     }
 }

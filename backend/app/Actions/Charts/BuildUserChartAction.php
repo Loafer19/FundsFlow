@@ -33,7 +33,9 @@ class BuildUserChartAction
 
     /**
      * @param array<string, mixed> $args
-     * @return array{html: string, caption: string, summary: array<string, mixed>}
+     * `data` is the same chart as structured series (for clients that draw charts themselves, e.g. the web agent).
+     *
+     * @return array{html: string, caption: string, summary: array<string, mixed>, data: array<string, mixed>}
      */
     public function execute(User $user, array $args): array
     {
@@ -63,6 +65,8 @@ class BuildUserChartAction
         $money = fn (float $v): string => UserFormatter::formatMoney($user, $v);
         $range = UserFormatter::formatDate($user, $from) . ' – ' . UserFormatter::formatDate($user, $to);
 
+        $data = [];
+
         switch ($type) {
             case 'expenses_by_tag':
                 $style = ($args['style'] ?? 'donut') === 'bar' ? 'bar' : 'donut';
@@ -74,6 +78,7 @@ class BuildUserChartAction
                     $caption .= "\nTop: " . $rows[0]['label'] . ' ' . $money(-$rows[0]['value']);
                 }
                 $summary = ['rows' => count($rows)];
+                $data = ['style' => $style, 'rows' => $rows];
                 break;
 
             case 'income_vs_expenses':
@@ -86,6 +91,7 @@ class BuildUserChartAction
                 $caption = "Income vs expenses · {$periodLabel}\nIncome: " . $money($income)
                     . "\nExpenses: " . $money($expenses) . "\nNet: " . $money($net);
                 $summary = ['buckets' => count($buckets), 'group_by' => $group];
+                $data = ['group_by' => $group, 'buckets' => $buckets];
                 break;
 
             default: // balance_trend
@@ -97,6 +103,7 @@ class BuildUserChartAction
                 $caption = "Balance trend · {$periodLabel}\nStart: " . $money($start)
                     . "\nEnd: " . $money($end) . "\nChange: " . $money($end - $start);
                 $summary = ['start' => $start, 'end' => $end];
+                $data = ['points' => $points];
                 break;
         }
 
@@ -105,6 +112,17 @@ class BuildUserChartAction
         return [
             'html' => $html,
             'caption' => mb_substr($caption, 0, 1000),
+            'data' => array_merge($data, [
+                'type' => $type,
+                'title' => $title,
+                'subtitle' => $periodLabel . ' · ' . $range,
+                'period_label' => $periodLabel,
+                'from' => $fromKey,
+                'to' => $toKey,
+                'income' => $income,
+                'expenses' => $expenses,
+                'net' => $net,
+            ]),
             'summary' => array_merge($summary, [
                 'type' => $type,
                 'from' => $fromKey,
@@ -158,7 +176,7 @@ class BuildUserChartAction
 
     /**
      * @param iterable<Transaction> $transactions
-     * @return list<array{label: string, value: float}>
+     * @return list<array{label: string, value: float, id: int|string, emoji: string, title: string, count: int}>
      */
     private function expensesByTag(iterable $transactions): array
     {
@@ -169,20 +187,30 @@ class BuildUserChartAction
             }
             $amount = abs((float) $tx->amount);
             if ($tx->tags->isEmpty()) {
-                $byTag['untagged'] ??= ['label' => 'Untagged', 'value' => 0.0];
+                $byTag['untagged'] ??= ['label' => 'Untagged', 'value' => 0.0, 'id' => 'untagged', 'emoji' => '🏷️', 'title' => 'Untagged', 'count' => 0];
                 $byTag['untagged']['value'] += $amount;
+                $byTag['untagged']['count']++;
                 continue;
             }
             foreach ($tx->tags as $tag) {
-                $byTag[$tag->id] ??= ['label' => trim(((string) $tag->emoji) . ' ' . $tag->title), 'value' => 0.0];
+                $byTag[$tag->id] ??= [
+                    'label' => trim(((string) $tag->emoji) . ' ' . $tag->title),
+                    'value' => 0.0,
+                    'id' => (int) $tag->id,
+                    'emoji' => (string) $tag->emoji,
+                    'title' => (string) $tag->title,
+                    'count' => 0,
+                ];
                 $byTag[$tag->id]['value'] += $amount;
+                $byTag[$tag->id]['count']++;
             }
         }
 
         $rows = collect($byTag)->sortByDesc('value')->values();
         if ($rows->count() > 8) {
             $other = (float) $rows->slice(7)->sum('value');
-            $rows = $rows->take(7)->push(['label' => 'Other', 'value' => $other]);
+            $otherCount = (int) $rows->slice(7)->sum('count');
+            $rows = $rows->take(7)->push(['label' => 'Other', 'value' => $other, 'id' => 'other', 'emoji' => '', 'title' => 'Other', 'count' => $otherCount]);
         }
 
         return $rows->all();
@@ -190,7 +218,7 @@ class BuildUserChartAction
 
     /**
      * @param iterable<Transaction> $transactions
-     * @return list<array{label: string, income: float, expenses: float}>
+     * @return list<array{label: string, date: string, income: float, expenses: float}>
      */
     private function incomeExpenseBuckets(iterable $transactions, CarbonImmutable $from, CarbonImmutable $to, string $group, User $user): array
     {
@@ -210,7 +238,12 @@ class BuildUserChartAction
                     'week' => $cursor->startOfWeek()->format('d M'),
                     default => $cursor->format('d'),
                 };
-                $buckets[$key] = ['label' => $label, 'income' => 0.0, 'expenses' => 0.0];
+                $date = match ($group) {
+                    'month' => $cursor->startOfMonth()->toDateString(),
+                    'week' => $cursor->startOfWeek()->toDateString(),
+                    default => $cursor->toDateString(),
+                };
+                $buckets[$key] = ['label' => $label, 'date' => $date, 'income' => 0.0, 'expenses' => 0.0];
             }
             $cursor = $cursor->addDay();
         }
@@ -232,7 +265,7 @@ class BuildUserChartAction
 
     /**
      * @param iterable<Transaction> $all
-     * @return list<array{label: string, value: float}>
+     * @return list<array{label: string, date: string, value: float}>
      */
     private function balancePoints(iterable $all, CarbonImmutable $from, CarbonImmutable $to): array
     {
@@ -257,7 +290,7 @@ class BuildUserChartAction
         while ($cursor->lte($to) && count($points) < 1200) {
             $key = $cursor->toDateString();
             $balance += $daily[$key] ?? 0.0;
-            $points[] = ['label' => $cursor->format('d M'), 'value' => round($balance, 2)];
+            $points[] = ['label' => $cursor->format('d M'), 'date' => $key, 'value' => round($balance, 2)];
             $cursor = $cursor->addDay();
         }
 

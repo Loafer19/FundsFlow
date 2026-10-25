@@ -77,7 +77,7 @@ class MessageHandler
                 $chatId,
                 $this->transcribeAudio->quota()->exhaustedMessage(
                     $user,
-                    'Type your message instead, or try again after the reset. Settings in the Web UI shows your quota.',
+                    'Until then, type your message instead — quick-add like -350 groceries and the menu buttons still work.',
                 ),
             );
 

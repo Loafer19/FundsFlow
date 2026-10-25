@@ -68,14 +68,15 @@ nothing is saved until you press **Confirm**. Old previews stop working once han
 
 ## Daily AI limit
 
-AI features in Telegram share one daily budget of **AI assists**:
+AI features share one daily budget of **AI assists**:
 
 - reading a receipt photo with AI,
 - transcribing a voice message,
-- each message handled by the AI assistant.
+- each message handled by the AI assistant (in Telegram or in the web app's **Assistant** panel).
 
 The default limit is **5 assists per day** (configurable by the operator). The counter resets at **midnight in your
-timezone**. When only a couple are left the bot warns you, and when you run out it tells you when the limit resets.
+timezone**. When only a couple are left the bot warns you, and when you run out it tells you that the limit resets at
+midnight and what still works without AI.
 
 You can always see *AI assists today* (used / limit and reset time) in **Settings → Accounts** in the web app.
 

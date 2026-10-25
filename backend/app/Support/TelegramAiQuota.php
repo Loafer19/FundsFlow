@@ -68,15 +68,19 @@ final class TelegramAiQuota
     }
 
     /**
-     * Hard-fail copy when remaining is 0 (receipt AI, NL, STT).
+     * Hard-fail copy when remaining is 0 (receipt AI, NL agent, STT).
+     * The counter rolls over at midnight in the user's timezone (see key()/resetAt()).
+     *
+     * @param string $withoutAi Channel-specific tail: what still works without AI there.
      */
-    public function exhaustedMessage(User $user, ?string $nextStep = null): string
+    public function exhaustedMessage(User $user, string $withoutAi): string
     {
-        $snap = $this->snapshot($user);
-        $reset = $this->formatResetLabel($user);
-        $nextStep ??= 'Use the menu, type a quick-add like -350 groceries, or try again after the reset. Settings in the Web UI shows your quota.';
+        $limit = $this->dailyLimit();
+        $head = $limit > 0
+            ? "You've used all {$limit} AI assists for today. They reset at midnight ({$user->timezone()})."
+            : 'AI assists are turned off on this server.';
 
-        return "Daily AI limit reached ({$snap['used']}/{$snap['limit']} used). Resets {$reset}. {$nextStep}";
+        return trim($head . ' ' . $withoutAi);
     }
 
     /**
@@ -92,7 +96,7 @@ final class TelegramAiQuota
             return null;
         }
 
-        return "AI assists left today: {$snap['remaining']}/{$snap['limit']} (resets {$this->formatResetLabel($user)})";
+        return "Heads up: {$snap['remaining']} of {$snap['limit']} AI assists left today (they reset at midnight, {$user->timezone()}).";
     }
 
     /**

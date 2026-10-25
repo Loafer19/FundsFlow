@@ -15,6 +15,7 @@
     <RecurringEditModal />
     <SettingsModal />
     <OnboardingModal />
+    <AgentDrawer v-if="authStore.isAuthenticated" />
 
     <div class="container mx-auto p-4">
         <header class="flex gap-2 justify-end mb-4 flex-wrap">
@@ -22,6 +23,12 @@
                 data-tip="Docs" aria-label="Docs (opens in a new tab)">
                 <CircleHelp :size="24" />
             </a>
+
+            <button v-if="authStore.isAuthenticated" type="button" @click="agentStore.toggle()"
+                class="btn btn-ghost btn-square tooltip tooltip-bottom" data-tip="Assistant" aria-label="Assistant"
+                :aria-expanded="agentStore.isOpen">
+                <Sparkles :size="24" />
+            </button>
 
             <template v-if="authStore.isAuthenticated">
                 <button type="button" @click="showModal('transactions_add_modal')"
@@ -224,12 +231,14 @@ import {
     Presentation,
     Repeat,
     Settings,
+    Sparkles,
     Table,
     Tag,
     Tags,
     TrendingUp,
 } from 'lucide-vue-next'
 import { computed, markRaw, onMounted, provide, ref, watch } from 'vue'
+import AgentDrawer from './components/AgentDrawer.vue'
 import TagPicker from './components/TagPicker.vue'
 import Toasts from './components/Toasts.vue'
 import AttachmentPreviewModal from './modals/AttachmentPreviewModal.vue'
@@ -246,6 +255,7 @@ import TagsEditModal from './modals/TagsEditModal.vue'
 import TagsModal from './modals/TagsModal.vue'
 import TransactionsAddModal from './modals/TransactionsAddModal.vue'
 import TransactionsEditModal from './modals/TransactionsEditModal.vue'
+import { useAgentStore } from './services/agent.js'
 import { useAuthStore } from './services/auth.js'
 import { bootstrapStores } from './services/bootstrap.js'
 import { useBudgetsStore } from './services/budgets.js'
@@ -274,6 +284,7 @@ import TableTab from './tabs/TableTab.vue'
 import TagDistribution from './tabs/TagDistribution.vue'
 
 const authStore = useAuthStore()
+const agentStore = useAgentStore()
 const tagsStore = useTagsStore()
 const transactionsStore = useTransactionsStore()
 const recurringTransactionsStore = useRecurringTransactionsStore()
@@ -351,6 +362,7 @@ watch(
             transactionsStore.transactions = []
             budgetsStore.budgets = []
             recurringTransactionsStore.rules = []
+            agentStore.clearLocal()
         }
     },
 )

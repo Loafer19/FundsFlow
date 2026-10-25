@@ -438,7 +438,7 @@ class MediaHandler
                 $chatId,
                 $this->analyzeReceipt->quota()->exhaustedMessage(
                     $user,
-                    'Pick an amount or send like -350 groceries.',
+                    'Until then, pick an amount below or send it like -350 groceries.',
                 ),
                 $this->support->mediaAmountKeyboard(),
             );
