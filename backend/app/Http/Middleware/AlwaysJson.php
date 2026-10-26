@@ -13,8 +13,23 @@ class AlwaysJson
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $request->headers->set('Accept', 'application/json');
+        if (!self::isPanelRequest($request)) {
+            $request->headers->set('Accept', 'application/json');
+        }
 
         return $next($request);
+    }
+
+    /**
+     * The Filament admin panel and its Livewire endpoints: HTML, sessions and CSRF
+     * instead of the API's JSON + Sanctum tokens.
+     */
+    public static function isPanelRequest(Request $request): bool
+    {
+        $path = ltrim($request->path(), '/');
+
+        return $path === 'admin'
+            || str_starts_with($path, 'admin/')
+            || str_starts_with($path, 'livewire');
     }
 }

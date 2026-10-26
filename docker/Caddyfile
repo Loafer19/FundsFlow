@@ -18,6 +18,17 @@
     @compressible not path /api/agent/chat
     encode @compressible gzip
 
+    # Filament admin panel (/admin + Livewire endpoints/assets). The API itself sends JSON only
+    # and needs no CSP; the panel's Alpine/Livewire need inline scripts/styles and eval.
+    @admin path /admin /admin/* /livewire* /js/filament/* /css/filament/* /fonts/filament/*
+    header @admin {
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://ui-avatars.com; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+        X-Frame-Options DENY
+        X-Content-Type-Options nosniff
+        Referrer-Policy same-origin
+        -Server
+    }
+
     {$CADDY_SERVER_EXTRA_DIRECTIVES}
 
     php_server

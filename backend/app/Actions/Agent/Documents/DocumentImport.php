@@ -135,7 +135,7 @@ final class DocumentImport
         }
         $perImage = $this->ai->readScreenshots($user, $images, $caption);
         if ($perImage === null) {
-            return ['type' => 'error', 'message' => "Couldn't read the screenshots right now. Try again later, or export the statement as CSV / PDF from the bank app."];
+            return ['type' => 'error', 'message' => "Couldn't read the screenshots: " . $this->ai->failureReason() . '. No AI assist was used; send them again in a minute, or export the statement as CSV / PDF from the bank app.'];
         }
         $this->quota->consume($user);
 

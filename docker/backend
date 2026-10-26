@@ -15,6 +15,8 @@ COPY docker/Caddyfile /etc/frankenphp/Caddyfile
 
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 
+# composer's post-autoload-dump runs `php artisan filament:upgrade`, which publishes the
+# Filament/Livewire assets into public/{js,css,fonts}/filament for /admin (not committed).
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress --no-suggest --prefer-dist && \
     composer dump-autoload --optimize
 

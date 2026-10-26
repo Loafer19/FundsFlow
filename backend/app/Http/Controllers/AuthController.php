@@ -181,6 +181,10 @@ class AuthController extends Controller
                 ]);
             }
 
+            if ($user->isBlocked()) {
+                return redirect($frontend . '#auth_error=' . urlencode('Account blocked'));
+            }
+
             return redirect($frontend . '#token=' . urlencode($this->issueAuthToken($user)));
         } catch (Exception $e) {
             return redirect($frontend . '#auth_error=' . urlencode('Authentication failed'));
@@ -189,6 +193,8 @@ class AuthController extends Controller
 
     private function issueAuthToken(User $user): string
     {
+        abort_if($user->isBlocked(), 403, 'Account blocked');
+
         $existing = $user->tokens()
             ->where('name', 'auth_token')
             ->orderBy('created_at')

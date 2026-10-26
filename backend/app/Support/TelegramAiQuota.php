@@ -11,9 +11,40 @@ use Illuminate\Support\Facades\Cache;
  */
 final class TelegramAiQuota
 {
-    public function dailyLimit(): int
+    /**
+     * Today's limit: the user's own `ai_daily_limit` (set in /admin) or AI_RECEIPT_DAILY_LIMIT,
+     * plus any one-off bonus an admin granted for today. Without a user: the server default.
+     */
+    public function dailyLimit(?User $user = null): int
+    {
+        $base = $user?->ai_daily_limit ?? (int) config('services.ai_receipt.daily_limit', 5);
+
+        return max(0, (int) $base) + ($user ? $this->bonus($user) : 0);
+    }
+
+    /** Server default (AI_RECEIPT_DAILY_LIMIT), ignoring per-user overrides. */
+    public function defaultLimit(): int
     {
         return max(0, (int) config('services.ai_receipt.daily_limit', 5));
+    }
+
+    /** Extra assists an admin granted for the user's current day. */
+    public function bonus(User $user): int
+    {
+        return max(0, (int) Cache::get($this->bonusKey($user), 0));
+    }
+
+    /** Admin: add assists for today only (gone at the user's midnight). */
+    public function grantBonus(User $user, int $assists): void
+    {
+        Cache::put($this->bonusKey($user), $this->bonus($user) + max(0, $assists), now()->addDays(2));
+    }
+
+    /** Admin: zero today's counter (and drop today's bonus). */
+    public function reset(User $user): void
+    {
+        Cache::forget($this->key($user));
+        Cache::forget($this->bonusKey($user));
     }
 
     public function used(User $user): int
@@ -23,7 +54,7 @@ final class TelegramAiQuota
 
     public function remaining(User $user): int
     {
-        return max(0, $this->dailyLimit() - $this->used($user));
+        return max(0, $this->dailyLimit($user) - $this->used($user));
     }
 
     public function hasQuota(User $user): bool
@@ -46,7 +77,7 @@ final class TelegramAiQuota
      */
     public function snapshot(User $user): array
     {
-        $limit = $this->dailyLimit();
+        $limit = $this->dailyLimit($user);
         $used = min($this->used($user), $limit);
         $resetAt = $this->resetAt($user);
 
@@ -75,10 +106,10 @@ final class TelegramAiQuota
      */
     public function exhaustedMessage(User $user, string $withoutAi): string
     {
-        $limit = $this->dailyLimit();
+        $limit = $this->dailyLimit($user);
         $head = $limit > 0
             ? "You've used all {$limit} AI assists for today. They reset at midnight ({$user->timezone()})."
-            : 'AI assists are turned off on this server.';
+            : ($this->defaultLimit() > 0 ? 'AI assists are turned off for your account.' : 'AI assists are turned off on this server.');
 
         return trim($head . ' ' . $withoutAi);
     }
@@ -113,5 +144,10 @@ final class TelegramAiQuota
     public function key(User $user): string
     {
         return 'telegram_ai:' . $user->id . ':' . $user->todayDateString();
+    }
+
+    public function bonusKey(User $user): string
+    {
+        return 'telegram_ai_bonus:' . $user->id . ':' . $user->todayDateString();
     }
 }

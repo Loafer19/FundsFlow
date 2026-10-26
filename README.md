@@ -69,3 +69,13 @@ One renderer for every report PDF: Settings → Report (download / Send to Teleg
 - Local: `docker compose -f docker/compose.gotenberg.yml up -d`, then in `backend/.env` set `GOTENBERG_URL=http://127.0.0.1:3000` and `REPORT_RENDER_URL` to a frontend URL reachable *from the Gotenberg container* (or leave it empty for the HTML fallback)
 - Dokploy: add service image `gotenberg/gotenberg:8` (`--chromium-disable-javascript=false --api-timeout=120s`) on the same network as the backend; on the backend set `GOTENBERG_URL=http://<service>:3000` and `REPORT_RENDER_URL=https://<your frontend domain>`. Gotenberg needs outbound access to that frontend and to the API origin in the frontend's `VITE_API_URL`, and `CORS_ALLOWED_ORIGINS` must include the frontend origin
 
+## Admin panel (Filament)
+
+A [Filament](https://filamentphp.com) panel lives on the API host at `/admin` (e.g. `https://api.fundsflow.fun/admin`). It is for operators only: users list and detail (read-only transactions, tags, budgets, recurring), per-user AI limit / bonus / reset, block and unblock, admin role, a dashboard with stats and an audit log of every admin action (`admin_audit_logs` table plus `admin.*` log lines).
+
+- Access: only users with `is_admin` and no `blocked_at`; TOTP two-factor is required (set up on first sign-in, recovery codes shown once)
+- Grant or revoke: `php artisan admin:grant you@example.com [--password] [--revoke] [--reset-mfa]`. `--password` sets a sign-in password (Google/Telegram-only accounts have none you know); `--reset-mfa` clears a lost authenticator
+- AI limit: `AI_RECEIPT_DAILY_LIMIT` is the server default; `users.ai_daily_limit` overrides it per user (empty means the default, 0 turns AI off for that user). A bonus from the panel adds to today only
+- Blocking (`users.blocked_at`) rejects API tokens, password/OAuth sign-in and Telegram messages
+- Env (backend): `SESSION_DRIVER=redis`, `SESSION_DOMAIN=<api host>`, `SESSION_SECURE_COOKIE=true`, and `APP_URL=https://<api host>` (asset and Livewire URLs are built from it). Only `/admin` and `/livewire-*` start a session; the API, CORS and the Telegram webhook are unchanged
+- Deploy: the image publishes the panel's JS/CSS during `composer install` (`filament:upgrade`); migrations are not automatic, so run `php artisan migrate --force` in the backend container after the first deploy, then `admin:grant`

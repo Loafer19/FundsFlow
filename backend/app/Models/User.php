@@ -3,14 +3,20 @@
 namespace App\Models;
 
 use Database\Seeders\DefaultTagsSeeder;
+use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthentication;
+use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthenticationRecovery;
+use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
+use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery
 {
-    use HasApiTokens, Notifiable;
+    use HasApiTokens, InteractsWithAppAuthentication, InteractsWithAppAuthenticationRecovery, Notifiable;
 
     public const AUTH_PROVIDERS = [
         'google',
@@ -42,6 +48,12 @@ class User extends Authenticatable
         'password',
         'remember_token',
         'email_verified_at',
+        // Admin-only fields stay out of /auth/me and other API payloads.
+        'is_admin',
+        'ai_daily_limit',
+        'blocked_at',
+        'app_authentication_secret',
+        'app_authentication_recovery_codes',
         'created_at',
         'updated_at',
     ];
@@ -51,6 +63,19 @@ class User extends Authenticatable
         static::created(function (User $user) {
             (new DefaultTagsSeeder)->run($user);
         });
+    }
+
+    /**
+     * Admin panel (/admin): admins only, and never a blocked account.
+     */
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->is_admin && !$this->isBlocked();
+    }
+
+    public function isBlocked(): bool
+    {
+        return $this->blocked_at !== null;
     }
 
     /**
@@ -125,6 +150,14 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<TransactionAttachment, $this>
+     */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(TransactionAttachment::class);
+    }
+
+    /**
      * @return HasMany<Budget, $this>
      */
     public function budgets(): HasMany
@@ -149,6 +182,9 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'preferences' => 'array',
+            'is_admin' => 'boolean',
+            'ai_daily_limit' => 'integer',
+            'blocked_at' => 'datetime',
         ];
     }
 }

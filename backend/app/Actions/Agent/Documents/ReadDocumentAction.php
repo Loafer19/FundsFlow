@@ -128,7 +128,7 @@ final class ReadDocumentAction
             $sample = array_slice($rows, 0, self::MAPPING_ROWS);
             $proposed = $this->ai->mapColumns($sample, $this->dateLikeValues($rows));
             if ($proposed === null) {
-                return $this->error("Couldn't recognise the columns of {$fileName}. Name them date, amount and note and send it again.");
+                return $this->error("Couldn't recognise the columns of {$fileName}: " . $this->ai->failureReason() . '. Send it again in a minute, or name the columns date, amount and note (that needs no AI).');
             }
             $this->quota->consume($user);
             $aiUsed = true;
@@ -216,7 +216,7 @@ final class ReadDocumentAction
 
         $result = $this->ai->extractTransactions($user, $text, $fileName, $caption);
         if ($result === null) {
-            return $this->error("Couldn't read transactions from {$fileName} right now. Try again later; for a long bank statement, export it as CSV or Excel instead.");
+            return $this->error($this->aiFailedMessage($fileName, $kind, mb_strlen($text)));
         }
         $this->quota->consume($user);
 
@@ -309,6 +309,25 @@ final class ReadDocumentAction
     private function defaultDateOrder(User $user): string
     {
         return str_starts_with(strtoupper($user->dateFormat()), 'MM') ? 'mdy' : 'dmy';
+    }
+
+    /**
+     * The AI call that reads a document failed (not "no transactions in it"): say why, honestly,
+     * and what to do. Long statements get the CSV / Excel hint; a PDF the amount-by-hand hint.
+     */
+    private function aiFailedMessage(string $fileName, string $kind, int $chars): string
+    {
+        $failure = $this->ai->lastFailure();
+        $message = "Couldn't read {$fileName}: " . $this->ai->failureReason() . '.';
+        if ($failure === 'not_configured') {
+            return $message . ($kind === DocumentFile::PDF ? ' Send the amount like -350 groceries instead.' : ' Send a CSV or Excel file instead.');
+        }
+        $message .= in_array($failure, ['busy', 'unavailable'], true) ? ' No AI assist was used; send it again in a minute' : ' No AI assist was used; try sending it again';
+        if ($chars > 15000) {
+            return $message . ', or export a long statement as CSV or Excel instead.';
+        }
+
+        return $message . ($kind === DocumentFile::PDF ? ', or type the amount like -350 groceries.' : '.');
     }
 
     /**

@@ -12,6 +12,8 @@ class TelegramBot
         private readonly CallbackHandler $callbackHandler,
         private readonly MessageHandler $messageHandler,
         private readonly MediaHandler $mediaHandler,
+        private readonly TelegramSupport $support,
+        private readonly TelegramClient $client,
     ) {}
 
     /**
@@ -19,6 +21,10 @@ class TelegramBot
      */
     public function handle(array $update): void
     {
+        if ($this->rejectBlocked($update)) {
+            return;
+        }
+
         if (isset($update['callback_query'])) {
             $this->callbackHandler->handleCallbackQuery($update['callback_query']);
 
@@ -48,5 +54,30 @@ class TelegramBot
         if (isset($message['text'])) {
             $this->messageHandler->handleMessage($message);
         }
+    }
+
+    /**
+     * Accounts blocked in /admin get one short reply and nothing else runs.
+     *
+     * @param array<string, mixed> $update
+     */
+    private function rejectBlocked(array $update): bool
+    {
+        $callback = is_array($update['callback_query'] ?? null) ? $update['callback_query'] : null;
+        $chatId = $callback
+            ? ($callback['message']['chat']['id'] ?? null)
+            : ($update['message']['chat']['id'] ?? null);
+
+        if ($chatId === null || !$this->support->resolveUser($chatId)?->isBlocked()) {
+            return false;
+        }
+
+        if ($callback && isset($callback['id'])) {
+            $this->client->answerCallbackQuery((string) $callback['id'], 'Account blocked');
+        } else {
+            $this->client->sendMessage($chatId, 'Account blocked.');
+        }
+
+        return true;
     }
 }

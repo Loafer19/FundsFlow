@@ -1,3 +1,8 @@
 /vendor
 .env
 composer.lock
+# Filament/Livewire assets, published by `filament:upgrade` on composer install
+/public/css/filament
+/public/js/filament
+/public/fonts/filament
+/public/vendor

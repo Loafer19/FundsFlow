@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AlwaysJson;
+use App\Providers\Filament\AdminPanelProvider;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -14,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         App\Providers\AppServiceProvider::class,
         SanctumServiceProvider::class,
         SocialiteServiceProvider::class,
+        AdminPanelProvider::class,
     ])
     ->withRouting(
         api: __DIR__ . '/../routes/api.php',
@@ -25,9 +27,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->throttleApi('180,1');
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        $exceptions->shouldRenderJsonWhen(fn () => true);
+        // The API is JSON-only; the Filament panel (/admin, /livewire*) gets normal HTML
+        // pages, login redirects and the 419 page.
+        $exceptions->shouldRenderJsonWhen(fn (Request $request) => !AlwaysJson::isPanelRequest($request));
 
         $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if (AlwaysJson::isPanelRequest($request)) {
+                return null;
+            }
+
             return response()->json(['error' => 'Unauthorized'], 401);
         });
     })
