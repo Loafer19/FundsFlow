@@ -27,6 +27,11 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // TLS terminates at the proxy; generate https asset/route URLs when APP_URL is https.
+        if (str_starts_with((string) config('app.url'), 'https://')) {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
+
         JsonResource::withoutWrapping();
 
         Gate::policy(Tag::class, TagPolicy::class);

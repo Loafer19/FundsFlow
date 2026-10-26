@@ -22,6 +22,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__ . '/../routes/console.php',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Behind Traefik (Dokploy) and Caddy: trust X-Forwarded-* so URLs/redirects use https.
+        $middleware->trustProxies(at: '*');
+
         $middleware->append(AlwaysJson::class);
 
         $middleware->throttleApi('180,1');
