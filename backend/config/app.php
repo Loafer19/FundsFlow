@@ -27,6 +27,9 @@ return [
 
     'env' => env('APP_ENV', 'production'),
 
+    // Build identifier shown on the admin dashboard (e.g. a git SHA or tag set at deploy).
+    'version' => env('APP_VERSION'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Debug Mode

@@ -185,6 +185,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'is_admin' => 'boolean',
             'ai_daily_limit' => 'integer',
             'blocked_at' => 'datetime',
+            'last_active_at' => 'datetime',
         ];
     }
 }

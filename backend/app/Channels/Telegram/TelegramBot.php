@@ -5,6 +5,7 @@ namespace App\Channels\Telegram;
 use App\Channels\Telegram\Handlers\CallbackHandler;
 use App\Channels\Telegram\Handlers\MediaHandler;
 use App\Channels\Telegram\Handlers\MessageHandler;
+use App\Support\UserActivity;
 
 class TelegramBot
 {
@@ -68,7 +69,14 @@ class TelegramBot
             ? ($callback['message']['chat']['id'] ?? null)
             : ($update['message']['chat']['id'] ?? null);
 
-        if ($chatId === null || !$this->support->resolveUser($chatId)?->isBlocked()) {
+        $user = $chatId === null ? null : $this->support->resolveUser($chatId);
+
+        if (!$user?->isBlocked()) {
+            if ($user) {
+                // Telegram chats don't use Sanctum tokens; stamp users.last_active_at for /admin.
+                UserActivity::touch($user);
+            }
+
             return false;
         }
 

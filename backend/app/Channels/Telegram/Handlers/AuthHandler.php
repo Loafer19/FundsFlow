@@ -6,6 +6,7 @@ use App\Actions\Identities\GenerateTelegramLinkCodeAction;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
 use App\Models\User;
+use App\Support\AppSettings;
 use App\Support\TelegramCode;
 
 class AuthHandler
@@ -97,6 +98,17 @@ class AuthHandler
             ]);
 
             $this->support->sendWelcome($chatId, '✅ Linked back to your FundsFlow account');
+
+            return;
+        }
+
+        // Admin → Settings → "New registrations" off: only linking an existing account works.
+        if (!app(AppSettings::class)->registrationEnabled()) {
+            $this->client->sendMessage(
+                $chatId,
+                'New sign-ups are currently closed. If you already have a FundsFlow account, '
+                    . 'open FundsFlow → Settings → Accounts and link Telegram from there.',
+            );
 
             return;
         }

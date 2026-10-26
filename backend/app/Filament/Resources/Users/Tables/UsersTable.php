@@ -61,6 +61,12 @@ class UsersTable
                     ->since()
                     ->sortable()
                     ->placeholder('—'),
+                TextColumn::make('last_active_at')
+                    ->label('Last Telegram activity')
+                    ->since()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->toggleable(),
                 TextColumn::make('created_at')->label('Joined')->date()->sortable(),
             ])
             ->filters([
@@ -75,8 +81,12 @@ class UsersTable
             ])
             ->recordActions([
                 ViewAction::make(),
-                ActionGroup::make(UserAdminActions::all()),
+                ActionGroup::make([...UserAdminActions::all(), UserAdminActions::delete()]),
             ])
-            ->toolbarActions([]);
+            ->toolbarActions([
+                UserAdminActions::bulkDelete(),
+            ])
+            // Admins and yourself can't be deleted, so they can't be selected either.
+            ->checkIfRecordIsSelectableUsing(fn (User $record): bool => UserResource::canDelete($record));
     }
 }

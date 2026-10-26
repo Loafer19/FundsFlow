@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users;
 
+use App\Actions\Admin\DeleteUserAction;
 use App\Filament\Resources\Users\Pages\ListUsers;
 use App\Filament\Resources\Users\Pages\ViewUser;
 use App\Filament\Resources\Users\RelationManagers\BudgetsRelationManager;
@@ -21,7 +22,8 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * Read-only view of accounts + account-level actions (see UserAdminActions).
- * Nothing here creates, edits or deletes users or their financial data.
+ * Nothing here creates or edits users or their financial data; "Delete user" removes a
+ * whole (non-admin) account via App\Actions\Admin\DeleteUserAction.
  */
 class UserResource extends Resource
 {
@@ -43,14 +45,46 @@ class UserResource extends Resource
         return false;
     }
 
+    /** Never yourself, never another admin (remove the admin role first). */
     public static function canDelete(Model $record): bool
     {
-        return false;
+        return $record instanceof User
+            && DeleteUserAction::denialReason($record, auth()->user() instanceof User ? auth()->user() : null) === null;
     }
 
     public static function canDeleteAny(): bool
     {
-        return false;
+        return true;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['email', 'name'];
+    }
+
+    /**
+     * @return Builder<User>
+     */
+    public static function getGlobalSearchEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['identities' => fn ($q) => $q->select('id', 'user_id', 'provider', 'external_id', 'meta')]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function getGlobalSearchResultDetails(Model $record): array
+    {
+        /** @var User $record */
+        return array_filter([
+            'Name' => $record->name,
+            'Telegram' => self::telegramLabel($record),
+            'Status' => $record->isBlocked() ? 'Blocked' : ($record->is_admin ? 'Admin' : null),
+        ]);
     }
 
     /**

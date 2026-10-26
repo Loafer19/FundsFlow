@@ -11,21 +11,45 @@ use Illuminate\Support\Facades\Cache;
  */
 final class TelegramAiQuota
 {
+    private readonly AppSettings $settings;
+
+    public function __construct(?AppSettings $settings = null)
+    {
+        $this->settings = $settings ?? new AppSettings;
+    }
+
     /**
-     * Today's limit: the user's own `ai_daily_limit` (set in /admin) or AI_RECEIPT_DAILY_LIMIT,
+     * Today's limit: the user's own `ai_daily_limit` (set in /admin) or the server default,
      * plus any one-off bonus an admin granted for today. Without a user: the server default.
+     * 0 for everyone while AI is switched off globally (admin → Settings).
      */
     public function dailyLimit(?User $user = null): int
     {
-        $base = $user?->ai_daily_limit ?? (int) config('services.ai_receipt.daily_limit', 5);
+        if (!$this->enabledGlobally()) {
+            return 0;
+        }
+
+        $base = $user?->ai_daily_limit ?? $this->defaultLimit();
 
         return max(0, (int) $base) + ($user ? $this->bonus($user) : 0);
     }
 
-    /** Server default (AI_RECEIPT_DAILY_LIMIT), ignoring per-user overrides. */
+    /** Server default: admin → Settings override, else AI_RECEIPT_DAILY_LIMIT. Ignores per-user limits. */
     public function defaultLimit(): int
     {
+        return $this->settings->aiDefaultDailyLimit() ?? $this->envDefaultLimit();
+    }
+
+    /** AI_RECEIPT_DAILY_LIMIT from env/config. */
+    public function envDefaultLimit(): int
+    {
         return max(0, (int) config('services.ai_receipt.daily_limit', 5));
+    }
+
+    /** Global AI switch (admin → Settings); on unless an admin turned it off. */
+    public function enabledGlobally(): bool
+    {
+        return $this->settings->aiEnabled();
     }
 
     /** Extra assists an admin granted for the user's current day. */
@@ -106,6 +130,10 @@ final class TelegramAiQuota
      */
     public function exhaustedMessage(User $user, string $withoutAi): string
     {
+        if (!$this->enabledGlobally()) {
+            return trim('AI assists are temporarily turned off on this server. ' . $withoutAi);
+        }
+
         $limit = $this->dailyLimit($user);
         $head = $limit > 0
             ? "You've used all {$limit} AI assists for today. They reset at midnight ({$user->timezone()})."

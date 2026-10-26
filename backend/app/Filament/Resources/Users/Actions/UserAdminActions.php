@@ -2,17 +2,24 @@
 
 namespace App\Filament\Resources\Users\Actions;
 
+use App\Actions\Admin\DeleteUserAction;
+use App\Filament\Resources\Users\Pages\ViewUser;
+use App\Filament\Resources\Users\UserResource;
 use App\Models\User;
 use App\Support\Admin\AdminAudit;
 use App\Support\TelegramAiQuota;
 use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Collection;
+use Livewire\Component;
 
 /**
- * Account-level admin actions (no financial data is ever edited). Shared by the users
- * table and the user view page; every action is written to the audit log.
+ * Account-level admin actions (no financial data is ever edited; delete removes the whole
+ * account). Shared by the users table and the user view page; every action is written to
+ * the audit log.
  */
 final class UserAdminActions
 {
@@ -127,5 +134,128 @@ final class UserAdminActions
                 AdminAudit::log($blocking ? 'user_blocked' : 'user_unblocked', $record);
                 Notification::make()->title($blocking ? 'User blocked' : 'User unblocked')->success()->send();
             });
+    }
+
+    /**
+     * Permanently delete one account (see DeleteUserAction). The admin must type the email.
+     * Hidden for yourself and for other admins (remove their admin role first).
+     */
+    public static function delete(): Action
+    {
+        return Action::make('deleteUser')
+            ->label('Delete user')
+            ->icon(Heroicon::OutlinedTrash)
+            ->color('danger')
+            ->requiresConfirmation()
+            ->modalIcon(Heroicon::OutlinedTrash)
+            ->modalHeading(fn (User $record): string => 'Delete ' . $record->email . '?')
+            ->modalDescription('This permanently deletes the account and all of its data: transactions, '
+                . 'receipt attachments (files too), tags, budgets, recurring rules, Telegram/Google/GitHub links '
+                . 'and API/MCP tokens. It cannot be undone. Consider "Block" if you only want to stop access.')
+            ->modalSubmitActionLabel('Delete permanently')
+            ->schema([
+                TextInput::make('confirm_email')
+                    ->label('Type the user\'s email to confirm')
+                    ->required()
+                    ->autocomplete('off')
+                    ->rules([
+                        fn (User $record): \Closure => function (string $attribute, mixed $value, \Closure $fail) use ($record): void {
+                            if (mb_strtolower(trim((string) $value)) !== mb_strtolower($record->email)) {
+                                $fail('The email does not match.');
+                            }
+                        },
+                    ]),
+            ])
+            ->hidden(fn (User $record): bool => !UserResource::canDelete($record))
+            ->action(function (User $record, array $data, Action $action, Component $livewire): void {
+                if (mb_strtolower(trim((string) ($data['confirm_email'] ?? ''))) !== mb_strtolower($record->email)) {
+                    Notification::make()->title('The email does not match')->danger()->send();
+                    $action->halt();
+                }
+
+                $email = $record->email;
+
+                try {
+                    $counts = app(DeleteUserAction::class)->execute($record, self::admin());
+                } catch (\DomainException $e) {
+                    Notification::make()->title($e->getMessage())->danger()->send();
+                    $action->halt();
+
+                    return;
+                }
+
+                Notification::make()
+                    ->title("Deleted {$email}")
+                    ->body("{$counts['transactions']} transactions, {$counts['tags']} tags, {$counts['budgets']} budgets, {$counts['files']} files removed.")
+                    ->success()
+                    ->send();
+
+                if ($livewire instanceof ViewUser) {
+                    $livewire->redirect(UserResource::getUrl('index'), navigate: true);
+                }
+            });
+    }
+
+    /**
+     * Bulk delete for the users table. Admins and yourself are skipped (never deleted).
+     */
+    public static function bulkDelete(): BulkAction
+    {
+        return BulkAction::make('deleteUsers')
+            ->label('Delete selected users')
+            ->icon(Heroicon::OutlinedTrash)
+            ->color('danger')
+            ->requiresConfirmation()
+            ->modalIcon(Heroicon::OutlinedExclamationTriangle)
+            ->modalHeading(fn (?Collection $records): string => 'Permanently delete ' . ($records?->count() ?? 0) . ' user(s)?')
+            ->modalDescription('Every selected account is deleted with ALL of its data (transactions, attachment files, tags, '
+                . 'budgets, recurring rules, Telegram/OAuth links, API/MCP tokens). This cannot be undone. '
+                . 'Admins and your own account are skipped.')
+            ->schema([
+                TextInput::make('confirm')
+                    ->label('Type DELETE to confirm')
+                    ->required()
+                    ->autocomplete('off')
+                    ->in(['DELETE'])
+                    ->validationMessages(['in' => 'Type DELETE (capital letters) to confirm.']),
+            ])
+            ->modalSubmitActionLabel('Delete permanently')
+            ->deselectRecordsAfterCompletion()
+            ->action(function (Collection $records): void {
+                $admin = self::admin();
+                $action = app(DeleteUserAction::class);
+                $deleted = [];
+                $skipped = [];
+
+                foreach ($records as $user) {
+                    /** @var User $user */
+                    if (DeleteUserAction::denialReason($user, $admin) !== null) {
+                        $skipped[] = $user->email;
+
+                        continue;
+                    }
+
+                    try {
+                        $action->execute($user, $admin);
+                        $deleted[] = $user->email;
+                    } catch (\Throwable $e) {
+                        report($e);
+                        $skipped[] = $user->email;
+                    }
+                }
+
+                Notification::make()
+                    ->title('Deleted ' . count($deleted) . ' user(s)')
+                    ->body($skipped === [] ? null : 'Skipped: ' . implode(', ', array_slice($skipped, 0, 10)) . (count($skipped) > 10 ? '…' : ''))
+                    ->status($skipped === [] ? 'success' : 'warning')
+                    ->send();
+            });
+    }
+
+    private static function admin(): ?User
+    {
+        $user = auth()->user();
+
+        return $user instanceof User ? $user : null;
     }
 }

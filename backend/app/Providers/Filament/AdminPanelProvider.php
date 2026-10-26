@@ -2,16 +2,17 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Dashboard;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Enums\ThemeMode;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Width;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -43,11 +44,11 @@ class AdminPanelProvider extends PanelProvider
             ->brandName('FundsFlow')
             ->brandLogo(fn () => new HtmlString(
                 '<span style="display:inline-flex;align-items:center;gap:.5rem;font-weight:700;font-size:1.15rem">'
-                . '<img src="' . e(asset('images/fundsflow-logo.png')) . '" alt="" style="height:2rem;width:2rem;border-radius:.5rem">'
+                . '<img src="' . '/images/fundsflow-logo.png' . '" alt="" style="height:2rem;width:2rem;border-radius:.5rem">'
                 . 'FundsFlow</span>'
             ))
             ->brandLogoHeight('2rem')
-            ->favicon(asset('images/fundsflow-favicon.png'))
+            ->favicon('/images/fundsflow-favicon.png')
             ->colors([
                 'primary' => Color::Amber,
                 'gray' => Color::Stone,
@@ -61,7 +62,19 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([])
+            // No `notifications` table: flash notifications only.
             ->databaseNotifications(false)
+            // UX: collapsible sidebar (icon rail) on desktop, SPA navigation (same-origin
+            // fetches only, fine under the /admin CSP), "unsaved changes" prompt, full-width
+            // tables, and global search (users by email/name) on Ctrl+K / Cmd+K.
+            ->sidebarCollapsibleOnDesktop()
+            ->spa()
+            ->unsavedChangesAlerts()
+            ->maxContentWidth(Width::Full)
+            ->globalSearch()
+            ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
+            ->globalSearchFieldKeyBindingSuffix()
+            ->globalSearchDebounce('300ms')
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

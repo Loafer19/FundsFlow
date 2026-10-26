@@ -6,6 +6,7 @@ use App\Actions\Auth\AuthenticateTelegramWebAppAction;
 use App\Actions\Auth\LinkTelegramWebAppAction;
 use App\Models\Identity;
 use App\Models\User;
+use App\Support\AppSettings;
 use App\Support\TelegramCode;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -37,8 +38,11 @@ class AuthController extends Controller
         ]);
     }
 
-    public function register(Request $request): JsonResponse
+    public function register(Request $request, AppSettings $settings): JsonResponse
     {
+        // Admin → Settings → "New registrations": existing accounts can still sign in.
+        abort_unless($settings->registrationEnabled(), 403, 'New sign-ups are currently closed.');
+
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|max:255|email:dns,rfc|unique:users',
@@ -167,6 +171,10 @@ class AuthController extends Controller
                 $user = User::where('email', $email)->first();
 
                 if (!$user) {
+                    if (!app(AppSettings::class)->registrationEnabled()) {
+                        return redirect($frontend . '#auth_error=' . urlencode('New sign-ups are currently closed'));
+                    }
+
                     $user = User::create([
                         'name' => $socialUser->getName() ?: strstr($email, '@', true),
                         'email' => $email,

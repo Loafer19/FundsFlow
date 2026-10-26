@@ -17,6 +17,7 @@ class ViewUser extends ViewRecord
             ActionGroup::make(UserAdminActions::all())
                 ->label('Actions')
                 ->button(),
+            UserAdminActions::delete(),
         ];
     }
 }
