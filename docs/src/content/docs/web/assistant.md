@@ -124,6 +124,15 @@ Send a photo of a receipt and the assistant reads it into a transaction, like
 - Photos are uploaded privately and kept only until you confirm or cancel the card. If you don't, they're deleted when
   the conversation expires, or when you start a **New chat**.
 
+## Files: PDF, Word, CSV, Excel, OFX, QIF, JSON
+
+Attach a **PDF**, **Word** (`.docx`), **CSV**, **Excel** (`.xlsx`, `.ods`), **OFX / QFX**, **QIF**, **JSON**, or
+**HTML** file with the 📎 button or drag it onto the panel: up to 5 files per message. A receipt becomes the usual
+Confirm card. Statements and spreadsheets become one card that imports all their transactions at once, and what you
+write with them (*only expenses*, *create the tags if needed*) is applied. Screenshots of a bank app's transaction
+list work too: attach them and write *statement*. See [Files and bulk import](/docs/web/import/) for formats, limits,
+and templates.
+
 ## It knows what you're looking at
 
 With each message the panel tells the assistant which tab you're on, the period selected in the date picker, and your

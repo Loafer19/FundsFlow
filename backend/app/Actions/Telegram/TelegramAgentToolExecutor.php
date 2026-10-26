@@ -4,6 +4,7 @@ namespace App\Actions\Telegram;
 
 use App\Actions\Agent\AgentPlanningTools;
 use App\Actions\Agent\AgentToolExecutor;
+use App\Actions\Agent\Documents\ImportTransactionsAction;
 use App\Actions\Charts\BuildUserChartAction;
 use App\Actions\Charts\ScreenshotHtmlViaGotenbergAction;
 use App\Actions\Report\RenderReportPdfAction;
@@ -220,6 +221,7 @@ class TelegramAgentToolExecutor
                 'update_transaction' => $this->applyUpdateTransaction($user, $chatId, $identity, $payload),
                 'delete_transaction' => $this->applyDeleteTransaction($user, $chatId, $identity, $payload),
                 'create_budget' => $this->applyCreateBudget($user, $chatId, $identity, $payload),
+                'import_transactions' => $this->applyImport($user, $chatId, $identity, $payload),
                 default => AgentPlanningTools::isStaging($action)
                     ? $this->applyPlanning($user, $chatId, $identity, $action, $payload)
                     : $this->client->sendMessage($chatId, 'Nothing to confirm.'),
@@ -486,6 +488,20 @@ class TelegramAgentToolExecutor
         $this->session->setSummary($identity, $chatId, 'Agent mutation preview shown.');
 
         return ['staged' => true, 'payload' => $prepared['payload']];
+    }
+
+    /**
+     * Bulk import from a document (CSV / Excel / statement): all rows in one DB transaction.
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function applyImport(User $user, int|string $chatId, int|string $identity, array $payload): void
+    {
+        $created = app(ImportTransactionsAction::class)->apply($user, $payload, TransactionSource::Telegram);
+        $message = ImportTransactionsAction::doneMessage($created, $payload);
+
+        $this->session->setSummary($identity, $chatId, $message);
+        $this->client->sendMessage($chatId, $message);
     }
 
     /**

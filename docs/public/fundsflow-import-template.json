@@ -1,0 +1,8 @@
+{
+  "transactions": [
+    { "date": "2026-10-01", "amount": -350.50, "note": "Silpo", "tags": ["Groceries"] },
+    { "date": "2026-10-02", "amount": -120, "note": "Coffee with Anna", "tags": ["Coffee"] },
+    { "date": "2026-10-05", "amount": 25000, "note": "Salary", "tags": [] },
+    { "date": "2026-10-07", "amount": -899.99, "note": "Netflix and Spotify", "tags": ["Subscriptions", "Entertainment"] }
+  ]
+}

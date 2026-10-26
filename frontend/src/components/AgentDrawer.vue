@@ -2,10 +2,10 @@
     <div class="drawer drawer-end">
         <input id="agent_drawer" type="checkbox" class="drawer-toggle" :checked="agent.isOpen"
             @change="(event) => (event.target.checked ? agent.open() : agent.close())" />
-        <div class="drawer-side z-[60]">
+        <div class="drawer-side agent-drawer-side z-[60]">
             <label for="agent_drawer" aria-label="Close assistant" class="drawer-overlay" />
 
-            <aside ref="panel" class="relative bg-base-100 h-dvh w-full sm:w-[28rem] flex flex-col shadow-xl"
+            <aside ref="panel" class="agent-panel relative bg-base-100 h-dvh w-full sm:w-[28rem] flex flex-col shadow-xl"
                 role="dialog" aria-modal="true" aria-labelledby="agent_drawer_title" @keydown="trapFocus"
                 @dragenter="onDragEnter" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
                 <header class="flex items-center gap-2 px-4 py-3 border-b border-base-300">
@@ -19,12 +19,13 @@
                     </span>
 
                     <div class="ml-auto flex gap-1">
-                        <button type="button" class="btn btn-ghost btn-sm btn-square tooltip tooltip-bottom"
+                        <button type="button"
+                            class="btn btn-ghost btn-sm btn-square tooltip tooltip-bottom agent-press agent-spin-hover-ccw"
                             data-tip="New chat" aria-label="New chat" :disabled="!agent.items.length && !agent.isStreaming"
                             @click="agent.reset()">
                             <RotateCcw :size="18" />
                         </button>
-                        <button ref="closeButton" type="button" class="btn btn-ghost btn-sm btn-square tooltip tooltip-left"
+                        <button ref="closeButton" type="button" class="btn btn-ghost btn-sm btn-square tooltip tooltip-left agent-press"
                             data-tip="Close (Esc)" aria-label="Close assistant" aria-keyshortcuts="Escape"
                             @click="agent.close()">
                             <X :size="20" />
@@ -38,12 +39,15 @@
                     aria-live="polite" aria-relevant="additions" aria-label="Assistant conversation"
                     :aria-busy="agent.isStreaming || agent.isLoadingHistory" @scroll.passive="onScroll">
                     <div ref="content" class="flex flex-col gap-3">
-                    <div v-if="agent.isLoadingHistory && !agent.items.length" class="flex justify-center py-10">
-                        <span class="loading loading-dots" />
+                    <div v-if="agent.isLoadingHistory && !agent.items.length"
+                        class="agent-skeleton-wrap flex flex-col gap-3 py-2" aria-label="Loading conversation">
+                        <div class="agent-skeleton self-end h-9 w-2/5 rounded-box" />
+                        <div class="agent-skeleton h-16 w-3/4 rounded-box" />
+                        <div class="agent-skeleton self-end h-9 w-1/3 rounded-box" />
                     </div>
 
                     <div v-else-if="!agent.items.length && !agent.isStreaming"
-                        class="flex flex-col items-center text-center gap-4 py-8 px-2">
+                        class="agent-fade flex flex-col items-center text-center gap-4 py-8 px-2">
                         <Sparkles :size="36" class="text-primary" />
                         <div>
                             <p class="font-semibold">Ask about your money</p>
@@ -51,17 +55,29 @@
                                 Spending, budgets, charts, or add a transaction. Changes always wait for your confirm.
                             </p>
                         </div>
-                        <div class="flex flex-wrap justify-center gap-2">
-                            <button v-for="prompt in examples" :key="prompt" type="button"
-                                class="btn btn-sm btn-outline rounded-full font-normal" :disabled="agent.quotaExhausted"
-                                @click="send(prompt)">
-                                {{ prompt }}
+                        <!-- Fixed-height slots: a rotating chip never shifts the layout. aria-live off: no announcements. -->
+                        <div class="flex flex-col items-center gap-2 w-full" role="group" aria-label="Suggested questions"
+                            aria-live="off" @mouseenter="chipsHovered = true" @mouseleave="chipsHovered = false"
+                            @focusin="chipsFocused = true" @focusout="chipsFocused = false">
+                            <div v-for="(chip, slot) in chips" :key="slot" class="h-8 w-full flex justify-center">
+                                <Transition name="agent-swap" mode="out-in">
+                                    <button :key="chip.key" type="button"
+                                        class="btn btn-sm btn-outline rounded-full font-normal max-w-full agent-press"
+                                        :disabled="agent.quotaExhausted" @click="send(chip.text)">
+                                        <span class="truncate">{{ chip.text }}</span>
+                                    </button>
+                                </Transition>
+                            </div>
+                            <button type="button" class="btn btn-ghost btn-xs gap-1 text-base-content/60 agent-press"
+                                @click="shuffleChips">
+                                <Shuffle :size="14" aria-hidden="true" />
+                                More ideas
                             </button>
                         </div>
                     </div>
 
-                    <template v-for="item in agent.items" :key="item.id">
-                        <div v-if="item.role === 'user'" class="chat chat-end">
+                    <template v-for="(item, index) in agent.items" :key="itemKey(item, index)">
+                        <div v-if="item.role === 'user'" class="chat chat-end" :class="enterClass(item)">
                             <div class="chat-bubble chat-bubble-primary break-words flex flex-col gap-1.5">
                                 <div v-if="item.localImages?.length" class="grid gap-1"
                                     :class="item.localImages.length > 1 ? 'grid-cols-3' : 'grid-cols-1'">
@@ -70,22 +86,27 @@
                                         :class="item.localImages.length > 1 ? 'size-20' : 'max-h-48 max-w-full'" />
                                 </div>
                                 <span v-else-if="item.photos" class="text-sm opacity-90">📷 {{ photoLabel(item.photos) }}</span>
+                                <template v-if="item.documents?.length">
+                                    <span v-for="(doc, i) in item.documents" :key="i" class="text-sm opacity-90 break-all">📄 {{ doc.name }} · {{ formatSize(doc.size) }}</span>
+                                </template>
+                                <span v-else-if="item.document" class="text-sm opacity-90 break-all">📄 {{ item.document.name }} · {{ formatSize(item.document.size) }}</span>
                                 <span v-if="item.text" class="whitespace-pre-wrap">{{ item.text }}</span>
                             </div>
                         </div>
 
-                        <div v-else-if="item.kind === 'text'" class="chat chat-start">
+                        <div v-else-if="item.kind === 'text'" class="chat chat-start" :class="enterClass(item)">
                             <!-- renderMarkdown escapes all HTML first; only its own tags reach v-html. -->
                             <div class="chat-bubble agent-md break-words" v-html="renderMarkdown(item.text)" />
                             <div class="chat-footer flex gap-0.5 pt-0.5">
-                                <button type="button" class="btn btn-ghost btn-xs btn-square tooltip tooltip-right"
+                                <button type="button" class="btn btn-ghost btn-xs btn-square tooltip tooltip-right agent-press"
                                     :data-tip="copiedId === item.id ? 'Copied' : 'Copy'"
                                     :aria-label="copiedId === item.id ? 'Copied' : 'Copy answer'" @click="copyAnswer(item)">
-                                    <Check v-if="copiedId === item.id" :size="14" class="text-success" aria-hidden="true" />
-                                    <Copy v-else :size="14" aria-hidden="true" />
+                                    <Check v-if="copiedId === item.id" :size="14" class="text-success agent-pop" aria-hidden="true" />
+                                    <Copy v-else :size="14" class="agent-pop" aria-hidden="true" />
                                 </button>
                                 <button v-if="item.id === agent.regenerateTargetId" type="button"
-                                    class="btn btn-ghost btn-xs btn-square tooltip tooltip-right" :data-tip="REGENERATE_TIP"
+                                    class="btn btn-ghost btn-xs btn-square tooltip tooltip-right agent-press agent-spin-hover"
+                                    :data-tip="REGENERATE_TIP"
                                     :aria-label="REGENERATE_TIP" @click="regenerate">
                                     <RefreshCw :size="14" aria-hidden="true" />
                                 </button>
@@ -93,17 +114,18 @@
                         </div>
 
                         <div v-else-if="item.kind === 'notice'" role="status" class="alert alert-soft text-sm py-2"
-                            :class="noticeClass(item.tone)">
+                            :class="[noticeClass(item.tone), noticeMotion(item)]">
                             <span class="whitespace-pre-wrap break-words">{{ item.text }}</span>
                         </div>
 
-                        <div v-else-if="item.kind === 'ask'" class="chat chat-start">
+                        <div v-else-if="item.kind === 'ask'" class="chat chat-start" :class="enterClass(item)">
                             <div class="chat-bubble flex flex-col gap-2">
                                 <span class="whitespace-pre-wrap break-words">{{ item.question }}</span>
                                 <div v-if="item.status === 'pending' && item.suggestions?.length"
                                     class="flex flex-wrap gap-1.5">
-                                    <button v-for="option in item.suggestions" :key="option" type="button"
-                                        class="btn btn-xs btn-outline" :disabled="agent.isStreaming || agent.quotaExhausted"
+                                    <button v-for="(option, i) in item.suggestions" :key="option" type="button"
+                                        class="btn btn-xs btn-outline agent-press agent-pop"
+                                        :style="{ animationDelay: `${120 + i * 50}ms` }" :disabled="agent.isStreaming || agent.quotaExhausted"
                                         @click="send(option)">
                                         {{ option }}
                                     </button>
@@ -111,26 +133,28 @@
                             </div>
                         </div>
 
-                        <div v-else-if="item.kind === 'confirm'" class="card card-border bg-base-100">
+                        <div v-else-if="item.kind === 'confirm'" class="card card-border bg-base-100"
+                            :class="confirmClass(item)">
                             <div class="card-body p-3 gap-2">
                                 <div class="flex items-center gap-2">
                                     <ShieldQuestion :size="16" class="text-warning" />
                                     <span class="text-xs uppercase tracking-wide text-base-content/60">
                                         {{ actionLabel(item.action) }}
                                     </span>
-                                    <span v-if="item.status !== 'pending'" class="badge badge-xs ml-auto"
+                                    <span v-if="item.status !== 'pending'" class="badge badge-xs ml-auto agent-pop"
                                         :class="statusClass(item.status)">
+                                        <Check v-if="item.status === 'confirmed'" :size="10" aria-hidden="true" />
                                         {{ item.status }}
                                     </span>
                                 </div>
                                 <p class="text-sm whitespace-pre-wrap break-words">{{ item.preview }}</p>
                                 <div v-if="item.status === 'pending'" class="card-actions justify-end">
-                                    <button type="button" class="btn btn-sm btn-ghost"
-                                        :disabled="agent.busyPendingId !== null" @click="agent.resolve(item, 'cancel')">
+                                    <button type="button" class="btn btn-sm btn-ghost agent-press"
+                                        :disabled="agent.busyPendingId !== null" @click="resolvePending(item, 'cancel')">
                                         Cancel
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-primary"
-                                        :disabled="agent.busyPendingId !== null" @click="agent.resolve(item, 'confirm')">
+                                    <button type="button" class="btn btn-sm btn-primary agent-press"
+                                        :disabled="agent.busyPendingId !== null" @click="resolvePending(item, 'confirm')">
                                         <span v-if="agent.busyPendingId === item.pending_id"
                                             class="loading loading-spinner loading-xs" />
                                         Confirm
@@ -139,28 +163,29 @@
                             </div>
                         </div>
 
-                        <AgentChart v-else-if="item.kind === 'chart' && item.chart" :chart="item.chart" />
+                        <AgentChart v-else-if="item.kind === 'chart' && item.chart" class="agent-card-in" :chart="item.chart" />
 
-                        <AgentShowCard v-else-if="item.kind === 'show'" :item="item" />
+                        <AgentShowCard v-else-if="item.kind === 'show'" class="agent-card-in" :item="item" />
                     </template>
 
                     <!-- Regenerate for a turn that ended in a chart / card / error rather than text. -->
                     <div v-if="agent.regenerateTargetId && agent.items[agent.items.length - 1]?.kind !== 'text'"
-                        class="flex">
-                        <button type="button" class="btn btn-ghost btn-xs gap-1 tooltip tooltip-bottom"
+                        class="flex agent-fade">
+                        <button type="button"
+                            class="btn btn-ghost btn-xs gap-1 tooltip tooltip-bottom agent-press agent-spin-hover"
                             :data-tip="REGENERATE_TIP" :aria-label="REGENERATE_TIP" @click="regenerate">
                             <RefreshCw :size="14" aria-hidden="true" />
                             Regenerate
                         </button>
                     </div>
 
-                    <div v-if="agent.draft" class="chat chat-start">
-                        <div class="chat-bubble agent-md break-words" v-html="renderMarkdown(agent.draft)" />
+                    <div v-if="agent.draft" class="chat chat-start agent-fade">
+                        <div class="chat-bubble agent-md agent-streaming break-words" v-html="renderMarkdown(agent.draft)" />
                     </div>
 
                     <div v-if="agent.isStreaming && !agent.draft"
-                        class="flex items-center gap-2 text-sm text-base-content/60 px-1">
-                        <span class="loading loading-dots loading-sm" />
+                        class="agent-fade flex items-center gap-2 text-sm text-base-content/60 px-1">
+                        <span class="agent-dots" aria-hidden="true"><span /><span /><span /></span>
                         <span>{{ agent.status || 'Thinking…' }}</span>
                     </div>
                     </div>
@@ -168,7 +193,7 @@
 
                 <!-- Shown while scrolled up; new content no longer yanks the view down. -->
                 <button v-if="showJump" type="button"
-                    class="btn btn-sm rounded-full shadow-lg absolute bottom-3 left-1/2 -translate-x-1/2 gap-1"
+                    class="btn btn-sm rounded-full shadow-lg absolute bottom-3 left-1/2 -translate-x-1/2 gap-1 agent-pop agent-press"
                     :class="hasNew ? 'btn-primary' : 'btn-neutral'"
                     :aria-label="hasNew ? 'New messages: jump to latest' : 'Jump to latest message'"
                     @click="jumpToLatest">
@@ -180,7 +205,7 @@
                 <p class="sr-only" role="status">{{ agent.isStreaming ? agent.status || 'Thinking…' : '' }}</p>
                 <p class="sr-only" role="status">{{ copiedId ? 'Answer copied to the clipboard' : '' }}</p>
 
-                <div v-if="editing" class="border-t border-base-300 px-3 pt-2 flex items-center gap-2 text-xs"
+                <div v-if="editing" class="agent-fade border-t border-base-300 px-3 pt-2 flex items-center gap-2 text-xs"
                     role="status">
                     <Pencil :size="14" class="shrink-0 text-base-content/60" aria-hidden="true" />
                     <span class="flex-1 text-base-content/70">
@@ -191,7 +216,25 @@
                     </button>
                 </div>
 
-                <div v-if="attachments.length || preparing" class="border-t border-base-300 px-3 pt-3 flex flex-wrap gap-2"
+                <Transition name="agent-chip">
+                <div v-if="attachedDocuments.length" class="border-t border-base-300 px-3 pt-3 flex flex-col gap-1.5" role="list"
+                    :aria-label="attachedDocuments.length > 1 ? 'Files to send' : 'File to send'">
+                    <div v-for="(doc, i) in attachedDocuments" :key="`${doc.name}-${doc.size}-${i}`"
+                        class="flex items-center gap-2 rounded-lg border border-base-300 bg-base-200 px-2 py-1.5 max-w-full"
+                        role="listitem">
+                        <FileText :size="18" class="shrink-0 text-primary" aria-hidden="true" />
+                        <span class="text-sm truncate min-w-0 flex-1" :title="doc.name">{{ doc.name }}</span>
+                        <span class="text-xs text-base-content/60 shrink-0">{{ formatSize(doc.size) }}</span>
+                        <button type="button" class="btn btn-xs btn-circle btn-ghost shrink-0"
+                            :aria-label="`Remove ${doc.name}`" @click="removeDocument(i)">
+                            <X :size="12" aria-hidden="true" />
+                        </button>
+                    </div>
+                </div>
+                </Transition>
+
+                <TransitionGroup v-if="attachments.length || preparing" tag="div" name="agent-chip"
+                    class="agent-chip-group border-t border-base-300 px-3 pt-3 flex flex-wrap gap-2"
                     role="list" aria-label="Photos to send">
                     <div v-for="(image, index) in attachments" :key="image.url" class="relative" role="listitem">
                         <img :src="image.url" :alt="`Photo ${index + 1} to send`"
@@ -203,37 +246,38 @@
                     </div>
                     <div v-for="n in preparing" :key="`preparing-${n}`" class="size-16 rounded-lg skeleton" role="listitem"
                         aria-label="Preparing photo" />
-                </div>
+                </TransitionGroup>
 
                 <form class="p-3 flex gap-2 items-end"
-                    :class="{ 'border-t border-base-300': !attachments.length && !preparing && !editing }"
+                    :class="{ 'border-t border-base-300': !attachments.length && !preparing && !editing && !attachedDocument }"
                     @submit.prevent="send(input)">
-                    <input ref="fileInput" type="file" class="hidden" multiple :accept="ACCEPT" tabindex="-1"
+                    <input ref="fileInput" type="file" class="hidden" multiple :accept="FILE_ACCEPT" tabindex="-1"
                         aria-hidden="true" @change="onFilePicked" />
-                    <button type="button" class="btn btn-square btn-ghost tooltip tooltip-top" :data-tip="attachTip"
+                    <button type="button" class="btn btn-square btn-ghost tooltip tooltip-top agent-press" :data-tip="attachTip"
                         :aria-label="attachTip" :disabled="attachDisabled" @click="fileInput?.click()">
                         <Paperclip :size="18" aria-hidden="true" />
                     </button>
                     <textarea ref="textarea" v-model="input" rows="1" maxlength="2000"
-                        class="textarea flex-1 min-h-10 max-h-40 resize-none leading-snug" :placeholder="inputPlaceholder"
+                        class="textarea agent-input flex-1 min-h-10 max-h-40 resize-none leading-snug" :placeholder="inputPlaceholder"
                         :disabled="agent.quotaExhausted" aria-label="Message the assistant"
                         aria-keyshortcuts="ArrowUp" @keydown.enter.exact.prevent="send(input)"
                         @keydown.up.exact="editLast" @keydown.esc="onComposerEscape" @input="autoGrow" @paste="onPaste" />
-                    <button v-if="agent.isStreaming" type="button" class="btn btn-square btn-ghost"
+                    <button v-if="agent.isStreaming" type="button" class="btn btn-square btn-ghost agent-press agent-stop"
                         aria-label="Stop" @click="agent.stop()">
                         <Square :size="18" />
                     </button>
-                    <button v-else type="submit" class="btn btn-square btn-primary" aria-label="Send"
-                        :disabled="(!input.trim() && !attachments.length) || agent.quotaExhausted || preparing > 0">
+                    <button v-else type="submit" class="btn btn-square btn-primary agent-press agent-send" aria-label="Send"
+                        :disabled="(!input.trim() && !attachments.length && !attachedDocument) || agent.quotaExhausted || preparing > 0">
                         <SendHorizontal :size="18" />
                     </button>
                 </form>
 
-                <div v-if="dragging" class="absolute inset-0 z-10 m-2 rounded-box border-2 border-dashed border-primary
+                <div v-if="dragging" class="agent-fade absolute inset-0 z-10 m-2 rounded-box border-2 border-dashed border-primary
                     bg-base-100/90 flex flex-col items-center justify-center gap-2 pointer-events-none" aria-hidden="true">
                     <ImagePlus :size="32" class="text-primary" />
-                    <p class="font-medium">Drop receipt photos</p>
-                    <p class="text-xs text-base-content/60">JPEG, PNG, WebP or HEIC · up to {{ MAX_IMAGES }}</p>
+                    <p class="font-medium">Drop receipt photos or a file</p>
+                    <p class="text-xs text-base-content/60">Photos: JPEG, PNG, WebP or HEIC · up to {{ MAX_IMAGES }}</p>
+                    <p class="text-xs text-base-content/60">Files: PDF, Word, CSV, Excel, JSON, OFX, QIF, HTML · up to {{ MAX_DOCUMENTS }} at once</p>
                 </div>
             </aside>
         </div>
@@ -245,6 +289,7 @@ import {
     ArrowDown,
     Check,
     Copy,
+    FileText,
     ImagePlus,
     Paperclip,
     Pencil,
@@ -252,12 +297,23 @@ import {
     RotateCcw,
     SendHorizontal,
     ShieldQuestion,
+    Shuffle,
     Sparkles,
     Square,
     X,
 } from 'lucide-vue-next'
 import { computed, defineAsyncComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { lastTurnIndex, rewindBlocker, useAgentStore } from '../services/agent.js'
+import {
+    DOCUMENT_ACCEPT,
+    documentLimit,
+    formatSize,
+    isSupportedDocument,
+    legacyDocumentHint,
+    MAX_DOCUMENTS,
+    MAX_DOCUMENTS_TOTAL_BYTES,
+} from '../services/agentDocuments.js'
+import { suggestionPool, useSuggestionChips } from '../services/agentSuggestions.js'
 import { renderMarkdown } from '../services/markdown.js'
 import {
     ACCEPT,
@@ -287,46 +343,14 @@ const textarea = ref(null)
 const panel = ref(null)
 const closeButton = ref(null)
 
-const DEFAULT_EXAMPLES = [
-    'How much did I spend this month?',
-    'Chart of spending by tag this month',
-    'Show my budgets',
-    'Income vs expenses for the last 6 months',
-    'Add -350 groceries today',
-]
-
-// Starter prompts for the tab the user is on (screen context comes from App.vue).
-const TAB_EXAMPLES = {
-    analytics: [
-        'Compare this period with the previous one',
-        'What changed most in my spending?',
-        'PDF report for this period',
-    ],
-    calendar: [
-        'What recurring charges are coming up this week?',
-        'Which day did I spend the most here?',
-        'Add -350 groceries today',
-    ],
-    budgets: ['How are my budgets doing?', 'How much can I spend per day?', 'Pause my budget'],
-    tags: ['Compare spending by tag with last month', 'Which tag grew the most?', 'Chart of spending by tag'],
-    money_flow: [
-        'Income vs expenses compared with the previous period',
-        'Where did my money go here?',
-        'PDF report for this period',
-    ],
-    balance_trend: [
-        'How did my balance change in this period?',
-        'Upcoming charges for the next 30 days',
-        'Compare this quarter with last',
-    ],
-    table: [
-        'Summarize the transactions in this period',
-        'Biggest expenses in this period',
-        'PDF report for this period',
-    ],
-}
-
-const examples = computed(() => TAB_EXAMPLES[agent.screenContext?.tab] ?? DEFAULT_EXAMPLES)
+// Starter chips (pool per tab in services/agentSuggestions.js): 3 random, one swaps every ~7s.
+const chipsHovered = ref(false)
+const chipsFocused = ref(false)
+const { chips, shuffle: shuffleChips } = useSuggestionChips({
+    pool: computed(() => suggestionPool(agent.screenContext?.tab)),
+    active: computed(() => agent.isOpen && !agent.items.length && !agent.isStreaming && !agent.isLoadingHistory),
+    paused: computed(() => chipsHovered.value || chipsFocused.value || Boolean(input.value.trim())),
+})
 
 const ACTION_LABELS = {
     create_transaction: 'New transaction',
@@ -364,6 +388,55 @@ const noticeClass = (tone) =>
         warning: 'alert-warning',
         muted: '',
     })[tone] ?? 'alert-info'
+
+// --- Motion helpers (styles in styles/agent-motion.css) ---
+
+// User bubbles are keyed by position: the server echo swaps the local id, which must not
+// remount (and re-animate) the bubble that was just sent.
+const itemKey = (item, index) => (item.role === 'user' ? `user-${index}` : item.id)
+
+// The final answer replaces the streamed draft in place: no enter animation, or it would blink.
+let streamedText = ''
+watch(
+    () => agent.draft,
+    (draft, previous) => {
+        if (!draft && previous) streamedText = previous.trim()
+    },
+    { flush: 'sync' },
+)
+
+// Decided once per item, so a later re-render never restarts the animation.
+const enterMemo = new Map()
+const enterClass = (item) => {
+    if (enterMemo.has(item.id)) return enterMemo.get(item.id)
+    const head = streamedText.slice(0, 40)
+    const settled = item.kind === 'text' && item.role !== 'user' && head && String(item.text ?? '').startsWith(head)
+    if (item.role !== 'user') streamedText = ''
+    const value = settled ? '' : 'agent-enter'
+    enterMemo.set(item.id, value)
+    return value
+}
+
+const noticeMotion = (item) => (['error', 'warning'].includes(item.tone) ? 'agent-shake' : 'agent-enter')
+
+// Confirms resolved in this session: only these flash success / shake on failure (not history).
+const resolvedHere = ref(new Set())
+const resolvePending = (item, action) => {
+    resolvedHere.value.add(item.pending_id)
+    return agent.resolve(item, action)
+}
+
+const confirmClass = (item) => {
+    const here = resolvedHere.value.has(item.pending_id)
+    return [
+        'agent-card-in',
+        {
+            'agent-card-dim': item.status === 'cancelled' || item.status === 'outdated',
+            'agent-card-confirmed': here && item.status === 'confirmed',
+            'agent-shake': here && item.status === 'failed',
+        },
+    ]
+}
 
 // --- Quota badge: remaining, reset time (user timezone) and a live countdown ---
 
@@ -451,6 +524,7 @@ const inputPlaceholder = computed(() => {
     if (agent.quotaExhausted) {
         return countdown.value ? `AI assists reset in ${countdown.value}` : 'No AI assists left today'
     }
+    if (attachedDocument.value) return 'Note (optional), e.g. card statement'
     return attachments.value.length ? 'Note or amount (optional), e.g. -350' : 'Ask anything about your finances…'
 })
 
@@ -474,14 +548,71 @@ const autoGrow = () => {
 
 const attachments = ref([])
 const preparing = ref(0)
+// Documents (PDF, Word, CSV, Excel, JSON, OFX, QIF, HTML; up to MAX_DOCUMENTS) instead of photos;
+// several files become one import on the server.
+const attachedDocuments = ref([])
+const attachedDocument = computed(() => attachedDocuments.value[0] ?? null)
+const FILE_ACCEPT = `${ACCEPT},${DOCUMENT_ACCEPT}`
 
-const attachDisabled = computed(() => agent.quotaExhausted || attachments.value.length + preparing.value >= MAX_IMAGES)
+const attachDisabled = computed(
+    () =>
+        agent.quotaExhausted ||
+        attachedDocuments.value.length >= MAX_DOCUMENTS ||
+        attachments.value.length + preparing.value >= MAX_IMAGES,
+)
 
 const attachTip = computed(() => {
     if (agent.quotaExhausted) return 'No AI assists left today'
+    if (attachedDocuments.value.length >= MAX_DOCUMENTS) return `Up to ${MAX_DOCUMENTS} files per message`
     if (attachments.value.length + preparing.value >= MAX_IMAGES) return `Up to ${MAX_IMAGES} photos per message`
-    return 'Attach receipt photos'
+    return 'Attach receipt photos or files (PDF, Word, CSV, Excel, OFX, QIF…)'
 })
+
+// Documents go without photos: returns true when they were taken (or refused with a toast).
+const addDocument = (files) => {
+    const docs = files.filter(
+        (file) => !isSupportedImage(file) && (isSupportedDocument(file) || legacyDocumentHint(file)),
+    )
+    if (!docs.length) return false
+    if (attachments.value.length || preparing.value) {
+        toasts.error('Send files on their own, without photos.')
+        return true
+    }
+    if (files.length > docs.length) toasts.info('Files and photos go in separate messages: only the files were added.')
+    for (const file of docs) {
+        const name = file.name || 'The file'
+        const hint = legacyDocumentHint(file)
+        if (hint) {
+            toasts.error(hint)
+            continue
+        }
+        if (attachedDocuments.value.length >= MAX_DOCUMENTS) {
+            toasts.info(`Up to ${MAX_DOCUMENTS} files per message.`)
+            break
+        }
+        if (!file.size) {
+            toasts.error(`${name} is empty.`)
+            continue
+        }
+        if (file.size > documentLimit(file)) {
+            toasts.error(`${name} is larger than ${formatSize(documentLimit(file))}.`)
+            continue
+        }
+        const total = attachedDocuments.value.reduce((sum, doc) => sum + doc.size, 0) + file.size
+        if (total > MAX_DOCUMENTS_TOTAL_BYTES) {
+            toasts.error(`Files in one message can be up to ${formatSize(MAX_DOCUMENTS_TOTAL_BYTES)} together.`)
+            continue
+        }
+        attachedDocuments.value = [...attachedDocuments.value, file]
+    }
+    nextTick(() => textarea.value?.focus())
+    return true
+}
+
+const removeDocument = (index) => {
+    attachedDocuments.value = attachedDocuments.value.filter((_, i) => i !== index)
+    nextTick(() => textarea.value?.focus())
+}
 
 const photoLabel = (count) => `${count} photo${count === 1 ? '' : 's'}`
 
@@ -493,8 +624,16 @@ const addFiles = async (list) => {
         return
     }
 
+    if (addDocument(files)) return
+    if (attachedDocument.value) {
+        toasts.error('Send photos separately from the file.')
+        return
+    }
+
     const images = files.filter(isSupportedImage)
-    if (images.length < files.length) toasts.error('Only JPEG, PNG, WebP or HEIC photos can be attached.')
+    if (images.length < files.length) {
+        toasts.error('Attach JPEG, PNG, WebP or HEIC photos, or PDF, Word, CSV, Excel, JSON, OFX, QIF or HTML files.')
+    }
 
     const room = MAX_IMAGES - attachments.value.length - preparing.value
     if (images.length > room) toasts.error(`Up to ${MAX_IMAGES} photos per message.`)
@@ -663,22 +802,29 @@ const send = async (text) => {
     const message = String(text ?? '').trim()
     const fromComposer = text === input.value
     const images = fromComposer ? [...attachments.value] : []
-    if ((!message && !images.length) || agent.isStreaming || (images.length && preparing.value)) return
+    const docs = fromComposer ? [...attachedDocuments.value] : []
+    const file = docs[0] ?? null
+    if ((!message && !images.length && !file) || agent.isStreaming || (images.length && preparing.value)) return
     // Only a composer send of the prefilled edit replaces the turn; suggestion chips etc. are new messages.
     const rewind =
-        fromComposer && editing.value?.replace && !images.length
+        fromComposer && editing.value?.replace && !images.length && !file
             ? { mode: 'replace_last', turnId: editing.value.id }
             : null
     editing.value = null
     if (fromComposer) {
         input.value = ''
         attachments.value = []
+        attachedDocuments.value = []
     }
     nextTick(autoGrow)
     stickToBottom()
-    const ok = await agent.send(message, images, rewind)
+    const ok = await agent.send(message, images, rewind, docs)
     // Rejected before streaming (422 / 409 / 429): give the photos / edited text back instead of losing them.
     if (ok === false && images.length && !attachments.value.length) attachments.value = images
+    if (ok === false && file && !attachedDocuments.value.length && !attachments.value.length) {
+        attachedDocuments.value = docs
+        if (!input.value) input.value = message
+    }
     if (ok === false && rewind && !input.value) {
         input.value = message
         nextTick(autoGrow)
@@ -737,7 +883,8 @@ const editNote = computed(() => {
 })
 
 const editLast = (event) => {
-    if (input.value || attachments.value.length || agent.isStreaming || agent.quotaExhausted) return
+    if (input.value || attachments.value.length || attachedDocument.value || agent.isStreaming || agent.quotaExhausted)
+        return
     const index = lastTurnIndex(agent.items)
     const user = agent.items[index]
     if (!user?.text) return
@@ -770,7 +917,7 @@ const onComposerEscape = (event) => {
 watch(
     () => [
         input.value === '',
-        attachments.value.length,
+        attachments.value.length + attachedDocuments.value.length,
         agent.items[lastTurnIndex(agent.items)]?.id,
         agent.isStreaming,
     ],

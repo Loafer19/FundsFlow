@@ -3,11 +3,13 @@
 namespace App\Actions\Agent\Web;
 
 use App\Actions\Agent\AgentPlanningTools;
+use App\Actions\Agent\Documents\ImportTransactionsAction;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Transactions\StoreTransactionAttachmentAction;
 use App\Enums\TransactionSource;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\TransactionAttachmentRules;
 use App\Support\UserFormatter;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +29,7 @@ final class ConfirmWebAgentPendingAction
         private readonly AgentToolExecutor $tools,
         private readonly WebAgentUploads $uploads,
         private readonly StoreTransactionAttachmentAction $storeAttachment,
+        private readonly ImportTransactionsAction $import,
     ) {}
 
     /**
@@ -70,6 +73,7 @@ final class ConfirmWebAgentPendingAction
                 'rename_tags' => $this->renameTags($user, $session, $payload),
                 'create_transaction' => $this->createTransaction($user, $payload),
                 'create_transactions' => $this->createTransactions($user, $payload),
+                'import_transactions' => $this->importTransactions($user, $payload),
                 'update_transaction' => $this->updateTransaction($user, $payload),
                 'delete_transaction' => $this->deleteTransaction($user, $payload),
                 'create_budget' => $this->createBudget($user, $payload),
@@ -184,12 +188,30 @@ final class ConfirmWebAgentPendingAction
     }
 
     /**
+     * Bulk import from a document (CSV / Excel / statement): one database transaction.
+     *
+     * @param array<string, mixed> $payload
+     * @return array{0: bool, 1: string, 2: string}
+     */
+    private function importTransactions(User $user, array $payload): array
+    {
+        $created = $this->import->apply($user, $payload, TransactionSource::Web);
+        if ($created->isEmpty()) {
+            return [false, 'Nothing to import.', 'Import had no valid rows.'];
+        }
+        $message = ImportTransactionsAction::doneMessage($created, $payload);
+
+        return [true, $message, $message];
+    }
+
+    /**
      * Copy staged receipt photos onto the transaction (same rules as any attachment).
      */
     private function attachPhotos(User $user, Transaction $tx, mixed $refs): void
     {
         foreach (is_array($refs) ? $refs : [] as $ref) {
-            if (!is_array($ref)) {
+            // A Word file is read for its text only; it is not an attachment type.
+            if (!is_array($ref) || !isset(TransactionAttachmentRules::ALLOWED_MIMES[(string) ($ref['mime'] ?? '')])) {
                 continue;
             }
             $contents = $this->uploads->read($user, $ref);

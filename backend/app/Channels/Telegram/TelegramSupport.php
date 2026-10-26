@@ -352,6 +352,25 @@ class TelegramSupport
             'inline_keyboard' => [[
                 ['text' => 'One transaction', 'callback_data' => 'album:one:' . $groupId],
                 ['text' => 'Separate', 'callback_data' => 'album:each:' . $groupId],
+            ], [
+                ['text' => '📋 Transaction list', 'callback_data' => 'album:list:' . $groupId],
+            ]],
+        ];
+    }
+
+    /**
+     * Under "these tags don't exist yet" for an import; a typed reply works too.
+     *
+     * @return array<string, mixed>
+     */
+    public function importTagsKeyboard(string $nonce): array
+    {
+        return [
+            'inline_keyboard' => [[
+                ['text' => '🆕 Create them', 'callback_data' => "imp:create:{$nonce}"],
+                ['text' => 'Without tags', 'callback_data' => "imp:none:{$nonce}"],
+            ], [
+                ['text' => 'Cancel', 'callback_data' => "imp:cancel:{$nonce}"],
             ]],
         ];
     }

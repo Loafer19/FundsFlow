@@ -44,6 +44,17 @@ final class TelegramHistory
     }
 
     /**
+     * A staged change waiting for Confirm (status follows the Confirm / Cancel tap by its nonce).
+     */
+    public function proposal(int|string $chatId, ?User $user, string $text, string $nonce): void
+    {
+        if ($user === null || !self::isPrivate($chatId)) {
+            return;
+        }
+        $this->history->addProposal($user, AgentHistory::TELEGRAM, mb_substr(trim($text), 0, self::MAX_LINE), $nonce);
+    }
+
+    /**
      * "-350.00 ₴ groceries (🍔 Food) · 20.08.2026".
      */
     public static function transactionLine(User $user, Transaction $transaction): string

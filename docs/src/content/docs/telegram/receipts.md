@@ -7,6 +7,9 @@ Send a photo or a file to the bot to create a transaction with that file attache
 
 - Supported files: **JPEG, PNG, WebP, and PDF**.
 - Each file can be up to **8 MB**; a transaction can have up to **5** attachments.
+- **Word, CSV, Excel, OFX / QFX, QIF, JSON, and HTML** files, and PDF bank statements, are read too: one receipt
+  becomes a draft card, and a list of transactions becomes one card that imports them all on **Confirm**. Up to 5
+  files sent together become one import. See [Files and bulk import](/docs/web/import/).
 
 ## With an amount in the caption (instant, no AI)
 
@@ -26,9 +29,12 @@ Send a JPEG or PNG photo with no caption, or with a caption that is just a hint 
 If the AI can't find a clear total (for example a photo of food), it asks you to send the amount like `-350`, or
 choose **−100**, **−500**, **Other**, or **Cancel**.
 
+A **PDF** without an amount is read by its text (a scanned PDF by its first page) and gets the same draft card, or a
+bulk import card when it's a statement.
+
 The bot falls back to the same amount buttons, without AI, when:
 
-- the file is a PDF or WebP (AI reading works on JPEG and PNG only);
+- the file is a WebP photo (AI photo reading works on JPEG and PNG only);
 - your [daily AI limit](/docs/telegram/ai-assistant/#daily-ai-limit) is used up;
 - the AI couldn't read the receipt.
 
@@ -37,12 +43,15 @@ A successful AI read counts as one AI assist.
 ## Albums (several photos at once)
 
 When you send several photos as one album, the bot waits a few seconds to collect them and asks:
-*Got N photos. Is this one receipt or separate transactions?*
+*Got N photos. Is this one receipt, separate receipts, or screenshots of a transaction list?*
 
 - **One transaction** — all photos (up to 5) are attached to a single transaction. If the album caption has an amount,
   it is saved immediately; otherwise AI reads the best photo and shows a draft.
 - **Separate** — each photo is processed as its own receipt, one after another (*Processing 1 of N…*).
   A photo the bot can't download is skipped with a message naming it (*Photo 2 couldn't be read and was skipped…*),
   and the next one is processed.
+- **📋 Transaction list** — the photos are screenshots of your bank app's history (up to 10). They are read together
+  in one AI assist and become one bulk import; rows shown on two overlapping screenshots are kept once. A caption like
+  *statement* or *виписка* picks this right away, without the question.
 
 Pending receipts and drafts expire after about 15 minutes; send the photo again if a card says it is outdated.

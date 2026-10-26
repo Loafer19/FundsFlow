@@ -51,6 +51,7 @@ export default defineConfig({
                     items: [
                         { slug: 'web/overview' },
                         { slug: 'web/assistant' },
+                        { slug: 'web/import' },
                         { slug: 'web/transactions' },
                         { slug: 'web/tabs' },
                         { slug: 'web/tags' },

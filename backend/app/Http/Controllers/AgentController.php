@@ -3,17 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Agent\AgentHistory;
+use App\Actions\Agent\Documents\DocumentFile;
 use App\Actions\Agent\Web\ConfirmWebAgentPendingAction;
 use App\Actions\Agent\Web\RunWebAgentAction;
 use App\Actions\Agent\Web\WebAgentChannel;
 use App\Actions\Agent\Web\WebAgentSession;
 use App\Actions\Agent\Web\WebAgentUploads;
 use App\Models\User;
+use App\Support\TransactionAttachmentRules;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
@@ -45,6 +48,11 @@ class AgentController extends Controller
      * the last user message; `message` is ignored) drops the last turn first, see
      * WebAgentSession::rewindLastTurn. `turn_id` is the id of that user message; a stale one gets 409.
      * Photos can't be combined with a rewind.
+     *
+     * Or documents: `document` (one) and/or `documents[]` (up to DocumentFile::maxFiles() in all; PDF,
+     * DOCX, CSV, XLSX, ODS, JSON, OFX/QFX, QIF, HTML; kind sniffed from the bytes + extension, see
+     * DocumentFile; DocumentFile::maxTotalBytes() together): one receipt, or ONE bulk import of all
+     * files behind one Confirm card. Not with photos or a rewind.
      */
     public function chat(Request $request): StreamedResponse|JsonResponse
     {
@@ -62,6 +70,9 @@ class AgentController extends Controller
                 'max:' . intdiv(WebAgentUploads::MAX_BYTES, 1024),
                 'mimetypes:' . implode(',', array_keys(WebAgentUploads::MIMES)),
             ],
+            'document' => ['nullable', 'file', 'max:' . intdiv(max(DocumentFile::maxBytes(DocumentFile::PDF), DocumentFile::maxBytes(DocumentFile::CSV)), 1024)],
+            'documents' => ['nullable', 'array', 'max:' . DocumentFile::maxFiles()],
+            'documents.*' => ['bail', 'file', 'max:' . intdiv(max(DocumentFile::maxBytes(DocumentFile::PDF), DocumentFile::maxBytes(DocumentFile::CSV)), 1024)],
             'conversation_id' => ['nullable', 'string', 'max:64'],
             'rewind' => ['nullable', 'string', 'in:' . WebAgentSession::REWIND_REPLACE . ',' . WebAgentSession::REWIND_REGENERATE],
             'turn_id' => ['required_with:rewind', 'nullable', 'string', 'max:64'],
@@ -79,6 +90,15 @@ class AgentController extends Controller
             'images.*.uploaded' => 'Each photo must be ' . intdiv(WebAgentUploads::MAX_BYTES, 1024 * 1024) . ' MB or smaller.',
             'images.*.max' => 'Each photo must be ' . intdiv(WebAgentUploads::MAX_BYTES, 1024 * 1024) . ' MB or smaller.',
             'images.*.mimetypes' => 'Only JPEG, PNG and WebP photos are supported.',
+            'document.file' => 'That file could not be uploaded. Try again.',
+            'document.uploaded' => 'That file is too large.',
+            'document.max' => 'That file is too large: PDF up to ' . DocumentFile::formatBytes(DocumentFile::maxBytes(DocumentFile::PDF))
+                . ', other documents up to ' . DocumentFile::formatBytes(DocumentFile::maxBytes(DocumentFile::CSV)) . '.',
+            'documents.max' => 'Send up to ' . DocumentFile::maxFiles() . ' files at a time.',
+            'documents.*.file' => 'A file could not be uploaded. Try again.',
+            'documents.*.uploaded' => 'A file is too large.',
+            'documents.*.max' => 'A file is too large: PDF up to ' . DocumentFile::formatBytes(DocumentFile::maxBytes(DocumentFile::PDF))
+                . ', other documents up to ' . DocumentFile::formatBytes(DocumentFile::maxBytes(DocumentFile::CSV)) . '.',
         ]);
 
         $user = $request->user();
@@ -86,11 +106,28 @@ class AgentController extends Controller
         $message = trim((string) ($data['message'] ?? ''));
         $images = $request->file('images', []);
         $images = is_array($images) ? array_values($images) : [];
-        $rewind = isset($data['rewind']) ? (string) $data['rewind'] : null;
-        if ($rewind !== null && $images !== []) {
-            return response()->json(['message' => "Photos can't be attached when editing or regenerating a message."], 422);
+        $documents = $request->file('documents', []);
+        $documents = array_values(array_filter(
+            array_merge([$request->file('document')], is_array($documents) ? $documents : []),
+            static fn ($file) => $file instanceof \Illuminate\Http\UploadedFile,
+        ));
+        if (count($documents) > DocumentFile::maxFiles()) {
+            return response()->json(['message' => 'Send up to ' . DocumentFile::maxFiles() . ' files at a time.'], 422);
         }
-        if ($message === '' && $images === [] && $rewind !== WebAgentSession::REWIND_REGENERATE) {
+        $totalBytes = array_sum(array_map(static fn ($file) => (int) $file->getSize(), $documents));
+        if ($totalBytes > DocumentFile::maxTotalBytes()) {
+            return response()->json(['message' => 'These files are ' . DocumentFile::formatBytes($totalBytes) . ' together; up to '
+                . DocumentFile::formatBytes(DocumentFile::maxTotalBytes()) . ' per message.'], 422);
+        }
+        $document = $documents[0] ?? null;
+        $rewind = isset($data['rewind']) ? (string) $data['rewind'] : null;
+        if ($rewind !== null && ($images !== [] || $document !== null)) {
+            return response()->json(['message' => "Files can't be attached when editing or regenerating a message."], 422);
+        }
+        if ($document !== null && $images !== []) {
+            return response()->json(['message' => 'Send a document on its own, without photos.'], 422);
+        }
+        if ($message === '' && $images === [] && $document === null && $rewind !== WebAgentSession::REWIND_REGENERATE) {
             return response()->json(['message' => 'The message field is required.'], 422);
         }
 
@@ -99,6 +136,17 @@ class AgentController extends Controller
         try {
             foreach ($images as $image) {
                 $files[] = $this->uploads->store($user, $image);
+            }
+            foreach ($documents as $upload) {
+                try {
+                    $files[] = $this->uploads->storeDocument($user, $upload);
+                } catch (ValidationException $e) {
+                    if (count($documents) === 1) {
+                        throw $e;
+                    }
+                    $name = TransactionAttachmentRules::sanitizeOriginalName((string) ($upload->getClientOriginalName() ?: 'file'));
+                    throw ValidationException::withMessages(['documents' => $name . ': ' . collect($e->errors())->flatten()->first()]);
+                }
             }
         } catch (Throwable $e) {
             $this->uploads->delete($user, $files);

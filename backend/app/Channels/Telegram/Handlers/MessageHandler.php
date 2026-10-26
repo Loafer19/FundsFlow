@@ -292,6 +292,11 @@ class MessageHandler
             return;
         }
 
+        // Reply to an import's "these tags don't exist" question (or another edit of that import).
+        if ($this->mediaHandler->handleImportReply($user, $chatId, $telegramUserId, $text)) {
+            return;
+        }
+
         if ($this->mediaHandler->hasAwaitingDraft($chatId)) {
             $this->notes->input($chatId, $user, $text);
             $this->mediaHandler->completeDraftAmount($user, $chatId, $text);

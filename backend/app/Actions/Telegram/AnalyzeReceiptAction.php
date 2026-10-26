@@ -60,7 +60,9 @@ Reply with ONLY a JSON object (no markdown) matching this schema:
   "suggested_tag_titles": string[],
   "category": string|null,
   "needs_price": boolean,
-  "confidence": number|null
+  "confidence": number|null,
+  "is_transaction_list": boolean,
+  "transactions": [{"amount": number, "at": "YYYY-MM-DD"|null, "note": string|null, "suggested_tag_titles": string[]}]
 }
 Rules:
 - amount: total paid as a signed number. Prefer expense (negative) for purchases. Use null if the total is missing, ambiguous, or a food/menu photo without a clear price.
@@ -70,6 +72,10 @@ Rules:
 - category: coarse label like food, groceries, transport, utilities, health, shopping, entertainment, other — or null.
 - needs_price: true when amount is null OR the image is food/unclear and the user must type the price. Never invent a total.
 - confidence: 0–1 how sure you are about the amount (null if needs_price).
+- is_transaction_list: true when the image is NOT one receipt but a list of several operations (a banking app's
+  history, a statement page). Then fill "transactions" with every visible operation (signed amounts; resolve
+  "Today" / "Yesterday" / "24 October" date headers using today's date) and set amount to null.
+  Otherwise is_transaction_list is false and "transactions" is [].
 PROMPT;
 
         $userText = "Today (user timezone date) is {$today}. Extract the receipt fields.{$hint}";
@@ -81,7 +87,7 @@ PROMPT;
                 ->post($baseUrl . '/chat/completions', [
                     'model' => $model,
                     'temperature' => 0,
-                    'max_tokens' => 500,
+                    'max_tokens' => 4000,
                     'messages' => [
                         [
                             'role' => 'system',
@@ -163,7 +169,8 @@ PROMPT;
      *     suggested_tag_titles: list<string>,
      *     category: ?string,
      *     needs_price: bool,
-     *     confidence: ?float
+     *     confidence: ?float,
+     *     transaction_list: list<array{amount: float, at: ?string, note: ?string, suggested_tag_titles: list<string>}>|null
      * }|null
      */
     private function parseModelJson(string $content, string $fallbackDate): ?array
@@ -234,6 +241,26 @@ PROMPT;
         $confidence = $decoded['confidence'] ?? null;
         $confidence = is_numeric($confidence) ? max(0.0, min(1.0, (float) $confidence)) : null;
 
+        // A screenshot of a whole transaction list: its rows go to the bulk import instead.
+        $list = [];
+        if (($decoded['is_transaction_list'] ?? false) === true && is_array($decoded['transactions'] ?? null)) {
+            foreach (array_slice($decoded['transactions'], 0, 200) as $item) {
+                if (!is_array($item) || !is_numeric($item['amount'] ?? null) || (float) $item['amount'] == 0.0) {
+                    continue;
+                }
+                $itemNote = is_string($item['note'] ?? null) ? trim(mb_substr($item['note'], 0, 255)) : '';
+                $list[] = [
+                    'amount' => round((float) $item['amount'], 2),
+                    'at' => is_string($item['at'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $item['at']) ? $item['at'] : null,
+                    'note' => $itemNote !== '' ? $itemNote : null,
+                    'suggested_tag_titles' => array_slice(array_values(array_filter(
+                        array_map(static fn ($t) => is_string($t) ? trim(mb_substr($t, 0, 60)) : '', is_array($item['suggested_tag_titles'] ?? null) ? $item['suggested_tag_titles'] : []),
+                        static fn (string $t) => $t !== '',
+                    )), 0, 3),
+                ];
+            }
+        }
+
         return [
             'amount' => $amount,
             'at' => $at ?? $fallbackDate,
@@ -242,6 +269,8 @@ PROMPT;
             'category' => $category,
             'needs_price' => $needsPrice,
             'confidence' => $confidence,
+            // >= 2 rows: one row is just a receipt.
+            'transaction_list' => count($list) >= 2 ? $list : null,
         ];
     }
 }

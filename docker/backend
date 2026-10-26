@@ -1,6 +1,6 @@
 FROM dunglas/frankenphp:php8.4-alpine
 
-RUN apk add icu-dev libzip-dev unzip && \
+RUN apk add icu-dev libzip-dev unzip poppler-utils && \
     install-php-extensions bcmath intl pcntl pdo_mysql opcache redis zip
 
 RUN echo "memory_limit = 4G" >> /usr/local/etc/php/conf.d/memory-limit.ini && \

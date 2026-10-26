@@ -34,7 +34,7 @@ final class RunWebAgentAction
     /**
      * @param Closure(string, array<string, mixed>): void $emit
      * @param array<string, mixed> $context validated screen context (tab, period, tag filter)
-     * @param list<array{id: string, name: string, mime: string, file_size: int}> $files receipt photos (WebAgentUploads refs)
+     * @param list<array{id: string, name: string, mime: string, file_size: int}> $files receipt photos, or one document (WebAgentUploads refs)
      * @param array{prior_question: string}|null $rewoundAsk the question an edited / regenerated turn answered
      *        (WebAgentSession::rewindLastTurn already dropped that turn)
      */
@@ -92,9 +92,22 @@ final class RunWebAgentAction
         $replyTo = $files === [] && $askContext !== null
             ? ['reply_to' => 'agent_ask', 'prior_question' => $askContext['prior_question']]
             : [];
+        $documents = array_values(array_filter($files, static fn (array $file): bool => WebAgentUploads::isDocumentRef($file)));
+        $document = $documents[0] ?? null;
         $userItem = $channel->push('user', ['role' => 'user', 'kind' => 'text', 'text' => $message]
-            + ($files !== [] ? ['photos' => count($files)] : [])
+            + ($document !== null
+                ? ['document' => ['name' => (string) $document['name'], 'size' => (int) $document['file_size']]]
+                    + (count($documents) > 1 ? ['documents' => array_map(static fn (array $doc) => ['name' => (string) $doc['name'], 'size' => (int) $doc['file_size']], $documents)] : [])
+                : ($files !== [] ? ['photos' => count($files)] : []))
             + $replyTo);
+
+        // Documents: one receipt or ONE bulk import of all files (shared with Telegram, see DocumentImport).
+        if ($document !== null) {
+            $status = $this->receipt->startDocuments($user, $channel, $session, $documents, $message);
+            $this->finish($user, $session, $emit, $status);
+
+            return;
+        }
 
         // Receipt photos: the shared receipt flow (quota is checked per analysis, like Telegram).
         if ($files !== []) {

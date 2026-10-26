@@ -61,7 +61,7 @@ export const rewindBlocker = (items, mode) => {
     const turn = items.slice(index)
     if (turn.some(isApplied)) return 'applied'
     if (mode === 'regenerate') {
-        if (user.photos) return 'photos'
+        if (user.photos || user.document) return 'photos'
         if (turn.some((item) => item.kind === 'confirm')) return 'confirm'
         if (!String(user.text ?? '').trim()) return 'empty'
     }
@@ -211,12 +211,18 @@ export const useAgentStore = defineStore('agent', {
         },
 
         // images: [{ file: Blob (downscaled JPEG), name, url (object URL for the bubble thumbnail) }]
+        // document: a File or an array of Files (PDF, Word, CSV, Excel, JSON, OFX, QIF, HTML; up to
+        // MAX_DOCUMENTS), sent instead of photos; several files become one import on the server
         // rewind: { mode: 'replace_last' | 'regenerate', turnId } drops the last turn (here and on the
         // server) before sending; photos are never re-sent with it.
-        async send(text, images = [], rewind = null) {
+        async send(text, images = [], rewind = null, document = null) {
             const message = String(text ?? '').trim()
-            const photos = rewind ? [] : Array.isArray(images) ? images.filter((image) => image?.file) : []
-            if ((!message && !photos.length) || this.isStreaming) return
+            const docs = rewind
+                ? []
+                : (Array.isArray(document) ? document : [document]).filter((doc) => doc instanceof Blob)
+            const file = docs[0] ?? null
+            const photos = rewind || file ? [] : Array.isArray(images) ? images.filter((image) => image?.file) : []
+            if ((!message && !photos.length && !file) || this.isStreaming) return
 
             let dropped = null
             if (rewind) {
@@ -234,6 +240,10 @@ export const useAgentStore = defineStore('agent', {
                 kind: 'text',
                 text: message,
                 ...(photos.length ? { photos: photos.length, localImages: photos.map((image) => image.url) } : {}),
+                ...(file ? { document: { name: file.name || 'document', size: file.size } } : {}),
+                ...(docs.length > 1
+                    ? { documents: docs.map((doc) => ({ name: doc.name || 'document', size: doc.size })) }
+                    : {}),
             })
             this.isStreaming = true
             this.draft = ''
@@ -248,13 +258,15 @@ export const useAgentStore = defineStore('agent', {
                 }
                 let body
 
-                if (photos.length) {
+                if (photos.length || file) {
                     // multipart: the browser sets the boundary, so no Content-Type here.
                     body = new FormData()
                     body.append('message', message)
                     if (this.conversationId) body.append('conversation_id', this.conversationId)
                     if (this.screenContext) body.append('context', JSON.stringify(this.screenContext))
                     for (const image of photos) body.append('images[]', image.file, image.name || 'receipt.jpg')
+                    if (docs.length === 1) body.append('document', file, file.name || 'document')
+                    else for (const doc of docs) body.append('documents[]', doc, doc.name || 'document')
                 } else {
                     headers['Content-Type'] = 'application/json'
                     body = JSON.stringify({
@@ -287,7 +299,11 @@ export const useAgentStore = defineStore('agent', {
                     }
 
                     if (response.status === 429) detail = 'Too many messages. Wait a minute and try again.'
-                    if (response.status === 413) detail = 'Those photos are too large. Try fewer or smaller ones.'
+                    if (response.status === 413) {
+                        detail = file
+                            ? 'That file is too large. Send a shorter period or split it.'
+                            : 'Those photos are too large. Try fewer or smaller ones.'
+                    }
 
                     this.items = this.items.filter((item) => item.id !== localUserId)
                     if (dropped) this.items.push(...dropped)

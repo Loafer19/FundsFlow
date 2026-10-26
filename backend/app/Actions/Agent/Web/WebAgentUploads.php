@@ -2,6 +2,7 @@
 
 namespace App\Actions\Agent\Web;
 
+use App\Actions\Agent\Documents\DocumentFile;
 use App\Models\User;
 use App\Support\TransactionAttachmentRules;
 use Illuminate\Http\UploadedFile;
@@ -10,7 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Receipt photos sent to the web assistant, kept on the private `local` disk
+ * Receipt photos and documents (PDF, DOCX, CSV, XLSX, ODS) sent to the web assistant, kept on the private `local` disk
  * (never public) only until their Confirm card is resolved. Leftovers (expired
  * conversations, outdated cards) are removed by `agent:prune-uploads`.
  *
@@ -34,6 +35,19 @@ final class WebAgentUploads
         'image/jpeg' => 'jpg',
         'image/png' => 'png',
         'image/webp' => 'webp',
+    ];
+
+    /** @var array<string, string> canonical document mime => extension (see DocumentFile) */
+    public const DOCUMENT_MIMES = [
+        'application/pdf' => 'pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+        'text/csv' => 'csv',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+        'application/vnd.oasis.opendocument.spreadsheet' => 'ods',
+        'application/json' => 'json',
+        'application/x-ofx' => 'ofx',
+        'application/qif' => 'qif',
+        'text/html' => 'html',
     ];
 
     private const ID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
@@ -64,6 +78,38 @@ final class WebAgentUploads
             'mime' => $mime,
             'file_size' => $size,
         ];
+    }
+
+    /**
+     * One document (kind detected from the bytes + extension, see DocumentFile). The ref gets the
+     * canonical mime of its kind, so a stored CSV is always text/csv whatever the browser said.
+     *
+     * @return array{id: string, name: string, mime: string, file_size: int}
+     */
+    public function storeDocument(User $user, UploadedFile $file): array
+    {
+        $contents = (string) $file->getContent();
+        $name = TransactionAttachmentRules::sanitizeOriginalName((string) ($file->getClientOriginalName() ?: 'document'));
+        $detected = DocumentFile::detect($contents, $name);
+        if (isset($detected['error'])) {
+            throw ValidationException::withMessages(['document' => $detected['error']]);
+        }
+
+        $mime = DocumentFile::MIMES[$detected['kind']];
+        $id = Str::uuid()->toString();
+        Storage::disk(self::DISK)->put($this->path($user, $id, $mime), $contents);
+
+        return [
+            'id' => $id,
+            'name' => $name,
+            'mime' => $mime,
+            'file_size' => strlen($contents),
+        ];
+    }
+
+    public static function isDocumentRef(mixed $ref): bool
+    {
+        return is_array($ref) && isset(self::DOCUMENT_MIMES[(string) ($ref['mime'] ?? '')]);
     }
 
     /**
@@ -162,7 +208,7 @@ final class WebAgentUploads
     {
         $id = is_string($ref['id'] ?? null) ? $ref['id'] : '';
         $mime = is_string($ref['mime'] ?? null) ? $ref['mime'] : '';
-        if (!preg_match(self::ID_PATTERN, $id) || !isset(self::MIMES[$mime])) {
+        if (!preg_match(self::ID_PATTERN, $id) || (!isset(self::MIMES[$mime]) && !isset(self::DOCUMENT_MIMES[$mime]))) {
             return null;
         }
 
@@ -171,6 +217,6 @@ final class WebAgentUploads
 
     private function path(User $user, string $id, string $mime): string
     {
-        return self::DIR . '/' . $user->id . '/' . $id . '.' . self::MIMES[$mime];
+        return self::DIR . '/' . $user->id . '/' . $id . '.' . (self::MIMES[$mime] ?? self::DOCUMENT_MIMES[$mime]);
     }
 }

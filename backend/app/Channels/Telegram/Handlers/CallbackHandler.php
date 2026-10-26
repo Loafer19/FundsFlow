@@ -138,6 +138,20 @@ class CallbackHandler
             return;
         }
 
+        if (preg_match('/^album:list:(.+)$/', $data, $matches)) {
+            $this->client->answerCallbackQuery($callbackId, 'Transaction list');
+            $this->mediaHandler->handleAlbumList($user, $chatId, $matches[1], $telegramUserId);
+
+            return;
+        }
+
+        if (preg_match('/^imp:(create|none|cancel):(' . TelegramSupport::NONCE_PATTERN . ')$/', $data, $matches)) {
+            $this->removeKeyboard($chatId, $messageId);
+            $this->client->answerCallbackQuery($callbackId, $this->mediaHandler->handleImportButton($user, $chatId, $telegramUserId, $matches[1], $matches[2]));
+
+            return;
+        }
+
         if (preg_match('/^nl:(tags|rename|agent):(ok|cancel)(?::(' . TelegramSupport::NONCE_PATTERN . '))?$/', $data, $matches)) {
             $this->removeKeyboard($chatId, $messageId);
             $this->handleNlConfirmButton($user, $chatId, $callbackId, $telegramUserId, $matches[1], $matches[2], $matches[3] ?? '');
