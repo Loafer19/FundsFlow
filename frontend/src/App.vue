@@ -270,7 +270,7 @@ import {
     TrendingUp,
     X,
 } from 'lucide-vue-next'
-import { computed, defineAsyncComponent, markRaw, onMounted, provide, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, markRaw, nextTick, onMounted, provide, ref, watch } from 'vue'
 import AgentDrawer from './components/AgentDrawer.vue'
 import TagPicker from './components/TagPicker.vue'
 import Toasts from './components/Toasts.vue'
@@ -341,7 +341,7 @@ const budgetsStore = useBudgetsStore()
 
 const dateSelectionType = ref('month')
 const datePicker = ref(null)
-const selectedRange = ref(getDefaultRange('month'))
+const selectedRange = ref(rangeFor('month'))
 const selectedTab = ref(markRaw(Analytics))
 
 watch(selectedTab, () => haptic.select())
@@ -352,11 +352,22 @@ const periodTypes = [
     { value: 'year', label: 'Year', icon: markRaw(CalendarFold) },
 ]
 
+// Switching Week / Month / Year keeps the period on screen: Month → Year stays in the viewed year,
+// Year → Month opens today's month in the current year (January otherwise). The range is set here,
+// not in a watcher on the type, so callers that pick a range themselves (handleJumpToMonth) keep it.
 function setDateSelectionType(type) {
     if (dateSelectionType.value === type) return
 
     haptic.select()
+    const { currentStart, currentEnd } = getDateRange.value
+    const today = new Date()
+    selectRange(type, today >= currentStart && today <= currentEnd ? today : currentStart)
+}
+
+function selectRange(type, date) {
     dateSelectionType.value = type
+    selectedRange.value = rangeFor(type, date)
+    nextTick(() => datePicker.value?.parseModel())
 }
 
 const tagFilterChips = computed(() => {
@@ -455,14 +466,6 @@ watch(
     },
 )
 
-watch(
-    () => dateSelectionType.value,
-    (type) => {
-        selectedRange.value = getDefaultRange(type)
-        datePicker.value.parseModel()
-    },
-)
-
 function shiftPeriod(delta) {
     haptic.select()
 
@@ -481,20 +484,20 @@ function shiftPeriod(delta) {
 
     datePicker.value?.parseModel()
 }
+// Year view month card → that month of the viewed year.
 function handleJumpToMonth(date) {
-    dateSelectionType.value = 'month'
-    selectedRange.value = { month: date.getMonth(), year: date.getFullYear() }
-    datePicker.value?.parseModel()
+    haptic.select()
+    selectRange('month', date)
 }
 
-function getDefaultRange(type) {
-    const today = new Date()
+function rangeFor(type, date = new Date()) {
+    const anchor = new Date(date)
 
     if (type === 'week') {
-        const day = today.getDay()
+        const day = anchor.getDay()
         const daysFromMonday = day === 0 ? 6 : day - 1
-        const start = new Date(today)
-        start.setDate(today.getDate() - daysFromMonday)
+        const start = new Date(anchor)
+        start.setDate(anchor.getDate() - daysFromMonday)
         start.setHours(0, 0, 0, 0)
 
         const end = new Date(start)
@@ -505,10 +508,10 @@ function getDefaultRange(type) {
     }
 
     if (type === 'month') {
-        return { month: today.getMonth(), year: today.getFullYear() }
+        return { month: anchor.getMonth(), year: anchor.getFullYear() }
     }
 
-    return today.getFullYear()
+    return anchor.getFullYear()
 }
 
 const getDateRange = computed(() => {

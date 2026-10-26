@@ -1,164 +1,223 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 
-// Starter prompts for the assistant's empty state, per tab (screen context comes from App.vue).
-// Only things the web assistant's tools can do: summaries, budgets, recurring rules, comparisons,
-// report / PDF cards, charts, tag create / rename, transaction search / add / edit.
+// Starter prompts for the assistant's empty state. Every prompt maps to something the web assistant's
+// tools really do (period summary / comparison, charts, budget status, recurring rules, report / PDF
+// cards, tags, quick add, transaction search / edit, statement and receipt import).
+//
+// Grouped by category: a visible set never shows two chips of one category, so it stays varied.
+// Optional flags:
+//   needs   'budgets' | 'recurring' | 'transactions' | 'tag'  shown only when that data exists
+//   unless  'budgets' | 'recurring'                            shown only when it does NOT exist (setup ideas)
+//   attach  chip opens the file picker with `prompt` prefilled instead of sending `text`
+// `{tag}` is replaced with the user's most used expense tag (needs: 'tag').
 
-const GENERIC = [
-    'How much did I spend this month?',
-    'Income vs expenses for the last 6 months',
-    'Chart of spending by tag this month',
-    'What were my biggest expenses this month?',
-    'Am I on track with my budgets?',
-    "What's my average daily spend this month?",
-    'Compare this month with last month',
-    'What recurring charges are coming up?',
-    'Show my recurring payments',
-    'Add -350 groceries today',
-    'Add -120 taxi yesterday',
-    'Find all Bolt rides last month',
-    'PDF report for last month',
-    'Show my last 10 transactions',
-    'Will I stay within budget by month end?',
-]
-
-const BY_TAB = {
-    analytics: [
-        'Compare this period with the previous one',
-        'What changed most in my spending?',
-        'PDF report for this period',
-        'Biggest expenses in this period',
-        'Which tag grew the most vs last period?',
-        'Average daily spend in this period',
-        'Chart of spending by tag for this period',
-        'Income vs expenses for this period',
-        'Where did most of my money go?',
-        'Compare this quarter with last',
-        'Summarize my finances this month',
-        'How much did I save this month?',
+const CATEGORIES = {
+    overview: [
+        { text: 'How did this month go overall?' },
+        { text: 'Where did most of my money go?', needs: 'transactions' },
+        { text: "What's my average daily spend?", needs: 'transactions' },
+        { text: 'What were my 5 biggest expenses?', needs: 'transactions' },
+        { text: 'Did I save anything this month?' },
     ],
-    calendar: [
-        'Upcoming charges this week',
-        'Upcoming charges for the next 30 days',
-        'Which day did I spend the most here?',
-        'Add -350 groceries today',
-        'Add -80 coffee yesterday',
-        'Show my recurring payments',
-        'Add monthly rent -12000 on the 1st',
-        'Pause my Netflix subscription',
-        'How much do subscriptions cost per month?',
-        'Find all Bolt rides last month',
-        'Show my last 10 transactions',
+    compare: [
+        { text: 'Compare this month with last month' },
+        { text: 'Which tag grew most vs last month?', needs: 'transactions' },
+        { text: 'Am I spending more than last quarter?' },
+        { text: 'How does this year compare to last?' },
+    ],
+    charts: [
+        { text: 'Chart my spending by tag' },
+        { text: 'Chart income vs expenses this year' },
+        { text: 'Show my balance trend this year' },
+        { text: 'Chart spending by tag vs last month' },
     ],
     budgets: [
-        'How are my budgets doing?',
-        'Am I on track with my budgets?',
-        'How much can I spend per day?',
-        'Will I stay within budget by month end?',
-        'Which budget is at risk?',
-        'Create a 5000 monthly budget for groceries',
-        'Raise my groceries budget to 6000',
-        'Pause my budget',
-        'Resume a paused budget',
-        'Show my budgets',
-        'Where can I cut spending this month?',
-        'Chart of spending by tag this month',
+        { text: 'Am I on track with my budgets?', needs: 'budgets' },
+        { text: 'How much can I spend per day?', needs: 'budgets' },
+        { text: 'Which budget is closest to its limit?', needs: 'budgets' },
+        { text: 'Will any budget go over this month?', needs: 'budgets' },
+        { text: 'Suggest budgets from my spending', unless: 'budgets' },
+        { text: 'Set up a monthly groceries budget', unless: 'budgets' },
     ],
-    tags: [
-        'Compare spending by tag with last month',
-        'Which tag grew the most?',
-        'Chart of spending by tag',
-        'Top 5 tags by spending this month',
-        'Which tags did I spend less on?',
-        'How much did I spend on groceries?',
-        'What share of my spending is food?',
-        'Show my tags',
-        'Create tags Pets and Gifts',
-        'Rename tag Food to Groceries',
-        'PDF report for groceries this month',
+    recurring: [
+        { text: "What's due in the next 7 days?", needs: 'recurring' },
+        { text: 'How much do subscriptions cost monthly?', needs: 'recurring' },
+        { text: 'Which recurring payment costs most?', needs: 'recurring' },
+        { text: 'Add monthly rent of 12000 on the 1st', unless: 'recurring' },
+        { text: 'Add Spotify as a monthly subscription' },
     ],
-    money_flow: [
-        'Income vs expenses vs the previous period',
-        'Where did my money go here?',
-        'PDF report for this period',
-        'How much did I save this period?',
-        'What was my biggest income this period?',
-        'Chart of income vs expenses for 6 months',
-        'Is my net positive this month?',
-        'Compare this month with last month',
-        'Biggest expenses in this period',
-        'Average daily spend in this period',
-        'What recurring charges are coming up?',
+    reports: [
+        { text: 'PDF report for last month' },
+        { text: 'Make a report for this quarter' },
+        { text: 'Report on {tag} this year', needs: 'tag' },
     ],
-    balance_trend: [
-        'How did my balance change in this period?',
-        'Upcoming charges for the next 30 days',
-        'Compare this quarter with last',
-        'Balance trend chart for this year',
-        'How much did I save this year?',
-        'Will I stay within budget by month end?',
-        'Which recurring charges cost the most?',
-        'Income vs expenses for the last 6 months',
-        'Summarize my finances this month',
-        'What recurring charges are coming up?',
+    tags: [{ text: 'How much went on {tag} this month?', needs: 'tag' }, { text: 'Create tags Pets and Gifts' }],
+    quickAdd: [
+        { text: 'Add -350 groceries today' },
+        { text: 'Spent 120 on taxi yesterday' },
+        { text: 'Got 25000 salary today' },
+        { text: 'Add lunch 200 and coffee 60 today' },
     ],
-    table: [
-        'Summarize the transactions in this period',
-        'Biggest expenses in this period',
-        'PDF report for this period',
-        'Find all Bolt rides last month',
-        'Find transactions with "coffee" this month',
-        'Show my last 10 transactions',
-        'How many transactions did I make this month?',
-        'Average daily spend in this period',
-        'Add -350 groceries yesterday',
-        'Add +25000 salary today',
-        'Change my last transaction to -400',
-        'Delete my last transaction',
+    search: [
+        { text: 'Show my last 10 transactions', needs: 'transactions' },
+        { text: 'Find my taxi rides last month', needs: 'transactions' },
+        { text: 'Find payments with "coffee" this month', needs: 'transactions' },
+        { text: 'Change my last transaction to -400', needs: 'transactions' },
+    ],
+    import: [
+        { text: 'Import a bank statement', attach: true, prompt: 'Import the transactions from this file' },
+        { text: 'Scan a receipt', attach: true, prompt: 'Add this receipt' },
     ],
 }
 
-export const suggestionPool = (tab) => BY_TAB[tab] ?? GENERIC
+export const SUGGESTIONS = Object.entries(CATEGORIES).flatMap(([category, items]) =>
+    items.map((item, index) => ({ ...item, category, id: `${category}-${index}` })),
+)
 
-const pick = (list) => list[Math.floor(Math.random() * list.length)]
+// Categories that fit the tab on screen get more weight (screen context comes from App.vue).
+const TAB_FOCUS = {
+    analytics: ['overview', 'compare', 'charts', 'reports'],
+    calendar: ['recurring', 'quickAdd', 'search'],
+    budgets: ['budgets', 'overview'],
+    tags: ['tags', 'compare', 'charts'],
+    money_flow: ['overview', 'compare', 'charts'],
+    balance_trend: ['charts', 'recurring', 'compare'],
+    table: ['search', 'quickAdd', 'import'],
+}
+const FOCUS_WEIGHT = 3
+const MAX_TAG_LENGTH = 14
 
-// Fisher–Yates on a copy, first n.
-const sample = (list, n) => {
-    const copy = [...list]
-    for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1))
-        ;[copy[i], copy[j]] = [copy[j], copy[i]]
+/**
+ * The user's most used expense tag (short titles only, so the chip fits).
+ * Cheap: reads the already-loaded transactions store, no requests.
+ */
+export function topExpenseTag(transactions) {
+    const counts = new Map()
+    for (const transaction of transactions) {
+        if (!(transaction.amount < 0)) continue
+        for (const tag of transaction.tags ?? []) {
+            const title = tag?.title?.trim()
+            if (!title || title.length > MAX_TAG_LENGTH) continue
+            counts.set(title, (counts.get(title) ?? 0) + 1)
+        }
     }
-    return copy.slice(0, n)
+    let best = null
+    for (const [title, count] of counts) if (!best || count > best.count) best = { title, count }
+
+    return best?.title ?? null
 }
+
+/**
+ * Prompts that make sense for this user right now, each with a pick weight.
+ * ctx: { tab, hasBudgets, hasRecurring, hasTransactions, topTag }
+ */
+export function suggestionPool(ctx = {}) {
+    const has = {
+        budgets: Boolean(ctx.hasBudgets),
+        recurring: Boolean(ctx.hasRecurring),
+        transactions: Boolean(ctx.hasTransactions),
+        tag: Boolean(ctx.topTag),
+    }
+    const focus = new Set(TAB_FOCUS[ctx.tab] ?? [])
+
+    return SUGGESTIONS.filter((item) => (!item.needs || has[item.needs]) && !(item.unless && has[item.unless])).map(
+        (item) => ({
+            ...item,
+            text: item.text.replace('{tag}', ctx.topTag ?? ''),
+            weight: focus.has(item.category) ? FOCUS_WEIGHT : 1,
+        }),
+    )
+}
+
+const weightedPick = (list) => {
+    let roll = Math.random() * list.reduce((sum, item) => sum + item.weight, 0)
+    for (const item of list) {
+        roll -= item.weight
+        if (roll < 0) return item
+    }
+
+    return list[list.length - 1]
+}
+
+const pickIndex = (n) => Math.floor(Math.random() * n)
 
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
 /**
- * Three random chips from the pool (no repeats), reshuffled whenever they become visible again or the
- * pool changes. While visible, one chip is swapped every `interval` ms unless `paused` is true, the
- * browser tab is hidden, or the user prefers reduced motion.
- * Each chip is { key, text }; the key changes on every swap so a <Transition> can animate it.
+ * Picks one prompt: never one already on screen, prefers a category not on screen and one not in
+ * the recent history; each rule is relaxed only when nothing is left.
+ */
+export function pickNext(pool, shown, recent) {
+    const shownIds = new Set(shown.map((item) => item.id))
+    const shownCategories = new Set(shown.map((item) => item.category))
+    const recentIds = new Set(recent)
+    const fresh = pool.filter((item) => !shownIds.has(item.id))
+    const tiers = [
+        fresh.filter((item) => !shownCategories.has(item.category) && !recentIds.has(item.id)),
+        fresh.filter((item) => !shownCategories.has(item.category)),
+        fresh.filter((item) => !recentIds.has(item.id)),
+        fresh,
+    ]
+    const tier = tiers.find((list) => list.length)
+
+    return tier ? weightedPick(tier) : null
+}
+
+/**
+ * `count` chips from the pool: one per category, nothing repeated on screen, recently shown prompts
+ * avoided. Reshuffled whenever they become visible again or the pool changes. While visible, one chip
+ * is swapped every `interval` ms unless `paused` is true, the browser tab is hidden, or the user
+ * prefers reduced motion.
+ * Each chip is { key, id, text, attach?, prompt? }; the key changes on every swap so a <Transition>
+ * can animate it.
  */
 export function useSuggestionChips({ pool, active, paused, count = 3, interval = 7000 }) {
     const chips = ref([])
     let seq = 0
     let lastSlot = -1
     let timer = null
+    let recent = []
+
+    const remember = (item) => {
+        // About half the pool, so a prompt can't come straight back but small pools still rotate.
+        const size = Math.max(count, Math.floor(pool.value.length / 2))
+        recent = [...recent.filter((id) => id !== item.id), item.id].slice(-size)
+    }
+
+    const toChip = (item) => {
+        remember(item)
+
+        return {
+            key: seq++,
+            id: item.id,
+            category: item.category,
+            text: item.text,
+            attach: item.attach,
+            prompt: item.prompt,
+        }
+    }
 
     const shuffle = () => {
-        chips.value = sample(pool.value, count).map((text) => ({ key: seq++, text }))
+        const picked = []
+        while (picked.length < count) {
+            const item = pickNext(pool.value, picked, recent)
+            if (!item) break
+            picked.push(item)
+        }
+        // Remember after picking so the whole set counts as "recent" for the next shuffle.
+        chips.value = picked.map(toChip)
         lastSlot = -1
     }
 
     const rotateOne = () => {
-        const shown = new Set(chips.value.map((chip) => chip.text))
-        const fresh = pool.value.filter((text) => !shown.has(text))
-        if (!fresh.length || !chips.value.length) return
+        if (!chips.value.length) return
         const slots = chips.value.map((_, index) => index).filter((index) => index !== lastSlot)
-        const slot = pick(slots.length ? slots : [0])
+        const slot = slots[pickIndex(slots.length)] ?? 0
+        // The chip being replaced counts as shown: its category and text must change.
+        const item = pickNext(pool.value, chips.value, recent)
+        if (!item) return
         lastSlot = slot
-        chips.value.splice(slot, 1, { key: seq++, text: pick(fresh) })
+        chips.value.splice(slot, 1, toChip(item))
     }
 
     const tick = () => {
@@ -182,7 +241,13 @@ export function useSuggestionChips({ pool, active, paused, count = 3, interval =
         { immediate: true },
     )
 
-    watch(pool, shuffle)
+    // Only reshuffle when the set of prompts really changes (not on every store update).
+    watch(
+        () => pool.value.map((item) => `${item.id}:${item.text}:${item.weight}`).join('|'),
+        () => {
+            if (active.value) shuffle()
+        },
+    )
 
     onBeforeUnmount(stop)
 

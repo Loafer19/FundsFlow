@@ -63,7 +63,7 @@
                                 <Transition name="agent-swap" mode="out-in">
                                     <button :key="chip.key" type="button"
                                         class="btn btn-sm btn-outline rounded-full font-normal max-w-full agent-press"
-                                        :disabled="agent.quotaExhausted" @click="send(chip.text)">
+                                        :disabled="agent.quotaExhausted" @click="useChip(chip)">
                                         <span class="truncate">{{ chip.text }}</span>
                                     </button>
                                 </Transition>
@@ -313,7 +313,8 @@ import {
     MAX_DOCUMENTS,
     MAX_DOCUMENTS_TOTAL_BYTES,
 } from '../services/agentDocuments.js'
-import { suggestionPool, useSuggestionChips } from '../services/agentSuggestions.js'
+import { suggestionPool, topExpenseTag, useSuggestionChips } from '../services/agentSuggestions.js'
+import { useBudgetsStore } from '../services/budgets.js'
 import { renderMarkdown } from '../services/markdown.js'
 import {
     ACCEPT,
@@ -322,8 +323,10 @@ import {
     MAX_INPUT_BYTES,
     prepareReceiptImage,
 } from '../services/receiptImages.js'
+import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 import settings from '../services/settings.js'
 import toasts from '../services/toasts.js'
+import { useTransactionsStore } from '../services/transactions.js'
 import AgentShowCard from './AgentShowCard.vue'
 
 // Chart.js stays out of the main bundle: it loads with the first chart in the chat.
@@ -343,11 +346,24 @@ const textarea = ref(null)
 const panel = ref(null)
 const closeButton = ref(null)
 
-// Starter chips (pool per tab in services/agentSuggestions.js): 3 random, one swaps every ~7s.
+// Starter chips (services/agentSuggestions.js): 3 from different categories, one swaps every ~7s.
+// Lightly personalized from the already-loaded stores (budgets / recurring / top tag), no requests.
+const budgetsStore = useBudgetsStore()
+const recurringStore = useRecurringTransactionsStore()
+const transactionsStore = useTransactionsStore()
+const topTag = computed(() => topExpenseTag(transactionsStore.transactions))
 const chipsHovered = ref(false)
 const chipsFocused = ref(false)
 const { chips, shuffle: shuffleChips } = useSuggestionChips({
-    pool: computed(() => suggestionPool(agent.screenContext?.tab)),
+    pool: computed(() =>
+        suggestionPool({
+            tab: agent.screenContext?.tab,
+            hasBudgets: budgetsStore.budgets.some((budget) => budget.periods?.some((period) => period.active)),
+            hasRecurring: recurringStore.rules.some((rule) => rule.active),
+            hasTransactions: transactionsStore.transactions.length > 0,
+            topTag: topTag.value,
+        }),
+    ),
     active: computed(() => agent.isOpen && !agent.items.length && !agent.isStreaming && !agent.isLoadingHistory),
     paused: computed(() => chipsHovered.value || chipsFocused.value || Boolean(input.value.trim())),
 })
@@ -797,6 +813,17 @@ watch(
         if (!resizeObserver) nextTick(onContentResize)
     },
 )
+
+// Import chips prefill the composer and open the file picker; the rest send their text right away.
+const useChip = (chip) => {
+    if (!chip.attach) return send(chip.text)
+    input.value = chip.prompt ?? chip.text
+    nextTick(() => {
+        autoGrow()
+        textarea.value?.focus()
+    })
+    if (!attachDisabled.value) fileInput.value?.click()
+}
 
 const send = async (text) => {
     const message = String(text ?? '').trim()
