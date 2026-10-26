@@ -1,0 +1,32 @@
+---
+import Assistant from '../components/Assistant.astro'
+import Cta from '../components/Cta.astro'
+import Faq from '../components/Faq.astro'
+import Features from '../components/Features.astro'
+import Footer from '../components/Footer.astro'
+import Header from '../components/Header.astro'
+import Hero from '../components/Hero.astro'
+import Mcp from '../components/Mcp.astro'
+import Privacy from '../components/Privacy.astro'
+import Ways from '../components/Ways.astro'
+import Base from '../layouts/Base.astro'
+
+const title = 'FundsFlow — Personal finance tracker with Telegram, AI assistant, and MCP'
+const description =
+    'Track spending with tags, budgets, and recurring payments. Log expenses from the web app or Telegram — text, receipt photos, voice — ask the AI assistant, or connect Claude, ChatGPT, Cursor, or Grok via MCP.'
+---
+
+<Base title={title} description={description}>
+    <Header />
+    <main id="main">
+        <Hero />
+        <Ways />
+        <Features />
+        <Assistant />
+        <Mcp />
+        <Privacy />
+        <Faq />
+        <Cta />
+    </main>
+    <Footer />
+</Base>

@@ -3,3 +3,4 @@ Allow: /
 
 Sitemap: https://fundsflow.fun/sitemap.xml
 Sitemap: https://fundsflow.fun/docs/sitemap-index.xml
+Sitemap: https://fundsflow.fun/landing/sitemap-index.xml

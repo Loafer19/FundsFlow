@@ -1,4 +1,4 @@
-# Frontend (Vue app + Starlight docs under /docs/) for https://fundsflow.fun.
+# Frontend (Vue app at /, Starlight docs under /docs/, Astro landing under /landing/) for https://fundsflow.fun.
 # TLS, HTTP/2 and HTTP/3 are handled by Traefik (Dokploy) in front of this container,
 # so Caddy only speaks plain HTTP/1.1 on :80.
 #
@@ -6,6 +6,7 @@
 #   API_ORIGIN          origin of VITE_API_URL, the only cross-origin host the app talks to
 #   APP_SCRIPT_HASHES   hashes of the inline scripts in the app's index.html (docker/csp-hashes.mjs)
 #   DOCS_SCRIPT_HASHES  hashes of Starlight's inline scripts (docker/csp-hashes.mjs)
+#   LANDING_SCRIPT_HASHES hashes of the landing's inline scripts (none unless PUBLIC_REDIRECT_LOGGED_IN=true)
 {
 	auto_https off
 	admin off
@@ -15,7 +16,7 @@
 	}
 }
 
-# Headers shared by the app and the docs.
+# Headers shared by the app, the docs and the landing.
 # - No X-Frame-Options: the app runs as a Telegram Mini App inside web.telegram.org; framing is governed by CSP frame-ancestors.
 # - COOP same-origin: nothing needs a cross-origin opener (OAuth is a full-page redirect, t.me links open without one).
 # - CORP same-origin: nobody embeds these files cross-origin; link-preview bots fetch og.png server-side, which CORP doesn't affect.
@@ -47,6 +48,13 @@
 	header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' {$DOCS_SCRIPT_HASHES}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; object-src 'none'; upgrade-insecure-requests"
 }
 
+# Landing CSP: static HTML with external CSS and no inline styles; the only script is the JSON-LD data block,
+# which CSP doesn't apply to (LANDING_SCRIPT_HASHES is empty unless the logged-in redirect is built in).
+(landing_headers) {
+	import common_headers
+	header Content-Security-Policy "default-src 'self'; script-src 'self' {$LANDING_SCRIPT_HASHES}; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; object-src 'none'; upgrade-insecure-requests"
+}
+
 # .br/.gz and .etag sidecars are written at build time (docker/precompress.mjs);
 # files without a .br/.gz are compressed on the fly by `encode`.
 (static) {
@@ -70,6 +78,7 @@
 		header @scripts Cache-Control "public, max-age=3600, stale-while-revalidate=86400"
 		header /assets/* Cache-Control "public, max-age=31536000, immutable"
 		header /docs/_astro/* Cache-Control "public, max-age=31536000, immutable"
+		header /landing/_astro/* Cache-Control "public, max-age=31536000, immutable"
 		# Pagefind chunks carry a content hash in their names; the entry files (pagefind.js,
 		# pagefind-entry.json, wasm.*.pagefind) don't, so they stay no-cache.
 		header /docs/pagefind/fragment/* Cache-Control "public, max-age=31536000, immutable"
@@ -98,6 +107,17 @@
 
 	handle /docs/* {
 		import docs_headers
+		import cache_rules
+		try_files {path} {path}/index.html {path}.html =404
+		import static
+	}
+
+	# Landing (docker/frontend builds landing/ with base /landing). Matched before the SPA fallback below,
+	# so /landing never ends up as the app's index.html.
+	redir /landing /landing/ 301
+
+	handle /landing/* {
+		import landing_headers
 		import cache_rules
 		try_files {path} {path}/index.html {path}.html =404
 		import static
@@ -137,6 +157,10 @@
 			import docs_headers
 			rewrite * /docs/404.html
 			import static
+		}
+		handle /landing/* {
+			import landing_headers
+			respond "404 Not Found"
 		}
 		handle {
 			import app_headers

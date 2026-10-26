@@ -1,0 +1,66 @@
+---
+import { APP_URL, DOCS_URL, FEEDBACK_URL, GITHUB_URL, TELEGRAM_BOT_URL, VERSION, docs } from '../config'
+
+const year = new Date().getFullYear()
+const cols = [
+    {
+        title: 'Product',
+        links: [
+            { href: APP_URL, label: 'Web app' },
+            { href: TELEGRAM_BOT_URL, label: 'Telegram bot' },
+            { href: docs('mini-app/'), label: 'Mini App' },
+            { href: docs('ai/mcp/'), label: 'MCP server' },
+        ],
+    },
+    {
+        title: 'Docs',
+        links: [
+            { href: DOCS_URL, label: 'Documentation' },
+            { href: docs('getting-started/introduction/'), label: 'Getting started' },
+            { href: docs('help/faq/'), label: 'FAQ' },
+            { href: docs('help/privacy/'), label: 'Privacy and data' },
+        ],
+    },
+    {
+        title: 'Project',
+        links: [
+            { href: GITHUB_URL, label: 'GitHub' },
+            { href: FEEDBACK_URL, label: 'Feedback' },
+        ],
+    },
+]
+---
+
+<footer class="border-t border-base-300 bg-base-200">
+    <div class="mx-auto grid max-w-6xl grid-cols-2 gap-10 px-4 py-12 sm:px-6 md:grid-cols-[2fr_1fr_1fr_1fr]">
+        <div class="col-span-2 md:col-span-1">
+            <p class="text-lg font-bold">FundsFlow</p>
+            <p class="mt-2 max-w-xs text-sm text-base-content/70">
+                Personal finance tracker with tags, budgets, recurring payments, a Telegram bot, and an MCP server for AI
+                assistants.
+            </p>
+        </div>
+        {
+            cols.map((c) => (
+                <nav aria-label={c.title}>
+                    <h2 class="text-sm font-semibold">{c.title}</h2>
+                    <ul class="mt-3 space-y-2 text-sm">
+                        {c.links.map((l) => (
+                            <li>
+                                <a href={l.href} class="link link-hover text-base-content/80">
+                                    {l.label}
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                </nav>
+            ))
+        }
+    </div>
+    <div class="border-t border-base-300">
+        <div class="mx-auto flex max-w-6xl flex-wrap justify-between gap-2 px-4 py-5 text-xs text-base-content/70 sm:px-6">
+            <span>© {year} FundsFlow</span>
+            <span>v{VERSION}</span>
+        </div>
+    </div>
+</footer>

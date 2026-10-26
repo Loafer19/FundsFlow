@@ -6,6 +6,7 @@ ENV VITE_API_URL=$VITE_API_URL
 ARG VITE_TELEGRAM_BOT_USERNAME
 ENV VITE_TELEGRAM_BOT_USERNAME=$VITE_TELEGRAM_BOT_USERNAME
 
+
 WORKDIR /app
 
 COPY frontend /app
@@ -34,6 +35,34 @@ RUN bun run build
 COPY docker/csp-hashes.mjs docker/precompress.mjs /tmp/
 RUN bun /tmp/csp-hashes.mjs /docs/dist /docs/csp.env DOCS_SCRIPT_HASHES && bun /tmp/precompress.mjs /docs/dist
 
+FROM oven/bun:latest AS landing
+
+# Served at https://fundsflow.fun/landing/ (landing/astro.config.mjs). LANDING_SITE / LANDING_BASE and
+# PUBLIC_APP_URL / PUBLIC_DOCS_URL are optional overrides; empty means the defaults in landing/src/config.ts.
+ARG LANDING_SITE
+ARG LANDING_BASE
+ARG PUBLIC_APP_URL
+ARG PUBLIC_DOCS_URL
+ARG VITE_TELEGRAM_BOT_USERNAME
+ENV LANDING_SITE=$LANDING_SITE \
+    LANDING_BASE=$LANDING_BASE \
+    PUBLIC_APP_URL=$PUBLIC_APP_URL \
+    PUBLIC_DOCS_URL=$PUBLIC_DOCS_URL \
+    PUBLIC_TELEGRAM_BOT_USERNAME=$VITE_TELEGRAM_BOT_USERNAME
+
+WORKDIR /landing
+
+COPY landing/package.json landing/bun.lock /landing/
+
+RUN bun install --frozen-lockfile
+
+COPY landing /landing
+
+RUN bun run build
+
+COPY docker/csp-hashes.mjs docker/precompress.mjs /tmp/
+RUN bun /tmp/csp-hashes.mjs /landing/dist /landing/csp.env LANDING_SCRIPT_HASHES && bun /tmp/precompress.mjs /landing/dist
+
 FROM caddy:2.11-alpine
 
 ARG VITE_API_URL
@@ -41,14 +70,17 @@ ARG VITE_API_URL
 COPY docker/Caddyfile.frontend /etc/caddy/Caddyfile
 COPY --from=builder /app/csp.env /tmp/app-csp.env
 COPY --from=docs /docs/csp.env /tmp/docs-csp.env
+COPY --from=landing /landing/csp.env /tmp/landing-csp.env
 
 # connect-src gets the origin of VITE_API_URL, so the CSP always matches the API the bundle calls.
-RUN cat /tmp/app-csp.env /tmp/docs-csp.env > /etc/caddy/csp.env && rm /tmp/app-csp.env /tmp/docs-csp.env \
+RUN cat /tmp/app-csp.env /tmp/docs-csp.env /tmp/landing-csp.env > /etc/caddy/csp.env \
+    && rm /tmp/app-csp.env /tmp/docs-csp.env /tmp/landing-csp.env \
     && printf 'API_ORIGIN=%s\n' "$(printf '%s' "$VITE_API_URL" | sed -E 's#^(https?://[^/]+).*#\1#')" >> /etc/caddy/csp.env \
     && caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile --envfile /etc/caddy/csp.env
 
 COPY --from=builder /app/dist /srv
 COPY --from=docs /docs/dist /srv/docs
+COPY --from=landing /landing/dist /srv/landing
 
 EXPOSE 80
 

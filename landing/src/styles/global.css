@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/* Same base theme as the web app (frontend/src/assets/css/main.css): DaisyUI "bumblebee". */
+@plugin "daisyui" {
+    themes: bumblebee --default;
+    logs: false;
+}
+
+@plugin "daisyui/theme" {
+    name: "bumblebee";
+    default: true;
+    prefersdark: false;
+    color-scheme: "light";
+    --radius-selector: 0.5rem;
+    --radius-field: 0.5rem;
+    --radius-box: 0.5rem;
+    --border: 2px;
+    --depth: 0;
+}
+
+/* Dark counterpart (prefers-color-scheme: dark): warm stone background, brand amber — matches the docs accent. */
+@plugin "daisyui/theme" {
+    name: "fundsflow-dark";
+    prefersdark: true;
+    color-scheme: "dark";
+    --color-base-100: oklch(21.6% 0.006 56.043);
+    --color-base-200: oklch(18.5% 0.005 56);
+    --color-base-300: oklch(26.8% 0.007 34.298);
+    --color-base-content: oklch(92.3% 0.003 48.717);
+    --color-primary: oklch(82.8% 0.189 84.429);
+    --color-primary-content: oklch(21.6% 0.006 56.043);
+    --color-secondary: oklch(76.9% 0.188 70.08);
+    --color-secondary-content: oklch(21.6% 0.006 56.043);
+    --color-accent: oklch(92.4% 0.12 95.746);
+    --color-accent-content: oklch(21.6% 0.006 56.043);
+    --color-neutral: oklch(37.4% 0.01 67.558);
+    --color-neutral-content: oklch(97% 0.001 106.424);
+    --color-info: oklch(74.6% 0.16 232.661);
+    --color-info-content: oklch(21.6% 0.006 56.043);
+    --color-success: oklch(79.2% 0.209 151.711);
+    --color-success-content: oklch(21.6% 0.006 56.043);
+    --color-warning: oklch(83.7% 0.128 66.29);
+    --color-warning-content: oklch(21.6% 0.006 56.043);
+    --color-error: oklch(71.1% 0.166 22.216);
+    --color-error-content: oklch(21.6% 0.006 56.043);
+    --radius-selector: 0.5rem;
+    --radius-field: 0.5rem;
+    --radius-box: 0.5rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 2px;
+    --depth: 0;
+    --noise: 0;
+}
+
+@theme {
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans",
+        sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+}
+
+/* Readable accent text: amber-700 on light, amber-300 on dark (AA contrast). */
+@utility text-brand {
+    color: var(--color-amber-700);
+    @media (prefers-color-scheme: dark) {
+        color: var(--color-amber-300);
+    }
+}
+
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+}
+
+:focus-visible {
+    outline: 3px solid var(--color-amber-500);
+    outline-offset: 2px;
+}
+
+.select-all {
+    user-select: all;
+}
+
+details > summary::-webkit-details-marker {
+    display: none;
+}

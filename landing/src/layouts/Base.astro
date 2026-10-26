@@ -1,0 +1,97 @@
+---
+import '../styles/global.css'
+import { APP_URL, asset, BASE, DOCS_URL, GITHUB_URL, MCP_ENDPOINT, REDIRECT_LOGGED_IN, SITE_URL, TELEGRAM_BOT_URL } from '../config'
+
+interface Props {
+    title: string
+    description: string
+}
+
+const { title, description } = Astro.props
+const ogImage = asset('og.png')
+
+const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+        {
+            '@type': 'SoftwareApplication',
+            name: 'FundsFlow',
+            url: SITE_URL,
+            applicationCategory: 'FinanceApplication',
+            operatingSystem: 'Web, Telegram',
+            description,
+            image: ogImage,
+            sameAs: [GITHUB_URL, TELEGRAM_BOT_URL],
+            featureList: [
+                'Transactions with tags, notes, and attachments',
+                'Budgets per tag with alerts',
+                'Recurring transactions',
+                'Analytics, calendar, money flow, balance trend',
+                'Telegram bot with quick add, receipt photos, and voice messages',
+                'AI assistant in the web app and Telegram',
+                `MCP server for AI assistants (${MCP_ENDPOINT})`,
+                'PDF reports and JSON export',
+            ],
+        },
+        {
+            '@type': 'WebSite',
+            name: 'FundsFlow',
+            url: SITE_URL,
+        },
+    ],
+}
+
+const appRedirect = new URL(APP_URL, SITE_URL).href
+---
+
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {
+            REDIRECT_LOGGED_IN && (
+                <script is:inline define:vars={{ appRedirect }}>
+                    try {
+                        if (localStorage.getItem('token')) location.replace(appRedirect)
+                    } catch (e) {}
+                </script>
+            )
+        }
+        <title>{title}</title>
+        <meta name="description" content={description} />
+        <link rel="canonical" href={SITE_URL} />
+        <meta name="color-scheme" content="light dark" />
+        <meta name="theme-color" content="#f6c90e" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#1c1917" media="(prefers-color-scheme: dark)" />
+        <link rel="icon" type="image/png" sizes="32x32" href={`${BASE}favicon-32.png`} />
+        <link rel="apple-touch-icon" href={`${BASE}apple-touch-icon.png`} sizes="180x180" />
+        <link rel="sitemap" href={`${BASE}sitemap-index.xml`} />
+        <link rel="help" href={DOCS_URL} />
+
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="FundsFlow" />
+        <meta property="og:url" content={SITE_URL} />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:image" content={ogImage} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="FundsFlow — personal finance tracker" />
+        <meta property="og:locale" content="en_US" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={description} />
+        <meta name="twitter:image" content={ogImage} />
+
+        <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    </head>
+    <body class="bg-base-100 text-base-content antialiased">
+        <a
+            href="#main"
+            class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:btn focus:btn-sm"
+            >Skip to content</a
+        >
+        <slot />
+    </body>
+</html>

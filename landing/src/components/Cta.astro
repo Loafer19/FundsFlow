@@ -1,0 +1,22 @@
+---
+import { Image } from 'astro:assets'
+import logo from '../assets/logo.png'
+import { APP_URL, DOCS_URL, TELEGRAM_BOT_URL } from '../config'
+---
+
+<section class="px-4 pb-20 sm:px-6" aria-labelledby="cta-title">
+    <div class="mx-auto max-w-5xl rounded-[2rem] bg-primary px-6 py-14 text-center text-primary-content sm:px-12">
+        <Image src={logo} alt="" width={80} height={80} layout="fixed" class="mx-auto size-20" />
+        <h2 id="cta-title" class="mt-6 text-3xl font-bold tracking-tight text-balance sm:text-4xl">
+            Start with one expense. It takes two seconds.
+        </h2>
+        <p class="mx-auto mt-4 max-w-xl text-primary-content">
+            Open the web app, or send <span class="font-mono">-350 groceries</span> to the bot and see it land in your charts.
+        </p>
+        <div class="mt-8 flex flex-wrap justify-center gap-3">
+            <a href={APP_URL} class="btn btn-neutral btn-lg">Open app</a>
+            <a href={TELEGRAM_BOT_URL} class="btn btn-lg border-primary-content/30 bg-transparent text-primary-content hover:bg-primary-content/10" rel="noopener">Add Telegram bot</a>
+            <a href={DOCS_URL} class="btn btn-ghost btn-lg text-primary-content">Read docs</a>
+        </div>
+    </div>
+</section>

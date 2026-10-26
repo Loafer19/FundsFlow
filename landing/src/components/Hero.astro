@@ -1,0 +1,81 @@
+---
+import { APP_URL, DOCS_URL, TELEGRAM_BOT_URL, TELEGRAM_BOT_USERNAME } from '../config'
+---
+
+<section class="relative overflow-hidden" aria-labelledby="hero-title">
+    <div
+        class="pointer-events-none absolute inset-x-0 -top-40 -z-0 h-[36rem] bg-[radial-gradient(ellipse_at_top,var(--color-primary)_0%,transparent_60%)] opacity-25"
+        aria-hidden="true"
+    >
+    </div>
+    <div class="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pt-14 pb-20 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:pt-20 lg:pb-28">
+        <div class="min-w-0">
+            <p class="badge badge-outline badge-lg mb-5 gap-2 font-medium">
+                <span aria-hidden="true">✨</span> FundsFlow 2.0 · AI assistant on the web
+            </p>
+            <h1 id="hero-title" class="text-4xl leading-[1.1] font-extrabold tracking-tight text-balance sm:text-5xl lg:text-[3.4rem]">
+                Track your money in seconds — on the web, in Telegram, or with your&nbsp;AI.
+            </h1>
+            <p class="mt-6 max-w-xl text-lg text-base-content/80 text-pretty">
+                FundsFlow is a personal finance tracker with tags, budgets, and recurring payments. Send
+                <code class="rounded bg-base-200 px-1.5 py-0.5 font-mono text-[0.95em]">-350 groceries</code> to the bot, snap a
+                receipt, or just ask the assistant where your money went.
+            </p>
+            <div class="mt-8 flex flex-wrap gap-3">
+                <a href={APP_URL} class="btn btn-primary btn-lg max-sm:w-full">Open app</a>
+                <a href={TELEGRAM_BOT_URL} class="btn btn-outline btn-lg max-sm:w-full" rel="noopener">
+                    <span aria-hidden="true">✈️</span> Add Telegram bot
+                </a>
+                <a href={DOCS_URL} class="btn btn-ghost btn-lg max-sm:w-full">Read docs</a>
+            </div>
+            <p class="mt-5 text-sm text-base-content/70">
+                Sign in with email, Google, GitHub, or a one-time code from{' '}
+                <a href={TELEGRAM_BOT_URL} class="link" rel="noopener">@{TELEGRAM_BOT_USERNAME}</a>.
+            </p>
+        </div>
+
+        <!-- screenshot: Telegram chat with quick add + saved transaction card (replace this mock with a real demo screenshot) -->
+        <div class="relative mx-auto w-full max-w-md" role="img" aria-label="Illustration: a Telegram chat where the message “-350 groceries” is saved as an expense, next to a budget card">
+            <div class="rounded-3xl border border-base-300 bg-base-200 p-4 shadow-xl sm:p-5" aria-hidden="true">
+                <div class="mb-4 flex items-center gap-3 border-b border-base-300 pb-3">
+                    <div class="grid size-9 place-items-center rounded-full bg-primary text-lg text-primary-content">💸</div>
+                    <div>
+                        <div class="text-sm font-semibold">FundsFlow</div>
+                        <div class="text-xs text-base-content/60">bot</div>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="ml-auto w-fit max-w-[80%] rounded-2xl rounded-br-sm bg-primary px-3.5 py-2 font-mono text-primary-content">
+                        -350 groceries
+                    </div>
+                    <div class="w-fit max-w-[88%] rounded-2xl rounded-bl-sm bg-base-100 px-3.5 py-2.5 shadow-sm">
+                        <div class="font-semibold">✅ Saved</div>
+                        <div class="mt-1 text-base-content/80"><span class="font-mono">−350.00</span> · today · groceries</div>
+                        <div class="mt-2.5 grid grid-cols-3 gap-1.5 text-xs">
+                            <span class="rounded-lg bg-base-200 px-2 py-1.5 text-center">🏷 Tags</span>
+                            <span class="rounded-lg bg-base-200 px-2 py-1.5 text-center">✏️ Amount</span>
+                            <span class="rounded-lg bg-base-200 px-2 py-1.5 text-center">🗑</span>
+                        </div>
+                    </div>
+                    <div class="ml-auto w-fit max-w-[80%] rounded-2xl rounded-br-sm bg-primary px-3.5 py-2 text-primary-content">
+                        🎤 Voice message · 0:04
+                    </div>
+                    <div class="w-fit max-w-[88%] rounded-2xl rounded-bl-sm bg-base-100 px-3.5 py-2.5 shadow-sm">
+                        <span class="text-base-content/60">Heard:</span> “minus three hundred fifty groceries”
+                    </div>
+                </div>
+            </div>
+
+            <div class="absolute -top-8 -right-2 w-56 sm:-right-8 rounded-2xl border border-base-300 bg-base-100 p-4 shadow-xl" aria-hidden="true">
+                <div class="flex items-center justify-between text-xs font-semibold">
+                    <span>🛒 Groceries · Monthly</span>
+                    <span class="text-base-content/60">80%</span>
+                </div>
+                <div class="mt-2 h-2 rounded-full bg-base-300">
+                    <div class="h-2 w-4/5 rounded-full bg-warning"></div>
+                </div>
+                <div class="mt-2 text-xs text-base-content/70">⚠️ Budget alert at 80%</div>
+            </div>
+        </div>
+    </div>
+</section>

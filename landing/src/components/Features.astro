@@ -1,0 +1,81 @@
+---
+import { docs } from '../config'
+
+const features = [
+    {
+        icon: '🧾',
+        title: 'Receipt photos & albums',
+        text: 'Send a photo without an amount and AI vision drafts the total, date, note, and tags for you to confirm. Albums become one transaction or several.',
+        href: docs('telegram/receipts/'),
+    },
+    {
+        icon: '🎤',
+        title: 'Voice messages',
+        text: 'Say “minus three hundred fifty groceries” in your own language. The transcript is handled just like a typed message.',
+        href: docs('telegram/voice/'),
+    },
+    {
+        icon: '✨',
+        title: 'AI assistant',
+        text: 'Ask questions, draw charts, and stage changes in plain language — in the web app and in Telegram. Nothing is saved until you confirm.',
+        href: docs('web/assistant/'),
+    },
+    {
+        icon: '💰',
+        title: 'Budgets',
+        text: 'Weekly, monthly, or yearly limits for one or more tags, with pause/resume, period history, and Telegram alerts at 80% and 100%.',
+        href: docs('web/budgets/'),
+    },
+    {
+        icon: '🔁',
+        title: 'Recurring payments',
+        text: 'Rent, salary, and subscriptions are added automatically — daily, weekly, monthly, or yearly — and show up in the calendar forecast.',
+        href: docs('web/recurring/'),
+    },
+    {
+        icon: '📊',
+        title: 'Analytics & charts',
+        text: 'Analytics, Calendar, Budgets, Tags, Flow, Trend, and List tabs, with a week / month / year period bar and previous-period comparison.',
+        href: docs('web/tabs/'),
+    },
+    {
+        icon: '📄',
+        title: 'PDF reports',
+        text: 'Pick the tabs you need and print the report, or have it rendered as a PDF and sent to your Telegram chat.',
+        href: docs('web/reports/'),
+    },
+    {
+        icon: '📱',
+        title: 'Telegram Mini App',
+        text: 'The full web app inside Telegram, signed in automatically from your linked chat, with native back and main buttons.',
+        href: docs('mini-app/'),
+    },
+]
+---
+
+<section id="features" class="py-20" aria-labelledby="features-title">
+    <div class="mx-auto max-w-6xl px-4 sm:px-6">
+        <p class="text-brand text-sm font-semibold tracking-wide uppercase">Features</p>
+        <h2 id="features-title" class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Built for everyday tracking</h2>
+        <p class="mt-4 max-w-2xl text-base-content/80">
+            Hierarchical tags with emojis, attachments on every transaction, and the formats and timezone you prefer.
+        </p>
+        <ul class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {
+                features.map((f) => (
+                    <li class="group relative rounded-box border border-base-300 bg-base-100 p-6 transition-colors hover:border-primary">
+                        <div class="text-3xl" aria-hidden="true">
+                            {f.icon}
+                        </div>
+                        <h3 class="mt-3 text-lg font-semibold">
+                            <a href={f.href} class="after:absolute after:inset-0 focus-visible:outline-none">
+                                {f.title}
+                            </a>
+                        </h3>
+                        <p class="mt-2 text-sm text-base-content/80">{f.text}</p>
+                    </li>
+                ))
+            }
+        </ul>
+    </div>
+</section>

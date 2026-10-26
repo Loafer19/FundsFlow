@@ -1,0 +1,55 @@
+---
+import { APP_URL, TELEGRAM_BOT_URL, docs } from '../config'
+
+const ways = [
+    {
+        icon: '🖥️',
+        title: 'Web app',
+        text: 'Analytics, a calendar with a year view, budgets, tag donuts, money flow with previous-period compare, balance trend, and a searchable list — plus the ✨ Assistant panel.',
+        link: { href: APP_URL, label: 'Open app' },
+    },
+    {
+        icon: '✈️',
+        title: 'Telegram bot',
+        text: 'Log an expense in two seconds with a quick add, send receipt photos or a voice note, get budget alerts and a weekly digest. The Mini App opens the full web app inside Telegram.',
+        link: { href: TELEGRAM_BOT_URL, label: 'Add the bot' },
+    },
+    {
+        icon: '🤖',
+        title: 'Your AI, via MCP',
+        text: 'Connect Claude, ChatGPT, Cursor, VS Code, or Grok to the FundsFlow MCP server and manage your data from the assistant you already use.',
+        link: { href: docs('ai/connect-clients/'), label: 'Connect a client' },
+    },
+]
+---
+
+<section id="ways" class="bg-base-200 py-20" aria-labelledby="ways-title">
+    <div class="mx-auto max-w-6xl px-4 sm:px-6">
+        <p class="text-brand text-sm font-semibold tracking-wide uppercase">One account, three ways in</p>
+        <h2 id="ways-title" class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Use it wherever you are</h2>
+        <p class="mt-4 max-w-2xl text-base-content/80">
+            Every entry point is backed by the same account, so a receipt sent from your phone shows up in your charts right
+            away.
+        </p>
+        <div class="mt-10 grid gap-6 md:grid-cols-3">
+            {
+                ways.map((w) => (
+                    <article class="card border border-base-300 bg-base-100">
+                        <div class="card-body">
+                            <div class="text-3xl" aria-hidden="true">
+                                {w.icon}
+                            </div>
+                            <h3 class="card-title mt-2 text-xl">{w.title}</h3>
+                            <p class="text-base-content/80">{w.text}</p>
+                            <div class="card-actions mt-3">
+                                <a href={w.link.href} class="link font-semibold">
+                                    {w.link.label} <span aria-hidden="true">→</span>
+                                </a>
+                            </div>
+                        </div>
+                    </article>
+                ))
+            }
+        </div>
+    </div>
+</section>

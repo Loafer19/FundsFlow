@@ -1,0 +1,65 @@
+---
+import { FEEDBACK_URL, docs } from '../config'
+
+// Answers condensed from docs/src/content/docs/help/faq.md — keep in sync.
+const faqs: { q: string; a: string }[] = [
+    {
+        q: 'Does FundsFlow connect to my bank?',
+        a: 'No. You add transactions yourself — in the web app, through the Telegram bot (text, receipt photos, voice), with recurring rules, the built-in AI assistant, or your own AI client over MCP.',
+    },
+    {
+        q: 'Which currency does it use?',
+        a: 'FundsFlow tracks plain amounts and doesn’t convert currencies. Choose how numbers look in Settings → Formatting.',
+    },
+    {
+        q: 'How do I sign in?',
+        a: 'With email and password, Google, GitHub, or a one-time code: send /website to the Telegram bot. Sending /start to the bot creates an account tied to that chat.',
+    },
+    {
+        q: 'Can I ask an AI about my finances in the web app?',
+        a: 'Yes. Click ✨ Assistant in the header (or press /). It answers questions, draws charts, and proposes changes that you confirm.',
+    },
+    {
+        q: 'Is there a limit on AI features?',
+        a: 'Receipt reading, voice messages, and assistant messages share a daily limit of AI assists (5 by default), reset at midnight in your timezone. Quick add, receipts with the amount in the caption, commands, and all web tabs work without AI.',
+    },
+    {
+        q: 'Why does MCP OAuth ask for an email and password?',
+        a: 'OAuth sign-in for AI clients uses your FundsFlow email and password. If you signed up with Telegram, Google, or GitHub, set them in Settings → Accounts → Login credentials, or use a personal token.',
+    },
+    {
+        q: 'Can I export my data?',
+        a: 'Yes. Settings → Data → Download JSON downloads your tags, transactions (with attachment metadata), budgets, and recurring rules. AI clients can do the same with export_account.',
+    },
+    {
+        q: 'How do I delete my account or send feedback?',
+        a: 'There’s no self-service account deletion yet — contact @Loafer19 on Telegram. The same contact works for feedback and bug reports.',
+    },
+]
+---
+
+<section id="faq" class="py-20" aria-labelledby="faq-title">
+    <div class="mx-auto max-w-3xl px-4 sm:px-6">
+        <p class="text-brand text-center text-sm font-semibold tracking-wide uppercase">FAQ</p>
+        <h2 id="faq-title" class="mt-2 text-center text-3xl font-bold tracking-tight sm:text-4xl">Questions, answered</h2>
+        <div class="mt-10 space-y-3">
+            {
+                faqs.map((f) => (
+                    <details class="group rounded-box border border-base-300 bg-base-100 open:border-primary">
+                        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 p-5 font-semibold">
+                            <h3>{f.q}</h3>
+                            <span class="text-xl transition-transform group-open:rotate-45" aria-hidden="true">
+                                +
+                            </span>
+                        </summary>
+                        <p class="px-5 pb-5 text-base-content/80">{f.a}</p>
+                    </details>
+                ))
+            }
+        </div>
+        <p class="mt-8 text-center text-base-content/70">
+            More in the <a href={docs('help/faq/')} class="link">full FAQ</a> · Feedback:{' '}
+            <a href={FEEDBACK_URL} class="link" rel="noopener">@Loafer19</a>
+        </p>
+    </div>
+</section>

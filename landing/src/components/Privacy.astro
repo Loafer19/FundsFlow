@@ -1,0 +1,41 @@
+---
+import { GITHUB_URL, docs } from '../config'
+
+const items = [
+    ['🏦', 'No bank connection', 'You add transactions yourself. FundsFlow never asks for bank credentials.'],
+    ['🔒', 'Private per account', 'Your transactions, tags, budgets, and attachments are visible only to your account.'],
+    ['🧠', 'AI only when you use it', 'Quick add, commands, and the web app tabs send nothing to an AI provider. Receipt reading, voice, and the assistant are processed by xAI.'],
+    ['📦', 'Export anytime', 'Download all your data as JSON from Settings → Data, or with export_account over MCP.'],
+]
+---
+
+<section id="privacy" class="bg-base-200 py-20" aria-labelledby="privacy-title">
+    <div class="mx-auto max-w-6xl px-4 sm:px-6">
+        <div class="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <div>
+                <p class="text-brand text-sm font-semibold tracking-wide uppercase">Privacy & source</p>
+                <h2 id="privacy-title" class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Your data stays yours</h2>
+                <p class="mt-4 max-w-2xl text-base-content/80">
+                    The code is public on GitHub, so you can see exactly how FundsFlow works.
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <a href={GITHUB_URL} class="btn btn-neutral" rel="noopener">View on GitHub</a>
+                <a href={docs('help/privacy/')} class="btn btn-ghost">Privacy details</a>
+            </div>
+        </div>
+        <ul class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {
+                items.map(([icon, title, text]) => (
+                    <li class="rounded-box border border-base-300 bg-base-100 p-6">
+                        <div class="text-2xl" aria-hidden="true">
+                            {icon}
+                        </div>
+                        <h3 class="mt-3 font-semibold">{title}</h3>
+                        <p class="mt-2 text-sm text-base-content/80">{text}</p>
+                    </li>
+                ))
+            }
+        </ul>
+    </div>
+</section>

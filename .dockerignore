@@ -10,6 +10,10 @@ docs/node_modules
 docs/dist
 docs/.astro
 
+landing/node_modules
+landing/dist
+landing/.astro
+
 .env
 .env.*
 **/.env

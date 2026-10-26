@@ -66,7 +66,12 @@ export default defineConfig({
                 },
                 {
                     label: 'Help',
-                    items: [{ slug: 'help/faq' }, { slug: 'help/privacy' }],
+                    items: [
+                        { slug: 'help/faq' },
+                        { slug: 'help/privacy' },
+                        // The landing page, served at /landing/ by the same container (an absolute URL, or Starlight prefixes /docs).
+                        { label: 'About FundsFlow', link: 'https://fundsflow.fun/landing/' },
+                    ],
                 },
             ],
         }),
