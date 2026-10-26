@@ -8,7 +8,8 @@ interface Props {
 }
 
 const { title, description } = Astro.props
-const ogImage = asset('og.png')
+// Versioned file name, so link-preview caches (Telegram, X, Slack) pick up the new banner.
+const ogImage = asset('og-2.0.png')
 
 const jsonLd = {
     '@context': 'https://schema.org',
@@ -31,6 +32,7 @@ const jsonLd = {
                 'AI assistant in the web app and Telegram',
                 `MCP server for AI assistants (${MCP_ENDPOINT})`,
                 'PDF reports and JSON export',
+                'Document import: PDF, DOCX, CSV, XLSX, ODS, JSON, OFX, QIF, HTML, and screenshots',
             ],
         },
         {
@@ -77,12 +79,13 @@ const appRedirect = new URL(APP_URL, SITE_URL).href
         <meta property="og:image" content={ogImage} />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
-        <meta property="og:image:alt" content="FundsFlow — personal finance tracker" />
+        <meta property="og:image:alt" content="FundsFlow 2.0 — AI assistant and document import for your personal finances" />
         <meta property="og:locale" content="en_US" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={title} />
         <meta name="twitter:description" content={description} />
         <meta name="twitter:image" content={ogImage} />
+        <meta name="twitter:image:alt" content="FundsFlow 2.0 — AI assistant and document import for your personal finances" />
 
         <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     </head>

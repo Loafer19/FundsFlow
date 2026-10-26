@@ -2,7 +2,7 @@
 
 ![FundsFlow](./frontend/public/logo.png)
 
-Personal finance tracker
+Personal finance tracker · [Docs](https://fundsflow.fun/docs/) · [What's new in 2.0](https://fundsflow.fun/docs/whats-new/) · [MIT License](./LICENSE)
 
 ## Features
 
@@ -79,3 +79,7 @@ A [Filament](https://filamentphp.com) panel lives on the API host at `/admin` (e
 - Blocking (`users.blocked_at`) rejects API tokens, password/OAuth sign-in and Telegram messages
 - Env (backend): `SESSION_DRIVER=redis`, `SESSION_DOMAIN=<api host>`, `SESSION_SECURE_COOKIE=true`, and `APP_URL=https://<api host>` (asset and Livewire URLs are built from it). Only `/admin` and `/livewire-*` start a session; the API, CORS and the Telegram webhook are unchanged
 - Deploy: the image publishes the panel's JS/CSS during `composer install` (`filament:upgrade`); migrations are not automatic, so run `php artisan migrate --force` in the backend container after the first deploy, then `admin:grant`
+
+## License
+
+FundsFlow is released under the [MIT License](./LICENSE). Copyright (c) 2026 Ruslan Popelyshyn.

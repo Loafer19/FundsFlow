@@ -21,10 +21,16 @@ export default defineConfig({
                 // Sharper tab/bookmark icon on high-DPI screens (generated from the original 1024px logo, see git history).
                 { tag: 'link', attrs: { rel: 'icon', type: 'image/png', sizes: '96x96', href: '/docs/favicon-96.png' } },
                 { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/docs/apple-touch-icon.png', sizes: '180x180' } },
-                { tag: 'meta', attrs: { property: 'og:image', content: 'https://fundsflow.fun/og.png' } },
+                // Shared with the landing (served at /landing/ by the same container).
+                { tag: 'meta', attrs: { property: 'og:image', content: 'https://fundsflow.fun/landing/og-2.0.png' } },
+                { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+                { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
+                { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
+                { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://fundsflow.fun/landing/og-2.0.png' } },
             ],
             customCss: ['./src/styles/brand.css'],
             sidebar: [
+                { label: "What's new in 2.0", slug: 'whats-new', badge: { text: 'New', variant: 'tip' } },
                 {
                     label: 'Getting started',
                     items: [

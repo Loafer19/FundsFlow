@@ -1,5 +1,5 @@
 ---
-import { APP_URL, DOCS_URL, TELEGRAM_BOT_URL, TELEGRAM_BOT_USERNAME } from '../config'
+import { APP_URL, DOCS_URL, docs, TELEGRAM_BOT_URL, TELEGRAM_BOT_USERNAME } from '../config'
 ---
 
 <section class="relative overflow-hidden" aria-labelledby="hero-title">
@@ -10,9 +10,14 @@ import { APP_URL, DOCS_URL, TELEGRAM_BOT_URL, TELEGRAM_BOT_USERNAME } from '../c
     </div>
     <div class="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pt-14 pb-20 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:pt-20 lg:pb-28">
         <div class="min-w-0">
-            <p class="badge badge-outline badge-lg mb-5 gap-2 font-medium">
-                <span aria-hidden="true">✨</span> FundsFlow 2.0 · AI assistant on the web
-            </p>
+            <a
+                href={docs('whats-new/')}
+                class="group mb-5 inline-flex max-w-full items-center gap-2 rounded-full border border-base-300 bg-base-100/80 py-1 pr-3 pl-1 text-sm font-medium shadow-sm transition-colors hover:border-primary focus-visible:border-primary"
+            >
+                <span class="badge badge-primary badge-sm shrink-0 font-semibold">New in 2.0</span>
+                <span class="truncate">AI assistant &amp; document import</span>
+                <span class="shrink-0 text-base-content/60 transition-transform group-hover:translate-x-0.5" aria-hidden="true">→</span>
+            </a>
             <h1 id="hero-title" class="text-4xl leading-[1.1] font-extrabold tracking-tight text-balance sm:text-5xl lg:text-[3.4rem]">
                 Track your money in seconds — on the web, in Telegram, or with your&nbsp;AI.
             </h1>
