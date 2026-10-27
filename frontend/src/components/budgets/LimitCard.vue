@@ -94,43 +94,20 @@
                 Paused — {{ formatMoney(Number(latest?.amount ?? 0)) }} {{ frequencyLabel.toLowerCase() }}
             </div>
 
-            <details v-if="history.length" class="limit-history mt-1" :open="inReport">
-                <summary class="text-xs text-base-content/60 cursor-pointer select-none flex items-center gap-1">
-                    <ChevronRight :size="14" class="limit-history__chevron shrink-0" />
-                    History
-                    <span class="ml-auto tabular-nums">{{ passedCount }}/{{ history.length }} within limit</span>
-                </summary>
-
-                <ul class="mt-1.5 flex flex-col gap-1">
-                    <li v-for="row in history" :key="row.key" class="grid grid-cols-[1rem_1fr_3.5rem_auto] items-center gap-2 text-xs">
-                        <Check v-if="row.ok" :size="14" class="text-success" aria-label="Within limit" />
-                        <X v-else :size="14" class="text-error" aria-label="Over limit" />
-                        <span class="truncate text-base-content/70">
-                            {{ formatDate(row.start) }} – {{ formatDate(row.end) }}
-                            <span v-if="row.tagsChanged" class="ml-0.5">{{ row.emojis }}</span>
-                        </span>
-                        <span class="limit-bar limit-bar--mini" aria-hidden="true">
-                            <span class="limit-bar__fill" :class="row.ok ? 'bg-success/70' : 'bg-error/80'"
-                                :style="{ width: Math.min(row.percent, 100) + '%' }"></span>
-                        </span>
-                        <span class="tabular-nums text-right text-base-content/70 whitespace-nowrap">
-                            {{ formatMoney(row.spent) }} / {{ formatMoney(row.amount) }}
-                        </span>
-                    </li>
-                </ul>
-            </details>
+            <LimitHistory v-if="history.length" :rows="history" :current="p" :open="inReport" />
         </div>
     </div>
 </template>
 
 <script setup>
-import { CalendarClock, Check, ChevronRight, Gauge, Pause, Pencil, Play, TrendingUp, X } from 'lucide-vue-next'
+import { CalendarClock, Gauge, Pause, Pencil, Play, TrendingUp } from 'lucide-vue-next'
 import { computed, inject } from 'vue'
 import { useBudgetsStore } from '../../services/budgets.js'
 import { formatDate, formatMoney } from '../../services/formatters.js'
 import { historyBuckets, limitPercent, limitProgress, spentBetween } from '../../services/limits.js'
 import { useTransactionsStore } from '../../services/transactions.js'
 import DeleteHold from '../buttons/DeleteHold.vue'
+import LimitHistory from './LimitHistory.vue'
 
 const props = defineProps({
     budget: { type: Object, required: true },
@@ -219,8 +196,6 @@ const history = computed(() => {
                 })
         })
 })
-
-const passedCount = computed(() => history.value.filter((row) => row.ok).length)
 </script>
 
 <style scoped>
@@ -248,25 +223,5 @@ const passedCount = computed(() => history.value.filter((row) => row.ok).length)
     margin-left: -1px;
     border-radius: 1px;
     background: color-mix(in oklab, var(--color-base-content) 55%, transparent);
-}
-
-.limit-bar--mini {
-    height: 0.375rem;
-}
-
-.limit-history > summary {
-    list-style: none;
-}
-
-.limit-history > summary::-webkit-details-marker {
-    display: none;
-}
-
-.limit-history__chevron {
-    transition: transform 0.15s ease;
-}
-
-.limit-history[open] .limit-history__chevron {
-    transform: rotate(90deg);
 }
 </style>
