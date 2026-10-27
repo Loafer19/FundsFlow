@@ -31,7 +31,7 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
             <StatCard v-for="item in comparison" :key="item.key" :label="item.label" :current="item.current"
-                :previous="item.previous" />
+                :previous="item.previous" :compare="compare" />
         </div>
 
         <div class="card card-border border-base-300 bg-base-100">
@@ -64,7 +64,7 @@ const props = defineProps({
 })
 
 const groupBy = ref('day')
-const compare = ref(false)
+const compare = ref(true)
 const openAdd = () => transactions_add_modal.showModal()
 const hasPeriodData = computed(
     () =>
