@@ -30,10 +30,24 @@
             <option value="year">Yearly</option>
         </select>
 
-        <label class="label cursor-pointer justify-start gap-2 mb-4">
-            <input type="checkbox" v-model="form.align_to_calendar" class="checkbox checkbox-sm" />
-            <span class="label-text">Start from the beginning of this {{ form.length }}</span>
-        </label>
+        <div class="flex items-baseline justify-between gap-2 mb-1">
+            <label for="budget-limit-start" class="text-sm text-base-content/60">Start date</label>
+            <button v-if="calendarStart" type="button" class="link link-primary text-xs"
+                @click="form.start_date = calendarStart">
+                Start of this {{ form.length }}
+            </button>
+        </div>
+        <input id="budget-limit-start" type="date" v-model="form.start_date" class="input w-full mb-1" :min="form.start_min || undefined"
+            :max="today" aria-label="Start date" />
+        <p class="text-xs text-base-content/60 mb-4">
+            <template v-if="limitBucket">
+                Current {{ form.length }}: {{ formatDay(limitBucket.start) }} – {{ formatDay(limitBucket.end) }}, then
+                every {{ form.length }} from the {{ repeatLabel }}.
+            </template>
+            <template v-if="form.paused"> Saving resumes this limit from the start date.</template>
+            <template v-else-if="startUnchanged"> Changing the amount, length or tags starts new settings from today
+                on the same schedule; past {{ form.length }}s stay in the history.</template>
+        </p>
     </template>
 
     <template v-if="goal">
@@ -69,6 +83,7 @@
 import { Gauge, Target } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { formatDate, nowDateStr, parseLocalDate, toLocalDateStr } from '../../services/formatters.js'
+import { bucketBounds } from '../../services/limits.js'
 import AmountField from '../AmountField.vue'
 import TagPicker from '../TagPicker.vue'
 
@@ -101,4 +116,58 @@ const deadlineMin = computed(
 const startLabel = computed(() =>
     !form.value.start_date || form.value.start_date === today.value ? 'today' : formatDate(form.value.start_date),
 )
+
+const formatDay = (dateStr) => formatDate(parseLocalDate(dateStr))
+
+const validStart = computed(() => /^\d{4}-\d{2}-\d{2}$/.test(form.value.start_date ?? ''))
+
+// Limits, edit modal: an untouched start keeps the budget's grid (budget.anchor_date,
+// null = calendar weeks/months/years); a new start date becomes the new grid.
+const startUnchanged = computed(
+    () => Boolean(form.value.start_original) && form.value.start_date === form.value.start_original,
+)
+
+const limitAnchor = computed(() =>
+    startUnchanged.value ? form.value.anchor_original || null : form.value.start_date || today.value,
+)
+
+const limitBucket = computed(() => {
+    const start = validStart.value ? form.value.start_date : today.value
+    const bucket = bucketBounds(today.value, form.value.length, limitAnchor.value)
+
+    return { start: [bucket.start, start].sort()[1], end: bucket.end }
+})
+
+const repeatLabel = computed(() => {
+    const anchor = parseLocalDate(limitAnchor.value || '2001-01-01')
+
+    if (form.value.length === 'week') {
+        return limitAnchor.value ? anchor.toLocaleDateString('en-US', { weekday: 'long' }) : 'Monday'
+    }
+    if (form.value.length === 'month') {
+        if (!limitAnchor.value) return '1st'
+        const day = anchor.getDate()
+        const suffix =
+            day % 10 === 1 && day !== 11
+                ? 'st'
+                : day % 10 === 2 && day !== 12
+                  ? 'nd'
+                  : day % 10 === 3 && day !== 13
+                    ? 'rd'
+                    : 'th'
+
+        return `${day}${suffix}`
+    }
+
+    return limitAnchor.value ? anchor.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'January 1'
+})
+
+// "Start of this month" shortcut: the calendar start, when allowed and not already set.
+const calendarStart = computed(() => {
+    const start = bucketBounds(today.value, form.value.length, null).start
+
+    if (start === form.value.start_date || (form.value.start_min && start < form.value.start_min)) return null
+
+    return start
+})
 </script>

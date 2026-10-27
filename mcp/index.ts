@@ -46,7 +46,7 @@ const TRUST_PROXY = process.env.TRUST_PROXY ?? '1'
 const TX_AMOUNT_MAX = 9_999_999_999_999.99
 const RULE_AMOUNT_MAX = 99_999_999.99
 /** Savings goal deadline, YYYY-MM-DD (BudgetStoreRequest: date_format:Y-m-d). */
-const GOAL_DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
+const DATE_YMD = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
 
 const ALLOWED_HOSTS = (process.env.ALLOWED_HOSTS || '127.0.0.1,localhost,mcp.fundsflow.fun')
     .split(',')
@@ -617,7 +617,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         {
             title: 'Create budget',
             description:
-                'Create a spending limit (type "limit", default; length week|month|year required) or a savings goal (type "goal"; amount is the target, length is ignored). tag_ids required (at least one). Goal progress = start_amount + net of transactions with these tags since start_date (YYYY-MM-DD, default today, may be in the past, not after target_date): expenses (transfers into savings) add, income (withdrawals) subtracts.',
+                'Create a spending limit (type "limit", default; length week|month|year required; optional start_date YYYY-MM-DD, today or earlier, default today: the limit starts that day and its periods repeat from it, e.g. monthly from the 15th runs 15th → 14th; legacy align_to_calendar=true starts it at the beginning of the current calendar week/month/year) or a savings goal (type "goal"; amount is the target, length is ignored). tag_ids required (at least one). Goal progress = start_amount + net of transactions with these tags since start_date (YYYY-MM-DD, default today, may be in the past, not after target_date): expenses (transfers into savings) add, income (withdrawals) subtracts.',
             inputSchema: {
                 type: z.enum(['limit', 'goal']).optional(),
                 amount: z.number().min(0.01).max(RULE_AMOUNT_MAX),
@@ -625,8 +625,8 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
                 tag_ids: z.array(z.number().int()).min(1),
                 title: z.string().max(255).optional(),
                 align_to_calendar: z.boolean().optional(),
-                start_date: GOAL_DATE.nullable().optional(),
-                target_date: GOAL_DATE.nullable().optional(),
+                start_date: DATE_YMD.nullable().optional(),
+                target_date: DATE_YMD.nullable().optional(),
                 start_amount: z.number().min(0).max(RULE_AMOUNT_MAX).nullable().optional(),
             },
         },
@@ -644,7 +644,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         {
             title: 'Update budget',
             description:
-                'Update a budget by id. The type cannot change. Limits: creates a new period version (length required). Goals: edited in place, progress is kept; amount is the target; start_date (today or earlier) moves the day progress counts from and is kept when omitted; target_date/start_amount are left as is when omitted and cleared when null.',
+                'Update a budget by id. The type cannot change. Limits (length required): a changed amount/length/tags closes the current period today and starts a new one on the same schedule (history kept); start_date (today or earlier, not before the previous settings ended) moves the start of the current period in place and its periods then repeat from that day; omitted = keep the current start; on a paused limit saving resumes it from start_date (default today); legacy align_to_calendar=true puts it on calendar weeks/months/years. Goals: edited in place, progress is kept; amount is the target; start_date (today or earlier) moves the day progress counts from and is kept when omitted; target_date/start_amount are left as is when omitted and cleared when null.',
             inputSchema: {
                 id: z.number().int(),
                 amount: z.number().min(0.01).max(RULE_AMOUNT_MAX),
@@ -652,8 +652,8 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
                 tag_ids: z.array(z.number().int()).min(1),
                 title: z.string().max(255).optional(),
                 align_to_calendar: z.boolean().optional(),
-                start_date: GOAL_DATE.nullable().optional(),
-                target_date: GOAL_DATE.nullable().optional(),
+                start_date: DATE_YMD.nullable().optional(),
+                target_date: DATE_YMD.nullable().optional(),
                 start_amount: z.number().min(0).max(RULE_AMOUNT_MAX).nullable().optional(),
             },
         },

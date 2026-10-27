@@ -30,15 +30,29 @@ class CalculateBudgetPeriodSpentAction
         return (float) $sum * -1;
     }
 
+    /**
+     * First day of the bucket containing $asOf, clamped to the period start
+     * (a period that began mid-bucket only counts from its own start).
+     */
     public function currentBucketStart(BudgetPeriod $period, Carbon $asOf): Carbon
     {
-        $boundary = $period->length->calendarStart($asOf);
+        [$boundary] = $period->bucketBounds($asOf);
 
         if ($boundary->toDateString() > $period->starts_at->toDateString()) {
             return $boundary;
         }
 
         return $period->starts_at->copy()->startOfDay();
+    }
+
+    /**
+     * Last day of the bucket containing $asOf.
+     */
+    public function currentBucketEnd(BudgetPeriod $period, Carbon $asOf): Carbon
+    {
+        [, $next] = $period->bucketBounds($asOf);
+
+        return $next->copy()->subDay();
     }
 }
 

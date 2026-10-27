@@ -96,8 +96,8 @@ and, optionally, some tags (“PDF report for groceries and coffee this year”)
 | `create_transaction` | Add a transaction |
 | `update_transaction` | Change a transaction |
 | `delete_transaction` | Delete a transaction |
-| `create_budget` | Create a weekly, monthly, or yearly budget for some tags, or a savings goal (target, tags, optional start date, deadline and amount already saved) |
-| `update_budget` | Change a budget's amount, period, tags, title, or alignment (applies to the current period and later); for a goal — its target, tags, title, start date, deadline, or amount already saved |
+| `create_budget` | Create a weekly, monthly, or yearly budget for some tags, optionally from a start date (periods repeat from it: monthly from the 15th runs 15th → 14th), or a savings goal (target, tags, optional start date, deadline and amount already saved) |
+| `update_budget` | Change a budget's amount, period, tags, title, or start date (a new start date moves the current period; other changes apply from today on the same schedule); for a goal — its target, tags, title, start date, deadline, or amount already saved |
 | `pause_budget` / `resume_budget` | Pause or resume a budget |
 | `delete_budget` | Delete a budget |
 | `create_recurring` | Add a recurring transaction (daily, weekly, monthly, or yearly). If the start date is in the past, the preview tells you how many past transactions will be added |

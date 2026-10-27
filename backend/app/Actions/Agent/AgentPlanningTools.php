@@ -125,7 +125,7 @@ class AgentPlanningTools
                     'tag_ids' => $tagIds,
                 ],
             ]),
-            $fn('update_budget', 'Propose editing a budget or savings goal. Stages Confirm/Cancel. Omitted fields keep their current value. Limits: amount, length, tags, title; a changed limit/length/tags starts a new budget period today (history kept); align_to_calendar defaults to the budget\'s current alignment. Goals: amount is the target; also tags, title, start_date (YYYY-MM-DD, today or earlier, not after the deadline: progress counts from that day), target_date (deadline, clear_target_date removes it) and start_amount (already saved before tracking); edited in place, progress keeps counting from the goal start unless start_date moves it. The type cannot change.', [
+            $fn('update_budget', 'Propose editing a budget or savings goal. Stages Confirm/Cancel. Omitted fields keep their current value. Limits: amount, length, tags, title and start_date; a changed limit/length/tags starts a new budget period today that keeps the same period grid (history kept); start_date (YYYY-MM-DD, today or earlier, not before the previous settings ended) moves the start of the current period in place, its periods then repeat from that day (monthly from the 15th runs 15th → 14th); on a paused budget saving resumes it from start_date (default today). align_to_calendar is a legacy flag: true puts the budget on calendar weeks/months/years. Goals: amount is the target; also tags, title, start_date (YYYY-MM-DD, today or earlier, not after the deadline: progress counts from that day), target_date (deadline, clear_target_date removes it) and start_amount (already saved before tracking); edited in place, progress keeps counting from the goal start unless start_date moves it. The type cannot change.', [
                 'type' => 'object',
                 'properties' => [
                     'id' => $id,
@@ -133,8 +133,8 @@ class AgentPlanningTools
                     'amount' => ['type' => 'number'],
                     'length' => ['type' => 'string', 'enum' => ['week', 'month', 'year'], 'description' => 'Limits only'],
                     'tag_ids' => $tagIds,
-                    'align_to_calendar' => ['type' => 'boolean', 'description' => 'Limits only'],
-                    'start_date' => ['type' => 'string', 'description' => 'Goals only: start YYYY-MM-DD (today or earlier, not after target_date); progress counts from this day'],
+                    'align_to_calendar' => ['type' => 'boolean', 'description' => 'Limits only, legacy: true = calendar weeks/months/years from now on'],
+                    'start_date' => ['type' => 'string', 'description' => 'Start YYYY-MM-DD, today or earlier. Limits: new start of the current period (periods repeat from it). Goals: progress counts from this day (not after target_date)'],
                     'target_date' => ['type' => 'string', 'description' => 'Goals only: deadline YYYY-MM-DD'],
                     'clear_target_date' => ['type' => 'boolean', 'description' => 'Goals only: remove the deadline'],
                     'start_amount' => ['type' => 'number', 'description' => 'Goals only: already saved before tracking (>= 0)'],
@@ -326,11 +326,7 @@ class AgentPlanningTools
     {
         $today = $now->copy()->startOfDay();
         $start = $this->calculateSpent->currentBucketStart($period, $now)->copy()->startOfDay();
-        $end = match ($period->length) {
-            BudgetLength::Week => $today->copy()->endOfWeek()->startOfDay(),
-            BudgetLength::Month => $today->copy()->endOfMonth()->startOfDay(),
-            BudgetLength::Year => $today->copy()->endOfYear()->startOfDay(),
-        };
+        $end = $this->calculateSpent->currentBucketEnd($period, $now)->copy()->startOfDay();
 
         // Whole calendar days from date strings: starts_at and "today" can carry different timezones.
         $day = fn (Carbon $d): int => intdiv((int) strtotime($d->toDateString() . ' 00:00:00 UTC'), 86400);
@@ -626,14 +622,31 @@ class AgentPlanningTools
             $title = $new;
         }
 
-        $alignedNow = $base->starts_at
-            && $base->starts_at->toDateString() === $base->length->calendarStart($base->starts_at->copy())->toDateString();
-        $align = array_key_exists('align_to_calendar', $args)
-            ? filter_var($args['align_to_calendar'], FILTER_VALIDATE_BOOL)
-            : $alignedNow;
+        $align = array_key_exists('align_to_calendar', $args) && filter_var($args['align_to_calendar'], FILTER_VALIDATE_BOOL);
+
+        $oldStart = $base->starts_at->toDateString();
+        $startDate = null;
+        if (isset($args['start_date'])) {
+            $startDate = $this->dateArg($args['start_date'], 'start_date');
+            if ($startDate !== null && $startDate > $user->todayDateString()) {
+                throw new InvalidArgumentException('start_date cannot be in the future');
+            }
+            if ($current && $startDate === $oldStart) {
+                $startDate = null;
+            }
+        }
+        if ($startDate !== null) {
+            $lastEnd = $budget->periods
+                ->filter(fn (BudgetPeriod $p) => $p->ends_at !== null && $p->id !== $current?->id)
+                ->map(fn (BudgetPeriod $p) => $p->ends_at->toDateString())
+                ->max();
+            if ($lastEnd !== null && $startDate < $lastEnd) {
+                throw new InvalidArgumentException("start_date must be on or after {$lastEnd}, when the previous settings ended");
+            }
+        }
 
         $periodChanged = abs($amount - (float) $base->amount) > 0.001 || $length !== $base->length->value || $tagIds !== $sortedBase;
-        if (!$periodChanged && !$titleChanged && $current) {
+        if (!$periodChanged && !$titleChanged && $startDate === null && !$align && $current) {
             throw new InvalidArgumentException('nothing to change: values equal the current budget');
         }
 
@@ -650,12 +663,22 @@ class AgentPlanningTools
         $lines[] = $tagIds !== $sortedBase
             ? 'Tags: ' . $this->tagLabels($user, $baseTagIds) . ' → ' . $this->tagLabels($user, $tagIds)
             : 'Tags: ' . $this->tagLabels($user, $tagIds);
+        $lengthEnum = BudgetLength::from($length);
         if (!$current) {
-            $lines[] = 'This budget is paused; saving resumes it from today.';
+            $resumeFrom = $startDate ?? $user->todayDateString();
+            $lines[] = 'This budget is paused; saving resumes it from ' . ($startDate ?? 'today') . '.';
+            if ($startDate !== null) {
+                $lines[] = 'Period: ' . $this->limitPeriodHint($user, $lengthEnum, $resumeFrom);
+            }
+        } elseif ($startDate !== null) {
+            $lines[] = "Start date: {$oldStart} → {$startDate} (changes the current period in place)";
+            $lines[] = 'Period: ' . $this->limitPeriodHint($user, $lengthEnum, $startDate);
         } elseif ($periodChanged) {
             $lines[] = $align
-                ? 'Starts a new period aligned to the calendar ' . $length . '; history is kept.'
-                : 'Starts a new period today; history is kept.';
+                ? 'Starts a new period today on calendar ' . $length . 's; history is kept.'
+                : 'Starts a new period today on the same schedule; history is kept.';
+        } elseif ($align) {
+            $lines[] = 'Switches to calendar ' . $length . 's.';
         }
 
         return [
@@ -666,6 +689,7 @@ class AgentPlanningTools
                 'amount' => $amount,
                 'length' => $length,
                 'tag_ids' => $tagIds,
+                'start_date' => $startDate,
                 'align_to_calendar' => $align,
             ],
             'preview' => implode("\n", $lines),
@@ -867,6 +891,7 @@ class AgentPlanningTools
                     'amount' => (float) $payload['amount'],
                     'length' => BudgetLength::from((string) $payload['length'])->value,
                     'tag_ids' => array_map('intval', (array) ($payload['tag_ids'] ?? [])),
+                    'start_date' => $payload['start_date'] ?? null,
                     'align_to_calendar' => (bool) ($payload['align_to_calendar'] ?? false),
                 ];
                 if (!empty($payload['title_changed'])) {
@@ -1196,6 +1221,17 @@ class AgentPlanningTools
         }
 
         return $raw;
+    }
+
+    /**
+     * "2026-10-15 – 2026-11-14, then every month" for a limit starting on $start.
+     */
+    public function limitPeriodHint(User $user, BudgetLength $length, string $start): string
+    {
+        $from = Carbon::parse($start, $user->timezone());
+        [, $next] = $length->bucketBounds($from, $from);
+
+        return $start . ' – ' . $next->subDay()->toDateString() . ', then every ' . $length->value;
     }
 
     public function dateArg(mixed $raw, string $field): ?string

@@ -44,6 +44,7 @@ class NotifyBudgetThresholdsAction
                 continue;
             }
 
+            $period->setRelation('budget', $budget); // bucket grid (anchor_date) without a query
             $asOf = $user->nowInTimezone();
             $spent = $this->calculateSpent->execute($period, $user, $asOf);
             $ratio = $spent / (float) $period->amount;

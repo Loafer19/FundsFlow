@@ -42,7 +42,6 @@ const createDefault = (type = 'limit') => ({
     title: '',
     amount: '',
     length: 'month',
-    align_to_calendar: false,
     tag_ids: [],
     start_date: nowDateStr(),
     target_date: '',

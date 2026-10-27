@@ -32,6 +32,7 @@ import { ref, watch } from 'vue'
 import BudgetFormFields from '../components/budgets/BudgetFormFields.vue'
 import { budgetPayload } from '../services/budgetPayload.js'
 import { useBudgetsStore } from '../services/budgets.js'
+import { nowDateStr } from '../services/formatters.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
 
 const budgetsStore = useBudgetsStore()
@@ -64,15 +65,28 @@ watch(
 
         if (!current) return
 
+        const goal = budget.type === 'goal'
+        // Limits: the start of the open period (paused: resume from today); it cannot move
+        // before the previous settings ended.
+        const limitStart = current.active ? current.starts_at : nowDateStr()
+        const closedEnds = budget.periods
+            .filter((period) => period !== current || !current.active)
+            .map((period) => period.ends_at)
+            .filter(Boolean)
+            .sort()
+
         form.value = {
             id: budget.id,
-            type: budget.type === 'goal' ? 'goal' : 'limit',
+            type: goal ? 'goal' : 'limit',
             title: budget.title ?? '',
             amount: current.amount,
             length: current.length ?? 'month',
-            align_to_calendar: false,
             tag_ids: current.tags.map((tag) => tag.id),
-            start_date: budget.start_date ?? earliestStart(budget.periods),
+            start_date: goal ? (budget.start_date ?? earliestStart(budget.periods)) : limitStart,
+            start_original: goal ? '' : limitStart,
+            paused: !current.active,
+            anchor_original: budget.anchor_date ?? '',
+            start_min: goal ? '' : (closedEnds.at(-1) ?? ''),
             target_date: budget.target_date ?? '',
             start_amount: budget.start_amount ?? '',
         }

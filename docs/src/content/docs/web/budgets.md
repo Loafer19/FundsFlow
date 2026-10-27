@@ -18,7 +18,10 @@ On the **Budgets** tab click **Add Budget or Goal** and keep **Limit** selected:
 - **Tags** — at least one. Spending on these tags counts toward the budget.
 - **Amount** — the limit per period.
 - **Weekly / Monthly / Yearly**.
-- **Start from the beginning of this week/month/year** — align periods to the calendar instead of starting today.
+- **Start date** — today by default; it can be in the past, so spending already made counts. Periods repeat from
+  this day: a monthly limit from the 15th runs from the 15th to the 14th, a weekly one from that weekday.
+  **Start of this week/month/year** picks the calendar start (the 1st, Monday or January 1). The hint under the
+  field shows the current period.
 
 ### The limit card
 
@@ -76,7 +79,10 @@ automatically. The summary above the goals shows the total saved, what is left, 
 
 - **Pause** stops tracking; **Resume** starts a new period from today with the same settings. A paused goal keeps
   its progress.
-- **Edit** changes a limit. FundsFlow keeps the earlier settings in history instead of rewriting the past.
+- **Edit** changes a limit. A new amount, length or tags start new settings from today on the same schedule, and
+  FundsFlow keeps the earlier settings in history instead of rewriting the past. Changing the **Start date** moves
+  the start of the current settings instead (it can't go before the previous settings ended); periods then repeat
+  from the new date. Editing a paused limit resumes it from its start date.
 - **Edit** on a goal changes it in place (target, tags, start date, deadline, already saved); its progress is
   recalculated.
   A limit cannot be turned into a goal or back — create a new one instead.

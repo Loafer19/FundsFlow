@@ -13,5 +13,9 @@ export const budgetPayload = (form) => {
         }
     }
 
-    return { ...base, type: 'limit', length: form.length, align_to_calendar: form.align_to_calendar }
+    // Buckets repeat from start_date (empty = today on create). On edit an untouched start is
+    // omitted so the API keeps the current schedule.
+    const start = form.start_date && form.start_date !== form.start_original ? form.start_date : null
+
+    return { ...base, type: 'limit', length: form.length, start_date: start }
 }

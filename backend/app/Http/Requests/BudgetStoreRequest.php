@@ -58,6 +58,9 @@ class BudgetStoreRequest extends FormRequest
 
         return $rules + [
             'length' => ['required', Rule::in(array_column(BudgetLength::cases(), 'value'))],
+            // First day of the limit; buckets repeat from it. Default today.
+            'start_date' => 'nullable|date_format:Y-m-d|after:2000-01-01|before_or_equal:' . $this->user()->todayDateString(),
+            // Legacy (kept for old clients): start at the beginning of the current week/month/year.
             'align_to_calendar' => 'sometimes|boolean',
         ];
     }

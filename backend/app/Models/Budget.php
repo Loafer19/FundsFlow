@@ -23,6 +23,7 @@ class Budget extends Model
         'type',
         'target_date',
         'start_amount',
+        'anchor_date',
     ];
 
     protected $attributes = [
@@ -33,6 +34,7 @@ class Budget extends Model
         'type' => BudgetType::class,
         'target_date' => 'date',
         'start_amount' => 'decimal:2',
+        'anchor_date' => 'date',
     ];
 
     public function isGoal(): bool

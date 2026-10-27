@@ -147,7 +147,9 @@ const current = computed(() => props.budget.periods.find((period) => period.acti
 const latest = computed(() => current.value ?? props.budget.periods[0] ?? null)
 const tags = computed(() => latest.value?.tags ?? [])
 
-const p = computed(() => (current.value ? limitProgress(current.value, transactionsStore) : null))
+const p = computed(() =>
+    current.value ? limitProgress(current.value, transactionsStore, props.budget.anchor_date) : null,
+)
 
 const frequencyLabel = computed(
     () => ({ week: 'Weekly', month: 'Monthly', year: 'Yearly' })[latest.value?.length] ?? '',
@@ -180,7 +182,7 @@ const chipClass = computed(
 )
 const cardBorder = computed(() => (status.value === 'over' ? 'border-error/40' : 'border-base-300'))
 
-// Closed periods sliced into calendar buckets, newest first, one compact pass/fail row each.
+// Closed periods sliced into week/month/year buckets on the budget's schedule, newest first, one compact pass/fail row each.
 const history = computed(() => {
     const currentIds = tags.value
         .map((tag) => tag.id)
@@ -197,7 +199,7 @@ const history = computed(() => {
                     .sort()
                     .join(',') !== currentIds
 
-            return historyBuckets(period)
+            return historyBuckets(period, props.budget.anchor_date)
                 .reverse()
                 .map((bucket) => {
                     const spent = spentBetween(transactionsStore, bucket.start, bucket.end, period.tags)

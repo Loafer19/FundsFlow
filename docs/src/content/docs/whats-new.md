@@ -74,6 +74,8 @@ FundsFlow 2.0 is the biggest update since the project started. It covers everyth
   pace. Also in Telegram (`/budgets`), the assistant, MCP, and the PDF report. [Learn more](/docs/web/budgets/)
 - **Clearer limit cards:** On track / Near limit / Over status, what is left or over, a per-day allowance and the
   projected total at the current pace, a time marker on the spending bar, and compact collapsible history.
+- **Limit start date** instead of the “Start from the beginning of this month” checkbox: pick any day up to today,
+  and periods repeat from it (monthly from the 15th runs 15th → 14th). Also in the assistant and MCP.
 - **Fix:** budget alerts, `/budgets` in Telegram, the assistant and the PDF report now count every limit transaction
   logged today (previously only the web app did).
 - **Documentation** at [fundsflow.fun/docs](/docs/) (this site) and a new

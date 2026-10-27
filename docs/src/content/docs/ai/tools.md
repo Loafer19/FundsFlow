@@ -50,8 +50,8 @@ Amounts are **signed**: negative for expenses, positive for income. Dates use `Y
 | Tool | Description |
 | --- | --- |
 | `list_budgets` | All budgets: limits (`type: limit`) and savings goals (`type: goal`, with a `progress` object: saved, target, remaining, percent, status, days left, required amount per week or month, projected date) |
-| `create_budget` | Create a limit: tags (at least one), amount, and `week`, `month`, or `year`. Or a savings goal: `type: goal`, tags, amount (the target), optional `start_date` (YYYY-MM-DD, default today, today or earlier, not after the deadline; progress counts from it), `target_date` (YYYY-MM-DD) and `start_amount` |
-| `update_budget` | Update a budget. Limits start a new period version (history is kept); goals are edited in place (`start_date` moves the day progress counts from; `target_date`/`start_amount` can be changed or cleared with `null`). The type cannot change |
+| `create_budget` | Create a limit: tags (at least one), amount, `week`, `month`, or `year`, and optional `start_date` (YYYY-MM-DD, today or earlier; periods repeat from it, e.g. monthly from the 15th runs 15th → 14th; default in the assistant: start of the current week/month/year). Or a savings goal: `type: goal`, tags, amount (the target), optional `start_date` (YYYY-MM-DD, default today, today or earlier, not after the deadline; progress counts from it), `target_date` (YYYY-MM-DD) and `start_amount` |
+| `update_budget` | Update a budget. Limits: a new amount, length or tags start a new period version on the same schedule (history is kept); `start_date` moves the start of the current period in place; goals are edited in place (`start_date` moves the day progress counts from; `target_date`/`start_amount` can be changed or cleared with `null`). The type cannot change |
 | `delete_budget` | Delete a budget |
 | `pause_budget` | Pause a budget |
 | `resume_budget` | Resume a paused budget |
