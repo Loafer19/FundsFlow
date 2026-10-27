@@ -12,7 +12,7 @@
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-            <StatCard v-for="item in summary" :key="item.key" :label="item.label" :current="item.current"
+            <StatCard v-for="item in summary" :key="item.key" :icon="item.key" :label="item.label" :current="item.current"
                 :previous="item.previous" :compare="compare" />
         </div>
 

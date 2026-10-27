@@ -4,36 +4,9 @@
         @action="openAdd" />
 
     <template v-else>
-        <div class="grid grid-cols-3 gap-2 sm:gap-3 mb-3">
-            <div class="card card-border border-base-300 bg-base-100 p-2 sm:p-3 min-w-0">
-                <div class="text-[10px] sm:text-xs text-base-content/60">Income</div>
-                <div class="text-sm sm:text-lg font-semibold text-success truncate">
-                    {{ formatMoney(factTotals.income) }}
-                </div>
-                <div v-if="hasForecast" class="text-[10px] sm:text-xs text-success/70 truncate mt-0.5">
-                    Forecast {{ formatMoney(forecastTotals.income) }}
-                </div>
-            </div>
-            <div class="card card-border border-base-300 bg-base-100 p-2 sm:p-3 min-w-0">
-                <div class="text-[10px] sm:text-xs text-base-content/60">Expenses</div>
-                <div class="text-sm sm:text-lg font-semibold text-error truncate">
-                    {{ formatMoney(factTotals.expense) }}
-                </div>
-                <div v-if="hasForecast" class="text-[10px] sm:text-xs text-error/70 truncate mt-0.5">
-                    Forecast {{ formatMoney(forecastTotals.expense) }}
-                </div>
-            </div>
-            <div class="card card-border border-base-300 bg-base-100 p-2 sm:p-3 min-w-0">
-                <div class="text-[10px] sm:text-xs text-base-content/60">Total</div>
-                <div class="text-sm sm:text-lg font-semibold truncate"
-                    :class="factTotals.total >= 0 ? 'text-success' : 'text-error'">
-                    {{ formatMoney(factTotals.total) }}
-                </div>
-                <div v-if="hasForecast" class="text-[10px] sm:text-xs truncate mt-0.5"
-                    :class="forecastTotals.total >= 0 ? 'text-success/70' : 'text-error/70'">
-                    Forecast {{ formatMoney(forecastTotals.total) }}
-                </div>
-            </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+            <StatCard v-for="item in comparison" :key="item.key" :icon="item.key" :label="item.label" :current="item.current"
+                :previous="item.previous" :note="item.note" />
         </div>
 
         <div class="grid grid-cols-1 gap-3 items-start" :class="{ 'lg:grid-cols-[1fr_300px]': dateSelectionType !== 'year' }">
@@ -178,6 +151,7 @@ import { FileText, Image as ImageIcon, Plus } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import CalendarYearMonths from '../components/CalendarYearMonths.vue'
 import EmptyState from '../components/EmptyState.vue'
+import StatCard from '../components/StatCard.vue'
 import { formatDate, formatMoney, nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 
 import { showModal } from '../services/modal.js'
@@ -327,6 +301,40 @@ const factTotals = computed(() => sumPeriodTotals(periodItems.value.filter((i) =
 const forecastTotals = computed(() => sumPeriodTotals(periodItems.value.filter((i) => !i.actual)))
 
 const hasForecast = computed(() => forecastTotals.value.income !== 0 || forecastTotals.value.expense !== 0)
+
+// Same cards as Flow (actual transactions vs the previous period); scheduled recurring payments
+// still in this period are shown as a forecast note next to the value.
+const previousTotals = computed(() =>
+    sumPeriodTotals(
+        transactionsStore.filteredByDateRangeAndTags(props.dateRange.previousStart, props.dateRange.previousEnd),
+    ),
+)
+
+const forecastNote = (value) => (value ? `Forecast ${formatMoney(value)}` : '')
+
+const comparison = computed(() => {
+    const cur = factTotals.value
+    const prev = previousTotals.value
+    const fc = forecastTotals.value
+
+    return [
+        { key: 'income', label: 'Income', current: cur.income, previous: prev.income, note: forecastNote(fc.income) },
+        {
+            key: 'expenses',
+            label: 'Expenses',
+            current: cur.expense,
+            previous: prev.expense,
+            note: forecastNote(fc.expense),
+        },
+        {
+            key: 'net',
+            label: 'Net',
+            current: cur.total,
+            previous: prev.total,
+            note: hasForecast.value ? forecastNote(fc.total) : '',
+        },
+    ]
+})
 
 const selectedItems = computed(() => {
     const date = parseLocalDate(selectedDate.value)
