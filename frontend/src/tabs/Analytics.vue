@@ -15,7 +15,7 @@
                     <h2 class="card-title text-base sm:text-lg min-w-0">
                         <Telescope :size="22" class="text-accent shrink-0" />
                         <span class="truncate">Forecast · end of {{ periodName }}</span>
-                        <span class="tooltip tooltip-bottom sm:tooltip-left font-normal text-sm report-hide" :data-tip="forecast.explanation">
+                        <span class="tooltip tooltip-bottom before:max-w-52 sm:before:max-w-64 font-normal text-sm report-hide" :data-tip="forecast.explanation">
                             <Info :size="16" class="opacity-60" />
                         </span>
                     </h2>
@@ -54,7 +54,7 @@
                     <h2 class="card-title text-base sm:text-lg min-w-0">
                         <ChartPie :size="22" class="text-primary shrink-0" />
                         <span class="truncate">Top spending tags</span>
-                        <span class="tooltip tooltip-bottom sm:tooltip-left font-normal text-sm report-hide" :data-tip="topTagsHint">
+                        <span class="tooltip tooltip-bottom before:max-w-52 sm:before:max-w-64 font-normal text-sm report-hide" :data-tip="topTagsHint">
                             <Info :size="16" class="opacity-60" />
                         </span>
                     </h2>

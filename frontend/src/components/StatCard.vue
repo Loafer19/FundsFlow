@@ -7,7 +7,7 @@
                 </span>
                 <div class="text-xs uppercase tracking-wide text-base-content/60 flex items-center gap-1 min-w-0">
                     <span class="truncate">{{ label }}</span>
-                    <span v-if="hint" class="tooltip tooltip-bottom shrink-0 normal-case tracking-normal report-hide" :data-tip="hint">
+                    <span v-if="hint" class="tooltip shrink-0 normal-case tracking-normal report-hide" :class="hintPlacement" :data-tip="hint">
                         <Info :size="12" class="opacity-60" />
                     </span>
                 </div>
@@ -31,6 +31,8 @@
 
 <script setup>
 import {
+    ArrowDownToLine,
+    ArrowUpToLine,
     CalendarDays,
     Flag,
     Gauge,
@@ -39,6 +41,7 @@ import {
     Receipt,
     Scale,
     Target,
+    Telescope,
     TrendingDown,
     TrendingUp,
 } from 'lucide-vue-next'
@@ -64,7 +67,10 @@ const props = defineProps({
     // Neither direction is good or bad (e.g. transaction count): grey pill.
     neutral: { type: Boolean, default: false },
     hint: { type: String, default: '' },
-    // income · expenses · net · avg · savings · count · daily · goal · done (unknown → no icon).
+    // Tooltip placement classes for the hint (a card in the last column can open it to the left).
+    hintPlacement: { type: String, default: 'tooltip-bottom' },
+    // income · expenses · net · avg · savings · count · daily · goal · done · low · peak · forecast
+    // (unknown → no icon).
     icon: { type: String, default: '' },
 })
 
@@ -78,6 +84,9 @@ const ICONS = {
     daily: { component: CalendarDays, class: 'bg-warning/15 text-warning' },
     goal: { component: Target, class: 'bg-primary/15 text-primary' },
     done: { component: Flag, class: 'bg-success/15 text-success' },
+    low: { component: ArrowDownToLine, class: 'bg-error/15 text-error' },
+    peak: { component: ArrowUpToLine, class: 'bg-success/15 text-success' },
+    forecast: { component: Telescope, class: 'bg-info/15 text-info' },
 }
 
 const iconMeta = computed(() => ICONS[props.icon] ?? null)

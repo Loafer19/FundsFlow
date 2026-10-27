@@ -9,10 +9,19 @@
                 <Search :size="16" class="text-base-content/60" />
                 <input v-model="searchQuery" type="text" placeholder="Search notes" />
             </label>
+
+            <span v-if="listDay" class="badge badge-info gap-1 pl-2 pr-0.5">
+                <CalendarDays :size="12" aria-hidden="true" />
+                {{ formatDate(parseLocalDate(listDay)) }}
+                <button type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="Show the whole period"
+                    @click="listDay = null">
+                    <X :size="12" />
+                </button>
+            </span>
         </div>
 
         <EmptyState v-if="!filteredTransactions.length" icon="🔍" title="No transactions match the current filters"
-            description="Try a different search term or clear the tag filter (including Untagged)" />
+            :description="listDay ? 'Try a different search term, clear the tag filter or show the whole period' : 'Try a different search term or clear the tag filter (including Untagged)'" />
 
         <div v-else class="card card-border border-base-300 bg-base-100 overflow-hidden">
             <div class="overflow-x-auto">
@@ -118,12 +127,24 @@
 </template>
 
 <script setup>
-import { Bot, FileText, Image as ImageIcon, Laptop, Paperclip, Pencil, Repeat, Search, Send } from 'lucide-vue-next'
+import {
+    Bot,
+    CalendarDays,
+    FileText,
+    Image as ImageIcon,
+    Laptop,
+    Paperclip,
+    Pencil,
+    Repeat,
+    Search,
+    Send,
+    X,
+} from 'lucide-vue-next'
 
 import { computed, inject, ref } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { getTransactionSourceLabel } from '../services/formatters'
+import { getTransactionSourceLabel, parseLocalDate, toLocalDateStr } from '../services/formatters'
 import { useTransactionsStore } from '../services/transactions'
 
 const formatMoney = inject('formatMoney')
@@ -140,7 +161,17 @@ const props = defineProps({
         type: Object,
         required: true,
     },
+    dateSelectionType: {
+        type: String,
+        default: 'month',
+    },
 })
+
+// App passes the same listeners to every tab; declared so they are not extraneous attrs.
+defineEmits(['jump-to-list', 'jump-to-month'])
+
+// A day picked from a Flow bar (App clears it when the period or tab changes); null = whole period.
+const listDay = inject('listDay', ref(null))
 
 const sortConfig = ref({
     key: 'at',
@@ -162,10 +193,17 @@ const dateRangeTransactions = computed(() =>
     transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd),
 )
 
+// Same day key as the Flow bars (toLocalDateStr of the transaction time).
+const dayTransactions = computed(() =>
+    listDay.value
+        ? dateRangeTransactions.value.filter((transaction) => toLocalDateStr(transaction.at) === listDay.value)
+        : dateRangeTransactions.value,
+)
+
 const filteredTransactions = computed(() => {
     const query = searchQuery.value.trim().toLowerCase()
 
-    return dateRangeTransactions.value
+    return dayTransactions.value
         .filter((transaction) => !query || transaction.note?.toLowerCase().includes(query))
         .sort((a, b) => transactionsStore.sort(a, b, sortConfig.value.key, sortConfig.value.direction))
 })

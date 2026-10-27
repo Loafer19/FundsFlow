@@ -13,15 +13,11 @@
                 </option>
             </select>
 
-            <template v-if="groupBy == 'week'">
-                <div class="flex items-center text-sm text-error">
-                    <div class="mx-2 inline-grid *:[grid-area:1/1]">
-                        <div class="status status-error animate-ping"></div>
-                        <div class="status status-error"></div>
-                    </div> Week totals only include full weeks inside this {{ dateSelectionType }}. Partial weeks at
-                    the edges are omitted.
-                </div>
-            </template>
+            <span v-if="groupBy == 'week'" tabindex="0" class="tooltip tooltip-bottom -ml-1 before:max-w-52"
+                :data-tip="`Weeks run Mon–Sun. The first and last weeks only count days inside this ${dateSelectionType}.`"
+                aria-label="About week totals">
+                <Info :size="16" class="opacity-60" />
+            </span>
 
             <label class="label text-sm cursor-pointer ml-auto report-hide">
                 <input v-model="compare" type="checkbox" class="toggle toggle-sm" />
@@ -29,25 +25,29 @@
             </label>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-            <StatCard v-for="item in comparison" :key="item.key" :icon="item.key" :label="item.label" :current="item.current"
-                :previous="item.previous" :compare="compare" />
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+            <StatCard v-for="item in comparison" :key="item.key" :icon="item.icon" :label="item.label"
+                :current="item.current" :previous="item.previous" :compare="compare" />
         </div>
 
         <div class="card card-border border-base-300 bg-base-100">
-            <div class="card-body">
-                <BarChart :balances="moneyFlow" :previous="compare ? previousFlow : null" />
+            <div class="card-body gap-3 p-3 sm:p-6">
+                <div class="h-64 sm:h-96">
+                    <BarChart :balances="moneyFlow" :previous="compare ? previousFlow : null" fill clickable
+                        @bar-click="openBar" />
+                </div>
             </div>
         </div>
     </template>
 </template>
 
 <script setup>
+import { Info } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import BarChart from '../components/charts/BarChart.vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatCard from '../components/StatCard.vue'
-import { parseLocalDate, toLocalDateStr } from '../services/formatters.js'
+import { nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
 const transactionsStore = useTransactionsStore()
@@ -62,6 +62,9 @@ const props = defineProps({
         required: true,
     },
 })
+
+// App passes the same listeners to every tab; Flow uses jump-to-list for bar clicks.
+const emit = defineEmits(['jump-to-list', 'jump-to-month'])
 
 const groupBy = ref('day')
 const compare = ref(true)
@@ -130,6 +133,11 @@ const getPeriodEnds = (start, end, groupBy) => {
             ends.push(toLocalDateStr(current))
             current.setDate(current.getDate() + 7)
         }
+
+        // Days after the last Sunday form a partial week too (keyed by its Sunday, like the first one).
+        if (!ends.length || ends.at(-1) < toLocalDateStr(endDate)) {
+            ends.push(toLocalDateStr(current))
+        }
     } else if (groupBy === 'month') {
         const current = new Date(startDate)
         current.setDate(1)
@@ -185,16 +193,46 @@ const totals = (start, end) =>
         { income: 0, expenses: 0 },
     )
 
+// Average expenses per bar (day / week / month). A running period only counts the buckets up to the
+// one holding today, so the average is not diluted by days that have not happened yet.
+const elapsedBuckets = (start, end) => {
+    const ends = getPeriodEnds(start, end, groupBy.value)
+    const today = nowDateStr()
+    if (today < toLocalDateStr(start) || today > toLocalDateStr(end)) return ends.length || 1
+
+    return Math.min(ends.length, ends.filter((periodEnd) => periodEnd < today).length + 1) || 1
+}
+
+const BUCKET_LABELS = { day: 'Avg daily expenses', week: 'Avg weekly expenses', month: 'Avg monthly expenses' }
+
 const comparison = computed(() => {
-    const cur = totals(props.dateRange.currentStart, props.dateRange.currentEnd)
-    const prev = totals(props.dateRange.previousStart, props.dateRange.previousEnd)
+    const { currentStart, currentEnd, previousStart, previousEnd } = props.dateRange
+    const cur = totals(currentStart, currentEnd)
+    const prev = totals(previousStart, previousEnd)
 
     return [
-        { key: 'income', label: 'Income', current: cur.income, previous: prev.income },
-        { key: 'expenses', label: 'Expenses', current: cur.expenses, previous: prev.expenses },
-        { key: 'net', label: 'Net', current: cur.income + cur.expenses, previous: prev.income + prev.expenses },
+        { key: 'income', icon: 'income', label: 'Income', current: cur.income, previous: prev.income },
+        { key: 'expenses', icon: 'expenses', label: 'Expenses', current: cur.expenses, previous: prev.expenses },
+        {
+            key: 'net',
+            icon: 'net',
+            label: 'Net',
+            current: cur.income + cur.expenses,
+            previous: prev.income + prev.expenses,
+        },
+        {
+            key: 'avg',
+            icon: 'daily',
+            label: BUCKET_LABELS[groupBy.value],
+            current: cur.expenses / elapsedBuckets(currentStart, currentEnd),
+            previous: prev.expenses / elapsedBuckets(previousStart, previousEnd),
+        },
     ]
 })
+
+// A bar opens the List for its range: the date picker jumps to that week / month, a day bar keeps the
+// period and filters the List to that day (App handles both).
+const openBar = (key) => emit('jump-to-list', { groupBy: groupBy.value, date: key })
 </script>
 
 <style scoped></style>

@@ -128,3 +128,8 @@ export const apiErrorMessage = (error, prefix = '') => {
 
     return prefix + (message || error.message)
 }
+
+// Short axis labels on narrow charts: 12 345 → "12.3K". Always English suffixes (uk-UA would print "тис."),
+// so the app UI stays in English whatever the money format.
+export const formatMoneyCompact = (amount) =>
+    new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(amount)

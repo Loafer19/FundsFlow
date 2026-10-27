@@ -218,7 +218,7 @@
             </div>
 
             <component :is="selectedTab" :dateRange="getDateRange" :dateSelectionType
-                @jump-to-month="handleJumpToMonth" @jump-to-list="selectedTab = markRaw(TableTab)" />
+                @jump-to-month="handleJumpToMonth" @jump-to-list="handleJumpToList" />
         </main>
 
         <footer class="mt-10 pt-4 border-t border-base-300 text-center text-sm text-base-content/50">
@@ -286,6 +286,7 @@ import { useAuthStore } from './services/auth.js'
 import { bootstrapStores } from './services/bootstrap.js'
 import { useBudgetsStore } from './services/budgets.js'
 import { resetCachedNotice } from './services/cache.js'
+import { parseLocalDate } from './services/formatters.js'
 import { showModal } from './services/modal.js'
 import { shouldShowOnboarding } from './services/onboarding.js'
 import { useRecurringTransactionsStore } from './services/recurringTransactions.js'
@@ -482,6 +483,27 @@ function handleJumpToMonth(date) {
     haptic.select()
     selectRange('month', date)
 }
+
+// "Open in List" from a tab (Analytics) or a Flow bar ({ groupBy, date }): a week / month bar moves the
+// date picker to that week / month; a day bar keeps the period and narrows the List to that day.
+const listDay = ref(null)
+provide('listDay', listDay)
+
+function handleJumpToList(bar) {
+    if (bar?.groupBy === 'week' || bar?.groupBy === 'month') {
+        selectRange(bar.groupBy, parseLocalDate(bar.date))
+    }
+    selectedTab.value = markRaw(TableTab)
+    listDay.value = bar?.groupBy === 'day' ? bar.date : null
+}
+
+// The day filter only lives while the List shows the period it was picked in.
+watch([selectedRange, dateSelectionType], () => {
+    listDay.value = null
+})
+watch(selectedTab, (tab) => {
+    if (tab !== TableTab) listDay.value = null
+})
 
 function rangeFor(type, date = new Date()) {
     const anchor = new Date(date)

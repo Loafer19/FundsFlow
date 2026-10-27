@@ -1,11 +1,15 @@
 <template>
-    <LineChart :data="chartData" :options="chartOptions" />
+    <div :class="{ 'relative h-full w-full': fill }">
+        <LineChart :data="chartData" :options="chartOptions" />
+    </div>
 </template>
 
 <script setup>
 import { CategoryScale, Chart as ChartJS, Legend, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import { computed, inject } from 'vue'
 import { Line as LineChart } from 'vue-chartjs'
+import { useChartTheme } from '../../services/chartTheme.js'
+import { formatMoneyCompact } from '../../services/formatters.js'
 
 ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend)
 
@@ -14,51 +18,60 @@ const props = defineProps({
         type: Object,
         required: true,
     },
+    // Fill the parent's height instead of the default 2:1 aspect ratio.
+    fill: {
+        type: Boolean,
+        default: false,
+    },
 })
 
 const formatDate = inject('formatDate')
 const formatMoney = inject('formatMoney')
+
+const { colors, narrow } = useChartTheme()
 
 const chartData = computed(() => {
     const { currentBalances, previousBalances } = props.balances
     const currentLabels = Object.keys(currentBalances)
     const previousLabels = Object.keys(previousBalances)
 
-    const labels = currentLabels
-
-    let repeat = previousLabels.length - currentLabels.length
-
-    while (repeat > 0) {
-        labels.push(previousLabels[previousLabels.length - repeat])
-        repeat--
-    }
+    // A longer previous period (31 vs 30 days) extends the axis with its own trailing dates.
+    const labels = [...currentLabels, ...previousLabels.slice(currentLabels.length)]
+    // Dots only while they stay readable; long ranges (a year) are a plain line with a hover dot.
+    const pointRadius = labels.length > 45 || narrow.value ? 0 : 2
 
     return {
         labels: labels.map((date) => formatDate(date)),
         datasets: [
             {
+                label: 'This period',
                 data: Object.values(currentBalances),
-                borderColor: window.getComputedStyle(document.documentElement).getPropertyValue('--color-success'),
+                borderColor: colors.value.success,
+                backgroundColor: colors.value.success,
+                borderWidth: 2,
+                pointRadius,
+                pointHoverRadius: 4,
                 tension: 0.1,
                 tooltip: {
                     callbacks: {
-                        label: (context) => {
-                            const date = new Date(currentLabels[context.dataIndex])
-                            return `${formatDate(date)}: ${formatMoney(context.raw)}`
-                        },
+                        label: (context) =>
+                            `${formatDate(currentLabels[context.dataIndex])}: ${formatMoney(context.raw)}`,
                     },
                 },
             },
             {
+                label: 'Previous period',
                 data: Object.values(previousBalances),
-                borderColor: window.getComputedStyle(document.documentElement).getPropertyValue('--color-error'),
+                borderColor: colors.value.error,
+                backgroundColor: colors.value.error,
+                borderWidth: 2,
+                pointRadius,
+                pointHoverRadius: 4,
                 tension: 0.1,
                 tooltip: {
                     callbacks: {
-                        label: (context) => {
-                            const date = new Date(previousLabels[context.dataIndex])
-                            return `${formatDate(date)}: ${formatMoney(context.raw)}`
-                        },
+                        label: (context) =>
+                            `Previous · ${formatDate(previousLabels[context.dataIndex])}: ${formatMoney(context.raw)}`,
                     },
                 },
             },
@@ -66,24 +79,35 @@ const chartData = computed(() => {
     }
 })
 
-const chartOptions = {
+const chartOptions = computed(() => ({
     responsive: true,
+    maintainAspectRatio: !props.fill,
+    interaction: {
+        mode: 'index',
+        intersect: false,
+    },
     scales: {
         x: {
             ticks: {
-                color: window.getComputedStyle(document.documentElement).getPropertyValue('--color-base-content'),
+                maxRotation: narrow.value ? 0 : 50,
+                autoSkipPadding: narrow.value ? 12 : 3,
+                color: colors.value.text,
+                font: { size: narrow.value ? 10 : 12 },
             },
             grid: {
-                color: window.getComputedStyle(document.documentElement).getPropertyValue('--color-base-200'),
+                display: !narrow.value,
+                color: colors.value.grid,
             },
         },
         y: {
             ticks: {
-                callback: (value) => formatMoney(value),
-                color: window.getComputedStyle(document.documentElement).getPropertyValue('--color-base-content'),
+                maxTicksLimit: narrow.value ? 6 : 11,
+                callback: (value) => (narrow.value ? formatMoneyCompact(value) : formatMoney(value)),
+                color: colors.value.text,
+                font: { size: narrow.value ? 10 : 12 },
             },
             grid: {
-                color: window.getComputedStyle(document.documentElement).getPropertyValue('--color-base-200'),
+                color: colors.value.grid,
             },
         },
     },
@@ -98,7 +122,7 @@ const chartOptions = {
             },
         },
     },
-}
+}))
 </script>
 
 <style scoped></style>
