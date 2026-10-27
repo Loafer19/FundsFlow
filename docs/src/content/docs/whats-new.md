@@ -4,7 +4,7 @@ description: Everything new in FundsFlow 2.0 — the AI assistant on the web and
 ---
 
 FundsFlow 2.0 is the biggest update since the project started. It covers everything shipped after
-**1.12.0** (Mini App, PDF report, Send to Telegram). The full history is on
+**1.12.0** (Mini App, PDF report, Send to Telegram), including the **1.13.0** Telegram AI update. The full history is on
 [GitHub](https://github.com/Loafer19/FundsFlow/commits/main).
 
 ## Assistant
