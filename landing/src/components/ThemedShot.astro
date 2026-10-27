@@ -1,0 +1,36 @@
+---
+// Product screenshot with a light and a dark variant. The browser downloads only the one that matches
+// prefers-color-scheme (same switch as the landing theme in global.css).
+import type { ImageMetadata } from 'astro'
+import { getImage } from 'astro:assets'
+
+interface Props {
+    light: ImageMetadata
+    dark: ImageMetadata
+    alt: string
+    widths: number[]
+    sizes: string
+    class?: string
+    loading?: 'lazy' | 'eager'
+}
+
+const { light, dark, alt, widths, sizes, class: className, loading = 'lazy' } = Astro.props
+const opts = { widths, sizes, format: 'webp' as const, layout: 'none' as const }
+const lightImg = await getImage({ src: light, ...opts })
+const darkImg = await getImage({ src: dark, ...opts })
+---
+
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset={darkImg.srcSet.attribute} sizes={sizes} type="image/webp" />
+    <img
+        src={lightImg.src}
+        srcset={lightImg.srcSet.attribute}
+        sizes={sizes}
+        width={light.width}
+        height={light.height}
+        alt={alt}
+        loading={loading}
+        decoding="async"
+        class:list={['block h-auto w-full', className]}
+    />
+</picture>

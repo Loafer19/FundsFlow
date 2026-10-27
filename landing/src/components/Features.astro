@@ -1,5 +1,28 @@
 ---
+import analyticsDark from '../assets/app-analytics-dark.webp'
+import analyticsLight from '../assets/app-analytics-light.webp'
+import budgetsDark from '../assets/app-budgets-dark.webp'
+import budgetsLight from '../assets/app-budgets-light.webp'
+import calendarDark from '../assets/app-calendar-dark.webp'
+import calendarLight from '../assets/app-calendar-light.webp'
 import { docs } from '../config'
+import ThemedShot from './ThemedShot.astro'
+
+const sideSizes = '(min-width: 1152px) 542px, (min-width: 1024px) calc(50vw - 2.5rem), calc(100vw - 2rem)'
+const shots = [
+    {
+        light: budgetsLight,
+        dark: budgetsDark,
+        caption: 'Budgets: savings goals and spending limits with pace and days left',
+        alt: 'FundsFlow Budgets tab: totals for savings goals, Emergency fund at 54% and Japan trip at 30% with monthly amounts needed, and spending limits for Groceries at 92% (near limit) and Transport at 37%',
+    },
+    {
+        light: calendarLight,
+        dark: calendarDark,
+        caption: 'Calendar: every day of the month, today’s transactions, and upcoming payments',
+        alt: 'FundsFlow Calendar tab for October 2026: income, expenses, and net cards, a month grid with daily amounts and planned payments, today’s transactions, and upcoming iCloud, gym, rent, and Netflix payments',
+    },
+]
 
 const features = [
     {
@@ -77,5 +100,32 @@ const features = [
                 ))
             }
         </ul>
+
+        <div class="mt-16 grid gap-6 lg:grid-cols-2">
+            <figure class="lg:col-span-2">
+                <div class="overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-lg">
+                    <ThemedShot
+                        light={analyticsLight}
+                        dark={analyticsDark}
+                        widths={[640, 1104, 1600, 2208]}
+                        sizes="(min-width: 1152px) 1104px, calc(100vw - 2rem)"
+                        alt="FundsFlow web app, Analytics tab for October 2026: income, expenses, net, savings rate, transaction count, and average daily expense compared with the previous month, an end-of-month forecast, insights, top spending tags, and largest expenses"
+                    />
+                </div>
+                <figcaption class="mt-3 text-sm text-base-content/60">
+                    Analytics: the month at a glance, compared with the previous one (demo data)
+                </figcaption>
+            </figure>
+            {
+                shots.map((s) => (
+                    <figure>
+                        <div class="overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-lg">
+                            <ThemedShot light={s.light} dark={s.dark} widths={[480, 800, 1084]} sizes={sideSizes} alt={s.alt} />
+                        </div>
+                        <figcaption class="mt-3 text-sm text-base-content/60">{s.caption}</figcaption>
+                    </figure>
+                ))
+            }
+        </div>
     </div>
 </section>

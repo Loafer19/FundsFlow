@@ -73,10 +73,17 @@
                             </td>
                             <td>
                                 <div class="flex flex-wrap gap-2">
-                                    <div v-for="tag in transaction.tags" :key="tag.id"
-                                        class="badge badge-soft badge-info px-1 gap-1">
-                                        <span>{{ tag.emoji }}</span><span>{{ tag.title }}</span>
-                                    </div>
+                                    <template v-for="tag in transaction.tags" :key="tag.id">
+                                        <div v-if="inReport" class="badge badge-soft badge-info px-1 gap-1">
+                                            <span>{{ tag.emoji }}</span><span>{{ tag.title }}</span>
+                                        </div>
+                                        <button v-else type="button"
+                                            class="badge badge-soft badge-info px-1 gap-1 cursor-pointer transition-colors hover:bg-info/25 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-info"
+                                            :aria-label="`Open ${tag.title} details`"
+                                            @click.stop="openTagDetail(tag, transaction)">
+                                            <span>{{ tag.emoji }}</span><span>{{ tag.title }}</span>
+                                        </button>
+                                    </template>
                                 </div>
                             </td>
                             <td class="max-w-xs" :title="transaction.note || undefined">
@@ -123,6 +130,9 @@
                 </table>
             </div>
         </div>
+
+        <TagDetailModal v-if="!inReport" ref="detailModal" :dateRange="dateRange"
+            @jump-to-list="emit('jump-to-list')" />
     </template>
 </template>
 
@@ -144,6 +154,7 @@ import {
 import { computed, inject, ref } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
+import TagDetailModal from '../components/TagDetailModal.vue'
 import { getTransactionSourceLabel, parseLocalDate, toLocalDateStr } from '../services/formatters'
 import { useTransactionsStore } from '../services/transactions'
 
@@ -168,7 +179,7 @@ const props = defineProps({
 })
 
 // App passes the same listeners to every tab; declared so they are not extraneous attrs.
-defineEmits(['jump-to-list', 'jump-to-month'])
+const emit = defineEmits(['jump-to-list', 'jump-to-month'])
 
 // A day picked from a Flow bar (App clears it when the period or tab changes); null = whole period.
 const listDay = inject('listDay', ref(null))
@@ -209,6 +220,13 @@ const filteredTransactions = computed(() => {
 })
 
 const openAdd = () => transactions_add_modal.showModal()
+
+// ReportDocument renders this tab for print: tag pills stay plain text there.
+const inReport = inject('inReport', false)
+const detailModal = ref(null)
+// Same modal as the Tags tab; the side follows the transaction sign.
+const openTagDetail = (tag, transaction) =>
+    detailModal.value?.open(tag.id, transaction.amount >= 0 ? 'income' : 'expenses')
 
 const editTransaction = (transaction) => {
     transactionsStore.transactionForEdit = transaction

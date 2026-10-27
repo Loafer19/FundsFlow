@@ -29,7 +29,7 @@ bun run preview
   theme applied via `prefers-color-scheme: dark`.
 - CSS is emitted as an external file (`inlineStylesheets: 'never'`) and there are no `style=""` attributes, so a strict
   CSP needs no `unsafe-inline`. `application/ld+json` is a data block, not executed.
-- Visuals are HTML/CSS mock illustrations. Slots for real screenshots are marked `<!-- screenshot: ... -->`.
+- Product visuals: the Assistant section and the Features gallery use real web app screenshots with demo data (`src/assets/app-*-{light,dark}.webp`, rendered by `ThemedShot.astro`, which picks the variant by `prefers-color-scheme`). The Hero Telegram chat is still an HTML/CSS mock, marked `<!-- screenshot: ... -->`.
 - FAQ copy is condensed from `docs/src/content/docs/help/faq.md`; keep in sync.
 - `public/og.png`, `favicon-32.png`, `apple-touch-icon.png` and `src/assets/logo.png` are copies from `frontend/public`.
 - No `robots.txt` here: robots is per host, so the app's `frontend/public/robots.txt` lists the landing sitemap

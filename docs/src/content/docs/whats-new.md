@@ -27,6 +27,10 @@ FundsFlow 2.0 is the biggest update since the project started. It covers everyth
   message (a quoted bot message is used as context), and long answers split into several messages.
 - **Daily AI limit** shared by every AI feature. The assistant panel shows how many assists are left and when they
   reset; the count is also in **Settings → Accounts**.
+- **Smarter suggestions:** the rotating prompts in the web assistant are more varied and only suggest what fits
+  your data (for example, budget questions once you have budgets, setup ideas when you don't).
+- **Limits in the assistant and MCP** carry the current period (dates, spent, left, percentage, days left, status),
+  so they show the same figures as the Budgets tab. [Learn more](/docs/ai/tools/)
 
 ## Imports
 
@@ -56,6 +60,10 @@ FundsFlow 2.0 is the biggest update since the project started. It covers everyth
   haptic feedback, a smarter amount field (`1 500,50`, `120+35`), and Today / Yesterday date chips.
   [Learn more](/docs/mini-app/)
 - Sign-in codes from the bot are now alphanumeric (like `K7QM-2XPA`).
+- **Budgets in Telegram:** `/budgets` shows each limit's period dates, what is left or over, days left and status,
+  and each savings goal's progress and pace. Budget alerts name the period, and each one is sent once per period,
+  even if you edit the limit during it. [Learn more](/docs/telegram/commands/)
+- **Weekly digest** ends with your active limits and savings goals. [Learn more](/docs/telegram/notifications/)
 - Webhook updates are processed in the background, and each Telegram update is handled once even if Telegram sends
   it again.
 
@@ -64,8 +72,20 @@ FundsFlow 2.0 is the biggest update since the project started. It covers everyth
 - **Themed PDF reports.** Reports match the app: your light or dark theme and the same charts as the tabs. They are
   rendered by a Chromium service (Gotenberg). Download them, send them to Telegram, or ask the assistant for one.
   [Learn more](/docs/web/reports/)
-- **Previous-period comparison** in the Money Flow tab.
-- Redesigned period bar and Calendar year view.
+- **Analytics revamp:** stat cards for income, expenses, net, savings rate, transactions and average daily expense,
+  each against the previous period; a forecast for the end of the running period; insights (biggest tag changes,
+  the priciest weekday, no-spend days); top spending tags (click to filter) and largest expenses. **Balances Per
+  Tag** switches between **This period** and **All time**. [Learn more](/docs/web/tabs/#analytics)
+- **Tag details:** click a donut slice or a tag in the Tags list (or a tag in the List) for its total, transactions
+  and average vs the previous period, the last 12 months, subtags, and the largest transactions. The Tags list also
+  shows each tag's change. [Learn more](/docs/web/tabs/#tags)
+- **Flow:** income, expenses, net and average per day/week/month cards, and a click on a bar opens the List for
+  that day, week or month. Partial weeks at the edges of a month or year are now included. Previous-period
+  comparison is on by default. [Learn more](/docs/web/tabs/#flow)
+- **Trend:** Net, Avg daily change, Low and Peak (with their dates), and a Forecast while the period is running.
+- **Calendar** totals are stat cards with the change vs the previous period and a forecast that includes upcoming
+  recurring payments.
+- Redesigned period bar and Calendar year view; clicking a month in the year view opens that month.
 
 ## Web app
 
@@ -78,6 +98,13 @@ FundsFlow 2.0 is the biggest update since the project started. It covers everyth
   and periods repeat from it (monthly from the 15th runs 15th → 14th). Also in the assistant and MCP.
 - **Fix:** budget alerts, `/budgets` in Telegram, the assistant and the PDF report now count every limit transaction
   logged today (previously only the web app did).
+- **Limit edits keep the period:** a new amount, length or tags applies to the whole current period, so spending
+  since it started still counts. New limits start at the beginning of the current week, month or year by default.
+- **Limit history** is a list with one row per period: the percentage, spent / limit, and a bar on a shared scale.
+- **One budget form** for limits and goals, with a hint that says when the next period starts.
+- **Tag picker:** child tags collapse under their parent, and a search field appears once you have many tags.
+- **Unified modals:** transaction, tag and recurring forms share one layout (emoji button, toggles, date chips);
+  Settings uses toggles; the login screen has labelled Google, GitHub and Telegram buttons.
 - **Documentation** at [fundsflow.fun/docs](/docs/) (this site) and a new
   [landing page](https://fundsflow.fun/landing/).
 - **Faster loading:** tabs and the emoji picker load on demand. The app and docs are served with precompressed

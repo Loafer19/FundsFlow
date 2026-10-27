@@ -33,8 +33,9 @@ On the **Budgets** tab click **Add Budget or Goal** and keep **Limit** selected:
 - the pace: how much you can spend per day for the rest of the period (**keep under ~N/day**) and where the current
   pace leads (**At current pace ~X by …**: spent so far ÷ days elapsed × days in the period);
 - the period dates, frequency and **day N of M**;
-- **History** (collapsed by default): one row per previous week/month/year with a small bar, spent / limit and a
-  ✓ or ✗ for whether it stayed within the limit.
+- **History** (collapsed by default): the average spent and how many periods stayed within the limit, then one row
+  per week/month/year, newest first and the current one marked **now**, with the percentage, spent / limit and a
+  bar on a shared scale (the marker is the limit).
 
 Spending counts every transaction dated within the period, including everything logged today. The percentage is
 rounded down, so a limit shows 100% only once it is actually reached. The Telegram bot, the assistant and the API
