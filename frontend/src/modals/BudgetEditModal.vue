@@ -2,28 +2,13 @@
     <dialog id="budgets_edit_modal" class="modal" aria-labelledby="budgets_edit_modal_title">
         <div class="modal-box max-w-sm">
             <h2 id="budgets_edit_modal_title" class="card-title mb-4">
-                <PiggyBank :size="24" />
-                Edit Budget
+                <Target v-if="form.type === 'goal'" :size="24" />
+                <PiggyBank v-else :size="24" />
+                {{ form.type === 'goal' ? 'Edit Savings Goal' : 'Edit Budget' }}
             </h2>
 
             <form ref="formRef" @submit.prevent="handleSubmit">
-                <input type="text" v-model="form.title" placeholder="Title (optional)" aria-label="Title"
-                    class="input w-full mb-4" maxlength="255" autofocus />
-
-                <AmountField v-model="form.amount" :signed="false" :max="99_999_999.99" :autofocus="false" />
-
-                <select v-model="form.length" class="select w-full mb-4" required aria-label="Budget length">
-                    <option value="week">Weekly</option>
-                    <option value="month">Monthly</option>
-                    <option value="year">Yearly</option>
-                </select>
-
-                <label class="label cursor-pointer justify-start gap-2 mb-4">
-                    <input type="checkbox" v-model="form.align_to_calendar" class="checkbox checkbox-sm" />
-                    <span class="label-text">Start from the beginning of this {{ form.length }}</span>
-                </label>
-
-                <TagPicker v-model="form.tag_ids" />
+                <BudgetFormFields v-model="form" type-locked />
 
                 <div class="modal-action">
                     <button type="submit" class="btn btn-success tg-primary"
@@ -42,18 +27,24 @@
 </template>
 
 <script setup>
-import { PiggyBank, Save } from 'lucide-vue-next'
+import { PiggyBank, Save, Target } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
-import AmountField from '../components/AmountField.vue'
-import TagPicker from '../components/TagPicker.vue'
+import BudgetFormFields from '../components/budgets/BudgetFormFields.vue'
+import { budgetPayload } from '../services/budgetPayload.js'
 import { useBudgetsStore } from '../services/budgets.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
 
 const budgetsStore = useBudgetsStore()
 
-const form = ref({ tag_ids: [] })
+const form = ref({ type: 'limit', tag_ids: [] })
 
 const formRef = ref(null)
+
+const earliestStart = (periods) =>
+    periods
+        .map((period) => period.starts_at)
+        .filter(Boolean)
+        .sort()[0] ?? ''
 
 useTelegramPrimary('budgets_edit_modal', {
     text: 'Update',
@@ -75,17 +66,21 @@ watch(
 
         form.value = {
             id: budget.id,
+            type: budget.type === 'goal' ? 'goal' : 'limit',
             title: budget.title ?? '',
             amount: current.amount,
-            length: current.length,
+            length: current.length ?? 'month',
             align_to_calendar: false,
             tag_ids: current.tags.map((tag) => tag.id),
+            start_date: budget.start_date ?? earliestStart(budget.periods),
+            target_date: budget.target_date ?? '',
+            start_amount: budget.start_amount ?? '',
         }
     },
 )
 
 const handleSubmit = async () => {
-    const ok = await budgetsStore.update(form.value.id, form.value)
+    const ok = await budgetsStore.update(form.value.id, budgetPayload(form.value))
 
     if (!ok) return
 

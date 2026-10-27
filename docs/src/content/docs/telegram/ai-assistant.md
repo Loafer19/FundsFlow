@@ -19,6 +19,7 @@ Examples:
 - “rename tag Food to Eating out”
 - “add -250 taxi yesterday”, “delete the last transaction”
 - “how is my groceries budget?”, “how much can I still spend per day?”, “pause my travel budget”
+- “save 60 000 for a Japan trip by December”, “how is my emergency fund going?”
 - “what charges are coming up this week?”, “add a monthly -15 Netflix subscription from the 5th”
 - “compare this quarter with last quarter”, “send me a PDF report for last month”
 
@@ -55,10 +56,10 @@ The assistant works by calling tools on your account.
 | `list_tags` | All tags with emoji and parent |
 | `list_recent_transactions` | Newest transactions (default 10, up to 20) |
 | `list_transactions` | Transactions filtered by date range, tag, or note text (up to 50 rows) |
-| `list_budgets` | Budgets with the current-period limit, spent amount, and progress |
+| `list_budgets` | Budgets with the current-period limit, spent amount, and progress, plus savings goals with saved / target |
 | `list_recurring` | Recurring rules |
 | `period_summary` | Income, expenses, net, and top expense tags for a month |
-| `budget_status` | For each active budget (or one): spent, left, days left, per-day allowance, average daily spend, and the projected total at the current pace (*on track*, *at risk*, or *over*) |
+| `budget_status` | For each active budget (or one): spent, left, days left, per-day allowance, average daily spend, and the projected total at the current pace (*on track*, *at risk*, or *over*). For savings goals: saved, left, days to the deadline, the amount needed per week or month, and when you will reach it at the current pace (*on track*, *behind*, *completed*) |
 | `upcoming_recurring` | Recurring charges and income due in the next N days (default 7, up to 90) with totals |
 | `compare_periods` | Income, expenses, and net for a period vs the previous one, plus per-tag spending changes. If the current period isn't over yet, it also compares with the same number of days of the previous period |
 
@@ -95,8 +96,8 @@ and, optionally, some tags (“PDF report for groceries and coffee this year”)
 | `create_transaction` | Add a transaction |
 | `update_transaction` | Change a transaction |
 | `delete_transaction` | Delete a transaction |
-| `create_budget` | Create a weekly, monthly, or yearly budget for some tags |
-| `update_budget` | Change a budget's amount, period, tags, title, or alignment (applies to the current period and later) |
+| `create_budget` | Create a weekly, monthly, or yearly budget for some tags, or a savings goal (target, tags, optional start date, deadline and amount already saved) |
+| `update_budget` | Change a budget's amount, period, tags, title, or alignment (applies to the current period and later); for a goal — its target, tags, title, start date, deadline, or amount already saved |
 | `pause_budget` / `resume_budget` | Pause or resume a budget |
 | `delete_budget` | Delete a budget |
 | `create_recurring` | Add a recurring transaction (daily, weekly, monthly, or yearly). If the start date is in the past, the preview tells you how many past transactions will be added |
@@ -126,8 +127,9 @@ You can always see *AI assists today* (used / limit and reset time) in **Setting
 Quick add, commands, menu buttons, and receipts with an amount in the caption **don't** use AI and keep working when
 the limit is reached.
 
-Savings goals aren't a FundsFlow feature yet. If you ask about one, the assistant says so and gives advice from your
-real numbers (month summary, budget status) instead.
+Savings goals are budgets too: ask “how is my emergency fund?” or “when will I reach my Japan trip goal?” and the
+assistant answers from `budget_status`; “create a goal of 60 000 for 🗾 Japan trip by December, I started saving on
+1 September” proposes a goal with that start date. See [Budgets](/docs/web/budgets/#create-a-savings-goal).
 
 ## PDF reports in Telegram
 

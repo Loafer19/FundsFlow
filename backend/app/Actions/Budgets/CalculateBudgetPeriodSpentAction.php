@@ -22,7 +22,7 @@ class CalculateBudgetPeriodSpentAction
 
         $sum = Transaction::query()
             ->where('user_id', $user->id)
-            ->whereBetween('at', [$start->toDateString(), $asOf->toDateString()])
+            ->onDays($start, $asOf)
             ->where('amount', '<', 0)
             ->whereHas('tags', fn ($query) => $query->whereIn('tags.id', $tagIds))
             ->sum('amount');

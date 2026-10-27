@@ -77,7 +77,7 @@ class TelegramSupport
             . "/recent — last " . self::RECENT_LIMIT . " transactions\n"
             . "/tags — list your tags\n"
             . "/newtag — create a tag: /newtag 🍕 Fast Food > Food\n"
-            . "/budgets — active budgets for the current period\n"
+            . "/budgets — active budgets and savings goals\n"
             . "/recurring — recurring rules\n"
             . "/app — open the Web UI from the menu button\n"
             . "/website — one-time web login code\n"

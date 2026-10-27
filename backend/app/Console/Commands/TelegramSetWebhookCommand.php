@@ -40,7 +40,7 @@ class TelegramSetWebhookCommand extends Command
             ['command' => 'recent', 'description' => 'Last 10 transactions'],
             ['command' => 'tags', 'description' => 'List your tags'],
             ['command' => 'newtag', 'description' => 'Create a tag: /newtag 🍕 Fast Food > Food'],
-            ['command' => 'budgets', 'description' => 'Active budgets: spent vs limit'],
+            ['command' => 'budgets', 'description' => 'Active budgets and savings goals'],
             ['command' => 'recurring', 'description' => 'List recurring transaction rules'],
             ['command' => 'app', 'description' => 'Open the Web UI from the menu button'],
             ['command' => 'website', 'description' => 'Get a one-time code to log in on the website'],

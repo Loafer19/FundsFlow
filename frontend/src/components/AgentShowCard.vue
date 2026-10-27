@@ -22,18 +22,40 @@
             </template>
 
             <template v-else-if="item.view === 'budgets'">
-                <p v-if="!budgets.length" class="text-sm text-base-content/60">No budgets yet.</p>
+                <p v-if="!budgets.length" class="text-sm text-base-content/60">No budgets or savings goals yet.</p>
                 <ul v-else class="flex flex-col gap-2">
-                    <li v-for="budget in budgets" :key="budget.id" class="text-sm">
-                        <div class="flex justify-between gap-2">
-                            <span class="truncate">{{ budget.title }}</span>
-                            <span class="tabular-nums text-xs shrink-0">
-                                {{ formatMoney(budget.spent) }} / {{ formatMoney(budget.amount_limit) }}
-                            </span>
-                        </div>
-                        <progress class="progress w-full"
-                            :class="budget.percent >= 100 ? 'progress-error' : budget.percent >= 80 ? 'progress-warning' : 'progress-success'"
-                            :value="Math.min(100, budget.percent ?? 0)" max="100" />
+                    <li v-for="budget in budgets" :key="budget.id" class="text-sm flex flex-col gap-1">
+                        <template v-if="budget.type === 'goal'">
+                            <div class="flex justify-between gap-2">
+                                <span class="truncate font-medium">🎯 {{ budget.title }}</span>
+                                <span class="badge badge-sm shrink-0" :class="goalStatusClass(budget.status)">
+                                    {{ goalStatusLabel(budget.status) }}
+                                </span>
+                            </div>
+                            <progress class="progress w-full"
+                                :class="budget.status === 'behind' ? 'progress-warning' : 'progress-success'"
+                                :value="Math.min(100, budget.percent ?? 0)" max="100" />
+                            <div class="flex flex-col text-xs text-base-content/70">
+                                <span>Saved <span class="tabular-nums">{{ budget.saved_formatted }}</span> of {{
+                                    budget.target_formatted }} ({{ budget.percent }}%)<template v-if="budget.status !== 'completed' && budget.remaining > 0">
+                                    · {{ budget.remaining_formatted }} left</template></span>
+                                <span v-if="budget.target_date && budget.required_amount_formatted">{{ budget.days_left }}
+                                    days left · need ~{{ budget.required_amount_formatted }}/{{ budget.required_per }}</span>
+                                <span v-if="budget.projected_date">At current pace: {{ formatMonthYear(budget.projected_date)
+                                    }}</span>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <div class="flex justify-between gap-2">
+                                <span class="truncate">{{ budget.title }}</span>
+                                <span class="tabular-nums text-xs shrink-0">
+                                    {{ formatMoney(budget.spent) }} / {{ formatMoney(budget.amount_limit) }}
+                                </span>
+                            </div>
+                            <progress class="progress w-full"
+                                :class="budget.percent >= 100 ? 'progress-error' : budget.percent >= 80 ? 'progress-warning' : 'progress-success'"
+                                :value="Math.min(100, budget.percent ?? 0)" max="100" />
+                        </template>
                     </li>
                 </ul>
             </template>
@@ -92,31 +114,53 @@
 
             <template v-else-if="item.view === 'budget_status'">
                 <p v-if="data.error || !budgets.length" class="text-sm text-base-content/60">
-                    {{ data.error || 'No active budgets.' }}
+                    {{ data.error || 'No active budgets or savings goals.' }}
                 </p>
                 <ul v-else class="flex flex-col gap-3">
                     <li v-for="budget in budgets" :key="budget.id" class="text-sm flex flex-col gap-1">
-                        <div class="flex justify-between gap-2">
-                            <span class="truncate font-medium">{{ budget.title }}</span>
-                            <span class="badge badge-sm shrink-0" :class="statusClass(budget.status)">
-                                {{ statusLabel(budget.status) }}
-                            </span>
-                        </div>
-                        <progress class="progress w-full"
-                            :class="budget.status === 'over' ? 'progress-error' : budget.status === 'at_risk' ? 'progress-warning' : 'progress-success'"
-                            :value="Math.min(100, budget.percent ?? 0)" max="100" />
-                        <div class="grid grid-cols-2 gap-x-3 text-xs text-base-content/70">
-                            <span>Spent <span class="tabular-nums">{{ budget.spent_formatted }}</span> / {{
-                                budget.amount_limit_formatted }}</span>
-                            <span class="text-right">Left <span class="tabular-nums"
-                                    :class="budget.left < 0 ? 'text-error' : ''">{{ budget.left_formatted }}</span></span>
-                            <span>{{ budget.days_left }} of {{ budget.days_total }} days left</span>
-                            <span class="text-right">Per day <span class="tabular-nums">{{
-                                budget.per_day_allowance_formatted }}</span></span>
-                            <span class="col-span-2">Projected <span class="tabular-nums"
-                                    :class="budget.projected_over_by > 0 ? 'text-error' : ''">{{
-                                    budget.projected_spend_formatted }}</span> by {{ formatDate(budget.period_end) }}</span>
-                        </div>
+                        <template v-if="budget.type === 'goal'">
+                            <div class="flex justify-between gap-2">
+                                <span class="truncate font-medium">🎯 {{ budget.title }}</span>
+                                <span class="badge badge-sm shrink-0" :class="goalStatusClass(budget.status)">
+                                    {{ goalStatusLabel(budget.status) }}
+                                </span>
+                            </div>
+                            <progress class="progress w-full"
+                                :class="budget.status === 'behind' ? 'progress-warning' : 'progress-success'"
+                                :value="Math.min(100, budget.percent ?? 0)" max="100" />
+                            <div class="flex flex-col text-xs text-base-content/70">
+                                <span>Saved <span class="tabular-nums">{{ budget.saved_formatted }}</span> of {{
+                                    budget.target_formatted }} ({{ budget.percent }}%)<template v-if="budget.status !== 'completed' && budget.remaining > 0">
+                                    · {{ budget.remaining_formatted }} left</template></span>
+                                <span v-if="budget.target_date && budget.required_amount_formatted">{{ budget.days_left }}
+                                    days left · need ~{{ budget.required_amount_formatted }}/{{ budget.required_per }}</span>
+                                <span v-if="budget.projected_date">At current pace: {{ formatMonthYear(budget.projected_date)
+                                    }}</span>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <div class="flex justify-between gap-2">
+                                <span class="truncate font-medium">{{ budget.title }}</span>
+                                <span class="badge badge-sm shrink-0" :class="statusClass(budget.status)">
+                                    {{ statusLabel(budget.status) }}
+                                </span>
+                            </div>
+                            <progress class="progress w-full"
+                                :class="budget.status === 'over' ? 'progress-error' : budget.status === 'at_risk' ? 'progress-warning' : 'progress-success'"
+                                :value="Math.min(100, budget.percent ?? 0)" max="100" />
+                            <div class="grid grid-cols-2 gap-x-3 text-xs text-base-content/70">
+                                <span>Spent <span class="tabular-nums">{{ budget.spent_formatted }}</span> / {{
+                                    budget.amount_limit_formatted }}</span>
+                                <span class="text-right">Left <span class="tabular-nums"
+                                        :class="budget.left < 0 ? 'text-error' : ''">{{ budget.left_formatted }}</span></span>
+                                <span>{{ budget.days_left }} of {{ budget.days_total }} days left</span>
+                                <span class="text-right">Per day <span class="tabular-nums">{{
+                                    budget.per_day_allowance_formatted }}</span></span>
+                                <span class="col-span-2">Projected <span class="tabular-nums"
+                                        :class="budget.projected_over_by > 0 ? 'text-error' : ''">{{
+                                        budget.projected_spend_formatted }}</span> by {{ formatDate(budget.period_end) }}</span>
+                            </div>
+                        </template>
                     </li>
                 </ul>
             </template>
@@ -226,6 +270,7 @@
 <script setup>
 import { computed, inject } from 'vue'
 import { useAgentStore } from '../services/agent.js'
+import { formatMonthYear, goalStatusLabel } from '../services/goals.js'
 import { saveBlob } from '../services/report.js'
 import { useTagsStore } from '../services/tags.js'
 import { hasTelegramLinked } from '../services/telegramSend.js'
@@ -258,6 +303,10 @@ const compareTags = computed(() => (data.value.tags ?? []).slice(0, 8))
 const statusLabel = (status) => ({ over: 'Over', at_risk: 'At risk', on_track: 'On track' })[status] ?? status
 const statusClass = (status) =>
     ({ over: 'badge-error', at_risk: 'badge-warning', on_track: 'badge-success' })[status] ?? 'badge-ghost'
+const goalStatusClass = (status) =>
+    ({ completed: 'badge-success', on_track: 'badge-success', behind: 'badge-warning', in_progress: 'badge-info' })[
+        status
+    ] ?? 'badge-ghost'
 
 const compareMetrics = computed(() => {
     const cur = data.value.current ?? {}

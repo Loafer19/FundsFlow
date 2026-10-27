@@ -9,7 +9,7 @@ class CheckBudgetThresholdsCommand extends Command
 {
     protected $signature = 'budgets:check-thresholds';
 
-    protected $description = 'Send a Telegram alert for budgets that crossed 80%/100% of their current period';
+    protected $description = 'Send a Telegram alert for budget limits that crossed 80%/100% of their current period, and once when a savings goal is reached';
 
     public function handle(NotifyBudgetThresholdsAction $action): int
     {

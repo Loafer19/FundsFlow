@@ -1,130 +1,57 @@
 <template>
-    <EmptyState v-if="!budgetsStore.budgets.length" icon="🐷" title="No budgets yet"
-        description="Set a limit on a few tags to keep spending in check" action-label="Add Budget"
-        @action="openAdd" />
+    <EmptyState v-if="!budgetsStore.budgets.length" icon="🐷" title="No budgets or goals yet"
+        description="Set a spending limit on a few tags, or a savings goal to see how close you are"
+        action-label="Add Budget or Goal" @action="openAdd" />
 
     <template v-else>
-        <div class="flex justify-end mb-3">
+        <div class="flex justify-end mb-3 report-hide">
             <button type="button" class="btn btn-primary btn-sm" @click="openAdd">
                 <Plus :size="20" />
-                Add Budget
+                Add Budget or Goal
             </button>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div v-for="budget in budgetsStore.budgets" :key="budget.id"
-                class="card card-border border-base-300 bg-base-100">
-                <div class="card-body">
-                    <div class="flex justify-between items-start gap-2 mb-2">
-                        <h3 class="card-title">
-                            <template v-if="budget.title">{{ budget.title }}</template>
-                            <template v-else-if="currentTags(budget).length">
-                                <span v-for="tag in currentTags(budget)" :key="tag.id" class="tooltip"
-                                    :data-tip="tag.title">{{ tag.emoji }}</span>
-                            </template>
-                            <template v-else>Budget</template>
-                        </h3>
-
-                        <div class="flex gap-1 shrink-0">
-                            <button v-if="currentPeriod(budget)" type="button"
-                                class="btn btn-outline btn-warning btn-square btn-sm tooltip" data-tip="Pause"
-                                aria-label="Pause" :disabled="budgetsStore.isLoading === budget.id"
-                                @click="budgetsStore.pause(budget.id)">
-                                <span v-if="budgetsStore.isLoading === budget.id"
-                                    class="loading loading-spinner loading-xs"></span>
-                                <Pause v-else :size="20" />
-                            </button>
-                            <button v-else type="button" class="btn btn-outline btn-success btn-square btn-sm tooltip"
-                                data-tip="Resume" aria-label="Resume" :disabled="budgetsStore.isLoading === budget.id"
-                                @click="budgetsStore.resume(budget.id)">
-                                <span v-if="budgetsStore.isLoading === budget.id"
-                                    class="loading loading-spinner loading-xs"></span>
-                                <Play v-else :size="20" />
-                            </button>
-
-                            <button type="button" class="btn btn-outline btn-secondary btn-square btn-sm tooltip"
-                                data-tip="Edit" aria-label="Edit" :disabled="budgetsStore.isLoading"
-                                @click="openEdit(budget)">
-                                <Pencil :size="20" />
-                            </button>
-
-                            <DeleteHold :id="budget.id" :disabled="budgetsStore.isLoading"
-                                :isLoading="budgetsStore.isLoading === budget.id"
-                                @delete="(id) => budgetsStore.delete(id)" />
-                        </div>
-                    </div>
-
-                    <template v-if="currentPeriod(budget)">
-                        <div class="flex items-center gap-1">
-                            <button v-for="tag in currentPeriod(budget).tags" :key="tag.id" type="button"
-                                class="tooltip cursor-pointer" :data-tip="tag.title"
-                                @click="viewTransactions(currentPeriod(budget).tags)">{{ tag.emoji }}</button>
-                            <div class="badge badge-outline ml-auto" :class="badgeToneClass(currentPeriod(budget))">
-                                {{ formatMoney(spentForActive(currentPeriod(budget))) }} /
-                                {{ formatMoney(currentPeriod(budget).amount) }}
-                            </div>
-                        </div>
-                        <div class="tooltip w-full"
-                            :data-tip="percentTooltip(spentForActive(currentPeriod(budget)), currentPeriod(budget).amount)">
-                            <progress class="progress w-full" :class="progressClass(currentPeriod(budget))"
-                                :value="spentForActive(currentPeriod(budget))" :max="currentPeriod(budget).amount"></progress>
-                        </div>
-
-                        <div class="flex items-center gap-1 mt-1">
-                            <span class="text-xs text-base-content/60">
-                                {{ formatDate(currentBucketStart(currentPeriod(budget))) }} –
-                                {{ formatDate(currentBucketEnd(currentPeriod(budget))) }}
-                            </span>
-                            <div class="badge badge-outline badge-neutral text-xs ml-auto">
-                                {{ frequencyLabel(currentPeriod(budget).length) }}
-                            </div>
-                        </div>
-                        <div class="tooltip w-full"
-                            :data-tip="percentTooltip(bucketProgress(currentPeriod(budget)).elapsed, bucketProgress(currentPeriod(budget)).total)">
-                            <progress class="progress w-full" :value="bucketProgress(currentPeriod(budget)).elapsed"
-                                :max="bucketProgress(currentPeriod(budget)).total"></progress>
-                        </div>
-                    </template>
-                    <div v-else class="flex items-center gap-1 mb-1">
-                        <button v-for="tag in currentTags(budget)" :key="tag.id" type="button"
-                            class="tooltip cursor-pointer" :data-tip="tag.title"
-                            @click="viewTransactions(currentTags(budget))">{{ tag.emoji }}</button>
-                        <span class="text-sm text-base-content/60 ml-auto italic">Paused</span>
-                    </div>
-
-                    <template v-if="historyFor(budget).length">
-                        <div class="divider text-sm text-base-content/60">History</div>
-
-                        <template v-for="period in historyFor(budget)" :key="period.id">
-                            <div class="flex items-center gap-1 mt-1">
-                                <span v-for="tag in period.tags" :key="tag.id" class="tooltip"
-                                    :data-tip="tag.title">{{ tag.emoji }}</span>
-                            </div>
-
-                            <div v-for="bucket in historyBuckets(period)" :key="bucket.start"
-                                class="flex justify-between text-sm text-base-content/60">
-                                <span>{{ formatDate(bucket.start) }} – {{ formatDate(bucket.end) }}</span>
-                                <span class="tooltip"
-                                    :data-tip="percentTooltip(spentBetween(bucket.start, bucket.end, period.tags), period.amount)">
-                                    {{ formatMoney(spentBetween(bucket.start, bucket.end, period.tags)) }} /
-                                    {{ formatMoney(period.amount) }}
-                                </span>
-                            </div>
-                        </template>
-                    </template>
-                </div>
+        <template v-if="goals.length">
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+                <StatCard label="Total saved" :current="goalSummary.saved" :previous="null" :compare="false"
+                    :note="'of ' + formatMoney(goalSummary.target)" icon="savings" />
+                <StatCard label="Left to save" :current="goalSummary.remaining" :previous="null" :compare="false"
+                    :note="goalSummary.monthlyNeed ? 'need ~' + formatMoney(Math.ceil(goalSummary.monthlyNeed)) + '/month' : ''"
+                    icon="goal" />
+                <StatCard class="col-span-2 md:col-span-1" label="Goals completed" :current="goalSummary.completed"
+                    :previous="null" :compare="false" format="count" :note="'of ' + goals.length" icon="done" />
             </div>
+
+            <h3 v-if="limits.length" class="text-sm font-semibold uppercase tracking-wide text-base-content/60 mb-2">
+                Savings goals
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3" :class="{ 'mb-5': limits.length }">
+                <GoalCard v-for="{ budget, progress } in goalCards" :key="budget.id" :budget="budget"
+                    :progress="progress" @edit="openEdit" @view-tags="viewTransactions" />
+            </div>
+
+            <h3 v-if="limits.length" class="text-sm font-semibold uppercase tracking-wide text-base-content/60 mb-2">
+                Spending limits
+            </h3>
+        </template>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <LimitCard v-for="budget in limitCards" :key="budget.id" :budget="budget" @edit="openEdit"
+                @view-tags="viewTransactions" />
         </div>
     </template>
 </template>
 
 <script setup>
-import { Pause, Pencil, Play, Plus } from 'lucide-vue-next'
-import DeleteHold from '../components/buttons/DeleteHold.vue'
+import { Plus } from 'lucide-vue-next'
+import { computed } from 'vue'
+import GoalCard from '../components/budgets/GoalCard.vue'
+import LimitCard from '../components/budgets/LimitCard.vue'
 import EmptyState from '../components/EmptyState.vue'
+import StatCard from '../components/StatCard.vue'
 import { useBudgetsStore } from '../services/budgets.js'
-import { formatDate, formatMoney, nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
-
+import { formatMoney, nowDateStr } from '../services/formatters.js'
+import { goalProgress, isGoal } from '../services/goals.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
 const budgetsStore = useBudgetsStore()
@@ -132,114 +59,43 @@ const transactionsStore = useTransactionsStore()
 
 const emit = defineEmits(['jump-to-list'])
 
-const currentPeriod = (budget) => budget.periods.find((period) => period.active) ?? null
-const historyFor = (budget) => budget.periods.filter((period) => !period.active)
+const limits = computed(() => budgetsStore.budgets.filter((budget) => !isGoal(budget)))
+const goals = computed(() => budgetsStore.budgets.filter(isGoal))
 
-const frequencyLabel = (length) => ({ week: 'Weekly', month: 'Monthly', year: 'Yearly' })[length]
+// Active limits first, paused ones last (stable otherwise).
+const limitCards = computed(() =>
+    limits.value
+        .map((budget, index) => ({ budget, index, paused: !budget.periods.some((period) => period.active) }))
+        .sort((a, b) => a.paused - b.paused || a.index - b.index)
+        .map(({ budget }) => budget),
+)
 
-const bucketStartFor = (date, length) => {
-    const d = new Date(date)
+// Active goals first (closest to done on top), then paused, completed last.
+const goalCards = computed(() => {
+    const today = nowDateStr()
+    const rank = (p) => (p.completed ? 2 : p.status === 'paused' ? 1 : 0)
 
-    if (length === 'week') d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
-    else if (length === 'month') d.setDate(1)
-    else d.setMonth(0, 1)
+    return goals.value
+        .map((budget) => ({ budget, progress: goalProgress(budget, transactionsStore.transactions, today) }))
+        .sort((a, b) => rank(a.progress) - rank(b.progress) || b.progress.percent - a.progress.percent)
+})
 
-    return d
-}
+const goalSummary = computed(() => {
+    const sum = { saved: 0, target: 0, remaining: 0, completed: 0, monthlyNeed: 0 }
 
-const nextBucketStart = (date, length) => {
-    const d = new Date(date)
-
-    if (length === 'week') d.setDate(d.getDate() + 7)
-    else if (length === 'month') d.setMonth(d.getMonth() + 1)
-    else d.setFullYear(d.getFullYear() + 1)
-
-    return d
-}
-
-const dayBefore = (dateStr) => {
-    const d = parseLocalDate(dateStr)
-    d.setDate(d.getDate() - 1)
-
-    return toLocalDateStr(d)
-}
-
-const todayWallDate = () => parseLocalDate(nowDateStr())
-
-const currentBucketStart = (period) => {
-    const boundary = toLocalDateStr(bucketStartFor(todayWallDate(), period.length))
-
-    return boundary > period.starts_at ? boundary : period.starts_at
-}
-
-const currentBucketEnd = (period) => {
-    const nextStart = toLocalDateStr(nextBucketStart(bucketStartFor(todayWallDate(), period.length), period.length))
-
-    return dayBefore(nextStart)
-}
-
-const daysBetween = (start, end) => Math.round((parseLocalDate(end) - parseLocalDate(start)) / 86400000)
-
-const bucketProgress = (period) => {
-    const start = currentBucketStart(period)
-    const end = currentBucketEnd(period)
-    const total = daysBetween(start, end) + 1
-
-    return { elapsed: Math.min(daysBetween(start, nowDateStr()) + 1, total), total }
-}
-
-// Slices a closed period's whole [starts_at, ends_at] range into
-// calendar-aligned week/month/year buckets, clamped at both ends, so a
-// budget that ran unedited for months shows one comparable row per bucket
-// instead of one misleading total against a per-bucket amount.
-const historyBuckets = (period) => {
-    const buckets = []
-    let cursor = period.starts_at
-
-    while (cursor <= period.ends_at) {
-        const nextStr = toLocalDateStr(
-            nextBucketStart(bucketStartFor(parseLocalDate(cursor), period.length), period.length),
-        )
-        const end = nextStr <= period.ends_at ? dayBefore(nextStr) : period.ends_at
-
-        buckets.push({ start: cursor, end })
-        cursor = nextStr
+    for (const { progress } of goalCards.value) {
+        sum.saved += progress.saved
+        sum.target += progress.target
+        sum.remaining += progress.remaining
+        if (progress.completed) sum.completed++
+        if (progress.requiredAmount && progress.status !== 'paused') {
+            sum.monthlyNeed +=
+                progress.requiredPer === 'week' ? (progress.requiredAmount * 30.4375) / 7 : progress.requiredAmount
+        }
     }
 
-    return buckets
-}
-
-const spentBetween = (start, end, tags) => {
-    const tagIds = new Set(tags.map((tag) => tag.id))
-
-    return transactionsStore
-        .filteredByDateRange(start, end)
-        .filter((t) => t.amount < 0 && t.tags.some((tag) => tagIds.has(tag.id)))
-        .reduce((sum, t) => sum - t.amount, 0)
-}
-
-// Only ever called with the active period — its current week/month/year
-// bucket so far. Closed periods go through historyBuckets() instead.
-const spentForActive = (period) => spentBetween(currentBucketStart(period), nowDateStr(), period.tags)
-
-const currentTags = (budget) => (currentPeriod(budget) ?? budget.periods[0])?.tags ?? []
-
-const percentTooltip = (spent, amount) => {
-    if (amount <= 0) return '0%'
-
-    return Math.round((spent / amount) * 100) + '%'
-}
-
-const progressClass = (period) => {
-    const ratio = period.amount > 0 ? spentForActive(period) / period.amount : 0
-
-    if (ratio >= 1) return 'progress-error'
-    if (ratio >= 0.8) return 'progress-warning'
-
-    return 'progress-success'
-}
-
-const badgeToneClass = (period) => progressClass(period).replace('progress-', 'badge-')
+    return sum
+})
 
 const viewTransactions = (tags) => {
     transactionsStore.tagFilterDraft = tags.map((tag) => tag.id)

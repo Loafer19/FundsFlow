@@ -5,12 +5,15 @@ namespace App\Actions\Report;
 use App\Actions\Agent\AgentPlanningTools;
 use App\Actions\Budgets\ListBudgetsAction;
 use App\Actions\Transactions\ListTransactionsAction;
+use App\Models\Budget;
 use App\Models\BudgetPeriod;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\GoalSummary;
 use App\Support\PeriodRange;
 use App\Support\UserFormatter;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -250,12 +253,18 @@ class BuildUserReportAction
     {
         $now = $user->nowInTimezone();
         $rows = '';
+        $goalRows = '';
         foreach ($this->listBudgets->execute($user) as $budget) {
             $period = $budget->periods->first(fn (BudgetPeriod $p) => $p->ends_at === null);
             if (!$period) {
                 continue;
             }
             if ($tagIds !== [] && $period->tags->pluck('id')->map(fn ($id) => (int) $id)->intersect($tagIds)->isEmpty()) {
+                continue;
+            }
+            if ($budget->isGoal()) {
+                $goalRows .= $this->goalRow($user, $budget, $e);
+
                 continue;
             }
             $s = $this->planning->budgetPeriodStatus($user, $budget, $period, $now);
@@ -265,12 +274,36 @@ class BuildUserReportAction
                 . '</td><td class="barcol"><div class="bar ' . $cls . '" style="width:' . $pct . '%"></div></td><td class="r nw">' . $e($s['left_formatted'])
                 . '</td><td class="r nw">' . $s['days_left'] . '</td><td class="nw">' . $e(str_replace('_', ' ', $s['status'])) . '</td></tr>';
         }
-        if ($rows === '') {
-            return '';
+        $out = '';
+        if ($rows !== '') {
+            $out .= '<h2>Budgets (current period, as of today)</h2><table><thead><tr><th>Budget</th><th>Length</th><th class="r">Spent / limit</th><th class="barcol"></th><th class="r">Left</th><th class="r">Days left</th><th>Status</th></tr></thead><tbody>'
+                . $rows . '</tbody></table>';
+        }
+        if ($goalRows !== '') {
+            $out .= '<h2>Savings goals (as of today)</h2><table><thead><tr><th>Goal</th><th class="r">Saved / target</th><th class="barcol"></th><th class="r">Left</th><th class="nw">Deadline</th><th>Pace</th><th>Status</th></tr></thead><tbody>'
+                . $goalRows . '</tbody></table>';
         }
 
-        return '<h2>Budgets (current period, as of today)</h2><table><thead><tr><th>Budget</th><th>Length</th><th class="r">Spent / limit</th><th class="barcol"></th><th class="r">Left</th><th class="r">Days left</th><th>Status</th></tr></thead><tbody>'
-            . $rows . '</tbody></table>';
+        return $out;
+    }
+
+    private function goalRow(User $user, Budget $budget, callable $e): string
+    {
+        $s = $this->planning->goalStatus($user, $budget);
+        $pct = min(100, max(0, $s['percent']));
+        $cls = match ($s['status']) {
+            'behind' => 'warnbg',
+            default => 'posbg',
+        };
+        $deadline = $s['target_date'] ? UserFormatter::formatDate($user, $s['target_date']) . ($s['overdue'] ? ' (passed)' : ' · ' . $s['days_left'] . 'd') : '—';
+        $pace = $s['status'] === 'completed'
+            ? '—'
+            : ($s['required_amount_formatted'] ? 'need ~' . $s['required_amount_formatted'] . '/' . $s['required_per'] . '; ' : '')
+                . ($s['projected_date'] ? 'reach ' . Carbon::parse($s['projected_date'])->format('M Y') : 'no pace yet');
+
+        return '<tr><td>' . $e($s['title']) . '</td><td class="r nw">' . $e($s['saved_formatted']) . ' / ' . $e($s['target_formatted'])
+            . '</td><td class="barcol"><div class="bar ' . $cls . '" style="width:' . $pct . '%"></div></td><td class="r nw">' . $e($s['remaining_formatted'])
+            . '</td><td class="nw">' . $e($deadline) . '</td><td>' . $e($pace) . '</td><td class="nw">' . $e(GoalSummary::statusLabel($s['status'])) . '</td></tr>';
     }
 
     /**

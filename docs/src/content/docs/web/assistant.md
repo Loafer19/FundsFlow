@@ -89,7 +89,8 @@ help, and *open the web app* tools.
 - **Propose changes** — add, edit, or delete a transaction; create, edit, pause, resume, or delete a budget; create,
   edit, pause, resume, or delete a recurring rule; create tags, or rename tags.
 
-Savings goals aren't a FundsFlow feature yet; if you ask, the assistant says so and advises from your real numbers.
+Savings goals work the same way: the assistant can create, edit (including the start date), pause, resume, or delete
+a goal, and tells you how much is left and when you will reach it. See [Budgets](/docs/web/budgets/).
 
 ## Receipt photos
 

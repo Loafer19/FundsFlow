@@ -15,7 +15,12 @@ class BudgetsRelationManager extends ReadOnlyRelationManager
             ->modifyQueryUsing(fn ($query) => $query->withCount('periods'))
             ->columns([
                 TextColumn::make('id'),
+                TextColumn::make('type')
+                    ->badge()
+                    ->formatStateUsing(fn ($state): string => ($state?->value ?? $state) === 'goal' ? 'Goal' : 'Limit')
+                    ->color(fn ($state): string => ($state?->value ?? $state) === 'goal' ? 'success' : 'gray'),
                 TextColumn::make('title')->placeholder('—'),
+                TextColumn::make('target_date')->label('Deadline')->date()->placeholder('—'),
                 TextColumn::make('periods_count')->label('Periods')->numeric(),
                 TextColumn::make('created_at')->date(),
             ]);

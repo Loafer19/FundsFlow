@@ -31,6 +31,10 @@ class UpdateBudgetAction
             $budget->update(['title' => $data['title']]);
         }
 
+        if ($budget->isGoal()) {
+            return $this->updateGoal($user, $budget, $data, $newTagIds->all());
+        }
+
         $length = BudgetLength::from($data['length']);
         $now = $user->nowInTimezone();
         $startsAt = ($data['align_to_calendar'] ?? false) ? $length->calendarStart($now) : $now;
@@ -72,6 +76,41 @@ class UpdateBudgetAction
         ]);
 
         $period->tags()->sync($newTagIds);
+
+        return $budget->load('periods.tags');
+    }
+
+    /**
+     * Goals have no history buckets: target and tags are edited in place on
+     * the open period, so progress keeps counting from the original start.
+     * Editing a paused goal resumes it (like limits) with a new open period.
+     *
+     * @param array<string, mixed> $data
+     * @param list<int> $tagIds
+     */
+    private function updateGoal(User $user, Budget $budget, array $data, array $tagIds): Budget
+    {
+        $budget->fill(array_intersect_key($data, array_flip(['target_date', 'start_amount'])));
+        $budget->save();
+
+        $current = $budget->currentPeriod;
+
+        if ($current) {
+            $current->update(['amount' => $data['amount']]);
+        } else {
+            $current = $budget->periods()->create([
+                'amount' => $data['amount'],
+                'length' => BudgetLength::Month->value,
+                'starts_at' => $user->todayDateString(),
+                'ends_at' => null,
+            ]);
+        }
+
+        $current->tags()->sync($tagIds);
+
+        if (!empty($data['start_date'])) {
+            $budget->moveGoalStart((string) $data['start_date']);
+        }
 
         return $budget->load('periods.tags');
     }

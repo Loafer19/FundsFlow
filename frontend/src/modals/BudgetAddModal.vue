@@ -2,28 +2,13 @@
     <dialog id="budgets_add_modal" class="modal" aria-labelledby="budgets_add_modal_title">
         <div class="modal-box max-w-sm">
             <h2 id="budgets_add_modal_title" class="card-title mb-4">
-                <PiggyBank :size="24" />
-                Add Budget
+                <Target v-if="form.type === 'goal'" :size="24" />
+                <PiggyBank v-else :size="24" />
+                {{ form.type === 'goal' ? 'Add Savings Goal' : 'Add Budget' }}
             </h2>
 
             <form ref="formRef" @submit.prevent="handleSubmit">
-                <input type="text" v-model="form.title" placeholder="Title (optional)" aria-label="Title"
-                    class="input w-full mb-4" maxlength="255" autofocus />
-
-                <AmountField v-model="form.amount" :signed="false" :max="99_999_999.99" :autofocus="false" />
-
-                <select v-model="form.length" class="select w-full mb-4" required aria-label="Budget length">
-                    <option value="week">Weekly</option>
-                    <option value="month">Monthly</option>
-                    <option value="year">Yearly</option>
-                </select>
-
-                <label class="label cursor-pointer justify-start gap-2 mb-4">
-                    <input type="checkbox" v-model="form.align_to_calendar" class="checkbox checkbox-sm" />
-                    <span class="label-text">Start from the beginning of this {{ form.length }}</span>
-                </label>
-
-                <TagPicker v-model="form.tag_ids" />
+                <BudgetFormFields v-model="form" />
 
                 <div class="modal-action">
                     <button type="submit" class="btn btn-success tg-primary"
@@ -42,21 +27,26 @@
 </template>
 
 <script setup>
-import { PiggyBank, Save } from 'lucide-vue-next'
+import { PiggyBank, Save, Target } from 'lucide-vue-next'
 import { ref } from 'vue'
-import AmountField from '../components/AmountField.vue'
-import TagPicker from '../components/TagPicker.vue'
+import BudgetFormFields from '../components/budgets/BudgetFormFields.vue'
+import { budgetPayload } from '../services/budgetPayload.js'
 import { useBudgetsStore } from '../services/budgets.js'
+import { nowDateStr } from '../services/formatters.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
 
 const budgetsStore = useBudgetsStore()
 
-const createDefault = () => ({
+const createDefault = (type = 'limit') => ({
+    type,
     title: '',
     amount: '',
     length: 'month',
     align_to_calendar: false,
     tag_ids: [],
+    start_date: nowDateStr(),
+    target_date: '',
+    start_amount: '',
 })
 
 const form = ref(createDefault())
@@ -71,11 +61,12 @@ useTelegramPrimary('budgets_add_modal', {
 })
 
 const handleSubmit = async () => {
-    const ok = await budgetsStore.create(form.value)
+    const ok = await budgetsStore.create(budgetPayload(form.value))
 
     if (!ok) return
 
-    form.value = createDefault()
+    // Keep the chosen type so adding several goals in a row stays quick.
+    form.value = createDefault(form.value.type)
     budgets_add_modal.close()
 }
 </script>

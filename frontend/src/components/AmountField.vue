@@ -13,8 +13,8 @@
 
         <!-- type="text" + inputmode="decimal": a decimal keypad on phones, and we parse
              "1 500,50" / "120+35" ourselves instead of the browser silently dropping it. -->
-        <input ref="input" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" required
-            :placeholder="placeholder" aria-label="Amount" :value="display" :autofocus="autofocus"
+        <input ref="input" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" :required="required"
+            :placeholder="placeholder" :aria-label="label" :value="display" :autofocus="autofocus"
             :aria-invalid="Boolean(shownError)" :aria-describedby="hintId" class="input w-full font-semibold"
             :class="signed ? (isIncome ? 'input-success text-success' : 'input-error text-error') : ''"
             @input="onInput" @blur="onBlur" />
@@ -38,6 +38,9 @@ const props = defineProps({
     max: { type: Number, default: 9_999_999_999.99 },
     autofocus: { type: Boolean, default: true },
     placeholder: { type: String, default: 'Amount' },
+    /** Optional fields (a goal's start amount) may stay empty; the model is then ''. */
+    required: { type: Boolean, default: true },
+    label: { type: String, default: 'Amount' },
 })
 
 const model = defineModel({ type: [Number, String], default: '' })

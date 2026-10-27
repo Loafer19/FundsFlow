@@ -69,6 +69,13 @@ FundsFlow 2.0 is the biggest update since the project started. It covers everyth
 
 ## Web app
 
+- **Savings goals** on the **Budgets** tab: set a target, the tags you save with, a start date (today or earlier), an
+  optional deadline, and how much you already have. Cards show saved vs target, what you need per month, and when you will reach it at your current
+  pace. Also in Telegram (`/budgets`), the assistant, MCP, and the PDF report. [Learn more](/docs/web/budgets/)
+- **Clearer limit cards:** On track / Near limit / Over status, what is left or over, a per-day allowance and the
+  projected total at the current pace, a time marker on the spending bar, and compact collapsible history.
+- **Fix:** budget alerts, `/budgets` in Telegram, the assistant and the PDF report now count every limit transaction
+  logged today (previously only the web app did).
 - **Documentation** at [fundsflow.fun/docs](/docs/) (this site) and a new
   [landing page](https://fundsflow.fun/landing/).
 - **Faster loading:** tabs and the emoji picker load on demand. The app and docs are served with precompressed

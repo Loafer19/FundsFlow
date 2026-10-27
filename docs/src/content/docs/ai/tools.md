@@ -49,9 +49,9 @@ Amounts are **signed**: negative for expenses, positive for income. Dates use `Y
 
 | Tool | Description |
 | --- | --- |
-| `list_budgets` | All budgets |
-| `create_budget` | Create a budget: tags (at least one), amount, and `week`, `month`, or `year` |
-| `update_budget` | Update a budget (starts a new period version; history is kept) |
+| `list_budgets` | All budgets: limits (`type: limit`) and savings goals (`type: goal`, with a `progress` object: saved, target, remaining, percent, status, days left, required amount per week or month, projected date) |
+| `create_budget` | Create a limit: tags (at least one), amount, and `week`, `month`, or `year`. Or a savings goal: `type: goal`, tags, amount (the target), optional `start_date` (YYYY-MM-DD, default today, today or earlier, not after the deadline; progress counts from it), `target_date` (YYYY-MM-DD) and `start_amount` |
+| `update_budget` | Update a budget. Limits start a new period version (history is kept); goals are edited in place (`start_date` moves the day progress counts from; `target_date`/`start_amount` can be changed or cleared with `null`). The type cannot change |
 | `delete_budget` | Delete a budget |
 | `pause_budget` | Pause a budget |
 | `resume_budget` | Resume a paused budget |

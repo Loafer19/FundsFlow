@@ -272,8 +272,9 @@ final class ConfirmWebAgentPendingAction
         }
 
         $label = $budget->title ?: ('Budget #' . $budget->id);
+        $noun = $budget->isGoal() ? 'Savings goal' : 'Budget';
 
-        return [true, '✅ Budget created: ' . $label, 'Budget created via agent confirm.'];
+        return [true, "✅ {$noun} created: " . $label, "{$noun} created via agent confirm."];
     }
 
     /**

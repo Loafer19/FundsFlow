@@ -27,7 +27,7 @@ export const useBudgetsStore = defineStore('budgets', {
                 this.budgets.push(response.data)
                 this.persist()
 
-                toasts.success('Budget created successfully!')
+                toasts.success(payload?.type === 'goal' ? 'Savings goal created!' : 'Budget created successfully!')
 
                 return true
             } catch (error) {
@@ -49,7 +49,7 @@ export const useBudgetsStore = defineStore('budgets', {
                 this.budgets[index] = response.data
                 this.persist()
 
-                toasts.success('Budget updated successfully!')
+                toasts.success(payload?.type === 'goal' ? 'Savings goal updated!' : 'Budget updated successfully!')
 
                 return true
             } catch (error) {

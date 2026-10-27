@@ -358,7 +358,10 @@ const { chips, shuffle: shuffleChips } = useSuggestionChips({
     pool: computed(() =>
         suggestionPool({
             tab: agent.screenContext?.tab,
-            hasBudgets: budgetsStore.budgets.some((budget) => budget.periods?.some((period) => period.active)),
+            hasBudgets: budgetsStore.budgets.some(
+                (budget) => budget.type !== 'goal' && budget.periods?.some((period) => period.active),
+            ),
+            hasGoals: budgetsStore.budgets.some((budget) => budget.type === 'goal'),
             hasRecurring: recurringStore.rules.some((rule) => rule.active),
             hasTransactions: transactionsStore.transactions.length > 0,
             topTag: topTag.value,

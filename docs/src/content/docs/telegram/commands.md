@@ -26,7 +26,7 @@ Below the message field the bot shows six buttons:
 | `/recent` | Your 5 most recent transactions, with **Open** buttons for each |
 | `/tags` | List your tags |
 | `/newtag` | Create a tag: `/newtag 🍕 Fast Food > Food` |
-| `/budgets` | Active budgets for the current period: spent vs limit |
+| `/budgets` | Active budgets for the current period (spent vs limit) and savings goals (saved vs target, deadline, pace) |
 | `/recurring` | Your recurring rules |
 | `/app` | How to open the Web UI (Mini App) from the menu button |
 | `/website` | One-time code to [log in on the website](/docs/getting-started/sign-in/#telegram-code) |

@@ -109,7 +109,7 @@ Rules:
 - For any request to see a chart/graph/diagram/visual (e.g. "покажи витрати по тегах за місяць", "chart of spending", "графік доходів і витрат", "balance trend"), call send_chart once with the best type/period (spending by tag -> expenses_by_tag; income vs expenses -> income_vs_expenses; balance over time -> balance_trend; "за місяць"/"this month" -> this_month unless they say last month). It renders an interactive chart in the chat; then stop.
 - For analysis questions (e.g. what do you think about my finances), call period_summary, list_budgets, list_recent_transactions (and more if needed), then answer with real figures.
 - Budgets: for "how is my budget / скільки лишилось / can I still spend" call budget_status (spent, left, days left, per-day allowance, projection) and answer with the figures; to show it as a card use show_budget_status. To change, pause, resume or delete a budget use update_budget / pause_budget / resume_budget / delete_budget (ids from list_budgets or budget_status; include_paused=true to find paused ones).
-- Savings goals are not a feature yet: if asked, say so briefly and give advice from real data (period_summary, budget_status) instead of pretending a goal exists.
+- Savings goals are budgets with type goal: a target amount reached through transactions with the goal's savings tag(s) since the goal started (transfers into savings logged as expenses add, withdrawals subtract; plus an optional start_amount already saved). For "how is my goal / when will I reach it" call budget_status (saved, remaining, deadline, required per month/week, pace, projected date). To create one use create_budget with type goal (amount = target, tag_ids = savings tag(s), optional start_date if the user started saving earlier (today or a past day; progress counts from it), target_date and start_amount); if the user has no savings tag, suggest creating one (create_tags) first. Edit, pause, resume, delete goals with the same budget tools.
 - Recurring transactions: create_recurring / update_recurring / pause_recurring / resume_recurring / delete_recurring (ids from list_recurring). For "what is coming up / upcoming charges / що спишеться" use upcoming_recurring (data) or show_upcoming (card).
 - Comparisons ("compare this quarter with last", "чи я витратив більше ніж минулого місяця"): call compare_periods (or show_comparison for a card) and report totals and the biggest per-tag changes; if the current period is not finished, say so and use previous_to_date for a fair comparison. For a visual comparison use send_chart with compare=true.
 - For "report / PDF / звіт / print" call show_report with the period (and tag_ids if relevant): it renders a card with Download PDF / Print / Send to Telegram buttons; then stop.
@@ -145,7 +145,7 @@ PROMPT;
             $this->tools->definition('list_recurring'),
             $this->tools->definition('period_summary'),
             ...$this->planningDefinitions(read: true),
-            $fn('show_budget_status', 'Show the Budget status card (spent, left, days left, per-day allowance, projection) for all active budgets or one budget, then stop.', [
+            $fn('show_budget_status', 'Show the Budget status card (limits: spent, left, days left, per-day allowance, projection; goals: saved, remaining, deadline, needed pace, projected date) for all active budgets or one budget, then stop.', [
                 'type' => 'object',
                 'properties' => [
                     'budget_id' => ['type' => 'integer', 'description' => 'Only this budget (optional)'],
@@ -160,7 +160,7 @@ PROMPT;
             $fn('show_comparison', 'Show the Period comparison card (income, expenses, net vs the previous period and per-tag deltas), then stop.', AgentPlanningTools::reportParameters()),
             $fn('show_report', 'Show a finance report card for a period and optional tag filter with Download PDF / Print / Send to Telegram buttons, then stop.', AgentPlanningTools::reportParameters()),
             $fn('show_recent', 'Show the Recent transactions card in the chat (10 newest), then stop.', $noArgs),
-            $fn('show_budgets', 'Show the Budgets card (limit, spent, progress) in the chat, then stop.', $noArgs),
+            $fn('show_budgets', 'Show the Budgets card (limits: limit, spent, progress; savings goals: saved of target, progress) in the chat, then stop.', $noArgs),
             $fn('show_tags', 'Show the Tags card in the chat and update session last_list, then stop.', $noArgs),
             $fn('show_recurring', 'Show the Recurring rules card in the chat, then stop.', $noArgs),
             $fn('show_month', 'Show the this-month summary card (income, expenses, net, top tags), then stop.', $noArgs),

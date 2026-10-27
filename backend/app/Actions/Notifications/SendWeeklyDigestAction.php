@@ -51,7 +51,7 @@ class SendWeeklyDigestAction
     {
         $transactions = Transaction::query()
             ->where('user_id', $user->id)
-            ->whereBetween('at', [$start->toDateString(), $end->toDateString()])
+            ->onDays($start, $end)
             ->with('tags')
             ->get();
 

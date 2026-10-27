@@ -78,7 +78,7 @@ class TelegramAgentToolExecutor
                 'type' => 'object',
                 'properties' => (object) [],
             ]),
-            $fn('show_budgets', 'Send the standard Budgets Telegram card.', [
+            $fn('show_budgets', 'Send the standard Budgets Telegram card (spending limits and savings goals).', [
                 'type' => 'object',
                 'properties' => (object) [],
             ]),
@@ -560,7 +560,7 @@ class TelegramAgentToolExecutor
 
         $this->session->setSummary($identity, $chatId, 'Budget created via agent confirm.');
         $label = $budget->title ?: ('Budget #' . $budget->id);
-        $this->client->sendMessage($chatId, '✅ Budget created: ' . $label);
+        $this->client->sendMessage($chatId, ($budget->isGoal() ? '✅ Savings goal created: ' : '✅ Budget created: ') . $label);
     }
 
     /**

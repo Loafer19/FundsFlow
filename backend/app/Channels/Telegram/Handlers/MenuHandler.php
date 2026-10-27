@@ -3,6 +3,7 @@
 namespace App\Channels\Telegram\Handlers;
 
 use App\Actions\Budgets\CalculateBudgetPeriodSpentAction;
+use App\Actions\Budgets\CalculateGoalProgressAction;
 use App\Actions\Budgets\ListBudgetsAction;
 use App\Actions\RecurringTransactions\ListRecurringTransactionsAction;
 use App\Actions\Tags\CreateTagAction;
@@ -11,11 +12,13 @@ use App\Actions\Transactions\ListTransactionsAction;
 use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
+use App\Models\Budget;
 use App\Models\BudgetPeriod;
 use App\Models\RecurringTransaction;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\GoalSummary;
 use App\Support\UserFormatter;
 
 class MenuHandler
@@ -30,6 +33,7 @@ class MenuHandler
         private readonly ListRecurringTransactionsAction $listRecurring,
         private readonly CalculateBudgetPeriodSpentAction $calculateBudgetSpent,
         private readonly TelegramChatSession $session,
+        private readonly CalculateGoalProgressAction $goalProgress,
     ) {}
 
     public function sendMonthSummary(User $user, int|string $chatId, int|string|null $telegramUserId = null): void
@@ -180,6 +184,7 @@ class MenuHandler
         $identity = $telegramUserId ?? $chatId;
         $budgets = $this->listBudgets->execute($user);
         $blocks = [];
+        $goals = [];
         $list = [];
 
         foreach ($budgets as $budget) {
@@ -192,6 +197,13 @@ class MenuHandler
             $label = $budget->title
                 ?: $period->tags->map(fn (Tag $tag) => trim($tag->emoji . ' ' . $tag->title))->filter()->implode(', ')
                 ?: 'Budget #' . $budget->id;
+
+            if ($budget->isGoal()) {
+                $goals[] = $this->goalBlock($user, $budget, $label);
+                $list[] = ['id' => (int) $budget->id, 'title' => $label];
+
+                continue;
+            }
 
             $spent = $this->calculateBudgetSpent->execute($period, $user);
             $limit = (float) $period->amount;
@@ -216,17 +228,25 @@ class MenuHandler
         $this->session->setDomain($identity, $chatId, 'budgets');
         $this->session->setLastList($identity, $chatId, $list);
 
-        if ($blocks === []) {
-            $this->session->setSummary($identity, $chatId, 'No active budgets.');
-            $this->client->sendMessage($chatId, 'No active budgets');
+        if ($blocks === [] && $goals === []) {
+            $this->session->setSummary($identity, $chatId, 'No active budgets or savings goals.');
+            $this->client->sendMessage($chatId, 'No active budgets or savings goals');
 
             return;
+        }
+
+        $sections = [];
+        if ($blocks !== []) {
+            $sections[] = "💰 <b>Budgets</b>\n\n" . implode("\n\n", $blocks);
+        }
+        if ($goals !== []) {
+            $sections[] = "🎯 <b>Savings goals</b>\n\n" . implode("\n\n", $goals);
         }
 
         $this->session->setSummary($identity, $chatId, 'Budgets listed.');
         $this->client->sendMessage(
             $chatId,
-            "💰 <b>Budgets</b>\n\n" . implode("\n\n", $blocks),
+            implode("\n\n", $sections),
             null,
             TelegramSupport::PARSE_HTML,
         );
@@ -318,5 +338,16 @@ class MenuHandler
         ]);
 
         $this->client->sendMessage($chatId, "✅ Tag created: {$tag->emoji} {$tag->title}");
+    }
+
+    private function goalBlock(User $user, Budget $budget, string $label): string
+    {
+        $progress = $this->goalProgress->execute($budget, $user);
+        $ratio = $progress['target'] > 0 ? min(1.0, $progress['saved'] / $progress['target']) : 0.0;
+        $lines = GoalSummary::lines($user, $progress);
+
+        return '<b>' . $this->support->escapeHtml($label) . "</b>\n"
+            . $this->support->progressBar($ratio) . ' ' . $progress['percent'] . "%\n"
+            . implode("\n", array_map(fn (string $line) => $this->support->escapeHtml($line), $lines));
     }
 }

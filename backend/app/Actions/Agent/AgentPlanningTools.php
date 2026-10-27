@@ -3,6 +3,7 @@
 namespace App\Actions\Agent;
 
 use App\Actions\Budgets\CalculateBudgetPeriodSpentAction;
+use App\Actions\Budgets\CalculateGoalProgressAction;
 use App\Actions\Budgets\DeleteBudgetAction;
 use App\Actions\Budgets\ListBudgetsAction;
 use App\Actions\Budgets\PauseBudgetAction;
@@ -73,6 +74,7 @@ class AgentPlanningTools
         private readonly DeleteRecurringTransactionAction $deleteRecurring,
         private readonly ListTransactionsAction $listTransactions,
         private readonly ListTagsAction $listTags,
+        private readonly CalculateGoalProgressAction $goalProgress,
     ) {}
 
     public static function isRead(string $name): bool
@@ -99,7 +101,7 @@ class AgentPlanningTools
         $tagIds = ['type' => 'array', 'items' => ['type' => 'integer']];
 
         return [
-            $fn('budget_status', 'Budget status for the current budget period: limit, spent, left, days left, safe daily allowance, average daily spend and projected end-of-period spend (status on_track|at_risk|over). Optional budget_id for one budget; include_paused also lists paused budgets (status paused).', [
+            $fn('budget_status', 'Budget status. Limits (type limit), for the current period: limit, spent, left, days left, safe daily allowance, average daily spend and projected end-of-period spend (status on_track|at_risk|over). Savings goals (type goal): saved of target, remaining, percent, deadline days left, required amount per month/week, monthly pace and projected reach date (status completed|on_track|behind|in_progress). Optional budget_id for one budget; include_paused also lists paused budgets (status paused).', [
                 'type' => 'object',
                 'properties' => [
                     'budget_id' => $id,
@@ -123,15 +125,19 @@ class AgentPlanningTools
                     'tag_ids' => $tagIds,
                 ],
             ]),
-            $fn('update_budget', 'Propose editing a budget (limit amount, length, tags, title). Stages Confirm/Cancel. Omitted fields keep their current value. A changed limit/length/tags starts a new budget period today (history kept); align_to_calendar defaults to the budget\'s current alignment.', [
+            $fn('update_budget', 'Propose editing a budget or savings goal. Stages Confirm/Cancel. Omitted fields keep their current value. Limits: amount, length, tags, title; a changed limit/length/tags starts a new budget period today (history kept); align_to_calendar defaults to the budget\'s current alignment. Goals: amount is the target; also tags, title, start_date (YYYY-MM-DD, today or earlier, not after the deadline: progress counts from that day), target_date (deadline, clear_target_date removes it) and start_amount (already saved before tracking); edited in place, progress keeps counting from the goal start unless start_date moves it. The type cannot change.', [
                 'type' => 'object',
                 'properties' => [
                     'id' => $id,
                     'title' => ['type' => 'string'],
                     'amount' => ['type' => 'number'],
-                    'length' => ['type' => 'string', 'enum' => ['week', 'month', 'year']],
+                    'length' => ['type' => 'string', 'enum' => ['week', 'month', 'year'], 'description' => 'Limits only'],
                     'tag_ids' => $tagIds,
-                    'align_to_calendar' => ['type' => 'boolean'],
+                    'align_to_calendar' => ['type' => 'boolean', 'description' => 'Limits only'],
+                    'start_date' => ['type' => 'string', 'description' => 'Goals only: start YYYY-MM-DD (today or earlier, not after target_date); progress counts from this day'],
+                    'target_date' => ['type' => 'string', 'description' => 'Goals only: deadline YYYY-MM-DD'],
+                    'clear_target_date' => ['type' => 'boolean', 'description' => 'Goals only: remove the deadline'],
+                    'start_amount' => ['type' => 'number', 'description' => 'Goals only: already saved before tracking (>= 0)'],
                 ],
                 'required' => ['id'],
             ]),
@@ -281,8 +287,14 @@ class AgentPlanningTools
 
             $label = $this->budgetLabel($budget, $period);
             $list[] = ['id' => (int) $budget->id, 'title' => $label];
+            if ($budget->isGoal()) {
+                $items[] = $this->goalStatus($user, $budget, $label);
+
+                continue;
+            }
             $items[] = $open ? $this->budgetPeriodStatus($user, $budget, $open, $now, $label) : [
                 'id' => (int) $budget->id,
+                'type' => 'limit',
                 'title' => $label,
                 'status' => 'paused',
                 'amount_limit' => (float) $period->amount,
@@ -337,6 +349,7 @@ class AgentPlanningTools
 
         return [
             'id' => (int) $budget->id,
+            'type' => 'limit',
             'title' => $label ?? $this->budgetLabel($budget, $period),
             'status' => $status,
             'length' => $period->length->value,
@@ -360,6 +373,46 @@ class AgentPlanningTools
             'projected_spend_formatted' => $money($projected),
             'projected_over_by' => max(0.0, round($projected - $limit, 2)),
             'tag_ids' => $this->periodTagIds($period),
+        ];
+    }
+
+    /**
+     * Savings goal progress for agents, cards and reports (see CalculateGoalProgressAction
+     * for the contribution rule: minus the net of tagged transactions since the goal start).
+     *
+     * @return array<string, mixed>
+     */
+    public function goalStatus(User $user, Budget $budget, ?string $label = null): array
+    {
+        $p = $this->goalProgress->execute($budget, $user);
+        $money = fn (?float $v): ?string => $v === null ? null : UserFormatter::formatMoney($user, $v);
+        $period = $budget->periods->first(fn (BudgetPeriod $x) => $x->ends_at === null) ?? $budget->periods->first();
+
+        return [
+            'id' => (int) $budget->id,
+            'type' => 'goal',
+            'title' => $label ?? ($period ? $this->budgetLabel($budget, $period) : ($budget->title ?: 'Goal #' . $budget->id)),
+            'status' => $p['status'],
+            'target' => $p['target'],
+            'target_formatted' => $money($p['target']),
+            'saved' => $p['saved'],
+            'saved_formatted' => $money($p['saved']),
+            'start_amount' => $p['start_amount'],
+            'contributed' => $p['contributed'],
+            'remaining' => $p['remaining'],
+            'remaining_formatted' => $money($p['remaining']),
+            'percent' => $p['percent'],
+            'started_at' => $p['started_at'],
+            'target_date' => $p['target_date'],
+            'days_left' => $p['days_left'],
+            'overdue' => $p['overdue'],
+            'required_amount' => $p['required_amount'],
+            'required_amount_formatted' => $money($p['required_amount']),
+            'required_per' => $p['required_per'],
+            'monthly_pace' => $p['monthly_pace'],
+            'monthly_pace_formatted' => $money($p['monthly_pace']),
+            'projected_date' => $p['projected_date'],
+            'tag_ids' => $p['tag_ids'],
         ];
     }
 
@@ -529,6 +582,10 @@ class AgentPlanningTools
             throw new InvalidArgumentException('budget has no periods');
         }
 
+        if ($budget->isGoal()) {
+            return $this->prepareUpdateGoal($user, $budget, $base, $current, $args);
+        }
+
         $amount = (float) $base->amount;
         if (array_key_exists('amount', $args) && $args['amount'] !== null) {
             if (!is_numeric($args['amount']) || (float) $args['amount'] < 0.01) {
@@ -619,13 +676,136 @@ class AgentPlanningTools
      * @param array<string, mixed> $args
      * @return array{payload: array<string, mixed>, preview: string}
      */
+    private function prepareUpdateGoal(User $user, Budget $budget, BudgetPeriod $base, ?BudgetPeriod $current, array $args): array
+    {
+        $money = fn (float $v): string => UserFormatter::formatMoney($user, $v);
+        $label = $this->budgetLabel($budget, $base);
+        $lines = ["Update savings goal “{$label}”:"];
+        $changed = false;
+
+        $amount = (float) $base->amount;
+        if (array_key_exists('amount', $args) && $args['amount'] !== null) {
+            $amount = $this->goalAmount($args['amount'], 'amount', 0.01);
+        }
+        $changed = $changed || abs($amount - (float) $base->amount) > 0.001;
+        $lines[] = abs($amount - (float) $base->amount) > 0.001
+            ? 'Target: ' . $money((float) $base->amount) . ' → ' . $money($amount)
+            : 'Target: ' . $money($amount);
+
+        $baseTagIds = $this->periodTagIds($base);
+        $tagIds = $baseTagIds;
+        if (is_array($args['tag_ids'] ?? null)) {
+            $owned = $this->ownedTagIds($user, $args['tag_ids']);
+            $kept = array_values(array_intersect(array_map('intval', array_filter($args['tag_ids'], 'is_numeric')), $baseTagIds));
+            $tagIds = array_values(array_unique(array_merge($owned, $kept)));
+            if ($tagIds === []) {
+                throw new InvalidArgumentException('tag_ids must contain at least one of the user\'s tags');
+            }
+        }
+        sort($tagIds);
+        $sortedBase = $baseTagIds;
+        sort($sortedBase);
+        $changed = $changed || $tagIds !== $sortedBase;
+        $lines[] = $tagIds !== $sortedBase
+            ? 'Tags: ' . $this->tagLabels($user, $baseTagIds) . ' → ' . $this->tagLabels($user, $tagIds)
+            : 'Tags: ' . $this->tagLabels($user, $tagIds);
+
+        $title = $budget->title;
+        $titleChanged = false;
+        if (array_key_exists('title', $args) && is_string($args['title'])) {
+            $new = mb_substr(trim($args['title']), 0, 255);
+            $new = $new === '' ? null : $new;
+            $titleChanged = $new !== $budget->title;
+            $title = $new;
+        }
+        if ($titleChanged) {
+            array_splice($lines, 1, 0, ['Title: ' . ($budget->title ?: '—') . ' → ' . ($title ?: '—')]);
+        }
+
+        $oldDate = $budget->target_date?->toDateString();
+        $targetDate = $oldDate;
+        if (filter_var($args['clear_target_date'] ?? false, FILTER_VALIDATE_BOOL)) {
+            $targetDate = null;
+        } elseif (isset($args['target_date'])) {
+            $targetDate = $this->dateArg($args['target_date'], 'target_date');
+        }
+        if ($targetDate !== $oldDate) {
+            $lines[] = 'Deadline: ' . ($oldDate ?? '—') . ' → ' . ($targetDate ?? '—');
+        }
+
+        $oldStartDate = $budget->goalStartDate();
+        $startDate = $oldStartDate;
+        if (isset($args['start_date'])) {
+            $startDate = $this->dateArg($args['start_date'], 'start_date');
+            if ($startDate !== null && $startDate > $user->todayDateString()) {
+                throw new InvalidArgumentException('start_date cannot be in the future');
+            }
+        }
+        if ($startDate !== null && $targetDate !== null && $startDate > $targetDate) {
+            throw new InvalidArgumentException('start_date must be on or before target_date');
+        }
+        $startDateChanged = $startDate !== null && $startDate !== $oldStartDate;
+        if ($startDateChanged) {
+            $lines[] = 'Start date: ' . ($oldStartDate ?? '—') . ' → ' . $startDate . ' (progress counts from this day)';
+        }
+
+        $oldStart = $budget->start_amount === null ? null : (float) $budget->start_amount;
+        $startAmount = $oldStart;
+        if (array_key_exists('start_amount', $args) && $args['start_amount'] !== null) {
+            $startAmount = $this->goalAmount($args['start_amount'], 'start_amount', 0.0);
+        }
+        if (abs(($startAmount ?? 0.0) - ($oldStart ?? 0.0)) > 0.001) {
+            $lines[] = 'Already saved: ' . $money($oldStart ?? 0.0) . ' → ' . $money($startAmount ?? 0.0);
+        }
+
+        $changed = $changed || $titleChanged || $startDateChanged || $targetDate !== $oldDate || abs(($startAmount ?? 0.0) - ($oldStart ?? 0.0)) > 0.001;
+        if (!$changed && $current) {
+            throw new InvalidArgumentException('nothing to change: values equal the current goal');
+        }
+        if (!$current) {
+            $lines[] = 'This goal is paused; saving resumes it.';
+        }
+
+        return [
+            'payload' => [
+                'id' => (int) $budget->id,
+                'title' => $title,
+                'title_changed' => $titleChanged,
+                'amount' => $amount,
+                'tag_ids' => $tagIds,
+                'start_date' => $startDateChanged ? $startDate : null,
+                'target_date' => $targetDate,
+                'start_amount' => $startAmount,
+            ],
+            'preview' => implode("\n", $lines),
+        ];
+    }
+
+    private function goalAmount(mixed $raw, string $field, float $min): float
+    {
+        if (!is_numeric($raw) || (float) $raw < $min || (float) $raw > 99_999_999.99) {
+            throw new InvalidArgumentException($min > 0 ? "{$field} must be a positive number" : "{$field} must be zero or more");
+        }
+
+        return round((float) $raw, 2);
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     * @return array{payload: array<string, mixed>, preview: string}
+     */
     private function prepareBudgetState(User $user, array $args, string $op): array
     {
         $budget = $this->findBudget($user, $args['id'] ?? null);
         $current = $budget->periods->first(fn (BudgetPeriod $p) => $p->ends_at === null);
         $base = $current ?? $budget->periods->sortByDesc(fn (BudgetPeriod $p) => $p->starts_at?->toDateString())->first();
         $label = $base ? $this->budgetLabel($budget, $base) : ($budget->title ?: 'Budget #' . $budget->id);
-        $terms = $base ? UserFormatter::formatMoney($user, (float) $base->amount) . ' / ' . $base->length->value : '';
+        $noun = $budget->isGoal() ? 'savings goal' : 'budget';
+        $terms = match (true) {
+            !$base => '',
+            $budget->isGoal() => 'target ' . UserFormatter::formatMoney($user, (float) $base->amount),
+            default => UserFormatter::formatMoney($user, (float) $base->amount) . ' / ' . $base->length->value,
+        };
 
         if ($op === 'pause' && !$current) {
             throw new InvalidArgumentException('budget is already paused');
@@ -638,9 +818,13 @@ class AgentPlanningTools
         }
 
         $preview = match ($op) {
-            'pause' => "Pause budget “{$label}” ({$terms}).\nTracking stops today; history is kept. You can resume it later.",
-            'resume' => "Resume budget “{$label}” ({$terms}) from today.\nTags: " . $this->tagLabels($user, $this->periodTagIds($base)),
-            default => "Delete budget “{$label}”" . ($terms !== '' ? " ({$terms})" : '') . " and all its history.\nThis can't be undone (pause keeps history instead).",
+            'pause' => $budget->isGoal()
+                ? "Pause savings goal “{$label}” ({$terms}).\nSaved progress is kept. You can resume it later."
+                : "Pause budget “{$label}” ({$terms}).\nTracking stops today; history is kept. You can resume it later.",
+            'resume' => $budget->isGoal()
+                ? "Resume savings goal “{$label}” ({$terms}).\nTags: " . $this->tagLabels($user, $this->periodTagIds($base))
+                : "Resume budget “{$label}” ({$terms}) from today.\nTags: " . $this->tagLabels($user, $this->periodTagIds($base)),
+            default => "Delete {$noun} “{$label}”" . ($terms !== '' ? " ({$terms})" : '') . " and all its history.\nThis can't be undone (pause keeps history instead).",
         };
 
         return ['payload' => ['id' => (int) $budget->id], 'preview' => $preview];
@@ -657,9 +841,28 @@ class AgentPlanningTools
             return ['ok' => false, 'message' => 'That budget no longer exists.', 'summary' => 'Budget to change no longer exists.'];
         }
         $label = $budget->title ?: ('Budget #' . $budget->id);
+        $noun = $budget->isGoal() ? 'Savings goal' : 'Budget';
 
         switch ($action) {
             case 'update_budget':
+                if ($budget->isGoal()) {
+                    $data = [
+                        'amount' => (float) $payload['amount'],
+                        'tag_ids' => array_map('intval', (array) ($payload['tag_ids'] ?? [])),
+                        'target_date' => $payload['target_date'] ?? null,
+                        'start_amount' => isset($payload['start_amount']) ? (float) $payload['start_amount'] : null,
+                    ];
+                    if (!empty($payload['start_date'])) {
+                        $data['start_date'] = (string) $payload['start_date'];
+                    }
+                    if (!empty($payload['title_changed'])) {
+                        $data['title'] = $payload['title'] ?? null;
+                    }
+                    $budget = $this->updateBudget->execute($user, $budget, $data);
+                    $label = $budget->title ?: ('Goal #' . $budget->id);
+
+                    return ['ok' => true, 'message' => '✅ Savings goal updated: ' . $label, 'summary' => 'Savings goal updated via agent confirm.'];
+                }
                 $data = [
                     'amount' => (float) $payload['amount'],
                     'length' => BudgetLength::from((string) $payload['length'])->value,
@@ -676,15 +879,15 @@ class AgentPlanningTools
             case 'pause_budget':
                 $this->pauseBudget->execute($user, $budget);
 
-                return ['ok' => true, 'message' => '⏸ Budget paused: ' . $label, 'summary' => 'Budget paused via agent confirm.'];
+                return ['ok' => true, 'message' => "⏸ {$noun} paused: " . $label, 'summary' => "{$noun} paused via agent confirm."];
             case 'resume_budget':
                 $this->resumeBudget->execute($user, $budget);
 
-                return ['ok' => true, 'message' => '▶️ Budget resumed: ' . $label, 'summary' => 'Budget resumed via agent confirm.'];
+                return ['ok' => true, 'message' => "▶️ {$noun} resumed: " . $label, 'summary' => "{$noun} resumed via agent confirm."];
             default:
                 $this->deleteBudget->execute($user, $budget);
 
-                return ['ok' => true, 'message' => '🗑 Budget deleted: ' . $label, 'summary' => 'Budget deleted via agent confirm.'];
+                return ['ok' => true, 'message' => "🗑 {$noun} deleted: " . $label, 'summary' => "{$noun} deleted via agent confirm."];
         }
     }
 
@@ -995,7 +1198,7 @@ class AgentPlanningTools
         return $raw;
     }
 
-    private function dateArg(mixed $raw, string $field): ?string
+    public function dateArg(mixed $raw, string $field): ?string
     {
         if ($raw === null || $raw === '') {
             return null;

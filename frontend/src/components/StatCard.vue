@@ -30,7 +30,18 @@
 </template>
 
 <script setup>
-import { CalendarDays, Gauge, Info, PiggyBank, Receipt, Scale, TrendingDown, TrendingUp } from 'lucide-vue-next'
+import {
+    CalendarDays,
+    Flag,
+    Gauge,
+    Info,
+    PiggyBank,
+    Receipt,
+    Scale,
+    Target,
+    TrendingDown,
+    TrendingUp,
+} from 'lucide-vue-next'
 import { computed } from 'vue'
 import { compareValues } from '../services/comparison.js'
 import { formatMoney, formatPercentage } from '../services/formatters.js'
@@ -53,7 +64,7 @@ const props = defineProps({
     // Neither direction is good or bad (e.g. transaction count): grey pill.
     neutral: { type: Boolean, default: false },
     hint: { type: String, default: '' },
-    // income · expenses · net · avg · savings · count · daily (unknown → no icon).
+    // income · expenses · net · avg · savings · count · daily · goal · done (unknown → no icon).
     icon: { type: String, default: '' },
 })
 
@@ -65,6 +76,8 @@ const ICONS = {
     savings: { component: PiggyBank, class: 'bg-secondary/15 text-secondary' },
     count: { component: Receipt, class: 'bg-base-content/10 text-base-content/70' },
     daily: { component: CalendarDays, class: 'bg-warning/15 text-warning' },
+    goal: { component: Target, class: 'bg-primary/15 text-primary' },
+    done: { component: Flag, class: 'bg-success/15 text-success' },
 }
 
 const iconMeta = computed(() => ICONS[props.icon] ?? null)

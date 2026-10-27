@@ -6,8 +6,8 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 //
 // Grouped by category: a visible set never shows two chips of one category, so it stays varied.
 // Optional flags:
-//   needs   'budgets' | 'recurring' | 'transactions' | 'tag'  shown only when that data exists
-//   unless  'budgets' | 'recurring'                            shown only when it does NOT exist (setup ideas)
+//   needs   'budgets' | 'goals' | 'recurring' | 'transactions' | 'tag'  shown only when that data exists
+//   unless  'budgets' | 'goals' | 'recurring'                            shown only when it does NOT exist (setup ideas)
 //   attach  chip opens the file picker with `prompt` prefilled instead of sending `text`
 // `{tag}` is replaced with the user's most used expense tag (needs: 'tag').
 
@@ -38,6 +38,9 @@ const CATEGORIES = {
         { text: 'Will any budget go over this month?', needs: 'budgets' },
         { text: 'Suggest budgets from my spending', unless: 'budgets' },
         { text: 'Set up a monthly groceries budget', unless: 'budgets' },
+        { text: 'How are my savings goals going?', needs: 'goals' },
+        { text: 'How much should I save per month to hit my goal?', needs: 'goals' },
+        { text: 'Set up a savings goal for a trip', unless: 'goals' },
     ],
     recurring: [
         { text: "What's due in the next 7 days?", needs: 'recurring' },
@@ -109,11 +112,12 @@ export function topExpenseTag(transactions) {
 
 /**
  * Prompts that make sense for this user right now, each with a pick weight.
- * ctx: { tab, hasBudgets, hasRecurring, hasTransactions, topTag }
+ * ctx: { tab, hasBudgets, hasGoals, hasRecurring, hasTransactions, topTag }
  */
 export function suggestionPool(ctx = {}) {
     const has = {
         budgets: Boolean(ctx.hasBudgets),
+        goals: Boolean(ctx.hasGoals),
         recurring: Boolean(ctx.hasRecurring),
         transactions: Boolean(ctx.hasTransactions),
         tag: Boolean(ctx.topTag),

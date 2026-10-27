@@ -45,6 +45,8 @@ const TRUST_PROXY = process.env.TRUST_PROXY ?? '1'
 // The backend has no explicit max, so larger values would only fail at the DB.
 const TX_AMOUNT_MAX = 9_999_999_999_999.99
 const RULE_AMOUNT_MAX = 99_999_999.99
+/** Savings goal deadline, YYYY-MM-DD (BudgetStoreRequest: date_format:Y-m-d). */
+const GOAL_DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
 
 const ALLOWED_HOSTS = (process.env.ALLOWED_HOSTS || '127.0.0.1,localhost,mcp.fundsflow.fun')
     .split(',')
@@ -603,7 +605,8 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         'list_budgets',
         {
             title: 'List budgets',
-            description: 'List all budgets.',
+            description:
+                'List all budgets: spending limits (type "limit") and savings goals (type "goal"). Goals include a progress object: saved, target, remaining, percent, status (completed|paused|on_track|behind|in_progress), days_left, required_amount per week|month, projected_date.',
             inputSchema: {},
         },
         async () => textResult(unwrapList(await api(token, '/budgets'))),
@@ -613,13 +616,18 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         'create_budget',
         {
             title: 'Create budget',
-            description: 'Create a budget. length is week|month|year. tag_ids required (at least one).',
+            description:
+                'Create a spending limit (type "limit", default; length week|month|year required) or a savings goal (type "goal"; amount is the target, length is ignored). tag_ids required (at least one). Goal progress = start_amount + net of transactions with these tags since start_date (YYYY-MM-DD, default today, may be in the past, not after target_date): expenses (transfers into savings) add, income (withdrawals) subtracts.',
             inputSchema: {
+                type: z.enum(['limit', 'goal']).optional(),
                 amount: z.number().min(0.01).max(RULE_AMOUNT_MAX),
-                length: z.enum(['week', 'month', 'year']),
+                length: z.enum(['week', 'month', 'year']).optional(),
                 tag_ids: z.array(z.number().int()).min(1),
                 title: z.string().max(255).optional(),
                 align_to_calendar: z.boolean().optional(),
+                start_date: GOAL_DATE.nullable().optional(),
+                target_date: GOAL_DATE.nullable().optional(),
+                start_amount: z.number().min(0).max(RULE_AMOUNT_MAX).nullable().optional(),
             },
         },
         async (args) =>
@@ -635,14 +643,18 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         'update_budget',
         {
             title: 'Update budget',
-            description: 'Update a budget by id (creates a new period version as the API defines).',
+            description:
+                'Update a budget by id. The type cannot change. Limits: creates a new period version (length required). Goals: edited in place, progress is kept; amount is the target; start_date (today or earlier) moves the day progress counts from and is kept when omitted; target_date/start_amount are left as is when omitted and cleared when null.',
             inputSchema: {
                 id: z.number().int(),
                 amount: z.number().min(0.01).max(RULE_AMOUNT_MAX),
-                length: z.enum(['week', 'month', 'year']),
+                length: z.enum(['week', 'month', 'year']).optional(),
                 tag_ids: z.array(z.number().int()).min(1),
                 title: z.string().max(255).optional(),
                 align_to_calendar: z.boolean().optional(),
+                start_date: GOAL_DATE.nullable().optional(),
+                target_date: GOAL_DATE.nullable().optional(),
+                start_amount: z.number().min(0).max(RULE_AMOUNT_MAX).nullable().optional(),
             },
         },
         async ({ id, ...body }) =>
