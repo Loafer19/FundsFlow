@@ -70,13 +70,15 @@ export const currentBucketEnd = (period, anchor = null, today = nowDateStr()) =>
 // Slices a closed period's whole [starts_at, ends_at] range into week/month/year buckets
 // on the budget's grid, clamped at both ends, so a budget that ran unedited for months
 // shows one comparable row per bucket instead of one misleading total.
-export const historyBuckets = (period, anchor = null) => {
+// An open period contributes its finished buckets (everything before the current one).
+export const historyBuckets = (period, anchor = null, today = nowDateStr()) => {
     const buckets = []
+    const last = period.ends_at ?? dayBefore(currentBucketStart(period, anchor, today))
     let cursor = period.starts_at
 
-    while (cursor <= period.ends_at) {
+    while (cursor <= last) {
         const { next } = periodBucket(period, anchor, cursor)
-        const end = next <= period.ends_at ? dayBefore(next) : period.ends_at
+        const end = next <= last ? dayBefore(next) : last
 
         buckets.push({ start: cursor, end })
         cursor = next

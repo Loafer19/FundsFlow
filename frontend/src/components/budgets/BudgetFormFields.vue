@@ -12,77 +12,68 @@
         </button>
     </div>
 
-    <p v-if="!typeLocked" class="text-sm text-base-content/60 -mt-2 mb-4">
-        <template v-if="goal">Save toward a target: money moved to the chosen tags counts as saved.</template>
-        <template v-else>Cap spending on a few tags per week, month or year.</template>
-    </p>
-
     <input type="text" v-model="form.title" :placeholder="goal ? 'Goal name, e.g. 🛟 Emergency fund' : 'Title (optional)'"
         aria-label="Title" class="input w-full mb-4" maxlength="255" autofocus />
 
     <AmountField v-model="form.amount" :signed="false" :max="99_999_999.99" :autofocus="false"
         :placeholder="goal ? 'Target amount' : 'Amount'" :label="goal ? 'Target amount' : 'Amount'" />
 
-    <template v-if="!goal">
-        <select v-model="form.length" class="select w-full mb-4" required aria-label="Budget length">
-            <option value="week">Weekly</option>
-            <option value="month">Monthly</option>
-            <option value="year">Yearly</option>
-        </select>
+    <!-- One row of two fields for both types, so switching Limit/Goal swaps fields in place. -->
+    <div class="grid grid-cols-2 gap-3" :class="goal ? 'mb-4' : 'mb-1'">
+        <label v-if="!goal" class="block min-w-0">
+            <span class="block text-sm text-base-content/60 mb-1">Frequency</span>
+            <select v-model="form.length" class="select w-full" required aria-label="Budget length">
+                <option value="week">Weekly</option>
+                <option value="month">Monthly</option>
+                <option value="year">Yearly</option>
+            </select>
+        </label>
+        <div class="min-w-0">
+            <label :for="startId" class="block text-sm text-base-content/60 mb-1">Start date</label>
+            <input :id="startId" type="date" v-model="form.start_date" class="input w-full"
+                :min="goal ? undefined : form.start_min || undefined" :max="goal ? startMax : today"
+                aria-label="Start date" />
+        </div>
+        <label v-if="goal" class="block min-w-0">
+            <span class="block text-sm text-base-content/60 mb-1">Deadline (optional)</span>
+            <input type="date" v-model="form.target_date" class="input w-full" :min="deadlineMin" aria-label="Deadline" />
+        </label>
+    </div>
 
-        <div class="flex items-baseline justify-between gap-2 mb-1">
-            <label for="budget-limit-start" class="text-sm text-base-content/60">Start date</label>
-            <button v-if="calendarStart" type="button" class="link link-primary text-xs"
-                @click="form.start_date = calendarStart">
+    <p v-if="!goal" class="text-xs text-base-content/60 mb-4">
+        {{ formatShort(limitBucket.start) }} – {{ formatShort(limitBucket.end) }}, then {{ frequencyWord }}<template
+            v-if="form.paused"> · resumes from the start date</template>
+        <template v-if="calendarStart">
+            ·
+            <button type="button" class="link link-primary" @click="form.start_date = calendarStart">
                 Start of this {{ form.length }}
             </button>
-        </div>
-        <input id="budget-limit-start" type="date" v-model="form.start_date" class="input w-full mb-1" :min="form.start_min || undefined"
-            :max="today" aria-label="Start date" />
-        <p class="text-xs text-base-content/60 mb-4">
-            <template v-if="limitBucket">
-                Current {{ form.length }}: {{ formatDay(limitBucket.start) }} – {{ formatDay(limitBucket.end) }}, then
-                every {{ form.length }} from the {{ repeatLabel }}.
-            </template>
-            <template v-if="form.paused"> Saving resumes this limit from the start date.</template>
-            <template v-else-if="startUnchanged"> Changing the amount, length or tags starts new settings from today
-                on the same schedule; past {{ form.length }}s stay in the history.</template>
-        </p>
-    </template>
+        </template>
+    </p>
 
-    <template v-if="goal">
-        <div class="text-sm text-base-content/60 mb-1">Savings tags</div>
-    </template>
+    <div class="flex items-center gap-1 text-sm text-base-content/60 mb-1">
+        <span>Tags</span>
+        <span class="tooltip tooltip-right before:max-w-56 before:text-left" :data-tip="tagsHint" tabindex="0"
+            role="img" :aria-label="tagsHint">
+            <Info :size="14" />
+        </span>
+    </div>
     <TagPicker v-model="form.tag_ids" />
 
-    <template v-if="goal">
-        <div class="grid grid-cols-2 gap-3">
-            <label class="block">
-                <span class="block text-sm text-base-content/60 mb-1">Start date</span>
-                <input type="date" v-model="form.start_date" class="input w-full mb-4" :max="startMax" aria-label="Start date" />
-            </label>
-            <label class="block">
-                <span class="block text-sm text-base-content/60 mb-1">Deadline (optional)</span>
-                <input type="date" v-model="form.target_date" class="input w-full mb-4" :min="deadlineMin"
-                    aria-label="Deadline" />
-            </label>
-        </div>
-
-        <div class="text-sm text-base-content/60 mb-1">Already saved before the start (optional)</div>
-        <AmountField v-model="form.start_amount" :signed="false" :max="99_999_999.99" :autofocus="false"
-            :required="false" placeholder="0" label="Already saved" />
-
-        <p class="text-xs text-base-content/60 mb-2">
-            Counts transactions with these tags from {{ startLabel }}: expenses (transfers into savings) add to the
-            goal, income (withdrawals) takes from it.
-        </p>
-    </template>
+    <details v-if="goal" class="mb-2" :open="showMore" @toggle="showMore = $event.target.open">
+        <summary class="text-sm text-base-content/60 cursor-pointer mb-2">More options</summary>
+        <label class="block">
+            <span class="block text-sm text-base-content/60 mb-1">Already saved</span>
+            <AmountField v-model="form.start_amount" :signed="false" :max="99_999_999.99" :autofocus="false"
+                :required="false" placeholder="0" label="Already saved" />
+        </label>
+    </details>
 </template>
 
 <script setup>
-import { Gauge, Target } from 'lucide-vue-next'
-import { computed } from 'vue'
-import { formatDate, nowDateStr, parseLocalDate, toLocalDateStr } from '../../services/formatters.js'
+import { Gauge, Info, Target } from 'lucide-vue-next'
+import { computed, ref, useId, watch } from 'vue'
+import { nowDateStr, parseLocalDate, toLocalDateStr } from '../../services/formatters.js'
 import { bucketBounds } from '../../services/limits.js'
 import AmountField from '../AmountField.vue'
 import TagPicker from '../TagPicker.vue'
@@ -113,11 +104,28 @@ const deadlineMin = computed(
     () => [props.typeLocked ? '' : tomorrow.value, form.value.start_date].filter(Boolean).sort().at(-1) || undefined,
 )
 
-const startLabel = computed(() =>
-    !form.value.start_date || form.value.start_date === today.value ? 'today' : formatDate(form.value.start_date),
+const startId = useId()
+
+// Goal "More options" (already saved): open when editing a goal that has one.
+const showMore = ref(false)
+
+watch(
+    () => form.value.id,
+    () => {
+        showMore.value = Boolean(Number(form.value.start_amount))
+    },
+    { immediate: true },
 )
 
-const formatDay = (dateStr) => formatDate(parseLocalDate(dateStr))
+const formatShort = (dateStr) => parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+const frequencyWord = computed(() => ({ week: 'weekly', month: 'monthly', year: 'yearly' })[form.value.length] ?? '')
+
+const tagsHint = computed(() =>
+    goal.value
+        ? 'Transactions with these tags since the start date count: expenses (transfers into savings) add to the goal, income (withdrawals) takes from it.'
+        : 'Spending on these tags counts toward the limit.',
+)
 
 const validStart = computed(() => /^\d{4}-\d{2}-\d{2}$/.test(form.value.start_date ?? ''))
 
@@ -136,30 +144,6 @@ const limitBucket = computed(() => {
     const bucket = bucketBounds(today.value, form.value.length, limitAnchor.value)
 
     return { start: [bucket.start, start].sort()[1], end: bucket.end }
-})
-
-const repeatLabel = computed(() => {
-    const anchor = parseLocalDate(limitAnchor.value || '2001-01-01')
-
-    if (form.value.length === 'week') {
-        return limitAnchor.value ? anchor.toLocaleDateString('en-US', { weekday: 'long' }) : 'Monday'
-    }
-    if (form.value.length === 'month') {
-        if (!limitAnchor.value) return '1st'
-        const day = anchor.getDate()
-        const suffix =
-            day % 10 === 1 && day !== 11
-                ? 'st'
-                : day % 10 === 2 && day !== 12
-                  ? 'nd'
-                  : day % 10 === 3 && day !== 13
-                    ? 'rd'
-                    : 'th'
-
-        return `${day}${suffix}`
-    }
-
-    return limitAnchor.value ? anchor.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'January 1'
 })
 
 // "Start of this month" shortcut: the calendar start, when allowed and not already set.

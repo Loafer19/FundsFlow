@@ -12,43 +12,46 @@
                 <input type="text" v-model="form.note" placeholder="Note (optional)" aria-label="Note"
                     class="input w-full mb-4" maxlength="255" />
 
-                <select v-model="form.frequency" class="select w-full mb-4" required aria-label="Recurring frequency">
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                </select>
+                <label class="block mb-4">
+                    <span class="block text-sm text-base-content/60 mb-1">Frequency</span>
+                    <select v-model="form.frequency" class="select w-full" required aria-label="Recurring frequency">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
+                    </select>
+                </label>
 
                 <div class="text-sm text-base-content/60 mb-1">Starts</div>
-                <input type="date" v-model="form.starts_at" class="input w-full mb-4" required />
+                <DateChips v-model="form.starts_at" :presets="startPresets" label="Starts" />
 
                 <div class="text-sm text-base-content/60 mb-1">Ends</div>
-                <div class="join w-full" :class="endMode === 'none' ? 'mb-4' : 'mb-1'">
-                    <button type="button" class="btn join-item flex-1" :class="{ 'btn-active': endMode === 'none' }"
+                <div class="join w-full" :class="endMode === 'none' ? 'mb-4' : 'mb-2'">
+                    <button type="button" class="btn btn-sm join-item flex-1" :class="{ 'btn-active': endMode === 'none' }"
                         @click="endMode = 'none'">No end</button>
-                    <button type="button" class="btn join-item flex-1" :class="{ 'btn-active': endMode === 'count' }"
+                    <button type="button" class="btn btn-sm join-item flex-1" :class="{ 'btn-active': endMode === 'count' }"
                         @click="endMode = 'count'">Times</button>
-                    <button type="button" class="btn join-item flex-1" :class="{ 'btn-active': endMode === 'date' }"
+                    <button type="button" class="btn btn-sm join-item flex-1" :class="{ 'btn-active': endMode === 'date' }"
                         @click="endMode = 'date'">Date</button>
                 </div>
 
                 <template v-if="endMode === 'count'">
                     <input type="number" min="1" v-model="occurrences" placeholder="Number of times"
                         aria-label="Number of times" class="input w-full" />
-                    <div class="text-sm text-base-content/60 mb-4 mt-1">
+                    <div class="text-xs text-base-content/60 mb-4 mt-1">
                         <template v-if="computedEndsAt">Ends around {{ formatDate(computedEndsAt) }}</template>
                     </div>
                 </template>
 
                 <template v-else-if="endMode === 'date'">
-                    <input type="date" v-model="form.ends_at" class="input w-full" />
-                    <div class="text-sm text-base-content/60 mb-4 mt-1">
+                    <input type="date" v-model="form.ends_at" class="input w-full" aria-label="End date" />
+                    <div class="text-xs text-base-content/60 mb-4 mt-1">
                         <template v-if="form.ends_at">~{{ estimatedOccurrences }} occurrence{{ estimatedOccurrences ===
                             1 ? '' : 's' }}</template>
                     </div>
                 </template>
 
-
+                <div class="text-sm text-base-content/60 mb-1">Tags</div>
                 <TagPicker v-model="form.tags" />
 
                 <div class="modal-action">
@@ -70,8 +73,10 @@
 import { Repeat, Save } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import AmountField from '../components/AmountField.vue'
+import DateChips from '../components/DateChips.vue'
 import TagPicker from '../components/TagPicker.vue'
-import { formatDate, nowDateStr } from '../services/formatters.js'
+import { today } from '../services/clock.js'
+import { formatDate, nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 
 import { advanceDateStr } from '../services/recurringSchedule.js'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
@@ -98,6 +103,20 @@ const createDefault = () => ({
 })
 
 const form = ref(createDefault())
+
+// Quick starts: today, or the 1st of next month (a past 1st would make the next run
+// back-fill an occurrence that may already have been logged by hand).
+const startPresets = computed(() => {
+    const first = parseLocalDate(today.value)
+
+    first.setDate(1)
+    first.setMonth(first.getMonth() + 1)
+
+    return [
+        { label: 'Today', value: today.value },
+        { label: first.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: toLocalDateStr(first) },
+    ]
+})
 const endMode = ref('none')
 const occurrences = ref('')
 

@@ -182,7 +182,7 @@ const chipClass = computed(
 )
 const cardBorder = computed(() => (status.value === 'over' ? 'border-error/40' : 'border-base-300'))
 
-// Closed periods sliced into week/month/year buckets on the budget's schedule, newest first, one compact pass/fail row each.
+// Closed periods plus the open one's finished buckets, sliced into week/month/year buckets on the budget's schedule, newest first, one compact pass/fail row each.
 const history = computed(() => {
     const currentIds = tags.value
         .map((tag) => tag.id)
@@ -190,7 +190,7 @@ const history = computed(() => {
         .join(',')
 
     return props.budget.periods
-        .filter((period) => !period.active && period.ends_at)
+        .filter((period) => period.ends_at || period.active)
         .flatMap((period) => {
             const amount = Number(period.amount)
             const tagsChanged =

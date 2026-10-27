@@ -12,16 +12,23 @@
                 <input type="text" v-model="form.note" placeholder="Note (optional)" aria-label="Note"
                     class="input w-full mb-4" maxlength="255" />
 
-                <select v-model="form.frequency" class="select w-full mb-4" required aria-label="Recurring frequency">
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                </select>
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <label class="block min-w-0">
+                        <span class="block text-sm text-base-content/60 mb-1">Frequency</span>
+                        <select v-model="form.frequency" class="select w-full" required aria-label="Recurring frequency">
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="yearly">Yearly</option>
+                        </select>
+                    </label>
+                    <label class="block min-w-0">
+                        <span class="block text-sm text-base-content/60 mb-1">Ends (optional)</span>
+                        <input type="date" v-model="form.ends_at" class="input w-full" aria-label="End date" />
+                    </label>
+                </div>
 
-                <div class="text-sm text-base-content/60 mb-1">Ends (optional)</div>
-                <input type="date" v-model="form.ends_at" class="input w-full mb-4" />
-
+                <div class="text-sm text-base-content/60 mb-1">Tags</div>
                 <TagPicker v-model="form.tags" />
 
                 <div class="modal-action">

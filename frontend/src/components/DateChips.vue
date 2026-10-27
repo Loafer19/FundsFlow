@@ -1,13 +1,8 @@
 <template>
-    <div class="flex gap-2 mb-4 flex-wrap" role="radiogroup" aria-label="Date">
-        <button type="button" role="radio" class="btn btn-sm" :class="chipClass(isToday)" :aria-checked="isToday"
-            @click="pick(today)">
-            Today
-        </button>
-
-        <button type="button" role="radio" class="btn btn-sm" :class="chipClass(isYesterday)"
-            :aria-checked="isYesterday" @click="pick(yesterday)">
-            Yesterday
+    <div class="flex gap-2 mb-4 flex-wrap" role="radiogroup" :aria-label="label">
+        <button v-for="chip in chips" :key="chip.label" type="button" role="radio" class="btn btn-sm"
+            :class="chipClass(model === chip.value)" :aria-checked="model === chip.value" @click="pick(chip.value)">
+            {{ chip.label }}
         </button>
 
         <label role="radio" class="btn btn-sm relative" :class="chipClass(isOther)" :aria-checked="isOther">
@@ -27,6 +22,12 @@ import { today } from '../services/clock.js'
 import { formatDate, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { haptic } from '../services/telegramWebApp.js'
 
+const props = defineProps({
+    // Quick picks [{ label, value: 'YYYY-MM-DD' }]; default Today / Yesterday.
+    presets: { type: Array, default: null },
+    label: { type: String, default: 'Date' },
+})
+
 // Empty until the parent fills it (e.g. the Edit modal before a row is picked).
 const model = defineModel({ type: String, default: '' })
 
@@ -37,9 +38,15 @@ const yesterday = computed(() => {
     return toLocalDateStr(date)
 })
 
-const isToday = computed(() => model.value === today.value)
-const isYesterday = computed(() => model.value === yesterday.value)
-const isOther = computed(() => Boolean(model.value) && !isToday.value && !isYesterday.value)
+const chips = computed(
+    () =>
+        props.presets ?? [
+            { label: 'Today', value: today.value },
+            { label: 'Yesterday', value: yesterday.value },
+        ],
+)
+
+const isOther = computed(() => Boolean(model.value) && !chips.value.some((chip) => chip.value === model.value))
 
 const chipClass = (active) => (active ? 'btn-primary' : 'btn-ghost border-base-300')
 
