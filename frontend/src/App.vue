@@ -150,72 +150,65 @@
             </div>
 
             <div class="mb-4 -mx-4 px-4 overflow-x-auto">
-                <div class="tabs tabs-box gap-2 p-0 w-max min-w-full sm:w-auto sm:min-w-0" role="tablist"
+                <div class="tabs tabs-box gap-2 p-0 w-max min-w-full sm:w-auto sm:min-w-0" role="radiogroup"
                     aria-label="Main views">
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
-                        :aria-selected="selectedTab === markRaw(Analytics)">
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                         <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(Analytics)" aria-hidden="true" />
+                            :value="markRaw(Analytics)" />
 
                         <Presentation :size="22" />
 
                         Analytics
                     </label>
 
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
-                        :aria-selected="selectedTab === markRaw(CalendarTab)">
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                         <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(CalendarTab)" aria-hidden="true" />
+                            :value="markRaw(CalendarTab)" />
 
                         <CalendarDays :size="22" />
 
                         Calendar
                     </label>
 
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
-                        :aria-selected="selectedTab === markRaw(Budgets)">
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                         <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(Budgets)" aria-hidden="true" />
+                            :value="markRaw(Budgets)" />
 
                         <PiggyBank :size="22" />
 
                         Budgets
                     </label>
 
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
-                        :aria-selected="selectedTab === markRaw(TagDistribution)">
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                         <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(TagDistribution)" aria-hidden="true" />
+                            :value="markRaw(TagDistribution)" />
 
                         <Tags :size="22" />
 
                         Tags
                     </label>
 
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
-                        :aria-selected="selectedTab === markRaw(MoneyFlow)">
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                         <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(MoneyFlow)" aria-hidden="true" />
+                            :value="markRaw(MoneyFlow)" />
 
                         <ArrowLeftRight :size="22" />
 
                         Flow
                     </label>
 
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
-                        :aria-selected="selectedTab === markRaw(BalanceTrend)">
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                         <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(BalanceTrend)" aria-hidden="true" />
+                            :value="markRaw(BalanceTrend)" />
 
                         <TrendingUp :size="22" />
 
                         Trend
                     </label>
 
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0" role="tab"
-                        :aria-selected="selectedTab === markRaw(TableTab)">
+                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
                         <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(TableTab)" aria-hidden="true" />
+                            :value="markRaw(TableTab)" />
 
                         <Table :size="22" />
 

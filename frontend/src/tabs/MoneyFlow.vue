@@ -30,20 +30,8 @@
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-            <div v-for="item in comparison" :key="item.key"
-                class="card card-border border-base-300 bg-base-100">
-                <div class="card-body p-4 gap-1">
-                    <div class="text-xs uppercase tracking-wide text-base-content/60">{{ item.label }}</div>
-                    <div class="text-lg font-semibold">{{ formatMoney(item.current) }}</div>
-                    <div class="flex items-center gap-2 text-xs">
-                        <span class="text-base-content/60">vs {{ formatMoney(item.previous) }}</span>
-                        <span class="badge badge-sm" :class="item.badge">
-                            {{ item.delta >= 0 ? '+' : '' }}{{ formatMoney(item.delta) }}
-                            <template v-if="item.pct !== null"> ({{ item.pct >= 0 ? '+' : '' }}{{ formatPercentage(item.pct) }})</template>
-                        </span>
-                    </div>
-                </div>
-            </div>
+            <StatCard v-for="item in comparison" :key="item.key" :label="item.label" :current="item.current"
+                :previous="item.previous" />
         </div>
 
         <div class="card card-border border-base-300 bg-base-100">
@@ -58,7 +46,8 @@
 import { computed, ref, watch } from 'vue'
 import BarChart from '../components/charts/BarChart.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { formatMoney, formatPercentage, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
+import StatCard from '../components/StatCard.vue'
+import { parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
 const transactionsStore = useTransactionsStore()
@@ -199,19 +188,12 @@ const totals = (start, end) =>
 const comparison = computed(() => {
     const cur = totals(props.dateRange.currentStart, props.dateRange.currentEnd)
     const prev = totals(props.dateRange.previousStart, props.dateRange.previousEnd)
-    // higherIsBetter: income/net up is good; expenses are negative, so a higher (less negative) value is also good.
-    const rows = [
+
+    return [
         { key: 'income', label: 'Income', current: cur.income, previous: prev.income },
         { key: 'expenses', label: 'Expenses', current: cur.expenses, previous: prev.expenses },
         { key: 'net', label: 'Net', current: cur.income + cur.expenses, previous: prev.income + prev.expenses },
     ]
-    return rows.map((r) => {
-        const delta = r.current - r.previous
-        const pct = r.previous === 0 ? null : (delta / Math.abs(r.previous)) * 100
-        let badge = 'badge-ghost'
-        if (Math.abs(delta) > 0.004) badge = delta > 0 ? 'badge-success' : 'badge-error'
-        return { ...r, delta, pct, badge }
-    })
 })
 </script>
 
