@@ -6,9 +6,9 @@
                     <Repeat :size="24" />
                     Recurring
                 </h2>
-                <button @click="showModal('recurring_add_modal')" class="btn btn-outline btn-info btn-sm">
-                    Add Recurring
+                <button type="button" @click="showModal('recurring_add_modal')" class="btn btn-primary btn-sm">
                     <Plus :size="20" />
+                    Add Recurring
                 </button>
             </div>
 

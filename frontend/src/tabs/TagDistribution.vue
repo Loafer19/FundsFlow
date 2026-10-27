@@ -16,14 +16,16 @@
                     <div>
                         <h3 class="text-xl font-medium mb-2">Income</h3>
                         <div v-if="positiveTagsWithAmount.length > 0">
-                            <TagDonutChart :tagsWithAmount="positiveTagsWithAmount" />
+                            <TagDonutChart :tagsWithAmount="positiveTagsWithAmount" :clickable="!inReport"
+                                @select="openDetail($event, 'income')" />
                         </div>
                         <div v-else class="text-base-content/60 py-8 text-center">No income in this period</div>
                     </div>
                     <div>
                         <h3 class="text-xl font-medium mb-2">Expenses</h3>
                         <div v-if="negativeTagsWithAmount.length > 0">
-                            <TagDonutChart :tagsWithAmount="negativeTagsWithAmount" />
+                            <TagDonutChart :tagsWithAmount="negativeTagsWithAmount" :clickable="!inReport"
+                                @select="openDetail($event, 'expenses')" />
                         </div>
                         <div v-else class="text-base-content/60 py-8 text-center">No expenses in this period</div>
                     </div>

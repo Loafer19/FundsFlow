@@ -14,7 +14,14 @@ const props = defineProps({
         type: Array,
         required: true,
     },
+    /** Emit `select` on slice click and show a pointer over slices. */
+    clickable: {
+        type: Boolean,
+        default: false,
+    },
 })
+
+const emit = defineEmits(['select'])
 
 const formatMoney = inject('formatMoney')
 
@@ -43,6 +50,14 @@ const chartData = computed(() => {
 
 const chartOptions = {
     responsive: true,
+    onClick: (_event, elements) => {
+        const tag = props.tagsWithAmount[elements[0]?.index]
+        if (props.clickable && tag?.clickable) emit('select', tag)
+    },
+    onHover: (event, elements) => {
+        if (!props.clickable || !event.native?.target) return
+        event.native.target.style.cursor = elements.length ? 'pointer' : 'default'
+    },
     plugins: {
         legend: {
             position: 'bottom',

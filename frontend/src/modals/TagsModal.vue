@@ -6,9 +6,9 @@
                     <Tag :size="24" />
                     Manage Tags
                 </h2>
-                <button @click="showModal('tags_add_modal')" class="btn btn-outline btn-info btn-sm">
-                    Add Tag
+                <button type="button" @click="showModal('tags_add_modal')" class="btn btn-primary btn-sm">
                     <Plus :size="20" />
+                    Add Tag
                 </button>
             </div>
 
@@ -28,21 +28,23 @@
                                     <span>{{ tag.title }}</span>
                                 </div>
                             </td>
-                            <td class="flex justify-end gap-1">
+                            <td class="text-right">
                                 <button v-if="tagsStore.isLoading == tag.id"
                                     class="btn btn-outline btn-error btn-square btn-sm" disabled>
                                     <span class="loading loading-spinner text-error"></span>
                                 </button>
-                                <button v-else type="button" class="btn btn-outline btn-secondary btn-square btn-sm"
-                                    aria-label="Edit"
-                                    @click="tagsStore.tagForEdit = tag; showModal('tags_edit_modal')"
-                                    :disabled="tagsStore.isLoading">
-                                    <Pencil :size="20" />
-                                </button>
+                                <div v-else class="flex justify-end gap-1">
+                                    <button type="button" class="btn btn-outline btn-secondary btn-square btn-sm tooltip"
+                                        data-tip="Edit" aria-label="Edit"
+                                        @click="tagsStore.tagForEdit = tag; showModal('tags_edit_modal')"
+                                        :disabled="tagsStore.isLoading">
+                                        <Pencil :size="20" />
+                                    </button>
 
-                                <DeleteHold :id="tag.id" :disabled="tagsStore.isLoading"
-                                    :isLoading="tagsStore.isLoading === tag.id"
-                                    @delete="(id) => tagsStore.delete(id)" />
+                                    <DeleteHold :id="tag.id" :disabled="tagsStore.isLoading"
+                                        :isLoading="tagsStore.isLoading === tag.id"
+                                        @delete="(id) => tagsStore.delete(id)" />
+                                </div>
                             </td>
                         </tr>
                     </tbody>

@@ -7,27 +7,35 @@
             </h2>
 
             <form ref="formRef" @submit.prevent="handleSubmit">
-                <input type="text" v-model="tag.title" placeholder="Title" aria-label="Title"
-                    class="input w-full mb-4" maxlength="255" required autofocus />
-
-                <select v-model="tag.parent_id" class="select w-full mb-4" aria-label="Parent tag">
-                    <option value="">No Parent</option>
-                    <option v-for="parent in parentOptions" :key="parent.id" :value="parent.id">
-                        {{ parent.title }}
-                    </option>
-                </select>
-
-                <div class="mb-4">
-                    <div class="badge badge-soft badge-info text-xl py-4 px-2">
-                        Choose an emoji: {{ tag.emoji || randomEmoji }}
-                    </div>
+                <div class="flex items-end gap-3 mb-4">
+                    <label class="block min-w-0 flex-1">
+                        <span class="block text-sm text-base-content/60 mb-1">Title</span>
+                        <input type="text" v-model="tag.title" placeholder="e.g. Groceries" aria-label="Title"
+                            class="input w-full" maxlength="255" required autofocus />
+                    </label>
+                    <button type="button" class="btn btn-ghost btn-square text-2xl"
+                        :class="pickerOpen ? 'border-primary' : 'border-base-300'"
+                        :aria-label="pickerOpen ? 'Close emoji picker' : 'Choose emoji'" :aria-expanded="pickerOpen"
+                        @click="pickerOpen = !pickerOpen">
+                        {{ tag.emoji || randomEmoji }}
+                    </button>
                 </div>
 
-                <LazyEmojiPicker v-if="hasOpened" class="mb-4" @select="setEmoji" />
+                <LazyEmojiPicker v-if="pickerOpen" class="mb-4" @select="setEmoji" />
 
-                <label class="label">
-                    <input v-model="tag.calc_balance" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
-                    Show in Balances
+                <label class="block mb-4">
+                    <span class="block text-sm text-base-content/60 mb-1">Parent</span>
+                    <select v-model="tag.parent_id" class="select w-full" aria-label="Parent tag">
+                        <option value="">No Parent</option>
+                        <option v-for="parent in parentOptions" :key="parent.id" :value="parent.id">
+                            {{ parent.title }}
+                        </option>
+                    </select>
+                </label>
+
+                <label class="flex items-center justify-between gap-3 cursor-pointer mb-4">
+                    <span class="text-sm">Show in Balances</span>
+                    <input v-model="tag.calc_balance" type="checkbox" class="toggle toggle-primary toggle-sm" />
                 </label>
 
                 <div class="modal-action">
@@ -47,7 +55,7 @@
 
 <script setup>
 import { Save, Tag } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import LazyEmojiPicker from '../components/LazyEmojiPicker.js'
 import { useDialogOpen } from '../services/dialogOpen.js'
 import { randomEmoji as pickRandomEmoji } from '../services/emojiDefaults.js'
@@ -56,7 +64,14 @@ import { useTelegramPrimary } from '../services/telegramChrome.js'
 
 const randomEmoji = pickRandomEmoji()
 
-const { hasOpened } = useDialogOpen('tags_add_modal')
+const { isOpen } = useDialogOpen('tags_add_modal')
+
+// The emoji picker opens from the button next to Title; it is mounted only while open.
+const pickerOpen = ref(false)
+
+watch(isOpen, (open) => {
+    if (!open) pickerOpen.value = false
+})
 
 const tagsStore = useTagsStore()
 
@@ -79,6 +94,7 @@ const tag = ref({ ...tag_default })
 
 const setEmoji = (emoji) => {
     tag.value.emoji = emoji.native
+    pickerOpen.value = false
 }
 
 const parentOptions = computed(() => {

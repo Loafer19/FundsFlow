@@ -1,7 +1,7 @@
 <template>
     <div class="mb-4">
-        <div class="flex items-center justify-between gap-2 mb-2">
-            <span class="text-sm font-medium">Attachments</span>
+        <div class="flex items-center justify-between gap-2 mb-1">
+            <span class="text-sm text-base-content/60">Attachments</span>
             <span class="text-xs text-base-content/50">{{ totalCount }}/{{ MAX_PER_TRANSACTION }} · images & PDF</span>
         </div>
 

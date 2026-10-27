@@ -1,17 +1,20 @@
 <template>
     <dialog id="transactions_add_modal" class="modal" aria-labelledby="transactions_add_modal_title">
         <div class="modal-box max-w-sm">
-            <h2 id="transactions_add_modal_title" class="card-title mb-4">Add Transaction</h2>
+            <h2 id="transactions_add_modal_title" class="card-title mb-4">
+                <ArrowLeftRight :size="24" />
+                Add Transaction
+            </h2>
 
             <form ref="formRef" @submit.prevent="handleSubmit">
                 <DateChips v-model="transaction.at" />
 
                 <AmountField v-model="transaction.amount" />
 
-                <TagPicker v-model="transaction.tags" />
+                <input type="text" v-model="transaction.note" placeholder="Note (optional)" aria-label="Note"
+                    class="input w-full mb-4" maxlength="255" />
 
-                <input type="text" v-model="transaction.note" class="input w-full mb-4" placeholder="Note"
-                    aria-label="Note" maxlength="255" />
+                <TagPicker v-model="transaction.tags" />
 
                 <AttachmentField v-model:pending="pendingFiles" :busy="Boolean(transactionsStore.isLoading)" />
 
@@ -19,7 +22,7 @@
                     <button type="submit" class="btn btn-success tg-primary" :disabled="transactionsStore.isLoading">
                         <span v-if="transactionsStore.isLoading" class="loading loading-spinner"></span>
                         Save
-                        <Save :size="20" />
+                        <Save :size="24" />
                     </button>
                 </div>
             </form>
@@ -31,7 +34,7 @@
 </template>
 
 <script setup>
-import { Save } from 'lucide-vue-next'
+import { ArrowLeftRight, Save } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
 import AmountField from '../components/AmountField.vue'
 import AttachmentField from '../components/AttachmentField.vue'
