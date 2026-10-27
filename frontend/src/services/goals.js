@@ -85,7 +85,7 @@ export const goalProgress = (budget, transactions, today = nowDateStr()) => {
     let requiredAmount = null
     let requiredPer = null
 
-    if (deadline && !completed && remaining > 0) {
+    if (deadline && !completed && !overdue && remaining > 0) {
         const left = Math.max(1, daysLeftRaw)
         requiredPer = left < WEEKLY_BELOW_DAYS ? 'week' : 'month'
         const units = requiredPer === 'week' ? Math.max(1, left / 7) : left / DAYS_PER_MONTH

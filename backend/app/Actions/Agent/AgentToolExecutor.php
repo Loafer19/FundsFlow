@@ -2,7 +2,6 @@
 
 namespace App\Actions\Agent;
 
-use App\Actions\Budgets\CalculateBudgetPeriodSpentAction;
 use App\Actions\Budgets\CreateBudgetAction;
 use App\Actions\Budgets\ListBudgetsAction;
 use App\Actions\RecurringTransactions\ListRecurringTransactionsAction;
@@ -52,7 +51,6 @@ class AgentToolExecutor
         private readonly ListTransactionsAction $listTransactions,
         private readonly ListBudgetsAction $listBudgets,
         private readonly ListRecurringTransactionsAction $listRecurring,
-        private readonly CalculateBudgetPeriodSpentAction $calculateBudgetSpent,
         private readonly CreateTransactionAction $createTransaction,
         private readonly UpdateTransactionAction $updateTransaction,
         private readonly DeleteTransactionAction $deleteTransaction,
@@ -89,7 +87,7 @@ class AgentToolExecutor
                     'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => self::MAX_TRANSACTIONS_PAGE],
                 ],
             ]),
-            'list_budgets' => self::fn('list_budgets', 'List active budgets: spending limits (type limit: current-period limit, spent, progress percent) and savings goals (type goal: saved of target, remaining, percent, deadline, status completed|on_track|behind|in_progress).', [
+            'list_budgets' => self::fn('list_budgets', 'List active budgets: spending limits (type limit: the current period with its dates, limit, spent, left, percent rounded down, days left, schedule) and savings goals (type goal: saved of target, remaining, percent, deadline, status completed|on_track|behind|in_progress).', [
                 'type' => 'object',
                 'properties' => (object) [],
             ]),
@@ -172,7 +170,7 @@ class AgentToolExecutor
                 ],
                 'required' => ['id'],
             ]),
-            'create_budget' => self::fn('create_budget', 'Propose creating a budget. Stages Confirm/Cancel. type limit (default): a spending limit; length week|month|year required; optional start_date YYYY-MM-DD (today or earlier): the limit starts that day and its periods repeat from it (monthly from the 15th runs 15th → 14th, weekly from that weekday); without start_date it starts at the beginning of the current calendar week/month/year (so spending already made this period counts) — pass today\'s date only if the user wants it to start today. align_to_calendar is a legacy flag (true = start of the current calendar period). type goal: a savings goal; amount is the target, tag_ids are the savings tags whose transactions count as contributions from today (transfers into savings logged as expenses add to it, withdrawals subtract), optional start_date (YYYY-MM-DD, default today, may be in the past: contributions count from that day), target_date deadline and start_amount already saved; no length. tag_ids required for both.', [
+            'create_budget' => self::fn('create_budget', 'Propose creating a budget. Stages Confirm/Cancel. type limit (default): a spending limit; length week|month|year required; optional start_date YYYY-MM-DD (today or earlier): the limit starts that day and its periods repeat from it (monthly from the 15th runs 15th → 14th, weekly from that weekday); without start_date it starts at the beginning of the current calendar week/month/year (so spending already made this period counts) — pass today\'s date only if the user wants it to start today. align_to_calendar is a legacy flag (true = start of the current calendar period). type goal: a savings goal; amount is the target, tag_ids are the savings tags whose transactions count as contributions from the start date (transfers into savings logged as expenses add to it, withdrawals subtract), optional start_date (YYYY-MM-DD, default today, may be in the past: contributions count from that day), target_date deadline (today or later) and start_amount already saved; no length. tag_ids required for both.', [
                 'type' => 'object',
                 'properties' => [
                     'type' => ['type' => 'string', 'enum' => ['limit', 'goal']],
@@ -182,7 +180,7 @@ class AgentToolExecutor
                     'tag_ids' => ['type' => 'array', 'items' => ['type' => 'integer']],
                     'align_to_calendar' => ['type' => 'boolean', 'description' => 'Limits only, legacy: true = start at the current calendar week/month/year (the default when start_date is omitted)'],
                     'start_date' => ['type' => 'string', 'description' => 'Optional start YYYY-MM-DD, today or earlier. Limits: periods repeat from this day (default: start of the current calendar week/month/year). Goals: progress counts transactions from this day (default today; not after target_date)'],
-                    'target_date' => ['type' => 'string', 'description' => 'Goals only: optional deadline YYYY-MM-DD'],
+                    'target_date' => ['type' => 'string', 'description' => 'Goals only: optional deadline YYYY-MM-DD, today or later'],
                     'start_amount' => ['type' => 'number', 'description' => 'Goals only: optional amount already saved before tracking'],
                 ],
                 'required' => ['amount', 'tag_ids'],
@@ -382,6 +380,7 @@ class AgentToolExecutor
     public function listBudgets(User $user, AgentSession $session): array
     {
         $budgets = $this->listBudgets->execute($user);
+        $now = $user->nowInTimezone();
         $items = [];
         $list = [];
 
@@ -391,33 +390,10 @@ class AgentToolExecutor
                 continue;
             }
 
-            $label = $budget->title
-                ?: $period->tags->map(fn (Tag $tag) => trim($tag->emoji . ' ' . $tag->title))->filter()->implode(', ')
-                ?: 'Budget #' . $budget->id;
-
-            if ($budget->isGoal()) {
-                $items[] = $this->planning->goalStatus($user, $budget, $label);
-                $list[] = ['id' => (int) $budget->id, 'title' => $label];
-
-                continue;
-            }
-
-            $spent = $this->calculateBudgetSpent->execute($period, $user);
-            $limit = (float) $period->amount;
-            $pct = $limit > 0 ? (int) round(($spent / $limit) * 100) : 0;
-
-            $items[] = [
-                'id' => (int) $budget->id,
-                'type' => 'limit',
-                'title' => $label,
-                'amount_limit' => $limit,
-                'amount_limit_formatted' => UserFormatter::formatMoney($user, $limit),
-                'spent' => $spent,
-                'spent_formatted' => UserFormatter::formatMoney($user, $spent),
-                'percent' => $pct,
-                'length' => $period->length?->value ?? (string) $period->length,
-                'tag_ids' => $period->tags->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
-            ];
+            $label = $budget->label($period);
+            $items[] = $budget->isGoal()
+                ? $this->planning->goalStatus($user, $budget, $label)
+                : $this->planning->budgetPeriodStatus($user, $budget, $period, $now, $label);
             $list[] = ['id' => (int) $budget->id, 'title' => $label];
         }
 
@@ -672,42 +648,51 @@ class AgentToolExecutor
             throw new \InvalidArgumentException('amount is required');
         }
         $amount = (float) $args['amount'];
+
         if ($amount <= 0) {
             throw new \InvalidArgumentException('amount must be positive');
         }
+
         if ($amount > 99_999_999.99) {
             throw new \InvalidArgumentException('amount is too large');
         }
 
         $type = (string) ($args['type'] ?? 'limit');
+
         if (!in_array($type, ['limit', 'goal'], true)) {
             throw new \InvalidArgumentException('type must be limit|goal');
         }
+
         if ($type === 'goal') {
             return $this->prepareCreateGoal($user, $args, round($amount, 2));
         }
 
         $length = (string) ($args['length'] ?? '');
+
         if (!in_array($length, ['week', 'month', 'year'], true)) {
             throw new \InvalidArgumentException('length must be week|month|year');
         }
 
         $tagIds = $this->sanitizeOwnedTagIds($user, $args['tag_ids'] ?? []);
+
         if ($tagIds === []) {
             throw new \InvalidArgumentException('tag_ids required (at least one owned tag)');
         }
 
         $title = is_string($args['title'] ?? null) ? mb_substr(trim((string) $args['title']), 0, 255) : null;
         $startDate = $this->planning->dateArg($args['start_date'] ?? null, 'start_date');
+
         if ($startDate !== null && $startDate > $user->todayDateString()) {
             throw new \InvalidArgumentException('start_date cannot be in the future');
         }
-        if ($startDate === null) {
-            $align = array_key_exists('align_to_calendar', $args) ? filter_var($args['align_to_calendar'], FILTER_VALIDATE_BOOL) : true;
-            $startDate = $align
-                ? BudgetLength::from($length)->calendarStart($user->nowInTimezone())->toDateString()
-                : $user->todayDateString();
+
+        // Default (no start_date): calendar weeks/months/years, counting from the start of the
+        // current one. Legacy align_to_calendar=false means "start today".
+        if ($startDate === null && array_key_exists('align_to_calendar', $args) && !filter_var($args['align_to_calendar'], FILTER_VALIDATE_BOOL)) {
+            $startDate = $user->todayDateString();
         }
+        $lengthEnum = BudgetLength::from($length);
+        $notBefore = $startDate ?? $lengthEnum->calendarStart($user->nowInTimezone())->toDateString();
 
         $payload = [
             'title' => $title !== '' ? $title : null,
@@ -717,11 +702,11 @@ class AgentToolExecutor
             'start_date' => $startDate,
         ];
 
-        $preview = 'Create budget:' . "\n"
+        $preview = 'Create limit:' . "\n"
             . ($title ? "{$title}\n" : '')
             . UserFormatter::formatMoney($user, $amount) . " / {$length}\n"
             . 'Tags: ' . $this->tagLabels($user, $tagIds) . "\n"
-            . 'Period: ' . $this->planning->limitPeriodHint($user, BudgetLength::from($length), $startDate);
+            . 'Period: ' . $this->planning->limitPeriodHint($user, $lengthEnum, $lengthEnum->anchorFor($startDate), $notBefore);
 
         return ['payload' => $payload, 'preview' => $preview];
     }
@@ -817,8 +802,8 @@ class AgentToolExecutor
             'amount' => (float) $payload['amount'],
             'length' => (string) $payload['length'],
             'tag_ids' => $tagIds,
+            // Null = calendar periods from the start of the current one (CreateBudgetAction).
             'start_date' => $payload['start_date'] ?? null,
-            'align_to_calendar' => (bool) ($payload['align_to_calendar'] ?? false),
         ]);
     }
 
@@ -1115,25 +1100,30 @@ class AgentToolExecutor
     private function prepareCreateGoal(User $user, array $args, float $amount): array
     {
         $tagIds = $this->sanitizeOwnedTagIds($user, $args['tag_ids'] ?? []);
+
         if ($tagIds === []) {
             throw new \InvalidArgumentException('tag_ids required (at least one owned tag: the savings tag(s) whose transactions count toward the goal)');
         }
 
         $title = is_string($args['title'] ?? null) ? mb_substr(trim((string) $args['title']), 0, 255) : null;
         $targetDate = $this->planning->dateArg($args['target_date'] ?? null, 'target_date');
-        if ($targetDate !== null && $targetDate <= $user->todayDateString()) {
-            throw new \InvalidArgumentException('target_date must be in the future');
+
+        if ($targetDate !== null && $targetDate < $user->todayDateString()) {
+            throw new \InvalidArgumentException(Budget::DEADLINE_ERROR);
         }
 
         $startDate = $this->planning->dateArg($args['start_date'] ?? null, 'start_date');
+
         if ($startDate !== null && $startDate > $user->todayDateString()) {
             throw new \InvalidArgumentException('start_date cannot be in the future');
         }
+
         if ($startDate !== null && $targetDate !== null && $startDate > $targetDate) {
             throw new \InvalidArgumentException('start_date must be on or before target_date');
         }
 
         $startAmount = null;
+
         if (isset($args['start_amount']) && $args['start_amount'] !== '') {
             if (!is_numeric($args['start_amount']) || (float) $args['start_amount'] < 0 || (float) $args['start_amount'] > 99_999_999.99) {
                 throw new \InvalidArgumentException('start_amount must be zero or more');
@@ -1144,10 +1134,10 @@ class AgentToolExecutor
         $money = fn (float $v): string => UserFormatter::formatMoney($user, $v);
         $preview = 'Create savings goal:' . "\n"
             . ($title ? "{$title}\n" : '')
-            . 'Target: ' . $money($amount) . ($targetDate ? " by {$targetDate}" : '') . "\n"
+            . 'Target: ' . $money($amount) . ($targetDate ? ' by ' . UserFormatter::formatDate($user, $targetDate) : '') . "\n"
             . ($startAmount ? 'Already saved: ' . $money($startAmount) . "\n" : '')
             . 'Tags: ' . $this->tagLabels($user, $tagIds) . "\n"
-            . 'Counts transactions with these tags from ' . ($startDate && $startDate !== $user->todayDateString() ? $startDate : 'today') . ': transfers into savings (expenses) add, withdrawals subtract.';
+            . 'Counts transactions with these tags from ' . ($startDate && $startDate !== $user->todayDateString() ? UserFormatter::formatDate($user, $startDate) : 'today') . ': transfers into savings (expenses) add, withdrawals subtract.';
 
         return [
             'payload' => [

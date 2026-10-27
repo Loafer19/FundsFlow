@@ -7,6 +7,7 @@ use App\Models\Budget;
 use App\Models\BudgetPeriod;
 use App\Models\User;
 use App\Support\TagIds;
+use App\Support\UserFormatter;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
@@ -100,7 +101,7 @@ class UpdateBudgetAction
         if ($current) {
             if ($startDate !== null && $startDate !== $current->starts_at->toDateString()) {
                 $this->assertStartAfterHistory($budget, $current, $startDate);
-                $budget->update(['anchor_date' => $startDate]);
+                $budget->update(['anchor_date' => $length->anchorFor($startDate)]);
                 $current->update($fields + ['starts_at' => $startDate]);
                 $current->tags()->sync($tagIds);
 
@@ -143,7 +144,7 @@ class UpdateBudgetAction
             $this->assertStartAfterHistory($budget, null, $startsAt);
 
             if ($startDate !== null) {
-                $budget->update(['anchor_date' => $startDate]);
+                $budget->update(['anchor_date' => $length->anchorFor($startDate)]);
             }
         }
 
@@ -170,7 +171,7 @@ class UpdateBudgetAction
 
         if ($lastEnd !== null && $startDate < $lastEnd) {
             throw ValidationException::withMessages([
-                'start_date' => "The start date must be on or after {$lastEnd}, when the previous settings ended.",
+                'start_date' => 'The start date must be on or after ' . UserFormatter::formatDate($budget->user, $lastEnd) . ', when the previous settings ended.',
             ]);
         }
     }

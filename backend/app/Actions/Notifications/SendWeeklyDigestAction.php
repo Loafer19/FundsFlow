@@ -2,15 +2,25 @@
 
 namespace App\Actions\Notifications;
 
+use App\Actions\Budgets\CalculateGoalProgressAction;
+use App\Actions\Budgets\CalculateLimitStatusAction;
+use App\Actions\Budgets\ListBudgetsAction;
 use App\Channels\Telegram\TelegramClient;
+use App\Models\BudgetPeriod;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\GoalSummary;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
 
 class SendWeeklyDigestAction
 {
-    public function __construct(private readonly TelegramClient $client) {}
+    public function __construct(
+        private readonly TelegramClient $client,
+        private readonly ListBudgetsAction $listBudgets,
+        private readonly CalculateLimitStatusAction $limitStatus,
+        private readonly CalculateGoalProgressAction $goalProgress,
+    ) {}
 
     public function execute(): void
     {
@@ -37,11 +47,72 @@ class SendWeeklyDigestAction
 
             $previous = $this->summarize($user, $previousStart, $previousEnd);
 
+            $message = $this->formatMessage($user, $start, $end, $current, $previous);
+            $budgets = $this->budgetLines($user);
+
             $this->client->sendMessage(
                 $identity->external_id,
-                $this->formatMessage($user, $start, $end, $current, $previous),
+                $budgets === [] ? $message : $message . "\n\n" . implode("\n", $budgets),
             );
         }
+    }
+
+    /**
+     * Current state of active limits and goals, e.g.
+     *   💰 Limits
+     *   Groceries — ₴7,200 / ₴10,000 (72%) · 5 days left
+     *   🎯 Goals
+     *   Vacation — ₴12,000 / ₴50,000 (24%) · behind
+     *
+     * @return list<string>
+     */
+    public function budgetLines(User $user): array
+    {
+        $limits = [];
+        $goals = [];
+        $money = fn (float $v): string => UserFormatter::formatMoney($user, $v);
+
+        foreach ($this->listBudgets->execute($user) as $budget) {
+            $period = $budget->periods->first(fn (BudgetPeriod $p) => $p->ends_at === null);
+
+            if (!$period) {
+                continue;
+            }
+
+            $label = $budget->label($period);
+
+            if ($budget->isGoal()) {
+                $g = $this->goalProgress->execute($budget, $user);
+                $goals[] = $label . ' — ' . $money($g['saved']) . ' / ' . $money($g['target'])
+                    . ' (' . $g['percent'] . '%) · ' . GoalSummary::statusLabel($g['status']);
+
+                continue;
+            }
+
+            $st = $this->limitStatus->execute($period, $user);
+            $tail = match ($st['status']) {
+                'over' => $st['left'] < 0 ? 'over by ' . $money(-$st['left']) : 'limit reached',
+                default => $st['days_left'] === 1 ? 'last day' : $st['days_left'] . ' days left',
+            };
+            $limits[] = ($st['status'] === 'over' ? '🔴 ' : ($st['status'] === 'at_risk' ? '🟠 ' : ''))
+                . $label . ' — ' . $money($st['spent']) . ' / ' . $money($st['limit'])
+                . ' (' . $st['percent'] . '%) · ' . $tail;
+        }
+
+        $lines = [];
+
+        if ($limits !== []) {
+            $lines = ['💰 Limits', ...$limits];
+        }
+
+        if ($goals !== []) {
+            if ($lines !== []) {
+                $lines[] = '';
+            }
+            $lines = [...$lines, '🎯 Goals', ...$goals];
+        }
+
+        return $lines;
     }
 
     /**

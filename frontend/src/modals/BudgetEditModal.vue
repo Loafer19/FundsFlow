@@ -33,6 +33,7 @@ import BudgetFormFields from '../components/budgets/BudgetFormFields.vue'
 import { budgetPayload } from '../services/budgetPayload.js'
 import { useBudgetsStore } from '../services/budgets.js'
 import { nowDateStr } from '../services/formatters.js'
+import { chainStart } from '../services/limits.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
 
 const budgetsStore = useBudgetsStore()
@@ -84,10 +85,13 @@ watch(
             tag_ids: current.tags.map((tag) => tag.id),
             start_date: goal ? (budget.start_date ?? earliestStart(budget.periods)) : limitStart,
             start_original: goal ? '' : limitStart,
+            // The run the open limit belongs to: edits keep counting from the active period's start.
+            chain_start: !goal && current.active ? chainStart(current, budget.periods) : '',
             paused: !current.active,
             anchor_original: budget.anchor_date ?? '',
             start_min: goal ? '' : (closedEnds.at(-1) ?? ''),
             target_date: budget.target_date ?? '',
+            target_original: budget.target_date ?? '',
             start_amount: budget.start_amount ?? '',
         }
     },

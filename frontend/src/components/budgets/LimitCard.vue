@@ -128,7 +128,7 @@ import { CalendarClock, Check, ChevronRight, Gauge, Pause, Pencil, Play, Trendin
 import { computed, inject } from 'vue'
 import { useBudgetsStore } from '../../services/budgets.js'
 import { formatDate, formatMoney } from '../../services/formatters.js'
-import { historyBuckets, limitProgress, spentBetween } from '../../services/limits.js'
+import { historyBuckets, limitPercent, limitProgress, spentBetween } from '../../services/limits.js'
 import { useTransactionsStore } from '../../services/transactions.js'
 import DeleteHold from '../buttons/DeleteHold.vue'
 
@@ -148,7 +148,9 @@ const latest = computed(() => current.value ?? props.budget.periods[0] ?? null)
 const tags = computed(() => latest.value?.tags ?? [])
 
 const p = computed(() =>
-    current.value ? limitProgress(current.value, transactionsStore, props.budget.anchor_date) : null,
+    current.value
+        ? limitProgress(current.value, props.budget.periods, transactionsStore, props.budget.anchor_date)
+        : null,
 )
 
 const frequencyLabel = computed(
@@ -182,7 +184,7 @@ const chipClass = computed(
 )
 const cardBorder = computed(() => (status.value === 'over' ? 'border-error/40' : 'border-base-300'))
 
-// Closed periods plus the open one's finished buckets, sliced into week/month/year buckets on the budget's schedule, newest first, one compact pass/fail row each.
+// Closed versions (from their effective start; a version replaced mid-period hands that period to its successor) plus the open one's finished buckets, sliced into week/month/year buckets on the budget's schedule, newest first, one compact pass/fail row each.
 const history = computed(() => {
     const currentIds = tags.value
         .map((tag) => tag.id)
@@ -199,7 +201,7 @@ const history = computed(() => {
                     .sort()
                     .join(',') !== currentIds
 
-            return historyBuckets(period, props.budget.anchor_date)
+            return historyBuckets(period, props.budget.periods, props.budget.anchor_date)
                 .reverse()
                 .map((bucket) => {
                     const spent = spentBetween(transactionsStore, bucket.start, bucket.end, period.tags)
@@ -210,7 +212,7 @@ const history = computed(() => {
                         amount,
                         spent,
                         ok: spent <= amount,
-                        percent: amount > 0 ? Math.round((spent / amount) * 100) : 0,
+                        percent: limitPercent(spent, amount),
                         tagsChanged,
                         emojis: period.tags.map((tag) => tag.emoji).join(''),
                     }

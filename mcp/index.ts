@@ -606,7 +606,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         {
             title: 'List budgets',
             description:
-                'List all budgets: spending limits (type "limit") and savings goals (type "goal"). Goals include a progress object: saved, target, remaining, percent, status (completed|paused|on_track|behind|in_progress), days_left, required_amount per week|month, projected_date.',
+                'List all budgets: spending limits (type "limit") and savings goals (type "goal"). Active limits include current_period: start, end, amount, spent, left, percent (rounded down), days_left, status (on_track|at_risk|over); spent counts from the start of the current period even if the limit was edited during it; null when paused. Goals include a progress object: saved, target, remaining, percent, status (completed|paused|on_track|behind|in_progress), days_left, required_amount per week|month, projected_date.',
             inputSchema: {},
         },
         async () => textResult(unwrapList(await api(token, '/budgets'))),
@@ -617,7 +617,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         {
             title: 'Create budget',
             description:
-                'Create a spending limit (type "limit", default; length week|month|year required; optional start_date YYYY-MM-DD, today or earlier, default today: the limit starts that day and its periods repeat from it, e.g. monthly from the 15th runs 15th → 14th; legacy align_to_calendar=true starts it at the beginning of the current calendar week/month/year) or a savings goal (type "goal"; amount is the target, length is ignored). tag_ids required (at least one). Goal progress = start_amount + net of transactions with these tags since start_date (YYYY-MM-DD, default today, may be in the past, not after target_date): expenses (transfers into savings) add, income (withdrawals) subtracts.',
+                'Create a spending limit (type "limit", default; length week|month|year required; without start_date it runs on calendar weeks/months/years from the start of the current one (spending already made this period counts); pass start_date YYYY-MM-DD (today or earlier) only when the user names a start day: its periods then repeat from it, e.g. monthly from the 15th runs 15th → 14th; legacy align_to_calendar is still accepted, false = start today) or a savings goal (type "goal"; amount is the target, length is ignored). tag_ids required (at least one). Goal progress = start_amount + net of transactions with these tags since start_date (YYYY-MM-DD, default today, may be in the past, not after target_date); target_date must be today or later: expenses (transfers into savings) add, income (withdrawals) subtracts.',
             inputSchema: {
                 type: z.enum(['limit', 'goal']).optional(),
                 amount: z.number().min(0.01).max(RULE_AMOUNT_MAX),
@@ -644,7 +644,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         {
             title: 'Update budget',
             description:
-                'Update a budget by id. The type cannot change. Limits (length required): a changed amount/length/tags closes the current period today and starts a new one on the same schedule (history kept); start_date (today or earlier, not before the previous settings ended) moves the start of the current period in place and its periods then repeat from that day; omitted = keep the current start; on a paused limit saving resumes it from start_date (default today); legacy align_to_calendar=true puts it on calendar weeks/months/years. Goals: edited in place, progress is kept; amount is the target; start_date (today or earlier) moves the day progress counts from and is kept when omitted; target_date/start_amount are left as is when omitted and cleared when null.',
+                'Update a budget by id. The type cannot change. Limits (length required): a changed amount/length/tags applies to the whole current period (spent still counts from its start; history kept); start_date (today or earlier, not before the previous settings ended) moves the start of the current period in place and its periods then repeat from that day; omitted = keep the current start; on a paused limit saving resumes it from start_date (default today); legacy align_to_calendar=true puts it on calendar weeks/months/years. Goals: edited in place, progress is kept; amount is the target; start_date (today or earlier) moves the day progress counts from and is kept when omitted; target_date/start_amount are left as is when omitted and cleared when null; a new target_date must be today or later.',
             inputSchema: {
                 id: z.number().int(),
                 amount: z.number().min(0.01).max(RULE_AMOUNT_MAX),

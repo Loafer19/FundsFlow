@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Collection;
 
 class BudgetPeriod extends Model
 {
@@ -53,6 +54,25 @@ class BudgetPeriod extends Model
     public function bucketBounds(CarbonInterface $date): array
     {
         return $this->length->bucketBounds($date, $this->budget?->anchor_date);
+    }
+
+    /**
+     * All versions of this period's budget (this one included), for bucket maths.
+     *
+     * @return Collection<int, BudgetPeriod>
+     */
+    public function siblings(): Collection
+    {
+        $budget = $this->budget;
+
+        if (!$budget) {
+            return collect([$this]);
+        }
+
+        $periods = $budget->periods;
+        $periods->each(fn (BudgetPeriod $p) => $p->relationLoaded('budget') || $p->setRelation('budget', $budget));
+
+        return $periods->contains(fn (BudgetPeriod $p) => $p->id === $this->id) ? $periods : $periods->toBase()->concat([$this]);
     }
 
     public function isActive(): bool

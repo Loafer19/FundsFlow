@@ -1,5 +1,5 @@
 // Spending-limit maths for the Budgets tab (mirrors BudgetLength::bucketBounds,
-// CalculateBudgetPeriodSpentAction and AgentPlanningTools::budgetPeriodStatus). All dates
+// LimitBuckets and CalculateLimitStatusAction). All dates
 // are 'YYYY-MM-DD' strings in the user's timezone. Buckets of all of a budget's periods
 // repeat from budget.anchor_date (monthly from the 15th runs 15th → 14th); a null anchor
 // (older limits) means calendar weeks (Mon–Sun), months and years.
@@ -61,20 +61,73 @@ export const bucketBounds = (dateStr, length, anchorStr = null) => {
 
 const periodBucket = (period, anchor, dateStr) => bucketBounds(dateStr, period.length, anchor)
 
-export const currentBucketStart = (period, anchor = null, today = nowDateStr()) =>
-    // The later of the bucket boundary and the period start (ISO date strings sort as dates).
-    [periodBucket(period, anchor, today).start, period.starts_at].sort()[1]
+// Versions sorted by start (ties by id), mirroring LimitBuckets::sorted.
+const sortedPeriods = (periods) =>
+    [...periods].sort((a, b) => (a.starts_at === b.starts_at ? a.id - b.id : a.starts_at < b.starts_at ? -1 : 1))
+
+// Edits (amount, length, tags) close the open version and open a new one the same day; a
+// pause leaves a gap. previous() is the closed version this one directly continues, if any.
+const previousPeriod = (period, periods) => {
+    const prev = sortedPeriods(periods)
+        .filter(
+            (p) =>
+                p.id !== period.id &&
+                p.ends_at &&
+                (p.starts_at < period.starts_at || (p.starts_at === period.starts_at && p.id < period.id)),
+        )
+        .at(-1)
+
+    return prev && prev.ends_at >= dayBefore(period.starts_at) ? prev : null
+}
+
+// First day of the run of back-to-back versions the period belongs to.
+export const chainStart = (period, periods) => {
+    let current = period
+    let prev = previousPeriod(current, periods)
+
+    for (let guard = 0; prev && guard < 1000; guard++) {
+        current = prev
+        prev = previousPeriod(current, periods)
+    }
+
+    return current.starts_at
+}
+
+// A version counts from the start of the bucket containing its starts_at (so a mid-period
+// edit applies to the whole active period), never before the start of its run.
+export const effectiveStart = (period, periods, anchor = null) =>
+    [periodBucket(period, anchor, period.starts_at).start, chainStart(period, periods)].sort()[1]
+
+// Last day a closed version owns: ends_at, or the day before the next back-to-back
+// version's effective start when that is earlier (no day is counted twice).
+export const closedEnd = (period, periods, anchor = null) => {
+    if (!period.ends_at) return null
+
+    const next = sortedPeriods(periods).find(
+        (p) => p.id !== period.id && p.starts_at >= period.starts_at && previousPeriod(p, periods)?.id === period.id,
+    )
+
+    return next ? [period.ends_at, dayBefore(effectiveStart(next, periods, anchor))].sort()[0] : period.ends_at
+}
+
+// periods: all versions of the budget (budget.periods); anchor: budget.anchor_date.
+export const currentBucketStart = (period, periods, anchor = null, today = nowDateStr()) =>
+    // The later of the bucket boundary and the version's effective start (ISO strings sort as dates).
+    [periodBucket(period, anchor, today).start, effectiveStart(period, periods, anchor)].sort()[1]
 
 export const currentBucketEnd = (period, anchor = null, today = nowDateStr()) => periodBucket(period, anchor, today).end
 
-// Slices a closed period's whole [starts_at, ends_at] range into week/month/year buckets
-// on the budget's grid, clamped at both ends, so a budget that ran unedited for months
-// shows one comparable row per bucket instead of one misleading total.
-// An open period contributes its finished buckets (everything before the current one).
-export const historyBuckets = (period, anchor = null, today = nowDateStr()) => {
+// Slices a version's finished range into week/month/year buckets on the budget's grid,
+// clamped at both ends, so a limit that ran unedited for months shows one comparable row per
+// bucket instead of one misleading total. A closed version runs from its effective start to
+// its closedEnd (empty when a later edit took over its only bucket); the open one contributes
+// the buckets before the current one.
+export const historyBuckets = (period, periods, anchor = null, today = nowDateStr()) => {
     const buckets = []
-    const last = period.ends_at ?? dayBefore(currentBucketStart(period, anchor, today))
-    let cursor = period.starts_at
+    const last = period.ends_at
+        ? closedEnd(period, periods, anchor)
+        : dayBefore(currentBucketStart(period, periods, anchor, today))
+    let cursor = effectiveStart(period, periods, anchor)
 
     while (cursor <= last) {
         const { next } = periodBucket(period, anchor, cursor)
@@ -97,6 +150,10 @@ export const spentBetween = (transactionsStore, start, end, tags) => {
         .reduce((sum, t) => sum - t.amount, 0)
 }
 
+// Rounded down (99.6% spent is not 100%), like CalculateLimitStatusAction::percent.
+export const limitPercent = (spent, amount) =>
+    amount > 0 ? Math.floor(Math.round((spent / amount) * 100 * 1e6) / 1e6) : 0
+
 export const limitStatus = (spent, amount) => {
     if (amount > 0 && spent > amount) return 'over'
     if (amount > 0 && spent >= amount * NEAR_LIMIT_RATIO) return 'near'
@@ -106,8 +163,10 @@ export const limitStatus = (spent, amount) => {
 
 // Current-bucket snapshot of an active limit period.
 // anchor: budget.anchor_date (null = calendar weeks/months/years).
-export const limitProgress = (period, transactionsStore, anchor = null, today = nowDateStr()) => {
-    const start = currentBucketStart(period, anchor, today)
+// periods: all versions of the budget, so spending since the start of the active period
+// counts even when the limit was edited mid-period (matches CalculateLimitStatusAction).
+export const limitProgress = (period, periods, transactionsStore, anchor = null, today = nowDateStr()) => {
+    const start = currentBucketStart(period, periods, anchor, today)
     const end = currentBucketEnd(period, anchor, today)
     const amount = Number(period.amount)
     const spent = spentBetween(transactionsStore, start, today, period.tags)
@@ -122,7 +181,7 @@ export const limitProgress = (period, transactionsStore, anchor = null, today = 
         amount,
         spent,
         left,
-        percent: amount > 0 ? Math.round((spent / amount) * 100) : 0,
+        percent: limitPercent(spent, amount),
         status: limitStatus(spent, amount),
         totalDays,
         elapsedDays,

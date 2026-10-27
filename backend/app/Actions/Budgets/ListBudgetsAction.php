@@ -16,6 +16,13 @@ class ListBudgetsAction
     {
         Gate::forUser($user)->authorize('viewAny', Budget::class);
 
-        return $user->budgets()->with('periods.tags')->get();
+        $budgets = $user->budgets()->with('periods.tags')->get();
+
+        // Bucket maths reads budget.anchor_date and sibling periods: link them without extra queries.
+        foreach ($budgets as $budget) {
+            $budget->periods->each(fn ($period) => $period->setRelation('budget', $budget));
+        }
+
+        return $budgets;
     }
 }

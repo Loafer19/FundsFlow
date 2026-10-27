@@ -2,8 +2,8 @@
 
 namespace App\Channels\Telegram\Handlers;
 
-use App\Actions\Budgets\CalculateBudgetPeriodSpentAction;
 use App\Actions\Budgets\CalculateGoalProgressAction;
+use App\Actions\Budgets\CalculateLimitStatusAction;
 use App\Actions\Budgets\ListBudgetsAction;
 use App\Actions\RecurringTransactions\ListRecurringTransactionsAction;
 use App\Actions\Tags\CreateTagAction;
@@ -31,7 +31,7 @@ class MenuHandler
         private readonly CreateTagAction $createTag,
         private readonly ListBudgetsAction $listBudgets,
         private readonly ListRecurringTransactionsAction $listRecurring,
-        private readonly CalculateBudgetPeriodSpentAction $calculateBudgetSpent,
+        private readonly CalculateLimitStatusAction $limitStatus,
         private readonly TelegramChatSession $session,
         private readonly CalculateGoalProgressAction $goalProgress,
     ) {}
@@ -194,9 +194,7 @@ class MenuHandler
                 continue;
             }
 
-            $label = $budget->title
-                ?: $period->tags->map(fn (Tag $tag) => trim($tag->emoji . ' ' . $tag->title))->filter()->implode(', ')
-                ?: 'Budget #' . $budget->id;
+            $label = $budget->label($period);
 
             if ($budget->isGoal()) {
                 $goals[] = $this->goalBlock($user, $budget, $label);
@@ -205,19 +203,7 @@ class MenuHandler
                 continue;
             }
 
-            $spent = $this->calculateBudgetSpent->execute($period, $user);
-            $limit = (float) $period->amount;
-            $ratio = $limit > 0 ? ($spent / $limit) : 0.0;
-            $pct = (int) round($ratio * 100);
-
-            $bar = $this->support->progressBar($ratio);
-            $barLine = $ratio > 1.0 ? $bar : "{$bar} {$pct}%";
-
-            $blocks[] = '<b>' . $this->support->escapeHtml($label) . "</b>\n"
-                . $barLine . "\n"
-                . $this->support->escapeHtml(UserFormatter::formatMoney($user, $spent))
-                . ' / '
-                . $this->support->escapeHtml(UserFormatter::formatMoney($user, $limit));
+            $blocks[] = $this->limitBlock($user, $period, $label);
 
             $list[] = [
                 'id' => (int) $budget->id,
@@ -236,9 +222,11 @@ class MenuHandler
         }
 
         $sections = [];
+
         if ($blocks !== []) {
-            $sections[] = "💰 <b>Budgets</b>\n\n" . implode("\n\n", $blocks);
+            $sections[] = "💰 <b>Limits</b>\n\n" . implode("\n\n", $blocks);
         }
+
         if ($goals !== []) {
             $sections[] = "🎯 <b>Savings goals</b>\n\n" . implode("\n\n", $goals);
         }
@@ -340,7 +328,27 @@ class MenuHandler
         $this->client->sendMessage($chatId, "✅ Tag created: {$tag->emoji} {$tag->title}");
     }
 
-    private function goalBlock(User $user, Budget $budget, string $label): string
+    /**
+     * <b>Groceries</b>
+     * ███████░░░ 72%
+     * ₴7,200 / ₴10,000 · ₴2,800 left
+     * Oct 1 – Oct 31 · 5 days left
+     */
+    public function limitBlock(User $user, BudgetPeriod $period, string $label): string
+    {
+        $st = $this->limitStatus->execute($period, $user);
+        $esc = fn (string $text): string => $this->support->escapeHtml($text);
+        $money = fn (float $v): string => $esc(UserFormatter::formatMoney($user, $v));
+        $balance = $st['left'] >= 0 ? $money($st['left']) . ' left' : $money(-$st['left']) . ' over';
+        $days = $st['days_left'] === 1 ? 'last day' : $st['days_left'] . ' days left';
+
+        return '<b>' . $esc($label) . "</b>\n"
+            . $this->support->progressBar($st['limit'] > 0 ? $st['spent'] / $st['limit'] : 0.0) . ' ' . $st['percent'] . "%\n"
+            . $money($st['spent']) . ' / ' . $money($st['limit']) . ' · ' . $balance . "\n"
+            . $esc(UserFormatter::formatDate($user, $st['start']) . ' – ' . UserFormatter::formatDate($user, $st['end'])) . ' · ' . $days;
+    }
+
+    public function goalBlock(User $user, Budget $budget, string $label): string
     {
         $progress = $this->goalProgress->execute($budget, $user);
         $ratio = $progress['target'] > 0 ? min(1.0, $progress['saved'] / $progress['target']) : 0.0;

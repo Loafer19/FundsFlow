@@ -74,14 +74,14 @@ class TelegramSupport
             "Commands\n"
             . "/month — this month's income, expenses, net, top tags\n"
             . "/analytics — same as /month\n"
-            . "/recent — last " . self::RECENT_LIMIT . " transactions\n"
+            . '/recent — last ' . self::RECENT_LIMIT . " transactions\n"
             . "/tags — list your tags\n"
             . "/newtag — create a tag: /newtag 🍕 Fast Food > Food\n"
-            . "/budgets — active budgets and savings goals\n"
+            . "/budgets — spending limits and savings goals\n"
             . "/recurring — recurring rules\n"
             . "/app — open the Web UI from the menu button\n"
             . "/website — one-time web login code\n"
-            . "/mute — mute budget alerts, weekly digest, recurring notifications\n"
+            . "/mute — mute limit alerts, weekly digest, recurring notifications\n"
             . "/unmute — turn notifications back on\n"
             . "/unlink — unlink Telegram (account stays on the website)\n"
             . "/reset — start a new AI conversation (alias /new)\n"
@@ -95,6 +95,12 @@ class TelegramSupport
             . "Receipts\n"
             . "Send a photo or PDF with a caption like \"-350 groceries\" for instant save. Without an amount, AI may draft a receipt (Confirm / Edit / Cancel).\n"
             . "Albums: choose one transaction or separate.\n\n"
+            . "Budgets & goals\n"
+            . "/budgets shows each limit's current period: spent, left, days left. Ask in chat:\n"
+            . "\"limit 8000 a month on groceries\" (calendar months; \"from the 15th\" to start there)\n"
+            . "\"how much is left for food?\" · \"raise the groceries limit to 9000\" (applies to the current period)\n"
+            . "\"goal: save 50000 for a vacation by June, tag savings\" · \"how is my vacation goal?\"\n"
+            . "Alerts at 80% and 100% of a limit, once per period.\n\n"
             . "Voice\n"
             . "Send a voice note for the same actions as typing (quick-add, menu, tags, help, month summary). Uses the shared daily AI budget.\n\n"
             . "Text AI\n"
@@ -162,20 +168,14 @@ class TelegramSupport
         return mb_substr($note, 0, max(1, $max - 1)) . '…';
     }
 
+    /**
+     * 10-cell bar, filled cells rounded down (96% never looks full). Callers append the percent.
+     */
     public function progressBar(float $ratio, int $width = 10): string
     {
-        $clamped = max(0.0, min(1.0, $ratio));
-        $filled = (int) round($clamped * $width);
-        $empty = max(0, $width - $filled);
-        $bar = str_repeat('█', $filled) . str_repeat('░', $empty);
-        $pct = (int) round($ratio * 100);
+        $filled = (int) floor(round(max(0.0, min(1.0, $ratio)) * $width, 6));
 
-        // Overspend: full bar + unclamped percent; otherwise bare bar (caller may append pct).
-        if ($ratio > 1.0) {
-            return str_repeat('█', $width) . " {$pct}%";
-        }
-
-        return $bar;
+        return str_repeat('█', $filled) . str_repeat('░', $width - $filled);
     }
 
     public function formatTagListHtml(Transaction $transaction): string

@@ -5,8 +5,10 @@ namespace App\Actions\Budgets;
 use App\Channels\Telegram\TelegramClient;
 use App\Enums\BudgetType;
 use App\Models\Budget;
+use App\Models\BudgetPeriod;
 use App\Models\User;
 use App\Support\UserFormatter;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 
 class NotifyBudgetThresholdsAction
@@ -15,7 +17,7 @@ class NotifyBudgetThresholdsAction
 
     public function __construct(
         private readonly TelegramClient $client,
-        private readonly CalculateBudgetPeriodSpentAction $calculateSpent,
+        private readonly CalculateLimitStatusAction $limitStatus,
         private readonly CalculateGoalProgressAction $goalProgress,
     ) {}
 
@@ -23,7 +25,7 @@ class NotifyBudgetThresholdsAction
     {
         $budgets = Budget::query()
             ->whereHas('currentPeriod')
-            ->with(['currentPeriod.tags', 'user.identities'])
+            ->with(['periods.tags', 'currentPeriod.tags', 'user.identities'])
             ->get();
 
         $messagesByChat = [];
@@ -37,17 +39,18 @@ class NotifyBudgetThresholdsAction
                 continue;
             }
 
-            $period = $budget->currentPeriod;
+            $period = $budget->periods->first(fn (BudgetPeriod $p) => $p->ends_at === null);
             $user = $budget->user;
 
             if (!$period || (float) $period->amount <= 0 || !$user) {
                 continue;
             }
 
-            $period->setRelation('budget', $budget); // bucket grid (anchor_date) without a query
+            // Bucket grid (anchor_date) and earlier versions for the active bucket, no extra queries.
+            $budget->periods->each(fn (BudgetPeriod $p) => $p->setRelation('budget', $budget));
             $asOf = $user->nowInTimezone();
-            $spent = $this->calculateSpent->execute($period, $user, $asOf);
-            $ratio = $spent / (float) $period->amount;
+            $status = $this->limitStatus->execute($period, $user, $asOf);
+            $ratio = $status['spent'] / $status['limit'];
 
             $threshold = collect(self::THRESHOLDS)->first(fn (int $t) => $ratio >= $t / 100);
 
@@ -55,14 +58,11 @@ class NotifyBudgetThresholdsAction
                 continue;
             }
 
-            $bucketStart = $this->calculateSpent->currentBucketStart($period, $asOf)->toDateString();
-            $cacheKey = "budget_notified:{$period->id}:{$bucketStart}:{$threshold}";
-
-            if (Cache::has($cacheKey)) {
+            if ($this->alreadySent($budget, $period, $status['start'], $threshold, $asOf)) {
                 continue;
             }
 
-            Cache::put($cacheKey, true, now()->addDays(400));
+            Cache::put(self::cacheKey($budget, $status['start'], $threshold), true, now()->addDays(400));
 
             $identity = $user->identities->firstWhere('provider', 'telegram');
 
@@ -70,26 +70,35 @@ class NotifyBudgetThresholdsAction
                 continue;
             }
 
-            $label = $budget->title ?: $period->tags->map(fn ($tag) => $tag->emoji)->implode(' ');
-            $emoji = $threshold >= 100 ? '🚨' : '⚠️';
-
             $messagesByChat[$identity->external_id][] = sprintf(
-                '%s %s: %s / %s (%d%%)',
-                $emoji,
-                $label,
-                UserFormatter::formatMoney($user, $spent),
-                UserFormatter::formatMoney($user, (float) $period->amount),
-                (int) round($ratio * 100),
+                "%s %s: %s / %s (%d%%)\n%s – %s",
+                $threshold >= 100 ? '🚨' : '⚠️',
+                $budget->label($period),
+                UserFormatter::formatMoney($user, $status['spent']),
+                UserFormatter::formatMoney($user, $status['limit']),
+                $status['percent'],
+                UserFormatter::formatDate($user, $status['start']),
+                UserFormatter::formatDate($user, $status['end']),
             );
         }
 
         foreach ($messagesByChat as $chatId => $lines) {
-            $this->client->sendMessage($chatId, "Budget alert\n" . implode("\n", $lines));
+            $this->client->sendMessage($chatId, "💰 Budget alert\n" . implode("\n", $lines));
         }
 
         foreach ($goalsByChat as $chatId => $lines) {
-            $this->client->sendMessage($chatId, "Savings goal reached\n" . implode("\n", $lines));
+            $this->client->sendMessage($chatId, "🎯 Savings goal reached\n" . implode("\n", $lines));
         }
+    }
+
+    /**
+     * One alert per threshold per active bucket of a budget. Keyed by budget (not period
+     * version) and the bucket's first day, so editing the amount, length or tags mid-bucket
+     * neither re-sends an alert already sent nor resets the bucket.
+     */
+    public static function cacheKey(Budget $budget, string $bucketStart, int $threshold): string
+    {
+        return "budget_notified:b{$budget->id}:{$bucketStart}:{$threshold}";
     }
 
     /**
@@ -126,7 +135,7 @@ class NotifyBudgetThresholdsAction
             return;
         }
 
-        $label = $budget->title ?: $period->tags->map(fn ($tag) => $tag->emoji)->implode(' ');
+        $label = $budget->label($period);
 
         $goalsByChat[$identity->external_id][] = sprintf(
             '🎉 %s: %s / %s (%d%%)',
@@ -135,5 +144,31 @@ class NotifyBudgetThresholdsAction
             UserFormatter::formatMoney($user, $progress['target']),
             $progress['percent'],
         );
+    }
+
+    private function alreadySent(Budget $budget, BudgetPeriod $period, string $bucketStart, int $threshold, Carbon $asOf): bool
+    {
+        if (Cache::has(self::cacheKey($budget, $bucketStart, $threshold))) {
+            return true;
+        }
+
+        // Keys written before alerts were keyed per budget: period version id + bucket start
+        // clamped to that version's starts_at. Check every version overlapping this bucket.
+        [$boundary] = $period->bucketBounds($asOf);
+        $boundary = $boundary->toDateString();
+
+        foreach ($budget->periods as $version) {
+            if ($version->ends_at !== null && $version->ends_at->toDateString() < $bucketStart) {
+                continue;
+            }
+
+            $legacyStart = max($boundary, $version->starts_at->toDateString());
+
+            if (Cache::has("budget_notified:{$version->id}:{$legacyStart}:{$threshold}")) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

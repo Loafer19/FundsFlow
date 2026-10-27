@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Models\User;
-use Carbon\Carbon;
 
 /**
  * Plain-text lines describing savings goal progress (Telegram card, PDF report).
@@ -26,26 +25,36 @@ final class GoalSummary
             return $lines;
         }
 
-        $lines[] = $money((float) $p['remaining']) . ' left';
+        $left = $money((float) $p['remaining']) . ' left';
+        $lines[] = in_array($p['status'], ['on_track', 'behind', 'paused'], true)
+            ? $left . ' · ' . self::statusLabel($p['status'])
+            : $left;
 
         if ($p['target_date']) {
             $deadline = 'Deadline ' . UserFormatter::formatDate($user, $p['target_date']);
 
             if ($p['overdue']) {
                 $deadline .= ' (passed)';
+            } elseif ($p['days_left'] === 0) {
+                $deadline .= ' · due today';
             } else {
                 $deadline .= ' · ' . $p['days_left'] . ' ' . ($p['days_left'] === 1 ? 'day' : 'days') . ' left';
-            }
 
-            if ($p['required_amount'] !== null) {
-                $deadline .= ' · need ~' . $money((float) $p['required_amount']) . '/' . $p['required_per'];
+                if ($p['required_amount'] !== null) {
+                    $deadline .= ' · need ~' . $money((float) $p['required_amount']) . '/' . $p['required_per'];
+                }
             }
             $lines[] = $deadline;
         }
 
-        $lines[] = $p['projected_date']
-            ? 'At current pace: ' . Carbon::parse($p['projected_date'])->format('F Y')
-            : 'No contributions yet to project a date';
+        if ((float) $p['monthly_pace'] > 0) {
+            $pace = 'Pace ~' . $money((float) $p['monthly_pace']) . '/mo';
+            $lines[] = $p['projected_date']
+                ? $pace . ' · done by ' . UserFormatter::formatDate($user, $p['projected_date'])
+                : $pace;
+        } else {
+            $lines[] = (float) $p['contributed'] > 0 ? 'No contributions in the last 3 months' : 'No contributions yet';
+        }
 
         if (!empty($p['started_at']) && $p['started_at'] < $user->todayDateString()) {
             $lines[] = 'Counting since ' . UserFormatter::formatDate($user, $p['started_at']);

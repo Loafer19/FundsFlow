@@ -31,17 +31,22 @@ class CreateBudgetAction
             return $this->createGoal($user, $data, $tagIds);
         }
 
-        // Buckets repeat from the start date: monthly from the 15th runs 15th → 14th.
-        // Legacy align_to_calendar = start of the current calendar week/month/year.
+        // Default: calendar weeks/months/years (anchor null) from the start of the current
+        // one, so spending already made this period counts. An explicit start_date anchors the
+        // grid there (monthly from the 15th runs 15th → 14th; a calendar boundary stays null).
+        // Legacy align_to_calendar=false without a start date starts today, anchored to today.
         $length = BudgetLength::from($data['length']);
-        $startsAt = $data['start_date'] ?? null;
-        $startsAt ??= ($data['align_to_calendar'] ?? false)
-            ? $length->calendarStart($user->nowInTimezone())->toDateString()
-            : $user->todayDateString();
+        $startDate = $data['start_date'] ?? null;
+
+        if ($startDate === null && array_key_exists('align_to_calendar', $data) && !$data['align_to_calendar']) {
+            $startDate = $user->todayDateString();
+        }
+
+        $startsAt = $startDate ?? $length->calendarStart($user->nowInTimezone())->toDateString();
 
         $budget = $user->budgets()->create([
             'title' => $data['title'] ?? null,
-            'anchor_date' => $startsAt,
+            'anchor_date' => $length->anchorFor($startDate),
         ]);
 
         $period = $budget->periods()->create([

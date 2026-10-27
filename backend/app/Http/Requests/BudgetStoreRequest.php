@@ -58,7 +58,8 @@ class BudgetStoreRequest extends FormRequest
 
         return $rules + [
             'length' => ['required', Rule::in(array_column(BudgetLength::cases(), 'value'))],
-            // First day of the limit; buckets repeat from it. Default today.
+            // First day of the limit; buckets repeat from it. Default: calendar weeks/months/years
+            // from the start of the current one.
             'start_date' => 'nullable|date_format:Y-m-d|after:2000-01-01|before_or_equal:' . $this->user()->todayDateString(),
             // Legacy (kept for old clients): start at the beginning of the current week/month/year.
             'align_to_calendar' => 'sometimes|boolean',
@@ -66,7 +67,8 @@ class BudgetStoreRequest extends FormRequest
     }
 
     /**
-     * A goal cannot start after its deadline. Either side may come from the
+     * A new or changed deadline must be today or later (an overdue goal keeps its stored one
+     * on edit). A goal cannot start after its deadline. Either side may come from the
      * stored goal on update, so this runs after the field rules.
      *
      * @return list<\Closure>
@@ -81,6 +83,16 @@ class BudgetStoreRequest extends FormRequest
 
                 $budget = $this->route('budget');
                 $stored = $budget instanceof Budget ? $budget : null;
+
+                $newTarget = $this->filled('target_date') ? (string) $this->input('target_date') : null;
+
+                if ($newTarget !== null
+                    && $newTarget !== $stored?->target_date?->toDateString()
+                    && $newTarget < $this->user()->todayDateString()) {
+                    $validator->errors()->add('target_date', Budget::DEADLINE_ERROR);
+
+                    return;
+                }
 
                 $start = $this->filled('start_date')
                     ? (string) $this->input('start_date')

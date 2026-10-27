@@ -26,11 +26,11 @@ Below the message field the bot shows six buttons:
 | `/recent` | Your 5 most recent transactions, with **Open** buttons for each |
 | `/tags` | List your tags |
 | `/newtag` | Create a tag: `/newtag 🍕 Fast Food > Food` |
-| `/budgets` | Active budgets for the current period (spent vs limit) and savings goals (saved vs target, deadline, pace) |
+| `/budgets` | Spending limits for the current period (spent / limit, left or over, period dates, days left) and savings goals (saved vs target, deadline, pace) |
 | `/recurring` | Your recurring rules |
 | `/app` | How to open the Web UI (Mini App) from the menu button |
 | `/website` | One-time code to [log in on the website](/docs/getting-started/sign-in/#telegram-code) |
-| `/mute` | Mute budget alerts, the weekly digest, and recurring notifications |
+| `/mute` | Mute limit alerts, goal messages, the weekly digest, and recurring notifications |
 | `/unmute` | Turn those notifications back on |
 | `/unlink` | Unlink this chat; the account stays on the website |
 | `/reset` | Start a new AI conversation (alias `/new`); see [AI assistant](/docs/telegram/ai-assistant/) |

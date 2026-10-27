@@ -18,10 +18,11 @@ On the **Budgets** tab click **Add Budget or Goal** and keep **Limit** selected:
 - **Tags** — at least one. Spending on these tags counts toward the budget.
 - **Amount** — the limit per period.
 - **Weekly / Monthly / Yearly**.
-- **Start date** — today by default; it can be in the past, so spending already made counts. Periods repeat from
-  this day: a monthly limit from the 15th runs from the 15th to the 14th, a weekly one from that weekday.
-  **Start of this week/month/year** picks the calendar start (the 1st, Monday or January 1). The hint under the
-  field shows the current period.
+- **Start date** — by default the start of the current calendar week, month or year (Monday, the 1st or
+  January 1), so spending already made this period counts and periods follow the calendar. Pick another day only
+  if your budget runs on its own schedule: periods then repeat from that day (a monthly limit from the 15th runs
+  from the 15th to the 14th, a weekly one from that weekday). It can't be in the future. The hint under the field
+  shows the current period.
 
 ### The limit card
 
@@ -35,7 +36,9 @@ On the **Budgets** tab click **Add Budget or Goal** and keep **Limit** selected:
 - **History** (collapsed by default): one row per previous week/month/year with a small bar, spent / limit and a
   ✓ or ✗ for whether it stayed within the limit.
 
-Spending counts every transaction dated within the period, including everything logged today.
+Spending counts every transaction dated within the period, including everything logged today. The percentage is
+rounded down, so a limit shows 100% only once it is actually reached. The Telegram bot, the assistant and the API
+show the same figures.
 
 ## Create a savings goal
 
@@ -46,7 +49,8 @@ Click **Add Budget or Goal** and switch to **Goal**:
 - **Savings tags** — at least one. Transactions with these tags are your contributions.
 - **Start date** — the day contributions start counting from. Defaults to today; pick an earlier date if you
   already started saving (e.g. transfers you logged last month). It cannot be in the future or after the deadline.
-- **Deadline** — optional date you want to reach the target by.
+- **Deadline** — optional date you want to reach the target by; today or later. A goal whose deadline has passed
+  keeps it until you change it.
 - **Already saved** — optional amount you had before the start date.
 
 ### How progress is counted
@@ -79,8 +83,10 @@ automatically. The summary above the goals shows the total saved, what is left, 
 
 - **Pause** stops tracking; **Resume** starts a new period from today with the same settings. A paused goal keeps
   its progress.
-- **Edit** changes a limit. A new amount, length or tags start new settings from today on the same schedule, and
-  FundsFlow keeps the earlier settings in history instead of rewriting the past. Changing the **Start date** moves
+- **Edit** changes a limit. A new amount, length or tags apply to the whole current period: spending since the
+  period started still counts, so raising the limit on the 20th doesn't reset what you spent. Earlier periods keep
+  their old settings in history instead of being rewritten, and an alert already sent for this period is not sent
+  again. Changing the **Start date** moves
   the start of the current settings instead (it can't go before the previous settings ended); periods then repeat
   from the new date. Editing a paused limit resumes it from its start date.
 - **Edit** on a goal changes it in place (target, tags, start date, deadline, already saved); its progress is

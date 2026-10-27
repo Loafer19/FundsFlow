@@ -32,7 +32,6 @@ import { ref } from 'vue'
 import BudgetFormFields from '../components/budgets/BudgetFormFields.vue'
 import { budgetPayload } from '../services/budgetPayload.js'
 import { useBudgetsStore } from '../services/budgets.js'
-import { nowDateStr } from '../services/formatters.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
 
 const budgetsStore = useBudgetsStore()
@@ -43,7 +42,9 @@ const createDefault = (type = 'limit') => ({
     amount: '',
     length: 'month',
     tag_ids: [],
-    start_date: nowDateStr(),
+    // Filled by BudgetFormFields: calendar period start for limits, today for goals.
+    start_date: '',
+    start_auto: true,
     target_date: '',
     start_amount: '',
 })

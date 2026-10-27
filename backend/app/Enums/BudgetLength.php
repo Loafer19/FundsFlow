@@ -23,10 +23,33 @@ enum BudgetLength: string
         $now = ($now ?? now())->copy();
 
         return match ($this) {
-            self::Week => $now->startOfWeek(),
+            self::Week => $now->startOfWeek(CarbonInterface::MONDAY),
             self::Month => $now->startOfMonth(),
             self::Year => $now->startOfYear(),
         };
+    }
+
+    /**
+     * True when $date starts a calendar week (Monday), month or year: anchoring a limit
+     * there is the same grid as no anchor, so such start dates are stored as null.
+     */
+    public function isCalendarStart(CarbonInterface $date): bool
+    {
+        [$start] = $this->bucketBounds($date);
+
+        return $start->toDateString() === $date->toDateString();
+    }
+
+    /**
+     * budgets.anchor_date for a limit starting on $startDate: null on calendar boundaries.
+     */
+    public function anchorFor(?string $startDate): ?string
+    {
+        if ($startDate === null || $this->isCalendarStart(Carbon::parse($startDate))) {
+            return null;
+        }
+
+        return $startDate;
     }
 
     /**

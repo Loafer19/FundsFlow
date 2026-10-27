@@ -2,8 +2,8 @@
 
 namespace App\Actions\Agent;
 
-use App\Actions\Budgets\CalculateBudgetPeriodSpentAction;
 use App\Actions\Budgets\CalculateGoalProgressAction;
+use App\Actions\Budgets\CalculateLimitStatusAction;
 use App\Actions\Budgets\DeleteBudgetAction;
 use App\Actions\Budgets\ListBudgetsAction;
 use App\Actions\Budgets\PauseBudgetAction;
@@ -23,6 +23,7 @@ use App\Models\RecurringTransaction;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\LimitBuckets;
 use App\Support\PeriodRange;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
@@ -63,7 +64,6 @@ class AgentPlanningTools
 
     public function __construct(
         private readonly ListBudgetsAction $listBudgets,
-        private readonly CalculateBudgetPeriodSpentAction $calculateSpent,
         private readonly UpdateBudgetAction $updateBudget,
         private readonly PauseBudgetAction $pauseBudget,
         private readonly ResumeBudgetAction $resumeBudget,
@@ -75,6 +75,7 @@ class AgentPlanningTools
         private readonly ListTransactionsAction $listTransactions,
         private readonly ListTagsAction $listTags,
         private readonly CalculateGoalProgressAction $goalProgress,
+        private readonly CalculateLimitStatusAction $limitStatus,
     ) {}
 
     public static function isRead(string $name): bool
@@ -125,7 +126,7 @@ class AgentPlanningTools
                     'tag_ids' => $tagIds,
                 ],
             ]),
-            $fn('update_budget', 'Propose editing a budget or savings goal. Stages Confirm/Cancel. Omitted fields keep their current value. Limits: amount, length, tags, title and start_date; a changed limit/length/tags starts a new budget period today that keeps the same period grid (history kept); start_date (YYYY-MM-DD, today or earlier, not before the previous settings ended) moves the start of the current period in place, its periods then repeat from that day (monthly from the 15th runs 15th → 14th); on a paused budget saving resumes it from start_date (default today). align_to_calendar is a legacy flag: true puts the budget on calendar weeks/months/years. Goals: amount is the target; also tags, title, start_date (YYYY-MM-DD, today or earlier, not after the deadline: progress counts from that day), target_date (deadline, clear_target_date removes it) and start_amount (already saved before tracking); edited in place, progress keeps counting from the goal start unless start_date moves it. The type cannot change.', [
+            $fn('update_budget', 'Propose editing a budget or savings goal. Stages Confirm/Cancel. Omitted fields keep their current value. Limits: amount, length, tags, title and start_date; a changed limit/length/tags applies to the whole current period (spent still counts from its start; history kept, same period grid); start_date (YYYY-MM-DD, today or earlier, not before the previous settings ended) moves the start of the current period in place, its periods then repeat from that day (monthly from the 15th runs 15th → 14th); on a paused budget saving resumes it from start_date (default today). align_to_calendar is a legacy flag: true puts the budget on calendar weeks/months/years. Goals: amount is the target; also tags, title, start_date (YYYY-MM-DD, today or earlier, not after the deadline: progress counts from that day), target_date (deadline, today or later; clear_target_date removes it) and start_amount (already saved before tracking); edited in place, progress keeps counting from the goal start unless start_date moves it. The type cannot change.', [
                 'type' => 'object',
                 'properties' => [
                     'id' => $id,
@@ -301,6 +302,9 @@ class AgentPlanningTools
                 'amount_limit_formatted' => UserFormatter::formatMoney($user, (float) $period->amount),
                 'length' => $period->length->value,
                 'paused_since' => $period->ends_at?->toDateString(),
+                'paused_since_formatted' => $period->ends_at ? UserFormatter::formatDate($user, $period->ends_at) : null,
+                'anchor_date' => $budget->anchor_date?->toDateString(),
+                'schedule' => self::scheduleText($period->length, $budget->anchor_date?->toDateString()),
                 'tag_ids' => $this->periodTagIds($period),
             ];
         }
@@ -324,52 +328,59 @@ class AgentPlanningTools
      */
     public function budgetPeriodStatus(User $user, Budget $budget, BudgetPeriod $period, Carbon $now, ?string $label = null): array
     {
-        $today = $now->copy()->startOfDay();
-        $start = $this->calculateSpent->currentBucketStart($period, $now)->copy()->startOfDay();
-        $end = $this->calculateSpent->currentBucketEnd($period, $now)->copy()->startOfDay();
-
-        // Whole calendar days from date strings: starts_at and "today" can carry different timezones.
-        $day = fn (Carbon $d): int => intdiv((int) strtotime($d->toDateString() . ' 00:00:00 UTC'), 86400);
-        $totalDays = max(1, $day($end) - $day($start) + 1);
-        $elapsed = max(1, min($totalDays, $day($today) - $day($start) + 1));
-        $daysLeft = max(1, $totalDays - $elapsed + 1); // today counts as a day left to spend
-
-        $limit = (float) $period->amount;
-        $spent = round($this->calculateSpent->execute($period, $user, $now), 2) + 0.0; // + 0.0 turns -0.0 into 0.0
-        $left = round($limit - $spent, 2);
-        $perDay = $left > 0 ? round($left / $daysLeft, 2) : 0.0;
-        $avgDaily = round($spent / $elapsed, 2);
-        $projected = round($spent / $elapsed * $totalDays, 2);
-        $status = $spent >= $limit && $limit > 0 ? 'over' : ($projected > $limit ? 'at_risk' : 'on_track');
+        $period->relationLoaded('budget') || $period->setRelation('budget', $budget);
+        $st = $this->limitStatus->execute($period, $user, $now);
         $money = fn (float $v): string => UserFormatter::formatMoney($user, $v);
 
         return [
             'id' => (int) $budget->id,
             'type' => 'limit',
             'title' => $label ?? $this->budgetLabel($budget, $period),
-            'status' => $status,
+            'status' => $st['status'],
             'length' => $period->length->value,
-            'period_start' => $start->toDateString(),
-            'period_end' => $end->toDateString(),
-            'days_total' => $totalDays,
-            'days_elapsed' => $elapsed,
-            'days_left' => $daysLeft,
-            'amount_limit' => $limit,
-            'amount_limit_formatted' => $money($limit),
-            'spent' => $spent,
-            'spent_formatted' => $money($spent),
-            'left' => $left,
-            'left_formatted' => $money($left),
-            'percent' => $limit > 0 ? (int) round($spent / $limit * 100) : 0,
-            'per_day_allowance' => $perDay,
-            'per_day_allowance_formatted' => $money($perDay),
-            'avg_daily_spend' => $avgDaily,
-            'avg_daily_spend_formatted' => $money($avgDaily),
-            'projected_spend' => $projected,
-            'projected_spend_formatted' => $money($projected),
-            'projected_over_by' => max(0.0, round($projected - $limit, 2)),
+            // Day the buckets repeat from (null = calendar weeks/months/years) and in words.
+            'anchor_date' => $budget->anchor_date?->toDateString(),
+            'schedule' => self::scheduleText($period->length, $budget->anchor_date?->toDateString()),
+            'period_start' => $st['start'],
+            'period_end' => $st['end'],
+            'period_formatted' => UserFormatter::formatDate($user, $st['start']) . ' – ' . UserFormatter::formatDate($user, $st['end']),
+            'days_total' => $st['days_total'],
+            'days_elapsed' => $st['days_elapsed'],
+            'days_left' => $st['days_left'],
+            'amount_limit' => $st['limit'],
+            'amount_limit_formatted' => $money($st['limit']),
+            'spent' => $st['spent'],
+            'spent_formatted' => $money($st['spent']),
+            'left' => $st['left'],
+            'left_formatted' => $money($st['left']),
+            'percent' => $st['percent'],
+            'per_day_allowance' => $st['per_day_allowance'],
+            'per_day_allowance_formatted' => $money($st['per_day_allowance']),
+            'avg_daily_spend' => $st['avg_daily_spend'],
+            'avg_daily_spend_formatted' => $money($st['avg_daily_spend']),
+            'projected_spend' => $st['projected_spend'],
+            'projected_spend_formatted' => $money($st['projected_spend']),
+            'projected_over_by' => max(0.0, round($st['projected_spend'] - $st['limit'], 2)),
             'tag_ids' => $this->periodTagIds($period),
         ];
+    }
+
+    /**
+     * "calendar months" / "monthly from the 15th" / "weekly from Wednesday" / "yearly from 15 Oct".
+     */
+    public static function scheduleText(BudgetLength $length, ?string $anchor): string
+    {
+        if ($anchor === null || $length->isCalendarStart(Carbon::parse($anchor))) {
+            return 'calendar ' . $length->value . 's';
+        }
+
+        $date = Carbon::parse($anchor);
+
+        return match ($length) {
+            BudgetLength::Week => 'weekly from ' . $date->format('l'),
+            BudgetLength::Month => 'monthly from the ' . $date->format('jS'),
+            BudgetLength::Year => 'yearly from ' . $date->format('j M'),
+        };
     }
 
     /**
@@ -399,7 +410,9 @@ class AgentPlanningTools
             'remaining_formatted' => $money($p['remaining']),
             'percent' => $p['percent'],
             'started_at' => $p['started_at'],
+            'started_at_formatted' => UserFormatter::formatDate($user, $p['started_at']),
             'target_date' => $p['target_date'],
+            'target_date_formatted' => $p['target_date'] ? UserFormatter::formatDate($user, $p['target_date']) : null,
             'days_left' => $p['days_left'],
             'overdue' => $p['overdue'],
             'required_amount' => $p['required_amount'],
@@ -408,6 +421,7 @@ class AgentPlanningTools
             'monthly_pace' => $p['monthly_pace'],
             'monthly_pace_formatted' => $money($p['monthly_pace']),
             'projected_date' => $p['projected_date'],
+            'projected_date_formatted' => $p['projected_date'] ? UserFormatter::formatDate($user, $p['projected_date']) : null,
             'tag_ids' => $p['tag_ids'],
         ];
     }
@@ -561,6 +575,33 @@ class AgentPlanningTools
         return $out;
     }
 
+    /**
+     * The limit period containing today, e.g. "Oct 15 – Nov 14 (current), then monthly from
+     * the 15th". $anchor is the bucket grid (null = calendar); $notBefore clips the first
+     * bucket to the day counting starts (a start date, or the start of the limit's run).
+     */
+    public function limitPeriodHint(User $user, BudgetLength $length, ?string $anchor, ?string $notBefore = null): string
+    {
+        [$start, $next] = $length->bucketBounds($user->nowInTimezone(), $anchor ? Carbon::parse($anchor) : null);
+        $from = max($start->toDateString(), $notBefore ?? '');
+
+        return UserFormatter::formatDate($user, $from) . ' – ' . UserFormatter::formatDate($user, $next->subDay())
+            . ' (current), then ' . self::scheduleText($length, $anchor);
+    }
+
+    public function dateArg(mixed $raw, string $field): ?string
+    {
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+
+        if (!PeriodRange::isDate($raw)) {
+            throw new InvalidArgumentException("{$field} must be YYYY-MM-DD");
+        }
+
+        return (string) $raw;
+    }
+
     // ---------------------------------------------------------------------
     // Budget writes
     // ---------------------------------------------------------------------
@@ -626,33 +667,40 @@ class AgentPlanningTools
 
         $oldStart = $base->starts_at->toDateString();
         $startDate = null;
+
         if (isset($args['start_date'])) {
             $startDate = $this->dateArg($args['start_date'], 'start_date');
+
             if ($startDate !== null && $startDate > $user->todayDateString()) {
                 throw new InvalidArgumentException('start_date cannot be in the future');
             }
+
             if ($current && $startDate === $oldStart) {
                 $startDate = null;
             }
         }
+
         if ($startDate !== null) {
             $lastEnd = $budget->periods
                 ->filter(fn (BudgetPeriod $p) => $p->ends_at !== null && $p->id !== $current?->id)
                 ->map(fn (BudgetPeriod $p) => $p->ends_at->toDateString())
                 ->max();
+
             if ($lastEnd !== null && $startDate < $lastEnd) {
-                throw new InvalidArgumentException("start_date must be on or after {$lastEnd}, when the previous settings ended");
+                throw new InvalidArgumentException('start_date must be on or after ' . UserFormatter::formatDate($user, $lastEnd) . ', when the previous settings ended');
             }
         }
 
         $periodChanged = abs($amount - (float) $base->amount) > 0.001 || $length !== $base->length->value || $tagIds !== $sortedBase;
+
         if (!$periodChanged && !$titleChanged && $startDate === null && !$align && $current) {
             throw new InvalidArgumentException('nothing to change: values equal the current budget');
         }
 
         $label = $this->budgetLabel($budget, $base);
         $money = fn (float $v): string => UserFormatter::formatMoney($user, $v);
-        $lines = ["Update budget “{$label}”:"];
+        $lines = ["Update limit “{$label}”:"];
+
         if ($titleChanged) {
             $lines[] = 'Title: ' . ($budget->title ?: '—') . ' → ' . ($title ?: '—');
         }
@@ -664,19 +712,20 @@ class AgentPlanningTools
             ? 'Tags: ' . $this->tagLabels($user, $baseTagIds) . ' → ' . $this->tagLabels($user, $tagIds)
             : 'Tags: ' . $this->tagLabels($user, $tagIds);
         $lengthEnum = BudgetLength::from($length);
+        $date = fn (string $d): string => UserFormatter::formatDate($user, $d);
+        $anchor = $budget->anchor_date?->toDateString();
+
         if (!$current) {
             $resumeFrom = $startDate ?? $user->todayDateString();
-            $lines[] = 'This budget is paused; saving resumes it from ' . ($startDate ?? 'today') . '.';
-            if ($startDate !== null) {
-                $lines[] = 'Period: ' . $this->limitPeriodHint($user, $lengthEnum, $resumeFrom);
-            }
+            $lines[] = 'This limit is paused; saving resumes it from ' . ($startDate ? $date($startDate) : 'today') . '.';
+            $lines[] = 'Period: ' . $this->limitPeriodHint($user, $lengthEnum, $startDate ? $lengthEnum->anchorFor($startDate) : $anchor, $resumeFrom);
         } elseif ($startDate !== null) {
-            $lines[] = "Start date: {$oldStart} → {$startDate} (changes the current period in place)";
-            $lines[] = 'Period: ' . $this->limitPeriodHint($user, $lengthEnum, $startDate);
+            $lines[] = 'Start date: ' . $date($oldStart) . ' → ' . $date($startDate) . ' (changes the current period in place)';
+            $lines[] = 'Period: ' . $this->limitPeriodHint($user, $lengthEnum, $lengthEnum->anchorFor($startDate), $startDate);
         } elseif ($periodChanged) {
-            $lines[] = $align
-                ? 'Starts a new period today on calendar ' . $length . 's; history is kept.'
-                : 'Starts a new period today on the same schedule; history is kept.';
+            $current->setRelation('budget', $budget);
+            $lines[] = 'Period: ' . $this->limitPeriodHint($user, $lengthEnum, $align ? null : $anchor, LimitBuckets::chainStart($current, $current->siblings()));
+            $lines[] = 'New settings apply to the whole current period (spending since its start counts); history is kept.';
         } elseif ($align) {
             $lines[] = 'Switches to calendar ' . $length . 's.';
         }
@@ -736,56 +785,73 @@ class AgentPlanningTools
 
         $title = $budget->title;
         $titleChanged = false;
+
         if (array_key_exists('title', $args) && is_string($args['title'])) {
             $new = mb_substr(trim($args['title']), 0, 255);
             $new = $new === '' ? null : $new;
             $titleChanged = $new !== $budget->title;
             $title = $new;
         }
+
         if ($titleChanged) {
             array_splice($lines, 1, 0, ['Title: ' . ($budget->title ?: '—') . ' → ' . ($title ?: '—')]);
         }
 
         $oldDate = $budget->target_date?->toDateString();
         $targetDate = $oldDate;
+
         if (filter_var($args['clear_target_date'] ?? false, FILTER_VALIDATE_BOOL)) {
             $targetDate = null;
         } elseif (isset($args['target_date'])) {
             $targetDate = $this->dateArg($args['target_date'], 'target_date');
         }
+
         if ($targetDate !== $oldDate) {
-            $lines[] = 'Deadline: ' . ($oldDate ?? '—') . ' → ' . ($targetDate ?? '—');
+            // A new deadline must be today or later; an existing past one may be kept.
+            if ($targetDate !== null && $targetDate < $user->todayDateString()) {
+                throw new InvalidArgumentException(Budget::DEADLINE_ERROR);
+            }
+            $fmt = fn (?string $d): string => $d ? UserFormatter::formatDate($user, $d) : '—';
+            $lines[] = 'Deadline: ' . $fmt($oldDate) . ' → ' . $fmt($targetDate);
         }
 
         $oldStartDate = $budget->goalStartDate();
         $startDate = $oldStartDate;
+
         if (isset($args['start_date'])) {
             $startDate = $this->dateArg($args['start_date'], 'start_date');
+
             if ($startDate !== null && $startDate > $user->todayDateString()) {
                 throw new InvalidArgumentException('start_date cannot be in the future');
             }
         }
+
         if ($startDate !== null && $targetDate !== null && $startDate > $targetDate) {
             throw new InvalidArgumentException('start_date must be on or before target_date');
         }
         $startDateChanged = $startDate !== null && $startDate !== $oldStartDate;
+
         if ($startDateChanged) {
-            $lines[] = 'Start date: ' . ($oldStartDate ?? '—') . ' → ' . $startDate . ' (progress counts from this day)';
+            $lines[] = 'Start date: ' . ($oldStartDate ? UserFormatter::formatDate($user, $oldStartDate) : '—') . ' → ' . UserFormatter::formatDate($user, $startDate) . ' (progress counts from this day)';
         }
 
         $oldStart = $budget->start_amount === null ? null : (float) $budget->start_amount;
         $startAmount = $oldStart;
+
         if (array_key_exists('start_amount', $args) && $args['start_amount'] !== null) {
             $startAmount = $this->goalAmount($args['start_amount'], 'start_amount', 0.0);
         }
+
         if (abs(($startAmount ?? 0.0) - ($oldStart ?? 0.0)) > 0.001) {
             $lines[] = 'Already saved: ' . $money($oldStart ?? 0.0) . ' → ' . $money($startAmount ?? 0.0);
         }
 
         $changed = $changed || $titleChanged || $startDateChanged || $targetDate !== $oldDate || abs(($startAmount ?? 0.0) - ($oldStart ?? 0.0)) > 0.001;
+
         if (!$changed && $current) {
             throw new InvalidArgumentException('nothing to change: values equal the current goal');
         }
+
         if (!$current) {
             $lines[] = 'This goal is paused; saving resumes it.';
         }
@@ -1129,6 +1195,7 @@ class AgentPlanningTools
         if (!$budget) {
             throw new InvalidArgumentException('budget not found (use list_budgets or budget_status for ids)');
         }
+        $budget->periods->each(fn (BudgetPeriod $p) => $p->setRelation('budget', $budget));
 
         return $budget;
     }
@@ -1145,9 +1212,7 @@ class AgentPlanningTools
 
     private function budgetLabel(Budget $budget, BudgetPeriod $period): string
     {
-        return $budget->title
-            ?: $period->tags->map(fn (Tag $tag) => trim($tag->emoji . ' ' . $tag->title))->filter()->implode(', ')
-            ?: 'Budget #' . $budget->id;
+        return $budget->label($period);
     }
 
     private function ruleLabel(User $user, RecurringTransaction $rule): string
@@ -1221,29 +1286,6 @@ class AgentPlanningTools
         }
 
         return $raw;
-    }
-
-    /**
-     * "2026-10-15 – 2026-11-14, then every month" for a limit starting on $start.
-     */
-    public function limitPeriodHint(User $user, BudgetLength $length, string $start): string
-    {
-        $from = Carbon::parse($start, $user->timezone());
-        [, $next] = $length->bucketBounds($from, $from);
-
-        return $start . ' – ' . $next->subDay()->toDateString() . ', then every ' . $length->value;
-    }
-
-    public function dateArg(mixed $raw, string $field): ?string
-    {
-        if ($raw === null || $raw === '') {
-            return null;
-        }
-        if (!PeriodRange::isDate($raw)) {
-            throw new InvalidArgumentException("{$field} must be YYYY-MM-DD");
-        }
-
-        return (string) $raw;
     }
 
     private function countOccurrences(RecurringFrequency $frequency, string $startsAt, ?string $endsAt, string $until): int

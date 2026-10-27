@@ -18,6 +18,9 @@ class Budget extends Model
 {
     use HasFactory;
 
+    /** Same text for the API (BudgetStoreRequest) and the agents' create/update tools. */
+    public const DEADLINE_ERROR = 'The deadline must be today or later.';
+
     protected $fillable = [
         'title',
         'type',
@@ -83,6 +86,20 @@ class Budget extends Model
         }
 
         $this->unsetRelation('periods');
+    }
+
+    /**
+     * Display name: title, else the tags of $period (default: the open one), else "Limit #id".
+     */
+    public function label(?BudgetPeriod $period = null): string
+    {
+        $period ??= $this->relationLoaded('periods')
+            ? $this->periods->first(fn (BudgetPeriod $p) => $p->ends_at === null) ?? $this->periods->first()
+            : $this->currentPeriod;
+
+        return $this->title
+            ?: $period?->tags->map(fn (Tag $tag) => trim($tag->emoji . ' ' . $tag->title))->filter()->implode(', ')
+            ?: ($this->isGoal() ? 'Goal #' : 'Limit #') . $this->id;
     }
 
     /**

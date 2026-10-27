@@ -3,8 +3,10 @@
 namespace App\Http\Resources;
 
 use App\Actions\Budgets\CalculateGoalProgressAction;
+use App\Actions\Budgets\CalculateLimitStatusAction;
 use App\Enums\BudgetType;
 use App\Models\BudgetPeriod;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -36,6 +38,9 @@ class BudgetResource extends JsonResource
             'periods' => BudgetPeriodResource::collection($this->whenLoaded('periods')),
             // Server-side goal progress (API / MCP clients); the web app recomputes it live.
             'progress' => $this->when($isGoal, fn () => $this->goalProgress($request)),
+            // Limits: the active period (spent counts from its first day, also after a mid-period
+            // edit), for API / MCP clients; the web app recomputes it live. Null when paused.
+            'current_period' => $this->when(!$isGoal, fn () => $this->limitPeriod($request)),
         ];
     }
 
@@ -44,8 +49,40 @@ class BudgetResource extends JsonResource
      */
     private function goalProgress(Request $request): ?array
     {
-        $user = $request->user()?->id === $this->user_id ? $request->user() : $this->resource->user;
+        $user = $this->owner($request);
 
         return $user ? app(CalculateGoalProgressAction::class)->execute($this->resource, $user) : null;
+    }
+
+    /**
+     * @return null|array<string, mixed>
+     */
+    private function limitPeriod(Request $request): ?array
+    {
+        $user = $this->owner($request);
+        $period = $this->resource->periods->first(fn (BudgetPeriod $p) => $p->ends_at === null);
+
+        if (!$user || !$period) {
+            return null;
+        }
+
+        $period->setRelation('budget', $this->resource);
+        $st = app(CalculateLimitStatusAction::class)->execute($period, $user);
+
+        return [
+            'start' => $st['start'],
+            'end' => $st['end'],
+            'amount' => $st['limit'],
+            'spent' => $st['spent'],
+            'left' => $st['left'],
+            'percent' => $st['percent'],
+            'days_left' => $st['days_left'],
+            'status' => $st['status'],
+        ];
+    }
+
+    private function owner(Request $request): ?User
+    {
+        return $request->user()?->id === $this->user_id ? $request->user() : $this->resource->user;
     }
 }

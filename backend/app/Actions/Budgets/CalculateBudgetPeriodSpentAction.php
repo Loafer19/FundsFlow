@@ -5,6 +5,7 @@ namespace App\Actions\Budgets;
 use App\Models\BudgetPeriod;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\LimitBuckets;
 use Carbon\Carbon;
 
 class CalculateBudgetPeriodSpentAction
@@ -31,18 +32,13 @@ class CalculateBudgetPeriodSpentAction
     }
 
     /**
-     * First day of the bucket containing $asOf, clamped to the period start
-     * (a period that began mid-bucket only counts from its own start).
+     * First day of the active bucket containing $asOf. A version opened mid-bucket by an
+     * edit (amount/length/tags) still counts from the bucket's first day, but never from
+     * before its run started (see LimitBuckets).
      */
     public function currentBucketStart(BudgetPeriod $period, Carbon $asOf): Carbon
     {
-        [$boundary] = $period->bucketBounds($asOf);
-
-        if ($boundary->toDateString() > $period->starts_at->toDateString()) {
-            return $boundary;
-        }
-
-        return $period->starts_at->copy()->startOfDay();
+        return LimitBuckets::currentBucketStart($period, $period->siblings(), $asOf);
     }
 
     /**

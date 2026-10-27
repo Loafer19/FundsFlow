@@ -84,7 +84,8 @@ class CalculateGoalProgressAction
         $requiredAmount = null;
         $requiredPer = null;
 
-        if ($deadline && !$completed && $remaining > 0) {
+        // No pace to ask for once the deadline has passed (it would read "need it all this week").
+        if ($deadline && !$completed && !$overdue && $remaining > 0) {
             $left = max(1, $daysLeft);
             $requiredPer = $left < self::WEEKLY_BELOW_DAYS ? 'week' : 'month';
             $units = $requiredPer === 'week' ? max(1.0, $left / 7) : $left / self::DAYS_PER_MONTH;
