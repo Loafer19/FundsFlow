@@ -72,6 +72,10 @@ export default defineConfig({
                     items: [{ slug: 'ai/mcp' }, { slug: 'ai/connect-clients' }, { slug: 'ai/tools' }],
                 },
                 {
+                    label: 'Self-hosting',
+                    items: [{ slug: 'self-hosting/report-pdf' }, { slug: 'self-hosting/admin-panel' }],
+                },
+                {
                     label: 'Help',
                     items: [
                         { slug: 'help/faq' },
