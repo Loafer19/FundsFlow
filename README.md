@@ -20,42 +20,14 @@ A personal finance tracker with an AI assistant on the web and in Telegram: log 
 ## Screenshots
 
 <table>
-  <tr>
-    <td width="50%">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./.github/screenshots/2.0/app-analytics-dark.webp">
-  <img src="./.github/screenshots/2.0/app-analytics-light.webp" alt="FundsFlow — Analytics tab" width="100%">
-</picture>
-
-    </td>
-    <td width="50%">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./.github/screenshots/2.0/app-budgets-dark.webp">
-  <img src="./.github/screenshots/2.0/app-budgets-light.webp" alt="FundsFlow — Budgets and savings goals" width="100%">
-</picture>
-
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./.github/screenshots/2.0/app-calendar-dark.webp">
-  <img src="./.github/screenshots/2.0/app-calendar-light.webp" alt="FundsFlow — Calendar tab" width="100%">
-</picture>
-
-    </td>
-    <td width="50%">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./.github/screenshots/2.0/app-assistant-dark.webp">
-  <img src="./.github/screenshots/2.0/app-assistant-light.webp" alt="FundsFlow — AI assistant" width="100%">
-</picture>
-
-    </td>
-  </tr>
+<tr>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="./.github/screenshots/2.0/app-analytics-dark.webp"><img src="./.github/screenshots/2.0/app-analytics-light.webp" alt="FundsFlow — Analytics tab" width="100%"></picture></td>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="./.github/screenshots/2.0/app-budgets-dark.webp"><img src="./.github/screenshots/2.0/app-budgets-light.webp" alt="FundsFlow — Budgets and savings goals" width="100%"></picture></td>
+</tr>
+<tr>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="./.github/screenshots/2.0/app-calendar-dark.webp"><img src="./.github/screenshots/2.0/app-calendar-light.webp" alt="FundsFlow — Calendar tab" width="100%"></picture></td>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="./.github/screenshots/2.0/app-assistant-dark.webp"><img src="./.github/screenshots/2.0/app-assistant-light.webp" alt="FundsFlow — AI assistant" width="100%"></picture></td>
+</tr>
 </table>
 
 ## Tech stack
