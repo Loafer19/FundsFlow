@@ -153,8 +153,8 @@
                 <div class="tabs tabs-box gap-2 p-0 w-max min-w-full sm:w-auto sm:min-w-0" role="radiogroup"
                     aria-label="Main views">
                     <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(Analytics)" />
+                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === Analytics"
+                            @change="selectedTab = Analytics" />
 
                         <Presentation :size="22" />
 
@@ -162,8 +162,8 @@
                     </label>
 
                     <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(CalendarTab)" />
+                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === CalendarTab"
+                            @change="selectedTab = CalendarTab" />
 
                         <CalendarDays :size="22" />
 
@@ -171,8 +171,8 @@
                     </label>
 
                     <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(Budgets)" />
+                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === Budgets"
+                            @change="selectedTab = Budgets" />
 
                         <PiggyBank :size="22" />
 
@@ -180,8 +180,8 @@
                     </label>
 
                     <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(TagDistribution)" />
+                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === TagDistribution"
+                            @change="selectedTab = TagDistribution" />
 
                         <Tags :size="22" />
 
@@ -189,8 +189,8 @@
                     </label>
 
                     <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(MoneyFlow)" />
+                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === MoneyFlow"
+                            @change="selectedTab = MoneyFlow" />
 
                         <ArrowLeftRight :size="22" />
 
@@ -198,8 +198,8 @@
                     </label>
 
                     <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(BalanceTrend)" />
+                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === BalanceTrend"
+                            @change="selectedTab = BalanceTrend" />
 
                         <TrendingUp :size="22" />
 
@@ -207,8 +207,8 @@
                     </label>
 
                     <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input v-model="selectedTab" type="radio" name="tabs_main" class="tab"
-                            :value="markRaw(TableTab)" />
+                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === TableTab"
+                            @change="selectedTab = TableTab" />
 
                         <Table :size="22" />
 

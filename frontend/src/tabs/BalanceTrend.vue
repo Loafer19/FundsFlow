@@ -11,9 +11,9 @@
             </label>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <StatCard v-for="item in summary" :key="item.key" :label="item.label" :current="item.current"
-                :previous="item.previous" :note="item.note" :previous-note="item.previousNote" />
+                :previous="item.previous" :compare="compare" />
         </div>
 
         <div class="card card-border border-base-300 bg-base-100">
@@ -29,7 +29,7 @@ import { computed, ref } from 'vue'
 import TrendChart from '../components/charts/TrendChart.vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatCard from '../components/StatCard.vue'
-import { formatDate, nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
+import { nowDateStr, toLocalDateStr } from '../services/formatters.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
 const transactionsStore = useTransactionsStore()
@@ -95,65 +95,23 @@ const chartBalances = computed(() => ({
     previousBalances: compare.value ? balanceTrend.value.previousBalances : {},
 }))
 
-const shortDate = (dateStr) => formatDate(parseLocalDate(dateStr))
-
-// Max / min point of a series (first day it was reached).
-const extreme = (entries, pick) =>
-    entries.reduce((best, entry) => (pick(entry[1], best[1]) ? entry : best), entries[0] ?? ['', 0])
-
 const summary = computed(() => {
-    const current = Object.entries(balanceTrend.value.currentBalances)
-    const previous = Object.entries(balanceTrend.value.previousBalances)
+    const current = Object.values(balanceTrend.value.currentBalances)
+    const previous = Object.values(balanceTrend.value.previousBalances)
 
-    // A period that is still running only counts the days up to today, so "to date" is compared with the
-    // same day of the previous period (same x position on the chart) and the daily average isn't diluted.
-    const today = nowDateStr()
-    const todayIdx = current.findIndex(([date]) => date === today)
-    const inProgress = todayIdx !== -1 && todayIdx < current.length - 1
-    const elapsed = inProgress ? current.slice(0, todayIdx + 1) : current
-    const prevIdx = inProgress ? Math.min(todayIdx, previous.length - 1) : previous.length - 1
-
-    const curEnd = elapsed.at(-1) ?? ['', 0]
-    const prevEnd = previous[prevIdx] ?? ['', 0]
-    const prevClose = previous.at(-1)?.[1] ?? 0
-    const curPeak = extreme(elapsed, (a, b) => a > b)
-    const prevPeak = extreme(previous, (a, b) => a > b)
-    const curLow = extreme(elapsed, (a, b) => a < b)
-    const prevLow = extreme(previous, (a, b) => a < b)
-
-    const withDate = ([date]) => (date ? shortDate(date) : '')
+    // A period that is still running only averages over the days up to today.
+    const todayIdx = Object.keys(balanceTrend.value.currentBalances).indexOf(nowDateStr())
+    const elapsedDays = todayIdx === -1 ? current.length : todayIdx + 1
+    const net = current.at(-1) ?? 0
+    const prevNet = previous.at(-1) ?? 0
 
     return [
-        {
-            key: 'net',
-            label: inProgress ? 'Net to date' : 'Period net',
-            current: curEnd[1],
-            previous: prevEnd[1],
-            note: inProgress ? `as of ${withDate(curEnd)}` : '',
-            previousNote: inProgress ? withDate(prevEnd) : '',
-        },
-        {
-            key: 'peak',
-            label: 'Peak',
-            current: curPeak[1],
-            previous: prevPeak[1],
-            note: withDate(curPeak),
-            previousNote: withDate(prevPeak),
-        },
-        {
-            key: 'low',
-            label: 'Low',
-            current: curLow[1],
-            previous: prevLow[1],
-            note: withDate(curLow),
-            previousNote: withDate(prevLow),
-        },
+        { key: 'net', label: 'Net', current: net, previous: prevNet },
         {
             key: 'avg',
             label: 'Avg daily change',
-            current: elapsed.length ? curEnd[1] / elapsed.length : 0,
-            previous: previous.length ? prevClose / previous.length : 0,
-            note: inProgress ? `over ${elapsed.length} days` : '',
+            current: elapsedDays ? net / elapsedDays : 0,
+            previous: previous.length ? prevNet / previous.length : 0,
         },
     ]
 })

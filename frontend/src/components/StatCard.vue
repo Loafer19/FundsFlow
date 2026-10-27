@@ -6,7 +6,7 @@
                 <span class="text-lg font-semibold">{{ formatMoney(current) }}</span>
                 <span v-if="note" class="text-xs text-base-content/60">{{ note }}</span>
             </div>
-            <div class="flex flex-wrap items-center gap-2 text-xs">
+            <div v-if="compare" class="flex flex-wrap items-center gap-2 text-xs">
                 <span class="text-base-content/60">
                     vs {{ formatMoney(previous) }}<template v-if="previousNote"> · {{ previousNote }}</template>
                 </span>
@@ -31,6 +31,8 @@ const props = defineProps({
     // Optional context next to the value / previous value (e.g. the date of a peak).
     note: { type: String, default: '' },
     previousNote: { type: String, default: '' },
+    // Hide the "vs previous" line when the period comparison is switched off.
+    compare: { type: Boolean, default: true },
 })
 
 const diff = computed(() => compareValues(props.current, props.previous))
