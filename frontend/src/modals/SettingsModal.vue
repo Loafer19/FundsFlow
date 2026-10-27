@@ -1,7 +1,10 @@
 <template>
     <dialog id="settings_modal" class="modal" aria-labelledby="settings_modal_title">
         <div class="modal-box max-w-md">
-            <h2 id="settings_modal_title" class="card-title mb-4">Settings</h2>
+            <h2 id="settings_modal_title" class="card-title mb-4">
+                <SettingsIcon :size="24" />
+                Settings
+            </h2>
 
             <div class="tabs tabs-box justify-center mb-4">
                 <template v-for="(title, key) in tabs">
@@ -37,9 +40,9 @@
                                 {{ title }}
                             </button>
                         </div>
-                        <label class="label cursor-pointer justify-start gap-2 py-0">
-                            <input v-model="decimals" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
-                            <span class="label-text text-sm">Show decimals</span>
+                        <label class="flex items-center justify-between gap-3 cursor-pointer">
+                            <span class="text-sm">Show decimals</span>
+                            <input v-model="decimals" type="checkbox" class="toggle toggle-primary toggle-sm" />
                         </label>
                     </div>
 
@@ -150,12 +153,13 @@
                                 <span v-if="mcpTokenActive" class="badge badge-success badge-sm">Token active</span>
                                 <span v-else class="badge badge-ghost badge-sm">No token</span>
                             </div>
-                            <p class="text-xs text-base-content/60 leading-relaxed">
-                                Generate a personal token for MCP clients. Prefer
-                                <code class="text-[10px]">Authorization: Bearer</code> when the client supports
-                                headers. Tip for Grok.com: it has no header field — copy the connection URL and paste
-                                it as the only MCP URL (skip OAuth).
-                            </p>
+                            <div class="flex items-center gap-1 text-xs text-base-content/60">
+                                <span>Personal token for MCP clients</span>
+                                <span class="tooltip before:max-w-56 before:text-left"
+                                    :data-tip="mcpHint" tabindex="0" role="img" :aria-label="mcpHint">
+                                    <Info :size="14" />
+                                </span>
+                            </div>
 
                             <code
                                 class="block text-[11px] font-mono break-all bg-base-100 rounded-box px-2 py-1.5 text-base-content/60">{{
@@ -193,17 +197,13 @@
                                 {{ aiQuotaUsed }} / {{ aiQuotaLimit }}
                             </span>
                         </div>
-                        <p class="text-xs text-base-content/60 leading-relaxed">
-                            Shared across Telegram receipt scan, voice, and text help.
-                            <template v-if="aiQuotaResetLabel"> Resets: {{ aiQuotaResetLabel }}</template>
+                        <p class="text-xs text-base-content/60">
+                            Receipts, voice and text help<template v-if="aiQuotaResetLabel"> · resets
+                                {{ aiQuotaResetLabel }}</template>
                         </p>
                     </div>
 
                     <div class="divider text-sm text-base-content/60">Login credentials</div>
-
-                    <p class="text-sm text-base-content/60 mb-3">
-                        Set an email and password to log in without Telegram or Google/GitHub
-                    </p>
 
                     <form @submit.prevent="saveCredentials">
                         <input v-model="credentialsForm.email" type="email" placeholder="Email" aria-label="Email"
@@ -224,9 +224,7 @@
                 </template>
 
                 <template v-else-if="tab === 'data'">
-                    <p class="text-sm text-base-content/60 mb-4">
-                        Download all your FundsFlow data as one JSON file
-                    </p>
+                    <p class="text-sm text-base-content/60 mb-3">All your data as one JSON file</p>
 
                     <pre
                         class="p-3 rounded-box bg-base-200 text-xs text-base-content/60 mb-4 font-mono leading-relaxed whitespace-pre-wrap">version,
@@ -247,39 +245,13 @@ recurring_transactions</pre>
                 </template>
 
                 <template v-else-if="tab === 'report'">
-                    <p class="text-sm text-base-content/60 mb-2">
-                        Export the selected tabs as on screen, using the current period type, dates, and tag filter from the header
-                    </p>
-                    <p class="text-xs text-base-content/50 mb-3 break-words whitespace-normal leading-relaxed">{{ reportPeriodLabel }}</p>
+                    <p class="text-sm text-base-content/60 mb-3 break-words whitespace-normal">{{ reportPeriodLabel }}</p>
 
-                    <div class="flex flex-col gap-2 mb-4">
-                        <label class="label cursor-pointer justify-start gap-2 py-0">
-                            <input v-model="reportSections.analytics" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
-                            <span class="label-text text-sm">Analytics</span>
-                        </label>
-                        <label class="label cursor-pointer justify-start gap-2 py-0">
-                            <input v-model="reportSections.calendar" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
-                            <span class="label-text text-sm">Calendar</span>
-                        </label>
-                        <label class="label cursor-pointer justify-start gap-2 py-0">
-                            <input v-model="reportSections.budgets" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
-                            <span class="label-text text-sm">Budgets</span>
-                        </label>
-                        <label class="label cursor-pointer justify-start gap-2 py-0">
-                            <input v-model="reportSections.tags" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
-                            <span class="label-text text-sm">Tags</span>
-                        </label>
-                        <label class="label cursor-pointer justify-start gap-2 py-0">
-                            <input v-model="reportSections.flow" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
-                            <span class="label-text text-sm">Flow</span>
-                        </label>
-                        <label class="label cursor-pointer justify-start gap-2 py-0">
-                            <input v-model="reportSections.trend" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
-                            <span class="label-text text-sm">Trend</span>
-                        </label>
-                        <label class="label cursor-pointer justify-start gap-2 py-0">
-                            <input v-model="reportSections.list" type="checkbox" class="checkbox checkbox-info checkbox-sm" />
-                            <span class="label-text text-sm">List</span>
+                    <div class="p-3 rounded-box bg-base-200 grid grid-cols-2 gap-x-6 gap-y-2 mb-4">
+                        <label v-for="(title, key) in reportSectionTitles" :key="key"
+                            class="flex items-center justify-between gap-3 cursor-pointer">
+                            <span class="text-sm">{{ title }}</span>
+                            <input v-model="reportSections[key]" type="checkbox" class="toggle toggle-primary toggle-sm" />
                         </label>
                     </div>
 
@@ -306,7 +278,7 @@ recurring_transactions</pre>
                 <button type="submit" class="btn btn-success" @click="saveSettings">
                     <span class="loading loading-spinner" v-if="saving"></span>
                     Save
-                    <Save :size="20" />
+                    <Save :size="24" />
                 </button>
             </div>
         </div>
@@ -318,7 +290,7 @@ recurring_transactions</pre>
 </template>
 
 <script setup>
-import { Bot, Download, KeyRound, Save, Send } from 'lucide-vue-next'
+import { Bot, Download, Info, KeyRound, Save, Send, Settings as SettingsIcon } from 'lucide-vue-next'
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import {
     createMcpToken,
@@ -415,6 +387,15 @@ const reportSections = ref({
     trend: true,
     list: true,
 })
+const reportSectionTitles = {
+    analytics: 'Analytics',
+    calendar: 'Calendar',
+    budgets: 'Budgets',
+    tags: 'Tags',
+    flow: 'Flow',
+    trend: 'Trend',
+    list: 'List',
+}
 const reportHasSection = computed(() => Object.values(reportSections.value).some(Boolean))
 const reportDateSelectionType = computed(() => {
     const raw = insightDateSelectionType?.value ?? insightDateSelectionType ?? 'month'
@@ -618,6 +599,8 @@ const googleLabel = computed(() => googleIdentity.value?.meta?.name || googleIde
 const githubLabel = computed(() => githubIdentity.value?.meta?.name || githubIdentity.value?.meta?.nickname || '')
 
 const mcpUrl = 'https://mcp.fundsflow.fun/mcp'
+const mcpHint =
+    'Prefer the Authorization: Bearer header when the client supports headers. Grok.com has no header field: paste the connection URL as the only MCP URL and skip OAuth.'
 const mcpCopied = ref('')
 const mcpPlainToken = ref('')
 const mcpTokenActive = ref(false)

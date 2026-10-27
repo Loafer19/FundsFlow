@@ -9,14 +9,8 @@
                     </h2>
                 </div>
 
-                <p class="text-sm text-base-content/60 mb-3">
-                    FundsFlow is a personal finance tracker for tagging spending, setting budgets, planning recurring
-                    payments, and logging expenses from Telegram — with charts for balance, flow, and tags.
-                </p>
-
                 <p class="text-sm text-base-content/60 mb-4">
-                    Starter tags are ready so you can categorize right away. Add a first transaction to see Analytics
-                    light up.
+                    Starter tags are ready. Add a first transaction to get going.
                 </p>
 
                 <div v-if="previewTags.length" class="flex flex-wrap gap-2 mb-4">
@@ -50,7 +44,7 @@
                 </h2>
 
                 <p class="text-sm text-base-content/60 mb-4">
-                    Link the bot to log expenses from chat. Optional — you can do this later in Settings.
+                    Log expenses from chat. Optional, link later in Settings.
                 </p>
 
                 <div class="flex flex-col gap-2">
@@ -65,13 +59,6 @@
                     </button>
                 </div>
             </template>
-
-            <p class="text-xs text-base-content/50 text-center mt-6">
-                Feedback?
-                <a href="https://t.me/Loafer19" target="_blank" rel="noopener noreferrer" class="link link-hover">
-                    @Loafer19
-                </a>
-            </p>
         </div>
 
         <form method="dialog" class="modal-backdrop">
