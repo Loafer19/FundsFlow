@@ -70,9 +70,9 @@
                                         <span class="truncate">{{ row.title }}</span>
                                     </span>
                                     <span class="flex items-center gap-2 shrink-0">
-                                        <span v-if="row.diff.delta !== null" class="badge badge-sm tabular-nums"
+                                        <span v-if="row.diff.label" class="badge badge-sm tabular-nums"
                                             :class="row.diff.badge">
-                                            {{ row.diff.pct === null ? 'new' : `${row.diff.pct >= 0 ? '+' : ''}${formatPercentage(row.diff.pct)}` }}
+                                            {{ row.diff.label }}
                                         </span>
                                         <span class="font-semibold tabular-nums">{{ formatMoney(row.amount) }}</span>
                                     </span>
@@ -131,7 +131,7 @@
                         <ChevronDown :size="20" class="shrink-0 transition-transform report-hide"
                             :class="{ '-rotate-90': !balancesOpen }" />
                         <span class="tooltip tooltip-right font-semibold"
-                            :data-tip="balancesScope === 'period' ? 'Selected period. Parent tags include child tags' : 'All-time. Parent tags include child tags'">
+                            data-tip="Parent tags include child tags">
                             Balances Per Tag
                         </span>
                         <span v-if="inReport" class="text-sm font-normal text-base-content/60">
@@ -176,7 +176,7 @@ import { computed, inject, ref } from 'vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatCard from '../components/StatCard.vue'
 import { today } from '../services/clock.js'
-import { compareValues } from '../services/comparison.js'
+import { tagChange } from '../services/comparison.js'
 import { parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { projectOccurrences } from '../services/recurringSchedule.js'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
@@ -364,12 +364,8 @@ const expensesByRoot = (list) => {
     return map
 }
 
-// Changes under 5% are noise for a tag: grey pill instead of red/green.
-const tagDiff = (amount, previousAmount) => {
-    const diff = compareValues(amount, previousAmount, { lowerIsBetter: true })
-    if (diff.pct !== null && Math.abs(diff.pct) < 5) diff.badge = 'badge-ghost'
-    return diff
-}
+// Changes under 5% are noise for a tag: grey pill instead of red/green (see tagChange).
+const tagDiff = (amount, previousAmount) => tagChange(amount, previousAmount, { lowerIsBetter: true, formatPercentage })
 
 const tagRows = computed(() => {
     const cur = expensesByRoot(filteredTransactions.value)

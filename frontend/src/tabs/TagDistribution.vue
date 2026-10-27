@@ -30,78 +30,42 @@
                 </div>
 
                 <div v-else-if="viewMode === 'list'" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div class="tags-list min-w-0">
-                        <h3 class="text-xl font-medium mb-2">Income</h3>
+                    <div v-for="section in listSections" :key="section.key" class="tags-list min-w-0">
+                        <h3 class="text-xl font-medium mb-2">{{ section.title }}</h3>
                         <table class="table table-sm w-full">
                             <tbody>
-                                <tr v-if="!filteredPositiveTagTree.length">
-                                    <td colspan="4" class="text-base-content/60">No income tags</td>
+                                <tr v-if="!section.rows.length">
+                                    <td colspan="3" class="text-base-content/60">{{ section.empty }}</td>
                                 </tr>
-                                <tr v-for="tag in filteredPositiveTagTree" :key="tag.id || 'untagged-positive'">
-                                    <td>
-                                        <div class="flex items-center gap-2" :style="{ paddingLeft: `${tag.depth * 20}px` }">
-                                            <div class="badge badge-soft badge-success text-xl py-4 px-2">
+                                <tr v-for="tag in section.rows" :key="tag.id || `untagged-${section.key}`"
+                                    :class="{ 'hover:bg-base-200/60': tag.clickable }">
+                                    <!-- In the app the button fills the cell (its padding replaces the cell's); the print report
+                                         keeps plain cells so the report table styles apply -->
+                                    <td :class="{ 'p-0': !inReport }">
+                                        <component :is="tag.clickable ? 'button' : 'div'"
+                                            :type="tag.clickable ? 'button' : undefined"
+                                            class="w-full flex items-center gap-2 text-left min-w-0"
+                                            :class="{ 'px-3 py-2': !inReport, 'cursor-pointer': tag.clickable }"
+                                            :style="{ paddingLeft: `${(inReport ? 0 : 12) + tag.depth * 20}px` }"
+                                            :aria-label="tag.clickable ? `Open ${tag.title} details` : undefined"
+                                            @click="tag.clickable && openDetail(tag, section.key)">
+                                            <span class="badge badge-soft text-xl py-4 px-2" :class="section.badge">
                                                 {{ tag.emoji }}
-                                            </div>
-                                            <span>{{ tag.title }}</span>
-                                        </div>
+                                            </span>
+                                            <span class="truncate">{{ tag.title }}</span>
+                                        </component>
                                     </td>
-                                    <td class="w-15 text-right">
-                                        <span class="text-base-content/60 tooltip" data-tip="Previous period">
-                                            {{ formatMoney(tag.previousAmount) }}
+                                    <td class="w-0 text-right whitespace-nowrap">
+                                        <span v-if="tag.change.label"
+                                            class="badge badge-sm tabular-nums tooltip tooltip-left"
+                                            :class="tag.change.badge"
+                                            :data-tip="`Previous period: ${formatMoney(tag.previousAmount)}`">
+                                            {{ tag.change.label }}
                                         </span>
                                     </td>
-                                    <td class="w-15 font-medium text-right">
-                                        <span class="tooltip" :data-tip="tag.count + ' txns'">
+                                    <td class="w-0 font-medium text-right whitespace-nowrap tabular-nums">
+                                        <span class="tooltip tooltip-left" :data-tip="tag.count + ' txns'">
                                             {{ formatMoney(tag.amount) }}
-                                        </span>
-                                    </td>
-                                    <td class="w-15 text-right">
-                                        <span :class="{
-                                            'text-success': tag.amount > tag.previousAmount,
-                                            'text-error': tag.amount < tag.previousAmount,
-                                            'text-secondary': tag.amount === tag.previousAmount,
-                                        }">
-                                            {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
-                                        </span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="tags-list min-w-0">
-                        <h3 class="text-xl font-medium mb-2">Expenses</h3>
-                        <table class="table table-sm w-full">
-                            <tbody>
-                                <tr v-if="!filteredNegativeTagTree.length">
-                                    <td colspan="4" class="text-base-content/60">No expense tags</td>
-                                </tr>
-                                <tr v-for="tag in filteredNegativeTagTree" :key="tag.id || 'untagged-negative'">
-                                    <td>
-                                        <div class="flex items-center gap-2" :style="{ paddingLeft: `${tag.depth * 20}px` }">
-                                            <div class="badge badge-soft badge-error text-xl py-4 px-2">
-                                                {{ tag.emoji }}
-                                            </div>
-                                            <span>{{ tag.title }}</span>
-                                        </div>
-                                    </td>
-                                    <td class="w-15 text-right">
-                                        <span class="text-base-content/60 tooltip" data-tip="Previous period">
-                                            {{ formatMoney(tag.previousAmount) }}
-                                        </span>
-                                    </td>
-                                    <td class="w-15 font-medium text-right">
-                                        <span class="tooltip" :data-tip="tag.count + ' txns'">
-                                            {{ formatMoney(tag.amount) }}
-                                        </span>
-                                    </td>
-                                    <td class="w-15 text-right">
-                                        <span :class="{
-                                            'text-success': tag.amount < tag.previousAmount,
-                                            'text-error': tag.amount > tag.previousAmount,
-                                            'text-secondary': tag.amount === tag.previousAmount,
-                                        }">
-                                            {{ formatPercentage(calculatePercentageDiff(tag.amount, tag.previousAmount)) }}
                                         </span>
                                     </td>
                                 </tr>
@@ -111,6 +75,9 @@
                 </div>
             </div>
         </div>
+
+        <TagDetailModal v-if="!inReport" ref="detailModal" :dateRange="dateRange"
+            @jump-to-list="emit('jump-to-list')" />
     </template>
 </template>
 
@@ -118,6 +85,8 @@
 import { computed, inject, ref } from 'vue'
 import TagDonutChart from '../components/charts/TagDonutChart.vue'
 import EmptyState from '../components/EmptyState.vue'
+import TagDetailModal from '../components/TagDetailModal.vue'
+import { tagChange } from '../services/comparison.js'
 import { useTagsStore } from '../services/tags'
 import { useTransactionsStore } from '../services/transactions'
 
@@ -134,12 +103,18 @@ const props = defineProps({
     },
 })
 
+const emit = defineEmits(['jump-to-list'])
+
 const tagsStore = useTagsStore()
 const transactionsStore = useTransactionsStore()
 const formatMoney = inject('formatMoney')
 const formatPercentage = inject('formatPercentage')
 const viewMode = ref(props.forcedViewMode || 'donuts')
 const openAdd = () => transactions_add_modal.showModal()
+// ReportDocument renders this tab for print: no detail modal, tag rows are plain text.
+const inReport = inject('inReport', false)
+const detailModal = ref(null)
+const openDetail = (tag, side) => detailModal.value?.open(tag.id, side)
 
 const hasPeriodData = computed(
     () =>
@@ -177,11 +152,6 @@ const calculateTagAmounts = (start, end) => {
     return result
 }
 
-const calculatePercentageDiff = (current, previous) => {
-    if (previous === 0) return current > 0 ? Number.POSITIVE_INFINITY : 0
-    return ((current - previous) / previous) * 100
-}
-
 const buildTagTree = (currentData, previousData, isPositive) => {
     const current = isPositive ? currentData.positive : currentData.negative
     const previous = isPositive ? previousData.positive : previousData.negative
@@ -194,6 +164,7 @@ const buildTagTree = (currentData, previousData, isPositive) => {
     if (untaggedCurrent.amount > 0 || untaggedCurrent.count > 0 || untaggedPrevious.amount > 0) {
         tree.push({
             id: null,
+            clickable: false,
             title: 'Untagged',
             emoji: '🏷️',
             amount: untaggedCurrent.amount,
@@ -210,6 +181,7 @@ const buildTagTree = (currentData, previousData, isPositive) => {
             amount: current[tag.id]?.amount || 0,
             count: current[tag.id]?.count || 0,
             previousAmount: previous[tag.id]?.amount || 0,
+            clickable: !inReport,
         }
 
         const hasActivity = tagData.amount > 0 || tagData.count > 0 || tagData.previousAmount > 0
@@ -236,6 +208,30 @@ const previousPeriod = computed(() => calculateTagAmounts(props.dateRange.previo
 
 const filteredPositiveTagTree = computed(() => buildTagTree(currentPeriod.value, previousPeriod.value, true))
 const filteredNegativeTagTree = computed(() => buildTagTree(currentPeriod.value, previousPeriod.value, false))
+
+// Expenses: a drop is good; income: growth is good. "new" when the previous period had nothing.
+const withChange = (tree, lowerIsBetter) =>
+    tree.map((tag) => ({
+        ...tag,
+        change: tagChange(tag.amount, tag.previousAmount, { lowerIsBetter, formatPercentage }),
+    }))
+
+const listSections = computed(() => [
+    {
+        key: 'income',
+        title: 'Income',
+        empty: 'No income tags',
+        badge: 'badge-success',
+        rows: withChange(filteredPositiveTagTree.value, false),
+    },
+    {
+        key: 'expenses',
+        title: 'Expenses',
+        empty: 'No expense tags',
+        badge: 'badge-error',
+        rows: withChange(filteredNegativeTagTree.value, true),
+    },
+])
 
 const positiveTagsWithAmount = computed(() => {
     return filteredPositiveTagTree.value.filter((tag) => tag.amount > 0)

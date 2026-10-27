@@ -18,3 +18,16 @@ export const compareValues = (current, previous, { lowerIsBetter = false, neutra
 
     return { delta, pct, badge }
 }
+
+// Per-tag change pill (Analytics top tags, Tags tab, tag details): changes under 5% are noise for a
+// tag, so they get a grey pill instead of red/green. `label` is the pill text: "+12.3%", or "new"
+// when the previous period had nothing; null when there is nothing to compare (both zero).
+export const tagChange = (current, previous, { lowerIsBetter = false, formatPercentage } = {}) => {
+    const diff = compareValues(current, previous, { lowerIsBetter })
+    if (diff.pct !== null && Math.abs(diff.pct) < 5) diff.badge = 'badge-ghost'
+    let label = null
+    if (diff.delta !== null && (current || previous)) {
+        label = diff.pct === null ? 'new' : `${diff.pct >= 0 ? '+' : ''}${formatPercentage(diff.pct)}`
+    }
+    return { ...diff, label }
+}

@@ -19,10 +19,31 @@ const props = defineProps({
         type: Array,
         default: null,
     },
+    // Optional label formatter for the bucket keys (default: the date format setting), e.g. months.
+    labelFormat: {
+        type: Function,
+        default: null,
+    },
+    // Optional tooltip title formatter for the bucket keys (default: labelFormat).
+    tooltipFormat: {
+        type: Function,
+        default: null,
+    },
+    aspectRatio: {
+        type: Number,
+        default: 2,
+    },
+    // 0 keeps x labels horizontal (Chart.js then skips labels that do not fit).
+    maxTickRotation: {
+        type: Number,
+        default: 50,
+    },
 })
 
 const formatDate = inject('formatDate')
 const formatMoney = inject('formatMoney')
+const label = (key) => (props.labelFormat ?? formatDate)(key)
+const tooltipLabel = (key) => (props.tooltipFormat ?? label)(key)
 
 const cssVar = (name) => window.getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
@@ -49,7 +70,7 @@ const chartData = computed(() => {
     const dates = Object.keys(props.balances)
 
     return {
-        labels: dates.map((date) => formatDate(date)),
+        labels: dates.map(label),
         datasets: [
             ...previousDatasets(dates),
             {
@@ -59,7 +80,7 @@ const chartData = computed(() => {
                 tooltip: {
                     callbacks: {
                         label: (context) => {
-                            return `${formatDate(dates[context.dataIndex])}: ${formatMoney(context.raw)}`
+                            return `${tooltipLabel(dates[context.dataIndex])}: ${formatMoney(context.raw)}`
                         },
                     },
                 },
@@ -71,7 +92,7 @@ const chartData = computed(() => {
                 tooltip: {
                     callbacks: {
                         label: (context) => {
-                            return `${formatDate(dates[context.dataIndex])}: ${formatMoney(context.raw)}`
+                            return `${tooltipLabel(dates[context.dataIndex])}: ${formatMoney(context.raw)}`
                         },
                     },
                 },
@@ -82,10 +103,12 @@ const chartData = computed(() => {
 
 const chartOptions = {
     responsive: true,
+    aspectRatio: props.aspectRatio,
     scales: {
         x: {
             stacked: true,
             ticks: {
+                maxRotation: props.maxTickRotation,
                 color: window.getComputedStyle(document.documentElement).getPropertyValue('--color-base-content'),
             },
             grid: {
