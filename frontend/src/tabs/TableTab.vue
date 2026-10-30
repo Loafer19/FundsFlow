@@ -131,6 +131,77 @@
             </div>
         </div>
 
+        <!-- Totals of exactly what the table lists, plus averages over the same rows. -->
+        <section v-if="filteredTransactions.length"
+            class="mt-4 grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+            aria-label="Totals of the listed transactions">
+            <div class="card card-border border-base-300 bg-base-100 min-w-0">
+                <div class="card-body p-4 gap-3 min-w-0">
+                    <h2 class="text-xs uppercase tracking-wide text-base-content/60">
+                        Totals <span class="normal-case tracking-normal">· {{ countLabel }}</span>
+                    </h2>
+
+                    <!-- Written addition: income, minus expenses, equals net. -->
+                    <div class="grid grid-cols-[1rem_1fr_auto] items-baseline gap-x-2 gap-y-1 tabular-nums">
+                        <span class="text-success font-semibold" aria-hidden="true">+</span>
+                        <span class="text-sm text-base-content/60">Income</span>
+                        <span class="text-right text-success">{{ formatMoney(totals.income) }}</span>
+                        <span class="text-error font-semibold" aria-hidden="true">−</span>
+                        <span class="text-sm text-base-content/60">Expenses</span>
+                        <span class="text-right text-error">{{ formatMoney(Math.abs(totals.expenses)) }}</span>
+                        <span class="col-span-3 border-t-2 border-base-content/20"></span>
+                        <span class="font-semibold" aria-hidden="true">=</span>
+                        <span class="text-sm font-semibold">Net</span>
+                        <span class="text-right text-lg font-semibold">{{ signed(totals.net) }}</span>
+                    </div>
+
+                    <div v-if="incomeShare !== null" class="flex h-1 overflow-hidden rounded-full bg-base-300"
+                        role="img"
+                        :aria-label="`Income ${incomeShare}% of the money moved, expenses ${100 - incomeShare}%`">
+                        <div class="bg-success/70" :style="{ width: `${incomeShare}%` }"></div>
+                        <div class="flex-1 bg-error/70"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card card-border border-base-300 bg-base-100 min-w-0">
+                <div class="card-body p-4 gap-3 min-w-0">
+                    <h2 class="text-xs uppercase tracking-wide text-base-content/60">Averages</h2>
+                    <dl class="grid grid-cols-2 gap-x-4 gap-y-3 tabular-nums">
+                        <div>
+                            <dt class="text-xs text-base-content/60">Spend per day</dt>
+                            <dd class="font-semibold">{{ formatMoney(averages.perDay) }}</dd>
+                            <dd class="text-xs text-base-content/50">
+                                over {{ averages.days }} {{ averages.days === 1 ? 'day' : 'days' }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs text-base-content/60">Avg expense</dt>
+                            <dd class="font-semibold">
+                                {{ averages.expense === null ? '—' : formatMoney(averages.expense) }}
+                            </dd>
+                            <dd class="text-xs text-base-content/50">
+                                {{ averages.expenseCount }} {{ averages.expenseCount === 1 ? 'expense' : 'expenses' }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs text-base-content/60">Days with spending</dt>
+                            <dd class="font-semibold">{{ averages.spendDays }} / {{ averages.days }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs text-base-content/60">Busiest day</dt>
+                            <dd class="font-semibold">
+                                {{ averages.busiest ? formatMoney(averages.busiest.amount) : '—' }}
+                            </dd>
+                            <dd v-if="averages.busiest" class="text-xs text-base-content/50">
+                                {{ formatDate(parseLocalDate(averages.busiest.day)) }}
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+        </section>
+
         <TagDetailModal v-if="!inReport" ref="detailModal" :dateRange="dateRange"
             @jump-to-list="emit('jump-to-list')" />
     </template>
@@ -155,6 +226,7 @@ import { computed, inject, ref } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
 import TagDetailModal from '../components/TagDetailModal.vue'
+import { today } from '../services/clock.js'
 import { getTransactionSourceLabel, parseLocalDate, toLocalDateStr } from '../services/formatters'
 import { useTransactionsStore } from '../services/transactions'
 
@@ -217,6 +289,67 @@ const filteredTransactions = computed(() => {
     return dayTransactions.value
         .filter((transaction) => !query || transaction.note?.toLowerCase().includes(query))
         .sort((a, b) => transactionsStore.sort(a, b, sortConfig.value.key, sortConfig.value.direction))
+})
+
+// Totals of exactly what the table lists (period, header tag filter, day, search).
+const totals = computed(() => {
+    let income = 0
+    let expenses = 0
+
+    for (const { amount } of filteredTransactions.value) {
+        if (amount > 0) income += amount
+        else expenses += amount
+    }
+
+    const round = (value) => Math.round(value * 100) / 100
+
+    return {
+        count: filteredTransactions.value.length,
+        income: round(income),
+        expenses: round(expenses),
+        net: round(income + expenses),
+    }
+})
+
+const countLabel = computed(() => `${totals.value.count} ${totals.value.count === 1 ? 'transaction' : 'transactions'}`)
+
+// Same sign style as the Amount column: "+" for income, the formatter's minus for expenses.
+const signed = (value) => (value > 0 ? '+' : '') + formatMoney(value)
+
+// Income share of all money moved (income + |expenses|), whole percent; null when nothing moved.
+const incomeShare = computed(() => {
+    const moved = totals.value.income - totals.value.expenses
+
+    return moved > 0 ? Math.round((totals.value.income / moved) * 100) : null
+})
+
+// Averages over the days of the period that have started (or the picked day).
+const averages = computed(() => {
+    const start = props.dateRange.currentStart
+    const end = new Date(Math.min(props.dateRange.currentEnd, parseLocalDate(today.value)))
+    const days = listDay.value ? 1 : Math.max(1, Math.round((end - start) / 86400000) + 1)
+    const byDay = new Map()
+    let expenseCount = 0
+
+    for (const transaction of filteredTransactions.value) {
+        if (transaction.amount >= 0) continue
+        expenseCount += 1
+        const day = toLocalDateStr(transaction.at)
+        byDay.set(day, (byDay.get(day) ?? 0) - transaction.amount)
+    }
+
+    let busiest = null
+    for (const [day, amount] of byDay) if (!busiest || amount > busiest.amount) busiest = { day, amount }
+    const spend = -totals.value.expenses
+
+    return {
+        days,
+        perDay: spend / days,
+        expense: expenseCount ? spend / expenseCount : null,
+        expenseCount,
+        spendDays: byDay.size,
+        busiest,
+    }
 })
 
 const openAdd = () => transactions_add_modal.showModal()

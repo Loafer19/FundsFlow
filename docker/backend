@@ -20,4 +20,12 @@ COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress --no-suggest --prefer-dist && \
     composer dump-autoload --optimize
 
+COPY docker/backend-entrypoint.sh /usr/local/bin/backend-entrypoint
+RUN chmod +x /usr/local/bin/backend-entrypoint
+
 EXPOSE 80
+
+# Runs `php artisan migrate --force` (opt out with AUTO_MIGRATE=false), then execs the base
+# image's docker-php-entrypoint. Setting ENTRYPOINT drops the inherited CMD, so restate it.
+ENTRYPOINT ["backend-entrypoint"]
+CMD ["--config", "/etc/frankenphp/Caddyfile", "--adapter", "caddyfile"]

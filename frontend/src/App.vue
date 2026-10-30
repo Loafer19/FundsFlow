@@ -17,7 +17,7 @@
     <OnboardingModal />
     <AgentDrawer v-if="authStore.isAuthenticated" />
 
-    <div class="container mx-auto p-4">
+    <div class="container mx-auto p-4 flex flex-col min-h-dvh">
         <header class="flex gap-2 justify-end mb-4 flex-wrap">
             <a href="/docs/" target="_blank" rel="noopener" class="btn btn-ghost btn-square tooltip tooltip-bottom"
                 data-tip="Docs" aria-label="Docs (opens in a new tab)">
@@ -62,7 +62,7 @@
                 </button>
             </template>
 
-            <button v-else @click="showModal('auth_modal')" class="btn btn-secondary">
+            <button v-else-if="!isBootstrapping" @click="showModal('auth_modal')" class="btn btn-secondary">
                 <LogIn :size="24" />
                 Login
             </button>
@@ -217,16 +217,14 @@
                 </div>
             </div>
 
-            <component :is="selectedTab" :dateRange="getDateRange" :dateSelectionType
+            <!-- First data load: a loader instead of the tab (its empty state would flash). Invisible for the
+                 first LOADER_DELAY_MS so fast loads show nothing. -->
+            <BootLoader v-if="isBootstrapping" :class="{ invisible: !loaderVisible }" />
+            <component v-else :is="selectedTab" :dateRange="getDateRange" :dateSelectionType
                 @jump-to-month="handleJumpToMonth" @jump-to-list="handleJumpToList" />
         </main>
 
-        <footer class="mt-10 pt-4 border-t border-base-300 text-center text-sm text-base-content/50">
-            Feedback
-            <a href="https://t.me/Loafer19" target="_blank" rel="noopener noreferrer" class="link link-hover">
-                @Loafer19
-            </a>
-        </footer>
+        <AppFooter :with-fab="authStore.isAuthenticated" />
     </div>
 
     <button v-if="authStore.isAuthenticated" type="button"
@@ -265,6 +263,8 @@ import {
 } from 'lucide-vue-next'
 import { computed, defineAsyncComponent, markRaw, nextTick, onMounted, provide, ref, watch } from 'vue'
 import AgentDrawer from './components/AgentDrawer.vue'
+import AppFooter from './components/AppFooter.vue'
+import BootLoader from './components/BootLoader.vue'
 import TagPicker from './components/TagPicker.vue'
 import Toasts from './components/Toasts.vue'
 import AttachmentPreviewModal from './modals/AttachmentPreviewModal.vue'
@@ -283,7 +283,7 @@ import TransactionsAddModal from './modals/TransactionsAddModal.vue'
 import TransactionsEditModal from './modals/TransactionsEditModal.vue'
 import { useAgentStore } from './services/agent.js'
 import { useAuthStore } from './services/auth.js'
-import { bootstrapStores } from './services/bootstrap.js'
+import { bootstrapStores, isBootstrapping } from './services/bootstrap.js'
 import { useBudgetsStore } from './services/budgets.js'
 import { resetCachedNotice } from './services/cache.js'
 import { parseLocalDate } from './services/formatters.js'
@@ -402,7 +402,28 @@ watch(
     { immediate: true },
 )
 
+const LOADER_DELAY_MS = 180
+const loaderVisible = ref(false)
+let loaderTimer = null
+
+// The delay counts from mount (or from a later login), not from setup, so it measures what the user waits.
+function armLoader(busy) {
+    clearTimeout(loaderTimer)
+    loaderVisible.value = false
+    if (busy) loaderTimer = setTimeout(() => (loaderVisible.value = true), LOADER_DELAY_MS)
+}
+
+watch(isBootstrapping, armLoader)
+
 onMounted(async () => {
+    armLoader(isBootstrapping.value)
+    await restoreSession()
+
+    // No session after all (bad token, Telegram sign-in needed): show the app as signed out.
+    if (!authStore.isAuthenticated) isBootstrapping.value = false
+})
+
+async function restoreSession() {
     if (isTelegramWebApp()) {
         telegramReady()
         installTelegramChrome()
@@ -410,6 +431,7 @@ onMounted(async () => {
         const initData = getInitData()
 
         if (initData) {
+            isBootstrapping.value = true
             const result = await authStore.loginWithTelegramWebApp(initData)
 
             if (result === true) {
@@ -438,7 +460,7 @@ onMounted(async () => {
     if (peekStashedInitData()) {
         showModal('auth_modal')
     }
-})
+}
 
 watch(
     () => authStore.isAuthenticated,
@@ -451,6 +473,7 @@ watch(
                 showModal('onboarding_modal')
             }
         } else {
+            isBootstrapping.value = false
             tagsStore.tags = []
             transactionsStore.transactions = []
             budgetsStore.budgets = []

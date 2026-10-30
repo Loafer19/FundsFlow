@@ -42,10 +42,13 @@ Only `/admin` and `/livewire-*` start a session; the API, CORS and the Telegram 
 
 ## Deploy
 
-The image publishes the panel's JS/CSS during `composer install` (`filament:upgrade`). Migrations are **not**
-automatic, so run this in the backend container after the first deploy (and after every deploy that adds migrations),
-then `admin:grant`:
+The image publishes the panel's JS/CSS during `composer install` (`filament:upgrade`). Migrations run
+automatically when the backend container starts (`php artisan migrate --force`, waiting up to ~30s for the database),
+so after the first deploy you only need `admin:grant`. To manage migrations yourself, set `AUTO_MIGRATE=false` on the
+backend service and run this in the container after each deploy that adds migrations:
 
 ```sh
 php artisan migrate --force
 ```
+
+Containers started from the same image with a different command (e.g. `php artisan queue:work`) skip the migration step.

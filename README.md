@@ -74,7 +74,7 @@ docker compose -f docker/compose.gotenberg.yml up -d
 ```
 
 Configuration (env vars, Telegram, MCP, AI) is covered in the [docs](https://fundsflow.fun/docs/).
-The backend Docker image does **not** run migrations automatically: after each deploy run `php artisan migrate --force` in the backend container.
+The backend Docker image runs `php artisan migrate --force` on container start (it waits up to ~30s for the database); set `AUTO_MIGRATE=false` to opt out and run it by hand.
 
 ## Self-hosting
 

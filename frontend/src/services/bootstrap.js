@@ -1,3 +1,4 @@
+import { ref } from 'vue'
 import api from './api.js'
 import { useBudgetsStore } from './budgets.js'
 import { currentUserId, noticeCachedData, persistCache, readCache } from './cache.js'
@@ -6,6 +7,10 @@ import { useRecurringTransactionsStore } from './recurringTransactions.js'
 import { useTagsStore } from './tags.js'
 import toasts from './toasts.js'
 import { useTransactionsStore } from './transactions.js'
+
+// True from page load with a stored session (or a login) until the first data load ends, unless cached
+// data could be shown meanwhile. Tabs are swapped for a loader then, so their empty states don't flash.
+export const isBootstrapping = ref(Boolean(localStorage.getItem('token')))
 
 export const bootstrapStores = async () => {
     const userId = currentUserId()
@@ -27,6 +32,8 @@ export const bootstrapStores = async () => {
     if (cached.recurring) recurringStore.rules = cached.recurring
 
     const hadCache = Object.values(cached).some((value) => value != null)
+
+    isBootstrapping.value = !hadCache
 
     tagsStore.isLoading = true
     transactionsStore.isLoading = true
@@ -53,6 +60,7 @@ export const bootstrapStores = async () => {
         transactionsStore.isLoading = false
         budgetsStore.isLoading = false
         recurringStore.isLoading = false
+        isBootstrapping.value = false
     }
 }
 
