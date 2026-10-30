@@ -7,6 +7,18 @@ FundsFlow 2.0 is the biggest update since the project started. It covers everyth
 **1.12.0** (Mini App, PDF report, Send to Telegram), including the **1.13.0** Telegram AI update. The full history is on
 [GitHub](https://github.com/Loafer19/FundsFlow/commits/main).
 
+## 2.0.1
+
+- **List totals.** Below the table, a Totals card adds up income and expenses into net, with an income/expense
+  share bar, and an Averages card shows spend per day, average expense, days with spending and the busiest day.
+  Both follow the period, tag filter, picked day and search.
+- **Loading after sign-in.** While your data loads you see a short “Loading your data…” indicator instead of empty
+  “No data” messages. Fast loads show nothing at all.
+- **New footer** with the app version (opens this page), the Telegram bot and Feedback, kept at the bottom of the
+  screen on short pages.
+- **Self-hosting:** the backend container now runs database migrations on start (set `AUTO_MIGRATE=false` to turn
+  this off). See [Admin panel](/docs/self-hosting/admin-panel/).
+
 ## Assistant
 
 - **AI assistant in the web app.** Click ✨ **Assistant** in the header, or press **/** or **Ctrl+K** (**⌘K** on a
