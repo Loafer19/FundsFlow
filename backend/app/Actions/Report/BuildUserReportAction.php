@@ -12,6 +12,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Support\GoalSummary;
 use App\Support\PeriodRange;
+use App\Support\TagTree;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -57,14 +58,17 @@ class BuildUserReportAction
         $money = fn (float $v): string => UserFormatter::formatMoney($user, $v);
         $date = fn ($d): string => UserFormatter::formatDate($user, $d);
 
-        $all = $this->listTransactions->execute($user)->filter(fn (Transaction $tx) => $this->matches($tx, $tagIds, $untagged));
+        $tree = TagTree::for($user);
+        // A selected parent tag includes its child tags (same as the web filter).
+        $matchIds = $tree->expand($tagIds);
+        $all = $this->listTransactions->execute($user)->filter(fn (Transaction $tx) => $this->matches($tx, $matchIds, $untagged));
         $current = $this->between($all, $range->from->toDateString(), $range->to->toDateString());
         $previous = $this->between($all, $range->previousFrom->toDateString(), $range->previousTo->toDateString());
 
         $cur = $this->totals($current);
         $prev = $this->totals($previous);
-        $expenseTags = $this->byTag($current, $previous, false);
-        $incomeTags = $this->byTag($current, $previous, true);
+        $expenseTags = $this->byTag($tree, $current, $previous, false);
+        $incomeTags = $this->byTag($tree, $current, $previous, true);
         $filterLabel = $this->filterLabel($user, $tagIds, $untagged);
 
         $summary = [
@@ -149,7 +153,8 @@ class BuildUserReportAction
     }
 
     /**
-     * Same rule as the web tag filter: no filter = all; untagged matches tagless rows; otherwise any selected tag.
+     * Same rule as the web tag filter: no filter = all; untagged matches tagless rows; otherwise any selected tag
+     * ($tagIds already include the selected tags' children).
      *
      * @param list<int> $tagIds
      */
@@ -191,11 +196,14 @@ class BuildUserReportAction
     }
 
     /**
+     * Totals per top-level tag, each including its child tags (like Analytics → Top spending tags):
+     * a transaction counts once per top-level tag even with several of its children.
+     *
      * @param Collection<int, Transaction> $current
      * @param Collection<int, Transaction> $previous
      * @return list<array{label: string, current: float, previous: float}>
      */
-    private function byTag(Collection $current, Collection $previous, bool $income): array
+    private function byTag(TagTree $tree, Collection $current, Collection $previous, bool $income): array
     {
         $rows = [];
         foreach (['current' => $current, 'previous' => $previous] as $side => $txs) {
@@ -206,7 +214,7 @@ class BuildUserReportAction
                 $amount = abs((float) $tx->amount);
                 $keys = $tx->tags->isEmpty()
                     ? ['untagged' => 'Untagged']
-                    : $tx->tags->mapWithKeys(fn (Tag $t) => [$t->id => trim($t->emoji . ' ' . $t->title)])->all();
+                    : collect($tree->rootsOf($tx->tags->pluck('id')))->mapWithKeys(fn (int $id) => [$id => $tree->label($id)])->all();
                 foreach ($keys as $key => $label) {
                     $rows[$key] ??= ['label' => $label, 'current' => 0.0, 'previous' => 0.0];
                     $rows[$key][$side] += $amount;
@@ -254,12 +262,15 @@ class BuildUserReportAction
         $now = $user->nowInTimezone();
         $rows = '';
         $goalRows = '';
+        $tree = TagTree::for($user);
+        $filterIds = $tree->expand($tagIds);
         foreach ($this->listBudgets->execute($user) as $budget) {
             $period = $budget->periods->first(fn (BudgetPeriod $p) => $p->ends_at === null);
             if (!$period) {
                 continue;
             }
-            if ($tagIds !== [] && $period->tags->pluck('id')->map(fn ($id) => (int) $id)->intersect($tagIds)->isEmpty()) {
+            // Shown when the budget's tags and the filter overlap, child tags included on both sides.
+            if ($tagIds !== [] && array_intersect($tree->expand($period->tags->pluck('id')), $filterIds) === []) {
                 continue;
             }
             if ($budget->isGoal()) {

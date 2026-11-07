@@ -1,11 +1,12 @@
 import { nowDateStr, parseLocalDate, toLocalDateStr } from './formatters.js'
+import { useTagsStore } from './tags.js'
 
 // Savings goal progress — a client-side mirror of
 // backend/app/Actions/Budgets/CalculateGoalProgressAction.php so the card
 // reacts to new transactions without a refetch (limits work the same way).
 //
 // Sign rule: contributions are transactions carrying ANY of the goal's tags
-// (exact tags, counted once) from the goal start through today. Money moved
+// or their child tags (counted once) from the goal start through today. Money moved
 // into savings is logged as an expense, so saved = -(net of those
 // transactions): a -500 transfer adds 500, a +200 withdrawal takes 200 off.
 // Progress = start_amount + saved, never below zero.
@@ -60,7 +61,8 @@ export const goalProgress = (budget, transactions, today = nowDateStr()) => {
     const latest = current ?? periods[0] ?? null
     const startedAt = earliest([today, ...periods.map((p) => p.starts_at).filter(Boolean)])
 
-    const tagIds = new Set((latest?.tags ?? []).map((tag) => tag.id))
+    // A goal's tags include their child tags.
+    const tagIds = useTagsStore().expandIds((latest?.tags ?? []).map((tag) => tag.id))
     const target = Number(latest?.amount ?? 0)
     const startAmount = Number(budget.start_amount ?? 0)
 

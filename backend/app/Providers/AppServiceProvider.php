@@ -12,6 +12,7 @@ use App\Policies\RecurringTransactionPolicy;
 use App\Policies\TagPolicy;
 use App\Policies\TransactionPolicy;
 use App\Support\ReportPrintToken;
+use App\Support\TagTreeCache;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -22,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // One tag hierarchy load per user per request/job (see TagTree::for).
+        $this->app->scoped(TagTreeCache::class);
     }
 
 

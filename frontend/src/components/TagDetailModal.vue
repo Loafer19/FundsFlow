@@ -249,10 +249,10 @@ const open = (id, fromSide = 'expenses') => {
 
 const close = () => dialog.value?.close()
 
-// Same as the Analytics jump-to-list: filter by the tag (incl. its children) and switch to the List tab.
+// Same as the Analytics jump-to-list: filter by the tag (the filter includes its children) and switch to the List tab.
 const seeAll = () => {
     transactionsStore.filterUntagged = false
-    transactionsStore.selectedTagIds = [...ids.value]
+    transactionsStore.selectedTagIds = [tagId.value]
     close()
     emit('jump-to-list')
 }

@@ -6,6 +6,7 @@ use App\Models\Budget;
 use App\Models\BudgetPeriod;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\TagTree;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 
@@ -14,7 +15,7 @@ use Carbon\CarbonImmutable;
  *
  * Contribution rule (mirrored in frontend/src/services/goals.js):
  * - Contributions are the user's transactions carrying ANY of the goal's tags
- *   (exact tags, no child tags — same matching as spending limits; a
+ *   (each tag includes its child tags — same matching as spending limits; a
  *   transaction with several matching tags counts once), dated from the goal
  *   start (its first period's starts_at) through today.
  * - Money moved into savings is usually logged as an expense (negative amount),
@@ -124,6 +125,7 @@ class CalculateGoalProgressAction
 
     /**
      * Net saved by the tagged transactions in [from, to]: minus their signed sum.
+     * The goal's tags include their child tags; a transaction counts once.
      *
      * @param list<int> $tagIds
      */
@@ -132,6 +134,8 @@ class CalculateGoalProgressAction
         if ($tagIds === [] || $from->greaterThan($to)) {
             return 0.0;
         }
+
+        $tagIds = TagTree::for($user)->expand($tagIds);
 
         $sum = Transaction::query()
             ->where('user_id', $user->id)

@@ -6,6 +6,7 @@ use App\Actions\Transactions\ListTransactionsAction;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Support\PeriodRange;
+use App\Support\TagTree;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -94,7 +95,7 @@ class BuildUserChartAction
 
         switch ($compare ? $type . '_compare' : $type) {
             case 'expenses_by_tag_compare':
-                $rows = $this->compareByTag($inRange, $prevIn);
+                $rows = $this->compareByTag(TagTree::for($user), $inRange, $prevIn);
                 $title = 'Expenses by tag: ' . $periodLabel . ' vs ' . $period->previousLabel;
                 $svg = $this->svgCompareBars($rows, $money, $periodLabel, $period->previousLabel);
                 $caption = "Expenses by tag · {$periodLabel} vs {$period->previousLabel}\n"
@@ -127,7 +128,7 @@ class BuildUserChartAction
 
             case 'expenses_by_tag':
                 $style = ($args['style'] ?? 'donut') === 'bar' ? 'bar' : 'donut';
-                $rows = $this->expensesByTag($inRange);
+                $rows = $this->expensesByTag(TagTree::for($user), $inRange);
                 $title = 'Expenses by tag';
                 $svg = $style === 'bar' ? $this->svgHorizontalBars($rows, $money) : $this->svgDonut($rows, $money, $expenses);
                 $caption = "Expenses by tag · {$periodLabel}\nTotal expenses: " . $money($expenses);
@@ -209,17 +210,17 @@ class BuildUserChartAction
     }
 
     /**
-     * Expense totals per tag for both periods (top 7 by the larger side + Other).
+     * Expense totals per top-level tag (child tags included) for both periods (top 7 by the larger side + Other).
      *
      * @param iterable<Transaction> $current
      * @param iterable<Transaction> $previous
      * @return list<array{label: string, value: float, previous: float, id: int|string, emoji: string, title: string, count: int}>
      */
-    private function compareByTag(iterable $current, iterable $previous): array
+    private function compareByTag(TagTree $tree, iterable $current, iterable $previous): array
     {
         $rows = [];
         foreach (['value' => $current, 'previous' => $previous] as $side => $transactions) {
-            foreach ($this->expensesByTagAll($transactions) as $key => $row) {
+            foreach ($this->expensesByTagAll($tree, $transactions) as $key => $row) {
                 $rows[$key] ??= ['label' => $row['label'], 'value' => 0.0, 'previous' => 0.0, 'id' => $row['id'], 'emoji' => $row['emoji'], 'title' => $row['title'], 'count' => 0];
                 $rows[$key][$side] += $row['value'];
                 if ($side === 'value') {
@@ -244,7 +245,7 @@ class BuildUserChartAction
      * @param iterable<Transaction> $transactions
      * @return array<int|string, array{label: string, value: float, id: int|string, emoji: string, title: string, count: int}>
      */
-    private function expensesByTagAll(iterable $transactions): array
+    private function expensesByTagAll(TagTree $tree, iterable $transactions): array
     {
         $byTag = [];
         foreach ($transactions as $tx) {
@@ -258,10 +259,12 @@ class BuildUserChartAction
                 $byTag['untagged']['count']++;
                 continue;
             }
-            foreach ($tx->tags as $tag) {
-                $byTag[$tag->id] ??= ['label' => trim(((string) $tag->emoji) . ' ' . $tag->title), 'value' => 0.0, 'id' => (int) $tag->id, 'emoji' => (string) $tag->emoji, 'title' => (string) $tag->title, 'count' => 0];
-                $byTag[$tag->id]['value'] += $amount;
-                $byTag[$tag->id]['count']++;
+            // Top-level tags, each including its child tags; once per top-level tag (like Analytics).
+            foreach ($tree->rootsOf($tx->tags->pluck('id')) as $id) {
+                $meta = $tree->meta($id);
+                $byTag[$id] ??= ['label' => $tree->label($id), 'value' => 0.0, 'id' => $id, 'emoji' => $meta['emoji'], 'title' => $meta['title'], 'count' => 0];
+                $byTag[$id]['value'] += $amount;
+                $byTag[$id]['count']++;
             }
         }
 
@@ -290,7 +293,7 @@ class BuildUserChartAction
      * @param iterable<Transaction> $transactions
      * @return list<array{label: string, value: float, id: int|string, emoji: string, title: string, count: int}>
      */
-    private function expensesByTag(iterable $transactions): array
+    private function expensesByTag(TagTree $tree, iterable $transactions): array
     {
         $byTag = [];
         foreach ($transactions as $tx) {
@@ -304,17 +307,12 @@ class BuildUserChartAction
                 $byTag['untagged']['count']++;
                 continue;
             }
-            foreach ($tx->tags as $tag) {
-                $byTag[$tag->id] ??= [
-                    'label' => trim(((string) $tag->emoji) . ' ' . $tag->title),
-                    'value' => 0.0,
-                    'id' => (int) $tag->id,
-                    'emoji' => (string) $tag->emoji,
-                    'title' => (string) $tag->title,
-                    'count' => 0,
-                ];
-                $byTag[$tag->id]['value'] += $amount;
-                $byTag[$tag->id]['count']++;
+            // Top-level tags, each including its child tags; once per top-level tag (like Analytics).
+            foreach ($tree->rootsOf($tx->tags->pluck('id')) as $id) {
+                $meta = $tree->meta($id);
+                $byTag[$id] ??= ['label' => $tree->label($id), 'value' => 0.0, 'id' => $id, 'emoji' => $meta['emoji'], 'title' => $meta['title'], 'count' => 0];
+                $byTag[$id]['value'] += $amount;
+                $byTag[$id]['count']++;
             }
         }
 

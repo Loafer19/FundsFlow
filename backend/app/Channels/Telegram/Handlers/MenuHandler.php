@@ -19,6 +19,7 @@ use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Support\GoalSummary;
+use App\Support\TagTree;
 use App\Support\UserFormatter;
 
 class MenuHandler
@@ -55,12 +56,14 @@ class MenuHandler
             'Net: ' . $this->support->escapeHtml(UserFormatter::formatMoney($user, $income + $expense)),
         ];
 
+        // Top-level tags, each including its child tags; a transaction counts once per top-level tag.
+        $tagTree = TagTree::for($user);
         $byTag = [];
 
         foreach ($transactions->filter(fn (Transaction $transaction) => $transaction->amount < 0) as $transaction) {
-            foreach ($transaction->tags as $tag) {
-                $byTag[$tag->id] ??= ['tag' => $tag, 'amount' => 0.0];
-                $byTag[$tag->id]['amount'] += abs((float) $transaction->amount);
+            foreach ($tagTree->rootsOf($transaction->tags->pluck('id')) as $id) {
+                $byTag[$id] ??= ['label' => $tagTree->label($id), 'amount' => 0.0];
+                $byTag[$id]['amount'] += abs((float) $transaction->amount);
             }
         }
 
@@ -71,9 +74,7 @@ class MenuHandler
             $lines[] = '<b>Top expense tags</b>';
 
             foreach ($top as $index => $row) {
-                /** @var Tag $tag */
-                $tag = $row['tag'];
-                $lines[] = ($index + 1) . ') ' . $this->support->escapeHtml(trim($tag->emoji . ' ' . $tag->title))
+                $lines[] = ($index + 1) . ') ' . $this->support->escapeHtml($row['label'])
                     . ' — ' . $this->support->escapeHtml(UserFormatter::formatMoney($user, -1 * $row['amount']));
             }
         }

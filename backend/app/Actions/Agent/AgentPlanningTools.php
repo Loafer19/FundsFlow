@@ -28,6 +28,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Support\LimitBuckets;
 use App\Support\PeriodRange;
+use App\Support\TagTree;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -120,7 +121,7 @@ class AgentPlanningTools
                     'days' => ['type' => 'integer', 'minimum' => 1, 'maximum' => self::MAX_UPCOMING_DAYS],
                 ],
             ]),
-            $fn('compare_periods', 'Compare two periods: income, expenses, net and per-tag expense deltas. period is the current period (default this_month) compared with the previous one (previous calendar month/quarter/year/week, or the same number of days before for from/to). Optional compare_from/compare_to override the previous period; tag_ids limits to transactions with any of those tags. For running periods also returns previous_to_date (same elapsed days) for a fair comparison.', [
+            $fn('compare_periods', 'Compare two periods: income, expenses, net and per-tag expense deltas (top-level tags, child tags included). period is the current period (default this_month) compared with the previous one (previous calendar month/quarter/year/week, or the same number of days before for from/to). Optional compare_from/compare_to override the previous period; tag_ids limits to transactions with any of those tags (a parent tag includes its child tags). For running periods also returns previous_to_date (same elapsed days) for a fair comparison.', [
                 'type' => 'object',
                 'properties' => [
                     'period' => $period,
@@ -215,7 +216,7 @@ class AgentPlanningTools
                 'period' => ['type' => 'string', 'enum' => PeriodRange::PRESETS, 'description' => 'Default this_month. Ignored when from/to given.'],
                 'from' => ['type' => 'string', 'description' => 'Explicit start YYYY-MM-DD'],
                 'to' => ['type' => 'string', 'description' => 'Explicit end YYYY-MM-DD'],
-                'tag_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Only transactions with any of these tags'],
+                'tag_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Only transactions with any of these tags (a parent tag includes its child tags)'],
                 'untagged' => ['type' => 'boolean', 'description' => 'Include (or, without tag_ids, only) untagged transactions'],
             ],
         ];
@@ -539,9 +540,12 @@ class AgentPlanningTools
         $prevLabel = $previous?->label ?? $range->previousLabel;
 
         $tagFilter = $this->ownedTagIds($user, $args['tag_ids'] ?? []);
+        $tagTree = TagTree::for($user);
         $all = $this->listTransactions->execute($user);
         if ($tagFilter !== []) {
-            $all = $all->filter(fn (Transaction $tx) => $tx->tags->pluck('id')->intersect($tagFilter)->isNotEmpty());
+            // A selected parent tag includes its child tags.
+            $matchIds = $tagTree->expand($tagFilter);
+            $all = $all->filter(fn (Transaction $tx) => $tx->tags->pluck('id')->intersect($matchIds)->isNotEmpty());
         }
 
         $current = $this->between($all, $range->from, $range->to);
@@ -549,8 +553,8 @@ class AgentPlanningTools
         $cur = $this->totals($user, $current);
         $prev = $this->totals($user, $before);
 
-        $curTags = $this->expenseByTag($current);
-        $prevTags = $this->expenseByTag($before);
+        $curTags = $this->expenseByTag($tagTree, $current);
+        $prevTags = $this->expenseByTag($tagTree, $before);
         $rows = [];
         foreach (array_unique(array_merge(array_keys($curTags), array_keys($prevTags))) as $key) {
             $meta = $curTags[$key] ?? $prevTags[$key];
@@ -1443,10 +1447,12 @@ class AgentPlanningTools
     }
 
     /**
+     * Expenses per top-level tag, each including its child tags; a transaction counts once per top-level tag.
+     *
      * @param Collection<int, Transaction> $txs
      * @return array<int|string, array{id: int|null, label: string, amount: float}>
      */
-    private function expenseByTag(Collection $txs): array
+    private function expenseByTag(TagTree $tree, Collection $txs): array
     {
         $out = [];
         foreach ($txs as $tx) {
@@ -1459,9 +1465,9 @@ class AgentPlanningTools
                 $out['untagged']['amount'] += $amount;
                 continue;
             }
-            foreach ($tx->tags as $tag) {
-                $out[$tag->id] ??= ['id' => (int) $tag->id, 'label' => trim($tag->emoji . ' ' . $tag->title), 'amount' => 0.0];
-                $out[$tag->id]['amount'] += $amount;
+            foreach ($tree->rootsOf($tx->tags->pluck('id')) as $id) {
+                $out[$id] ??= ['id' => $id, 'label' => $tree->label($id), 'amount' => 0.0];
+                $out[$id]['amount'] += $amount;
             }
         }
 

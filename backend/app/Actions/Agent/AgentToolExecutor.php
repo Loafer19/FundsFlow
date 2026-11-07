@@ -19,6 +19,7 @@ use App\Models\BudgetPeriod;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\TagTree;
 use App\Support\UserFormatter;
 use Illuminate\Support\Facades\DB;
 
@@ -82,7 +83,7 @@ class AgentToolExecutor
                 'properties' => [
                     'from' => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD inclusive'],
                     'to' => ['type' => 'string', 'description' => 'End date YYYY-MM-DD inclusive'],
-                    'tag_id' => ['type' => 'integer', 'description' => 'Filter by tag id'],
+                    'tag_id' => ['type' => 'integer', 'description' => 'Filter by tag id (a parent tag includes its child tags)'],
                     'note_contains' => ['type' => 'string', 'description' => 'Case-insensitive note substring'],
                     'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => self::MAX_TRANSACTIONS_PAGE],
                 ],
@@ -95,7 +96,7 @@ class AgentToolExecutor
                 'type' => 'object',
                 'properties' => (object) [],
             ]),
-            'period_summary' => self::fn('period_summary', 'Income, expenses, net, and top expense tags for a calendar month (user timezone).', [
+            'period_summary' => self::fn('period_summary', 'Income, expenses, net, and top expense tags (top-level tags, child tags included) for a calendar month (user timezone).', [
                 'type' => 'object',
                 'properties' => [
                     'month' => ['type' => 'string', 'description' => 'YYYY-MM; default current month in user timezone'],
@@ -170,7 +171,7 @@ class AgentToolExecutor
                 ],
                 'required' => ['id'],
             ]),
-            'create_budget' => self::fn('create_budget', 'Propose creating a budget. Stages Confirm/Cancel. type limit (default): a spending limit; length week|month|year required; optional start_date YYYY-MM-DD (today or earlier): the limit starts that day and its periods repeat from it (monthly from the 15th runs 15th → 14th, weekly from that weekday); without start_date it starts at the beginning of the current calendar week/month/year (so spending already made this period counts) — pass today\'s date only if the user wants it to start today. align_to_calendar is a legacy flag (true = start of the current calendar period). type goal: a savings goal; amount is the target, tag_ids are the savings tags whose transactions count as contributions from the start date (transfers into savings logged as expenses add to it, withdrawals subtract), optional start_date (YYYY-MM-DD, default today, may be in the past: contributions count from that day), target_date deadline (today or later) and start_amount already saved; no length. tag_ids required for both.', [
+            'create_budget' => self::fn('create_budget', 'Propose creating a budget. Stages Confirm/Cancel. type limit (default): a spending limit; length week|month|year required; optional start_date YYYY-MM-DD (today or earlier): the limit starts that day and its periods repeat from it (monthly from the 15th runs 15th → 14th, weekly from that weekday); without start_date it starts at the beginning of the current calendar week/month/year (so spending already made this period counts) — pass today\'s date only if the user wants it to start today. align_to_calendar is a legacy flag (true = start of the current calendar period). type goal: a savings goal; amount is the target, tag_ids are the savings tags whose transactions count as contributions from the start date (transfers into savings logged as expenses add to it, withdrawals subtract), optional start_date (YYYY-MM-DD, default today, may be in the past: contributions count from that day), target_date deadline (today or later) and start_amount already saved; no length. tag_ids required for both; a parent tag includes its child tags (no need to list them too).', [
                 'type' => 'object',
                 'properties' => [
                     'type' => ['type' => 'string', 'enum' => ['limit', 'goal']],
@@ -332,7 +333,10 @@ class AgentToolExecutor
         $tagId = isset($args['tag_id']) && is_numeric($args['tag_id']) ? (int) $args['tag_id'] : null;
         $noteContains = is_string($args['note_contains'] ?? null) ? trim((string) $args['note_contains']) : '';
 
-        $transactions = $this->listTransactions->execute($user)->filter(function (Transaction $tx) use ($from, $to, $tagId, $noteContains): bool {
+        // A parent tag includes its child tags.
+        $tagIds = $tagId !== null ? TagTree::for($user)->expand([$tagId]) : [];
+
+        $transactions = $this->listTransactions->execute($user)->filter(function (Transaction $tx) use ($from, $to, $tagId, $tagIds, $noteContains): bool {
             $at = $tx->at?->format('Y-m-d');
             if ($from !== null && ($at === null || $at < $from)) {
                 return false;
@@ -340,7 +344,7 @@ class AgentToolExecutor
             if ($to !== null && ($at === null || $at > $to)) {
                 return false;
             }
-            if ($tagId !== null && !$tx->tags->contains(fn (Tag $tag): bool => (int) $tag->id === $tagId)) {
+            if ($tagId !== null && !$tx->tags->contains(fn (Tag $tag): bool => in_array((int) $tag->id, $tagIds, true))) {
                 return false;
             }
             if ($noteContains !== '' && !str_contains(mb_strtolower((string) ($tx->note ?? '')), mb_strtolower($noteContains))) {
@@ -441,16 +445,19 @@ class AgentToolExecutor
         $income = (float) $transactions->filter(fn (Transaction $tx) => $tx->amount > 0)->sum('amount');
         $expense = (float) $transactions->filter(fn (Transaction $tx) => $tx->amount < 0)->sum('amount');
 
+        // Top-level tags, each including its child tags; a transaction counts once per top-level tag.
+        $tagTree = TagTree::for($user);
         $byTag = [];
         foreach ($transactions->filter(fn (Transaction $tx) => $tx->amount < 0) as $tx) {
-            foreach ($tx->tags as $tag) {
-                $byTag[$tag->id] ??= [
-                    'id' => (int) $tag->id,
-                    'title' => (string) $tag->title,
-                    'emoji' => (string) $tag->emoji,
+            foreach ($tagTree->rootsOf($tx->tags->pluck('id')) as $id) {
+                $meta = $tagTree->meta($id);
+                $byTag[$id] ??= [
+                    'id' => $id,
+                    'title' => $meta['title'],
+                    'emoji' => $meta['emoji'],
                     'amount' => 0.0,
                 ];
-                $byTag[$tag->id]['amount'] += abs((float) $tx->amount);
+                $byTag[$id]['amount'] += abs((float) $tx->amount);
             }
         }
 

@@ -382,9 +382,7 @@ const tagRows = computed(() => {
             const active =
                 key === UNTAGGED
                     ? transactionsStore.filterUntagged && !selected.size
-                    : !transactionsStore.filterUntagged &&
-                      selected.size === ids.length &&
-                      ids.every((id) => selected.has(id))
+                    : !transactionsStore.filterUntagged && selected.size === 1 && selected.has(key)
             return {
                 key,
                 ids,
@@ -419,7 +417,8 @@ const toggleTagFilter = (row) => {
         return
     }
     transactionsStore.filterUntagged = false
-    transactionsStore.selectedTagIds = row.ids
+    // The filter includes child tags by itself, so one chip for the top-level tag is enough.
+    transactionsStore.selectedTagIds = [row.key]
 }
 
 // ── Largest expenses
@@ -610,7 +609,7 @@ const balancesByTags = computed(() => {
                   transactionsStore.filteredByDateRange(props.dateRange.currentStart, props.dateRange.currentEnd),
               )
             : transactionsStore.groupedByTags()
-    const selected = transactionsStore.tagFilterActive ? new Set(transactionsStore.selectedTagIds) : null
+    const selected = transactionsStore.tagFilterActive ? transactionsStore.selectedTagIdSet : null
 
     const rows = tagsStore.forBalances().map((tag) => {
         const ids = tagsStore.descendantIds(tag.id)

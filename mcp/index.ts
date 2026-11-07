@@ -606,7 +606,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         {
             title: 'List budgets',
             description:
-                'List all budgets: spending limits (type "limit") and savings goals (type "goal"). Active limits include current_period: start, end, amount, spent, left, percent (rounded down), days_left, status (on_track|at_risk|over); spent counts from the start of the current period even if the limit was edited during it; null when paused. Goals include a progress object: saved, target, remaining, percent, status (completed|paused|on_track|behind|in_progress), days_left, required_amount per week|month, projected_date.',
+                'List all budgets: spending limits (type "limit") and savings goals (type "goal"). Active limits include current_period: start, end, amount, spent, left, percent (rounded down), days_left, status (on_track|at_risk|over); spent counts expenses on the limit's tags and their child tags (each transaction once), from the start of the current period even if the limit was edited during it; null when paused. Goals include a progress object (contributions on the goal's tags and their child tags): saved, target, remaining, percent, status (completed|paused|on_track|behind|in_progress), days_left, required_amount per week|month, projected_date.',
             inputSchema: {},
         },
         async () => textResult(unwrapList(await api(token, '/budgets'))),
@@ -617,7 +617,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         {
             title: 'Create budget',
             description:
-                'Create a spending limit (type "limit", default; length week|month|year required; without start_date it runs on calendar weeks/months/years from the start of the current one (spending already made this period counts); pass start_date YYYY-MM-DD (today or earlier) only when the user names a start day: its periods then repeat from it, e.g. monthly from the 15th runs 15th → 14th; legacy align_to_calendar is still accepted, false = start today) or a savings goal (type "goal"; amount is the target, length is ignored). tag_ids required (at least one). Goal progress = start_amount + net of transactions with these tags since start_date (YYYY-MM-DD, default today, may be in the past, not after target_date); target_date must be today or later: expenses (transfers into savings) add, income (withdrawals) subtracts.',
+                'Create a spending limit (type "limit", default; length week|month|year required; without start_date it runs on calendar weeks/months/years from the start of the current one (spending already made this period counts); pass start_date YYYY-MM-DD (today or earlier) only when the user names a start day: its periods then repeat from it, e.g. monthly from the 15th runs 15th → 14th; legacy align_to_calendar is still accepted, false = start today) or a savings goal (type "goal"; amount is the target, length is ignored). tag_ids required (at least one); a parent tag includes its child tags, so there is no need to list them too. Goal progress = start_amount + net of transactions with these tags since start_date (YYYY-MM-DD, default today, may be in the past, not after target_date); target_date must be today or later: expenses (transfers into savings) add, income (withdrawals) subtracts.',
             inputSchema: {
                 type: z.enum(['limit', 'goal']).optional(),
                 amount: z.number().min(0.01).max(RULE_AMOUNT_MAX),

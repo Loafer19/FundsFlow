@@ -23,7 +23,8 @@ Below the header:
 
 - **Week / Month / Year** — the period type. The current week, month, or year is selected by default.
 - **‹ ›** arrows and the date picker — move to another period.
-- **Filter tags** — show only transactions with the selected tags, or only **Untagged** ones. A badge shows how many
+- **Filter tags** — show only transactions with the selected tags (a parent includes its child tags), or only
+  **Untagged** ones. A badge shows how many
   filters are active; **Clear** removes them.
 
 The selected period and tag filter apply to all tabs. Most tabs also compare the selected period with the **previous**

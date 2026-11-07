@@ -126,6 +126,18 @@ const hasPeriodData = computed(
             .length > 0,
 )
 
+const parentById = computed(() => new Map(tagsStore.tags.map((tag) => [tag.id, tag.parent_id ?? null])))
+
+const selfAndAncestors = (id) => {
+    const out = [id]
+    let parent = parentById.value.get(id) ?? null
+    while (parent != null && !out.includes(parent)) {
+        out.push(parent)
+        parent = parentById.value.get(parent) ?? null
+    }
+    return out
+}
+
 const calculateTagAmounts = (start, end) => {
     const result = {
         positive: {},
@@ -143,11 +155,15 @@ const calculateTagAmounts = (start, end) => {
             untaggedTarget.amount += Math.abs(t.amount)
             untaggedTarget.count += 1
         } else {
-            t.tags.forEach((tag) => {
-                target[tag.id] = target[tag.id] || { ...tag, amount: 0, count: 0 }
-                target[tag.id].amount += Math.abs(t.amount)
-                target[tag.id].count += 1
-            })
+            // Each tag and all of its ancestors, once: a parent's total includes its child tags and a
+            // transaction with several tags under one parent counts once for it (like Analytics).
+            const ids = new Set()
+            for (const tag of t.tags) for (const id of selfAndAncestors(tag.id)) ids.add(id)
+            for (const id of ids) {
+                target[id] = target[id] || { amount: 0, count: 0 }
+                target[id].amount += Math.abs(t.amount)
+                target[id].count += 1
+            }
         }
     })
 
@@ -235,11 +251,12 @@ const listSections = computed(() => [
     },
 ])
 
+// Donuts show top-level tags only (each includes its child tags), so no amount is drawn twice.
 const positiveTagsWithAmount = computed(() => {
-    return filteredPositiveTagTree.value.filter((tag) => tag.amount > 0)
+    return filteredPositiveTagTree.value.filter((tag) => tag.amount > 0 && tag.depth === 0)
 })
 
 const negativeTagsWithAmount = computed(() => {
-    return filteredNegativeTagTree.value.filter((tag) => tag.amount > 0)
+    return filteredNegativeTagTree.value.filter((tag) => tag.amount > 0 && tag.depth === 0)
 })
 </script>

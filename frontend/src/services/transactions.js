@@ -3,6 +3,7 @@ import api from './api.js'
 import { persistCache } from './cache.js'
 import { apiErrorMessage, toLocalDateStr } from './formatters.js'
 import { isOnboardingDone, markOnboardingDone } from './onboarding.js'
+import { useTagsStore } from './tags.js'
 import toasts from './toasts.js'
 
 const CACHE = 'transactions'
@@ -26,17 +27,23 @@ export const useTransactionsStore = defineStore('transactions', {
                 return date >= toLocalDateStr(start) && date <= toLocalDateStr(end)
             }),
         tagFilterActive: (state) => state.selectedTagIds.length > 0 || state.filterUntagged,
-        matchesTagFilter: (state) => (transaction) => {
-            if (!state.selectedTagIds.length && !state.filterUntagged) {
-                return true
-            }
+        // Selected tags plus their child tags: picking a parent shows its children's transactions too.
+        selectedTagIdSet: (state) => useTagsStore().expandIds(state.selectedTagIds),
+        matchesTagFilter() {
+            const selected = this.selectedTagIdSet
 
-            const tags = transaction.tags
-            if (state.filterUntagged && !tags?.length) {
-                return true
-            }
+            return (transaction) => {
+                if (!this.selectedTagIds.length && !this.filterUntagged) {
+                    return true
+                }
 
-            return Array.isArray(tags) && tags.some((t) => state.selectedTagIds.includes(t.id))
+                const tags = transaction.tags
+                if (this.filterUntagged && !tags?.length) {
+                    return true
+                }
+
+                return Array.isArray(tags) && tags.some((t) => selected.has(t.id))
+            }
         },
         filteredByDateRangeAndTags() {
             return (start, end) => this.filteredByDateRange(start, end).filter(this.matchesTagFilter)

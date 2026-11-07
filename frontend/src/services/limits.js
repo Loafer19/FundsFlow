@@ -4,6 +4,7 @@
 // repeat from budget.anchor_date (monthly from the 15th runs 15th → 14th); a null anchor
 // (older limits) means calendar weeks (Mon–Sun), months and years.
 import { nowDateStr, parseLocalDate, toLocalDateStr } from './formatters.js'
+import { useTagsStore } from './tags.js'
 
 export const NEAR_LIMIT_RATIO = 0.8
 
@@ -140,9 +141,9 @@ export const historyBuckets = (period, periods, anchor = null, today = nowDateSt
     return buckets
 }
 
-// Expenses (negative amounts) carrying any of the tags, counted once, on days [start, end].
+// Expenses (negative amounts) carrying any of the tags or their child tags, counted once, on days [start, end].
 export const spentBetween = (transactionsStore, start, end, tags) => {
-    const tagIds = new Set(tags.map((tag) => tag.id))
+    const tagIds = useTagsStore().expandIds(tags.map((tag) => tag.id))
 
     return transactionsStore
         .filteredByDateRange(start, end)

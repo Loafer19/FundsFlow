@@ -10,6 +10,7 @@ use App\Models\BudgetPeriod;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Support\GoalSummary;
+use App\Support\TagTree;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
 
@@ -131,10 +132,13 @@ class SendWeeklyDigestAction
 
         $byTag = [];
 
+        // Top-level tags, each including its child tags; a transaction counts once per top-level tag.
+        $tagTree = TagTree::for($user);
+
         foreach ($transactions->where('amount', '<', 0) as $transaction) {
-            foreach ($transaction->tags as $tag) {
-                $byTag[$tag->id] ??= ['tag' => $tag, 'amount' => 0.0];
-                $byTag[$tag->id]['amount'] += abs((float) $transaction->amount);
+            foreach ($tagTree->rootsOf($transaction->tags->pluck('id')) as $id) {
+                $byTag[$id] ??= ['tag' => (object) $tagTree->meta($id), 'amount' => 0.0];
+                $byTag[$id]['amount'] += abs((float) $transaction->amount);
             }
         }
 

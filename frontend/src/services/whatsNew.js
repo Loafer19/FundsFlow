@@ -10,11 +10,12 @@ import { useAuthStore } from './auth.js'
  */
 export const RELEASES = [
     {
-        version: '2.0.2',
+        version: '2.1.0',
         items: [
             'Report a problem or send feedback right from the app: Feedback in the footer.',
             'Follow your requests and our replies in Settings → Support, or in Telegram.',
             'In the bot, send /support with your message, or just tell the assistant.',
+            'Limits and savings goals on a parent tag now count its child tags too.',
         ],
     },
     {

@@ -9,7 +9,7 @@ When your Telegram chat is linked, the bot can message you on its own:
 | --- | --- |
 | **💰 Budget alert** | Checked hourly. ⚠️ when a limit reaches **80%** for the current period, 🚨 at **100%**. Each threshold is sent once per period, even if you edit the limit during it. Savings goals are skipped. |
 | **🎯 Savings goal reached** | Checked hourly. 🎉 once when a savings goal reaches its target (sent again only if you raise the target and reach it). |
-| **📬 Weekly digest** | Mondays at 09:00 UTC: last week's income, expenses, net, top expense tag, and the change vs the week before, then your active limits and savings goals. Skipped if you had no transactions last week. |
+| **📬 Weekly digest** | Mondays at 09:00 UTC: last week's income, expenses, net, top expense tag (top-level, child tags included), and the change vs the week before, then your active limits and savings goals. Skipped if you had no transactions last week. |
 | **🔁 Added automatically** | When [recurring rules](/docs/web/recurring/) create transactions (runs daily at 06:00 UTC). |
 
 Use `/mute` to turn all of them off and `/unmute` to turn them back on. Muting doesn't affect replies to your own

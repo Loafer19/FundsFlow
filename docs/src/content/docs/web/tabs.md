@@ -12,7 +12,8 @@ Stat cards for the selected period, each compared with the previous period: **In
 
 - **Forecast** — expected income, expenses, and net at the end of the period, while it is still running.
 - **Insights** — short notes such as the biggest change in a tag, the priciest weekday, and no-spend days.
-- **Top spending tags** with their share and change; click one to filter by it.
+- **Top spending tags** (top-level tags, each including its child tags) with their share and change; click one to
+  filter by it.
 - **Largest expenses** of the period; **See all** opens the List.
 
 **Balances Per Tag** shows the balance of every tag marked **Show in Balances** (including its child tags), for
@@ -34,8 +35,9 @@ Your [budgets](/docs/web/budgets/) with progress bars for the current period, pa
 
 ## Tags
 
-Income and expenses by tag, as **Donuts** or a **List**. The list shows each tag's amount and its change versus the
-previous period.
+Income and expenses by tag, as **Donuts** or a **List**. The donuts show top-level tags; the list shows every tag,
+indented under its parent, with its amount and its change versus the previous period. A parent's amount includes its
+child tags, and a transaction counts once per tag.
 
 Click a donut slice or a tag in the list to open its details: total, transactions, and average amount versus the
 previous period, the last 12 months, subtags, and the largest transactions (**See all** opens them in the List).

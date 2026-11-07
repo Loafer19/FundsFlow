@@ -7,6 +7,19 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
 **1.13** update that put an AI assistant in the Telegram bot. Self-hosting and technical changes are listed in the
 [GitHub releases](https://github.com/Loafer19/FundsFlow/releases).
 
+## 2.1.0
+
+- **Ask for help right from the app.** Click **Feedback** in the footer to report a problem or share an idea.
+  Follow your requests and our replies in **Settings → Support**; replies also reach you in Telegram if it's linked.
+- **Or from Telegram.** Send `/support` with your message, or just tell the assistant something isn't working.
+- **See what's new after an update.** A short list of highlights appears once when the app updates, with a link to
+  this page.
+- **Answers to common questions.** A new [FAQ](/docs/help/faq/) covers sign-in, Telegram, imports, budgets and more.
+- **Parent tags include their child tags everywhere.** A limit or savings goal on *Food* now also counts *Groceries*
+  and *Restaurants* under it, so you don't have to pick every subtag. The same goes for the tag filter, the Tags
+  tab, reports and the Telegram bot. A transaction is still counted only once.
+  [Learn more](/docs/web/tags/)
+
 ## 2.0.1
 
 - **See your totals under the List.** Below the table you now get income, expenses and net for the period, plus

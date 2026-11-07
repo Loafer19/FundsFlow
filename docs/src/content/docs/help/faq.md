@@ -30,9 +30,9 @@ day. Check that the rule isn't paused and that its start date has come in **Recu
 
 ### My savings goal shows less than I saved.
 
-A goal counts transactions with the goal's own tags since its start date, plus **Already saved**. Transfers to
-savings are usually logged as expenses (−500 adds 500 to the goal). Child tags don't count, so put the goal's tag
-on each transfer. See [How progress is counted](/docs/web/budgets/#how-progress-is-counted).
+A goal counts transactions with the goal's tags (and their child tags) since its start date, plus **Already saved**.
+Transfers to savings are usually logged as expenses (−500 adds 500 to the goal), so put the goal's tag, or one of its
+child tags, on each transfer and check that the transfer is dated on or after the goal's start date. See [How progress is counted](/docs/web/budgets/#how-progress-is-counted).
 
 ### The bot or the Assistant says I've used my AI requests for today.
 

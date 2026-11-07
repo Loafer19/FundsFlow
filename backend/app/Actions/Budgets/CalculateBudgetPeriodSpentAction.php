@@ -6,15 +6,17 @@ use App\Models\BudgetPeriod;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Support\LimitBuckets;
+use App\Support\TagTree;
 use Carbon\Carbon;
 
 class CalculateBudgetPeriodSpentAction
 {
     public function execute(BudgetPeriod $period, User $user, ?Carbon $asOf = null): float
     {
-        $tagIds = $period->tags->pluck('id');
+        // A parent tag includes its child tags; a transaction counts once (whereHas).
+        $tagIds = TagTree::for($user)->expand($period->tags->pluck('id'));
 
-        if ($tagIds->isEmpty()) {
+        if ($tagIds === []) {
             return 0.0;
         }
 

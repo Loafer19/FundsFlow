@@ -15,7 +15,8 @@ Both are built on tags, so there is nothing extra to log: tag your transactions 
 On the **Budgets** tab click **Add Budget or Goal** and keep **Limit** selected:
 
 - **Title** — optional; without it the budget is labelled by its tags' emojis.
-- **Tags** — at least one. Spending on these tags counts toward the budget.
+- **Tags** — at least one. Spending on these tags and their child tags counts toward the budget (a limit on
+  *Food* also counts *Groceries* and *Restaurants* under it). A transaction counts once, even with several of the tags.
 - **Amount** — the limit per period.
 - **Weekly / Monthly / Yearly**.
 - **Start date** — by default the start of the current calendar week, month or year (Monday, the 1st or
@@ -47,7 +48,7 @@ Click **Add Budget or Goal** and switch to **Goal**:
 
 - **Goal name** — e.g. “🛟 Emergency fund”. Optional; without it the goal is labelled by its tags' emojis.
 - **Target amount** — how much you want to have saved.
-- **Savings tags** — at least one. Transactions with these tags are your contributions.
+- **Savings tags** — at least one. Transactions with these tags or their child tags are your contributions.
 - **Start date** — the day contributions start counting from. Defaults to today; pick an earlier date if you
   already started saving (e.g. transfers you logged last month). It cannot be in the future or after the deadline.
 - **Deadline** — optional date you want to reach the target by; today or later. A goal whose deadline has passed
@@ -60,8 +61,8 @@ Saving money is usually logged as a transfer *out* of your wallet, i.e. an expen
 
 - **Progress = Already saved + the net of transactions with the goal's tags since the goal started, with the sign
   flipped**: a −500 transfer to savings adds 500, a +200 withdrawal back to your wallet takes 200 off.
-- A transaction counts once, even if it has several of the goal's tags. As with limits, only the exact tags count
-  (child tags are not included).
+- A transaction counts once, even if it has several of the goal's tags. As with limits, child tags count too: a goal
+  on *Savings* includes transfers tagged *Emergency fund* under it.
 - Progress never goes below zero, and it can go above the target.
 - Pausing a goal does not reset it: progress always counts from the start date. Changing the **Start date** when
   editing recalculates progress from the new date.

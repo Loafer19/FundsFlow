@@ -21,7 +21,7 @@ Below the message field the bot shows six buttons:
 | Command | What it does |
 | --- | --- |
 | `/start` | Create an account for this chat, or link it with a code from the website |
-| `/month` | This month's income, expenses, net, and top tags |
+| `/month` | This month's income, expenses, net, and top tags (a parent tag includes its child tags) |
 | `/analytics` | Same as `/month` |
 | `/recent` | Your 5 most recent transactions, with **Open** buttons for each |
 | `/tags` | List your tags |

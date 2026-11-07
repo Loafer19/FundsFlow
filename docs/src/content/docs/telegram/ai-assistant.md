@@ -58,7 +58,7 @@ The assistant works by calling tools on your account.
 | `list_transactions` | Transactions filtered by date range, tag, or note text (up to 50 rows) |
 | `list_budgets` | Budgets with the current-period limit, spent amount, and progress, plus savings goals with saved / target |
 | `list_recurring` | Recurring rules |
-| `period_summary` | Income, expenses, net, and top expense tags for a month |
+| `period_summary` | Income, expenses, net, and top expense tags (top-level, child tags included) for a month |
 | `budget_status` | For each active budget (or one): spent, left, days left, per-day allowance, average daily spend, and the projected total at the current pace (*on track*, *at risk*, or *over*). For savings goals: saved, left, days to the deadline, the amount needed per week or month, and when you will reach it at the current pace (*on track*, *behind*, *completed*) |
 | `upcoming_recurring` | Recurring charges and income due in the next N days (default 7, up to 90) with totals |
 | `compare_periods` | Income, expenses, and net for a period vs the previous one, plus per-tag spending changes. If the current period isn't over yet, it also compares with the same number of days of the previous period |

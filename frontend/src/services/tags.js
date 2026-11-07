@@ -33,6 +33,14 @@ export const useTagsStore = defineStore('tags', {
 
             return ids
         },
+        // A tag includes all of its descendants (limits, goals, the tag filter): the given ids plus their child tags.
+        expandIds() {
+            return (ids) => {
+                const out = new Set()
+                for (const id of ids ?? []) for (const x of this.descendantIds(id)) out.add(x)
+                return out
+            }
+        },
     },
 
     actions: {
