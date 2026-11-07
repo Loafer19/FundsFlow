@@ -8,6 +8,7 @@ use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\IdentityController;
 use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\Telegram\TelegramWebhookController;
 use App\Http\Controllers\TelegramSendController;
@@ -93,6 +94,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/account/mcp-token', [AccountController::class, 'revokeMcpToken']);
     Route::get('/account/export', [AccountController::class, 'export'])
         ->middleware('throttle:10,1,export:');
+
+    // Support requests. New ones are also capped per hour in CreateSupportTicketAction (bot + assistant too).
+    Route::get('/support/tickets', [SupportTicketController::class, 'index']);
+    Route::post('/support/tickets', [SupportTicketController::class, 'store'])
+        ->middleware('throttle:5,10,support-create:');
+    Route::get('/support/tickets/{ticket}', [SupportTicketController::class, 'show'])->whereNumber('ticket');
+    Route::post('/support/tickets/{ticket}/messages', [SupportTicketController::class, 'reply'])
+        ->whereNumber('ticket')
+        ->middleware('throttle:20,10,support-reply:');
 
     Route::post('/agent/chat', [AgentController::class, 'chat'])
         ->middleware('throttle:20,1,agent-chat:');

@@ -388,6 +388,7 @@ const ACTION_LABELS = {
     delete_recurring: 'Delete recurring rule',
     create_tags: 'New tags',
     rename_tags: 'Rename tags',
+    create_support_ticket: 'Support request',
 }
 
 const actionLabel = (action) => ACTION_LABELS[action] ?? 'Confirm change'

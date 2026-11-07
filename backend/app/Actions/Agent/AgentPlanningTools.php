@@ -13,6 +13,8 @@ use App\Actions\RecurringTransactions\CreateRecurringTransactionAction;
 use App\Actions\RecurringTransactions\DeleteRecurringTransactionAction;
 use App\Actions\RecurringTransactions\ListRecurringTransactionsAction;
 use App\Actions\RecurringTransactions\UpdateRecurringTransactionAction;
+use App\Actions\Support\CreateSupportTicketAction;
+use App\Actions\Support\SupportRateLimitException;
 use App\Actions\Tags\ListTagsAction;
 use App\Actions\Transactions\ListTransactionsAction;
 use App\Enums\BudgetLength;
@@ -20,6 +22,7 @@ use App\Enums\RecurringFrequency;
 use App\Models\Budget;
 use App\Models\BudgetPeriod;
 use App\Models\RecurringTransaction;
+use App\Models\SupportTicket;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
@@ -52,6 +55,7 @@ class AgentPlanningTools
         'pause_recurring',
         'resume_recurring',
         'delete_recurring',
+        'create_support_ticket',
     ];
 
     public const MAX_UPCOMING_DAYS = 90;
@@ -76,6 +80,7 @@ class AgentPlanningTools
         private readonly ListTagsAction $listTags,
         private readonly CalculateGoalProgressAction $goalProgress,
         private readonly CalculateLimitStatusAction $limitStatus,
+        private readonly CreateSupportTicketAction $createSupportTicket,
     ) {}
 
     public static function isRead(string $name): bool
@@ -186,6 +191,14 @@ class AgentPlanningTools
             $fn('delete_recurring', 'Propose deleting a recurring rule. Already-added transactions stay. Stages Confirm/Cancel.', [
                 'type' => 'object', 'properties' => ['id' => $id], 'required' => ['id'],
             ]),
+            $fn('create_support_ticket', 'Propose sending a support request to the FundsFlow team (a bug, something not working, a question you cannot answer, feedback or a feature idea). Stages Confirm/Cancel. Support replies in Telegram and in Settings → Support.', [
+                'type' => 'object',
+                'properties' => [
+                    'subject' => ['type' => 'string', 'description' => 'Short summary, max 120 chars, in the user\'s language'],
+                    'message' => ['type' => 'string', 'description' => 'The problem in the user\'s own words with the useful details (what they did, what happened, what they expected); no made-up details'],
+                ],
+                'required' => ['subject', 'message'],
+            ]),
         ];
     }
 
@@ -238,6 +251,7 @@ class AgentPlanningTools
             'pause_recurring' => $this->prepareRecurringState($user, $args, 'pause'),
             'resume_recurring' => $this->prepareRecurringState($user, $args, 'resume'),
             'delete_recurring' => $this->prepareRecurringState($user, $args, 'delete'),
+            'create_support_ticket' => $this->prepareSupportTicket($user, $args),
             default => throw new InvalidArgumentException("Unknown staging tool: {$name}"),
         };
     }
@@ -253,6 +267,7 @@ class AgentPlanningTools
         return match ($action) {
             'update_budget', 'pause_budget', 'resume_budget', 'delete_budget' => $this->applyBudget($user, $action, $payload),
             'create_recurring', 'update_recurring', 'pause_recurring', 'resume_recurring', 'delete_recurring' => $this->applyRecurring($user, $action, $payload),
+            'create_support_ticket' => $this->applySupportTicket($user, $payload),
             default => ['ok' => false, 'message' => 'Nothing to confirm.', 'summary' => 'Nothing to confirm.'],
         };
     }
@@ -1183,6 +1198,67 @@ class AgentPlanningTools
 
                 return ['ok' => true, 'message' => '🗑 Recurring rule deleted: ' . $label, 'summary' => 'Recurring rule deleted via agent confirm.'];
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Support
+    // ---------------------------------------------------------------------
+
+    /**
+     * $args['source'] is set by the transport (telegram | web), not by the model.
+     *
+     * @param array<string, mixed> $args
+     * @return array{payload: array<string, mixed>, preview: string}
+     */
+    private function prepareSupportTicket(User $user, array $args): array
+    {
+        $message = trim(mb_substr((string) ($args['message'] ?? ''), 0, CreateSupportTicketAction::BODY_MAX));
+        if ($message === '') {
+            throw new InvalidArgumentException('message is required: describe the problem');
+        }
+        $subject = trim(mb_substr((string) ($args['subject'] ?? ''), 0, CreateSupportTicketAction::SUBJECT_MAX));
+        if ($subject === '') {
+            $subject = CreateSupportTicketAction::subjectFrom($message);
+        }
+        $source = ($args['source'] ?? null) === SupportTicket::SOURCE_TELEGRAM ? SupportTicket::SOURCE_TELEGRAM : SupportTicket::SOURCE_WEB;
+
+        try {
+            $this->createSupportTicket->ensureAllowed($user);
+        } catch (SupportRateLimitException $e) {
+            throw new InvalidArgumentException($e->getMessage());
+        }
+
+        return [
+            'payload' => ['subject' => $subject, 'message' => $message, 'source' => $source],
+            'preview' => "Send a support request to the FundsFlow team.\nSubject: {$subject}\n\n" . mb_strimwidth($message, 0, 700, '…')
+                . "\n\nThe reply comes " . ($source === SupportTicket::SOURCE_TELEGRAM ? 'here in Telegram' : 'in Settings → Support') . '.',
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{ok: bool, message: string, summary: string}
+     */
+    private function applySupportTicket(User $user, array $payload): array
+    {
+        try {
+            $ticket = $this->createSupportTicket->execute(
+                $user,
+                (string) ($payload['message'] ?? ''),
+                (string) ($payload['subject'] ?? ''),
+                (string) ($payload['source'] ?? SupportTicket::SOURCE_WEB),
+                null,
+                ($payload['source'] ?? null) === SupportTicket::SOURCE_TELEGRAM ? 'Telegram assistant' : 'Web assistant',
+            );
+        } catch (SupportRateLimitException $e) {
+            return ['ok' => false, 'message' => $e->getMessage(), 'summary' => 'Support request not sent (rate limit).'];
+        }
+
+        return [
+            'ok' => true,
+            'message' => "✅ Support request #{$ticket->id} sent. You'll get the reply in Telegram (if linked) and in Settings → Support.",
+            'summary' => "Support request #{$ticket->id} sent via agent confirm.",
+        ];
     }
 
     // ---------------------------------------------------------------------

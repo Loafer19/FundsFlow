@@ -30,6 +30,7 @@ class MessageHandler
         private readonly TranscribeTelegramAudioAction $transcribeAudio,
         private readonly AgentHistory $history,
         private readonly TelegramHistory $notes,
+        private readonly SupportHandler $supportHandler,
     ) {}
 
     /**
@@ -257,6 +258,7 @@ class MessageHandler
             $text === '/unmute' => $this->authHandler->handleMute($chatId, false),
             $text === '/unlink' => $this->authHandler->handleUnlink($chatId),
             (bool) preg_match('/^\/(reset|new)(@\w+)?$/', $text) => $this->resetConversation($user, $chatId, $telegramUserId),
+            SupportHandler::matches($text) => $this->supportHandler->handle($user, $chatId, $text),
             str_starts_with($text, '/newtag') => $this->menuHandler->handleNewTag($user, $chatId, $text),
             default => $this->handleDefaultText($user, $chatId, $text, $telegramUserId, $replyTo, $quoted),
         };

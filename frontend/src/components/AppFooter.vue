@@ -7,12 +7,18 @@
             </div>
             <nav class="flex flex-wrap items-center justify-center gap-x-2 text-xs text-base-content/50"
                 aria-label="Links">
-                <a :href="WHATS_NEW_URL" target="_blank" rel="noopener" class="link link-hover tabular-nums"
-                    :aria-label="`Version ${version}, what's new (opens in a new tab)`">v{{ version }}</a>
+                <button type="button" class="link link-hover tabular-nums inline-flex items-center gap-1"
+                    :aria-label="`Version ${version}, what's new${hasUnseenWhatsNew ? ' (new)' : ''}`"
+                    @click="showModal('whats_new_modal')">
+                    v{{ version }}
+                    <span v-if="hasUnseenWhatsNew" class="status status-info" aria-hidden="true"></span>
+                </button>
                 <span aria-hidden="true">·</span>
                 <a :href="BOT_URL" target="_blank" rel="noopener noreferrer" class="link link-hover">Telegram bot</a>
                 <span aria-hidden="true">·</span>
-                <a :href="FEEDBACK_URL" target="_blank" rel="noopener noreferrer" class="link link-hover">Feedback</a>
+                <button v-if="authStore.isAuthenticated" type="button" class="link link-hover"
+                    @click="showModal('support_modal')">Feedback</button>
+                <a v-else :href="FEEDBACK_URL" target="_blank" rel="noopener noreferrer" class="link link-hover">Feedback</a>
             </nav>
         </div>
     </footer>
@@ -20,6 +26,9 @@
 
 <script setup>
 import { version } from '../../package.json'
+import { useAuthStore } from '../services/auth.js'
+import { showModal } from '../services/modal.js'
+import { hasUnseenWhatsNew } from '../services/whatsNew.js'
 
 defineProps({
     // The fixed round "Add Transaction" button sits bottom-right: keep footer content clear of it.
@@ -29,7 +38,9 @@ defineProps({
     },
 })
 
-const WHATS_NEW_URL = 'https://fundsflow.fun/docs/whats-new/'
+const authStore = useAuthStore()
+
 const BOT_URL = 'https://t.me/funds_flow_bot'
+// Signed out there is no account to attach a request to: write to the developer in Telegram.
 const FEEDBACK_URL = 'https://t.me/Loafer19'
 </script>

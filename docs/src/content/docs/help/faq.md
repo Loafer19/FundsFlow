@@ -1,13 +1,16 @@
 ---
 title: FAQ
-description: Frequently asked questions about FundsFlow.
+description: Answers to common questions about FundsFlow, and how to get help when something doesn't work.
 ---
+
+Didn't find your answer? [Ask us](#how-do-i-report-a-problem-or-send-feedback): we reply in the app and in
+Telegram.
 
 ### Does FundsFlow connect to my bank?
 
-No. You add transactions yourself — in the web app, through the Telegram bot (text, receipt photos, voice), through
-recurring rules, the built-in [AI assistant](/docs/web/assistant/), or with your own AI client over
-[MCP](/docs/ai/mcp/).
+No. You add transactions yourself: in the web app, in the Telegram bot (text, receipt photos, voice), with
+recurring rules, through the [AI assistant](/docs/web/assistant/), or by
+[importing a bank statement](/docs/web/import/) or screenshots of your bank app.
 
 ### Which currency does it use?
 
@@ -19,32 +22,33 @@ FundsFlow tracks plain amounts and doesn't convert currencies. Choose how number
 Send `/website` to the bot and enter the code on the site, or open the **Web UI** button in the bot. See
 [Sign in](/docs/getting-started/sign-in/#telegram-code).
 
-### Why does MCP OAuth ask for an email and password?
+### A recurring payment didn't show up today.
 
-OAuth sign-in for AI clients uses FundsFlow email and password. If you signed up with Telegram, Google, or GitHub, set
-them in **Settings → Accounts → Login credentials**, or use a [personal token](/docs/ai/connect-clients/#personal-token).
+Recurring rules are processed once a day, at 06:00 UTC, so a payment due today can appear a few hours into the
+day. Check that the rule isn't paused and that its start date has come in **Recurring** (🔁). See
+[Recurring transactions](/docs/web/recurring/).
 
-### Can I ask an AI about my finances in the web app?
+### My savings goal shows less than I saved.
 
-Yes. Click ✨ **Assistant** in the header. It answers questions, draws charts, and proposes changes that you confirm.
-See [AI assistant](/docs/web/assistant/).
+A goal counts transactions with the goal's own tags since its start date, plus **Already saved**. Transfers to
+savings are usually logged as expenses (−500 adds 500 to the goal). Child tags don't count, so put the goal's tag
+on each transfer. See [How progress is counted](/docs/web/budgets/#how-progress-is-counted).
 
-### The bot or the web Assistant says I've used my AI assists for today.
+### The bot or the Assistant says I've used my AI requests for today.
 
-The [AI limit](/docs/telegram/ai-assistant/#daily-ai-limit) is shared by receipt reading, voice messages, and the AI
-assistant in Telegram and in the web app, and resets at midnight in your timezone. Meanwhile, quick add
-(`-350 groceries`), receipts with the amount in the caption, commands, and menu buttons still work in Telegram, and the
-**+** button and all tabs still work on the web.
+The [AI limit](/docs/telegram/ai-assistant/#daily-ai-limit) is shared by receipt reading, voice messages and the
+assistant in Telegram and on the web. It resets at midnight in your timezone. Until then, quick add
+(`-350 groceries`), receipts with the amount in the caption, commands and menu buttons still work in Telegram, and
+the **+** button and all tabs still work on the web.
 
 ### The receipt was read wrong.
 
-Tap **✏️ Edit amount** before confirming, or **Cancel** and type the amount in the photo caption — a caption with an
-amount is saved without AI. After saving, use the transaction card's buttons to fix tags or the amount.
+Tap **✏️ Edit amount** before confirming, or **Cancel** and type the amount in the photo caption: a caption with an
+amount is saved without AI. After saving, use the transaction card's buttons to fix the tags or the amount.
 
 ### Can I export my data?
 
-Yes. **Settings → Data → Download JSON** downloads everything: tags, transactions (with attachment metadata), budgets,
-and recurring rules. AI clients can do the same with `export_account`.
+Yes. **Settings → Data → Download JSON** downloads everything: tags, transactions, budgets and recurring rules.
 
 ### How do I stop notifications?
 
@@ -52,8 +56,15 @@ Send `/mute` to the bot. `/unmute` turns them back on.
 
 ### How do I delete my account?
 
-There's no self-service account deletion yet. Contact [@Loafer19](https://t.me/Loafer19) on Telegram.
+There's no self-service account deletion yet. [Send a request](#how-do-i-report-a-problem-or-send-feedback) and
+we'll delete it for you.
 
-### Where do I send feedback or report a bug?
+### How do I report a problem or send feedback?
 
-[@Loafer19](https://t.me/Loafer19) on Telegram (also linked in the web app footer).
+- **In the web app:** click **Feedback** at the bottom of the page, write what happened, and **Send**. The app
+  version and your browser are added for you.
+- **In Telegram:** send `/support` with your message, for example `/support The PDF report doesn't open`. Or just
+  tell the assistant that something doesn't work; it offers to send a request for you.
+
+We reply in the web app (**Settings → Support**, where you can also answer) and, if your Telegram is linked, in the
+bot. To add to an earlier request from Telegram, send `/support #12 your message` with the request number.

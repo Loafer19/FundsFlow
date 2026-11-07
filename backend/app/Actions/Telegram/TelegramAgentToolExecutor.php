@@ -164,6 +164,10 @@ class TelegramAgentToolExecutor
                 return AgentToolExecutor::ok($this->tools->planning->read($user, $session, $name, $arguments));
             }
             if (AgentPlanningTools::isStaging($name)) {
+                if ($name === 'create_support_ticket') {
+                    $arguments['source'] = 'telegram';
+                }
+
                 return AgentToolExecutor::confirmStop($this->stageMutation($identity, $chatId, $name, $this->tools->planning->prepare($user, $name, $arguments)));
             }
 

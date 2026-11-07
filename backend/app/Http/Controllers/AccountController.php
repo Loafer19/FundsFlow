@@ -52,6 +52,8 @@ class AccountController extends Controller
             'timezone' => 'sometimes|string|timezone:all',
             // App theme (DaisyUI name); used by server-rendered report PDFs (Telegram send_report).
             'theme' => ['sometimes', 'string', 'regex:/^[a-z0-9-]{1,32}$/'],
+            // Last app version whose "What's new" the user has seen (web footer dot + popup).
+            'whatsNewSeen' => ['sometimes', 'string', 'regex:/^\d+\.\d+\.\d+$/'],
         ]);
 
         if (array_key_exists('decimals', $data)) {

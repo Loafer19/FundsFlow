@@ -34,6 +34,7 @@ Below the message field the bot shows six buttons:
 | `/unmute` | Turn those notifications back on |
 | `/unlink` | Unlink this chat; the account stays on the website |
 | `/reset` | Start a new AI conversation (alias `/new`); see [AI assistant](/docs/telegram/ai-assistant/) |
+| `/support` | Report a problem or send feedback: `/support The PDF report doesn't open`; see [FAQ](/docs/help/faq/#how-do-i-report-a-problem-or-send-feedback) |
 | `/help` | List commands and the quick-add format |
 
 ### `/newtag`

@@ -85,6 +85,7 @@ class TelegramSupport
             . "/unmute — turn notifications back on\n"
             . "/unlink — unlink Telegram (account stays on the website)\n"
             . "/reset — start a new AI conversation (alias /new)\n"
+            . "/support — report a problem or send feedback: /support The report doesn't open\n"
             . "/help — this list\n\n"
             . "Reply menu\n"
             . "Month · Recent · Tags · Budgets · Recurring · Web UI\n\n"

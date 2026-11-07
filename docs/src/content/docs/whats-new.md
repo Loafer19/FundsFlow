@@ -1,137 +1,105 @@
 ---
 title: What's new in 2.0
-description: Everything new in FundsFlow 2.0 — the AI assistant on the web and in Telegram, document import, receipt photos, themed PDF reports, charts, the admin panel, and security fixes.
+description: What you can do in FundsFlow 2.0 — an AI assistant on the web and in Telegram, imports from bank files and screenshots, receipt photos, savings goals, clearer budgets, and better reports.
 ---
 
-FundsFlow 2.0 is the biggest update since the project started. It covers everything shipped after
-**1.12.0** (Mini App, PDF report, Send to Telegram), including the **1.13.0** Telegram AI update. The full history is on
-[GitHub](https://github.com/Loafer19/FundsFlow/commits/main).
+FundsFlow 2.0 is the biggest update so far. It brings together everything added since version 1.12, including the
+**1.13** update that put an AI assistant in the Telegram bot. Self-hosting and technical changes are listed in the
+[GitHub releases](https://github.com/Loafer19/FundsFlow/releases).
 
 ## 2.0.1
 
-- **List totals.** Below the table, a Totals card adds up income and expenses into net, with an income/expense
-  share bar, and an Averages card shows spend per day, average expense, days with spending and the busiest day.
-  Both follow the period, tag filter, picked day and search.
-- **Loading after sign-in.** While your data loads you see a short “Loading your data…” indicator instead of empty
-  “No data” messages. Fast loads show nothing at all.
-- **New footer** with the app version (opens this page), the Telegram bot and Feedback, kept at the bottom of the
-  screen on short pages.
-- **Self-hosting:** the backend container now runs database migrations on start (set `AUTO_MIGRATE=false` to turn
-  this off). See [Admin panel](/docs/self-hosting/admin-panel/).
+- **See your totals under the List.** Below the table you now get income, expenses and net for the period, plus
+  averages: spend per day, average expense, days with spending, and your busiest day. They follow the period, tag
+  filter, picked day and search.
+- **No more empty screens while loading.** Right after you sign in, a short “Loading your data…” shows until
+  your numbers are ready.
+- **A tidier footer** with the app version (opens this page), the Telegram bot and Feedback. It stays at the
+  bottom of the screen on short pages.
 
 ## Assistant
 
-- **AI assistant in the web app.** Click ✨ **Assistant** in the header, or press **/** or **Ctrl+K** (**⌘K** on a
-  Mac). Answers stream in as they're written, with Markdown, interactive charts, and cards.
+- **Ask the AI assistant about your money on the web.** Click ✨ **Assistant** in the header, or press **/** or
+  **Ctrl+K** (**⌘K** on a Mac). It answers with your real numbers, draws charts and shows cards.
   [Learn more](/docs/web/assistant/)
-- **AI assistant in Telegram.** Write or say anything that isn't a quick add, and the bot answers with your real
-  data. It uses a Grok (grok-4) tool-calling loop over FundsFlow's tools and asks a follow-up question when something
-  is unclear. [Learn more](/docs/telegram/ai-assistant/)
-- **Changes always wait for you.** Creating, editing, or deleting anything shows a **Confirm** card first. Buttons
-  are single-use, so an old or repeated tap can't apply a change twice.
-- **Shared memory.** The web chat and your private Telegram chat share one conversation, so you can start on the
-  phone and continue on the laptop. **New chat** on the web or `/reset` (`/new`) in Telegram starts over.
-- **More it can do:** budgets, recurring payments, period comparisons (“this month vs last month”), PDF reports, and
-  answers about the tab you have open.
-- **Web chat tools:** copy an answer, edit your last message, regenerate a reply, and smart auto-scroll. The data on
-  the page refreshes after you confirm a change.
-- **Telegram polish:** a typing indicator, streamed drafts in private chats, formatted replies, replies to your
-  message (a quoted bot message is used as context), and long answers split into several messages.
-- **Daily AI limit** shared by every AI feature. The assistant panel shows how many assists are left and when they
-  reset; the count is also in **Settings → Accounts**.
-- **Smarter suggestions:** the rotating prompts in the web assistant are more varied and only suggest what fits
-  your data (for example, budget questions once you have budgets, setup ideas when you don't).
-- **Limits in the assistant and MCP** carry the current period (dates, spent, left, percentage, days left, status),
-  so they show the same figures as the Budgets tab. [Learn more](/docs/ai/tools/)
+- **Talk to the bot in plain words.** In Telegram, write or say anything that isn't a quick add (“how much did I
+  spend on food this month?”), and the bot answers. If something is unclear, it asks.
+  [Learn more](/docs/telegram/ai-assistant/)
+- **Nothing changes without your OK.** When the assistant wants to add, edit or delete something, you see a
+  **Confirm** card first. Tapping an old button twice can't apply a change twice.
+- **Start on your phone, finish on your laptop.** The web chat and your private Telegram chat share one
+  conversation. **New chat** on the web or `/reset` in Telegram starts over.
+- **It can do more:** set up and check budgets, manage recurring payments, compare periods (“this month vs last
+  month”), make PDF reports, and answer questions about the tab you have open.
+- **Handy chat tools on the web:** copy an answer, edit your last message, or ask again. The page refreshes after
+  you confirm a change.
+- **A smoother bot:** you see when it's typing, answers appear as they're written, and long answers are split into
+  several messages. Reply to a bot message to ask about it.
+- **A daily AI limit**, shared by all AI features. The assistant shows how many requests are left and when they
+  reset; you can also see it in **Settings → Accounts**.
+- **Better suggestions:** the example questions in the assistant fit your data, like budget questions once you
+  have budgets.
 
 ## Imports
 
-- **Send files to the assistant** on the web or in Telegram: PDF (text or scanned), Word (`.docx`), CSV/TSV, Excel
-  (`.xlsx`), OpenDocument (`.ods`), JSON (including a FundsFlow export), OFX/QFX, QIF, saved HTML statement pages, and
-  screenshots of a bank app.
-- **Up to 5 files at once** become one import, shown as one Confirm card. A transaction that appears in two files or
-  on two overlapping screenshots is imported once.
-- **Say what to change** in the message: *only expenses*, *skip transfers*, *tag everything Travel*, *dates are month
-  first*, and so on. The card lists what was applied.
-- **Tags that don't exist yet:** the assistant asks whether to create them, map them to your tags, or skip them.
-- OFX, QIF, FundsFlow JSON, and CSV or spreadsheets with recognised columns are read without AI.
-  [Learn more](/docs/web/import/)
+- **Bring in transactions from files.** Send a bank statement or a list to the assistant on the web or in
+  Telegram: PDF (even scanned), Word, CSV, Excel, OpenDocument, OFX/QFX, QIF, a FundsFlow export, a saved bank web
+  page, or screenshots of your bank app.
+- **Up to 5 files at once**, checked together on one Confirm card. A transaction that shows up in two files or on two
+  overlapping screenshots is added only once.
+- **Say what you want** in the same message: *only expenses*, *skip transfers*, *tag everything Travel*, and so
+  on. The card shows what was applied.
+- **New tags?** If the file mentions tags you don't have, the assistant asks whether to create them, use your own
+  tags, or skip them. [Learn more](/docs/web/import/)
 
 ## Telegram
 
-- **Receipt photos.** Send a photo without an amount in the caption, and the bot reads the total, date, note, and
-  suggested tags into a draft for you to confirm. The web assistant reads receipt photos too. For an album, choose one transaction or a separate one per photo. Photos that can't be
-  read are named and skipped. [Learn more](/docs/telegram/receipts/)
-- **Voice messages** are transcribed and handled like text: a quick add, a question, or a change.
+- **Snap a receipt.** Send a photo without an amount, and the bot reads the total, date, note and tags into a
+  draft for you to confirm. Send an album to save it as one transaction or one per photo. The web assistant reads
+  receipts too. [Learn more](/docs/telegram/receipts/)
+- **Send a voice message** instead of typing: add a transaction, ask a question or make a change.
   [Learn more](/docs/telegram/voice/)
-- **Chart images.** Ask for spending by tag, income vs expenses, or your balance trend, and the bot sends a PNG
-  chart, optionally against the previous period.
-- **Natural language** for menus and tags: “show my budgets”, “rename tag Cafe to Coffee”, “create tags Gym and
-  Pool”, each with a preview and Confirm.
-- **Mini App:** the back button closes the open form instead of the whole app, the main button saves the form,
-  haptic feedback, a smarter amount field (`1 500,50`, `120+35`), and Today / Yesterday date chips.
-  [Learn more](/docs/mini-app/)
-- Sign-in codes from the bot are now alphanumeric (like `K7QM-2XPA`).
-- **Budgets in Telegram:** `/budgets` shows each limit's period dates, what is left or over, days left and status,
-  and each savings goal's progress and pace. Budget alerts name the period, and each one is sent once per period,
-  even if you edit the limit during it. [Learn more](/docs/telegram/commands/)
-- **Weekly digest** ends with your active limits and savings goals. [Learn more](/docs/telegram/notifications/)
-- Webhook updates are processed in the background, and each Telegram update is handled once even if Telegram sends
-  it again.
+- **Charts in the chat.** Ask for spending by tag, income vs expenses, or your balance over time, and the bot sends
+  a picture, optionally next to the previous period.
+- **Manage tags in words:** “rename tag Cafe to Coffee”, “create tags Gym and Pool”, each with a preview first.
+- **Mini App:** the back button closes the open form, the main button saves it, the amount field understands
+  `1 500,50` and `120+35`, and Today / Yesterday buttons pick the date. [Learn more](/docs/mini-app/)
+- **Clearer budgets in the bot:** `/budgets` shows each limit's dates, what's left or over and days left, and how
+  each savings goal is going. Budget alerts come once per period, even if you edit the limit.
+  [Learn more](/docs/telegram/commands/)
+- **The weekly digest** now ends with your limits and savings goals. [Learn more](/docs/telegram/notifications/)
 
 ## Reports & analytics
 
-- **Themed PDF reports.** Reports match the app: your light or dark theme and the same charts as the tabs. They are
-  rendered by a Chromium service (Gotenberg). Download them, send them to Telegram, or ask the assistant for one.
-  [Learn more](/docs/web/reports/)
-- **Analytics revamp:** stat cards for income, expenses, net, savings rate, transactions and average daily expense,
-  each against the previous period; a forecast for the end of the running period; insights (biggest tag changes,
-  the priciest weekday, no-spend days); top spending tags (click to filter) and largest expenses. **Balances Per
-  Tag** switches between **This period** and **All time**. [Learn more](/docs/web/tabs/#analytics)
-- **Tag details:** click a donut slice or a tag in the Tags list (or a tag in the List) for its total, transactions
-  and average vs the previous period, the last 12 months, subtags, and the largest transactions. The Tags list also
-  shows each tag's change. [Learn more](/docs/web/tabs/#tags)
-- **Flow:** income, expenses, net and average per day/week/month cards, and a click on a bar opens the List for
-  that day, week or month. Partial weeks at the edges of a month or year are now included. Previous-period
-  comparison is on by default. [Learn more](/docs/web/tabs/#flow)
-- **Trend:** Net, Avg daily change, Low and Peak (with their dates), and a Forecast while the period is running.
-- **Calendar** totals are stat cards with the change vs the previous period and a forecast that includes upcoming
-  recurring payments.
-- Redesigned period bar and Calendar year view; clicking a month in the year view opens that month.
+- **Good-looking PDF reports** in your app theme with the same charts as the tabs. Download them, send them to
+  Telegram, or ask the assistant for one. [Learn more](/docs/web/reports/)
+- **A richer Analytics tab:** income, expenses, net, savings rate, number of transactions and average daily
+  spend, each compared with the previous period; a forecast for the end of the period; tips like your priciest
+  weekday and no-spend days; your top tags and largest expenses. [Learn more](/docs/web/tabs/#analytics)
+- **Tag details:** click a tag to see its total, transactions, the last 12 months, subtags and the biggest
+  expenses. [Learn more](/docs/web/tabs/#tags)
+- **Flow:** totals and averages per day, week or month; click a bar to open those transactions in the List.
+  [Learn more](/docs/web/tabs/#flow)
+- **Trend:** your net change, average daily change, lowest and highest points, and a forecast.
+- **Calendar:** totals compared with the previous period and a forecast that includes upcoming recurring payments.
+  Click a month in the year view to open it.
 
 ## Web app
 
-- **Savings goals** on the **Budgets** tab: set a target, the tags you save with, a start date (today or earlier), an
-  optional deadline, and how much you already have. Cards show saved vs target, what you need per month, and when you will reach it at your current
-  pace. Also in Telegram (`/budgets`), the assistant, MCP, and the PDF report. [Learn more](/docs/web/budgets/)
-- **Clearer limit cards:** On track / Near limit / Over status, what is left or over, a per-day allowance and the
-  projected total at the current pace, a time marker on the spending bar, and compact collapsible history.
-- **Limit start date** instead of the “Start from the beginning of this month” checkbox: pick any day up to today,
-  and periods repeat from it (monthly from the 15th runs 15th → 14th). Also in the assistant and MCP.
-- **Fix:** budget alerts, `/budgets` in Telegram, the assistant and the PDF report now count every limit transaction
-  logged today (previously only the web app did).
-- **Limit edits keep the period:** a new amount, length or tags applies to the whole current period, so spending
-  since it started still counts. New limits start at the beginning of the current week, month or year by default.
-- **Limit history** is a list with one row per period: the percentage, spent / limit, and a bar on a shared scale.
-- **One budget form** for limits and goals, with a hint that says when the next period starts.
-- **Tag picker:** child tags collapse under their parent, and a search field appears once you have many tags.
-- **Unified modals:** transaction, tag and recurring forms share one layout (emoji button, toggles, date chips);
-  Settings uses toggles; the login screen has labelled Google, GitHub and Telegram buttons.
-- **Documentation** at [fundsflow.fun/docs](/docs/) (this site) and a new
+- **Savings goals** on the **Budgets** tab: set a target, the tags you save with, an optional deadline and how
+  much you already have. See how much you need per month and when you'll get there.
+  [Learn more](/docs/web/budgets/)
+- **Clearer spending limits:** On track / Near limit / Over, what's left, how much you can spend per day, and
+  where you'll end up at your current pace.
+- **Start a limit on any day:** a monthly limit from the 15th runs from the 15th to the 14th.
+- **Editing a limit keeps the period:** a new amount counts everything you've spent since the period started.
+- **Limit history:** one row per period, so you can see how each month went.
+- **Easier tag picking:** subtags fold under their parent, and you can search when you have many tags.
+- **Forms that look alike:** transactions, tags and recurring payments share one layout, and signing in shows clear
+  Google, GitHub and Telegram buttons.
+- **Help pages** at [fundsflow.fun/docs](/docs/) (you're here) and a new
   [landing page](https://fundsflow.fun/landing/).
-- **Faster loading:** tabs and the emoji picker load on demand. The app and docs are served with precompressed
-  Brotli/gzip files, ETags, and a strict, hash-based Content Security Policy.
-- **MCP:** attach a file from a public `source_url` as well as base64, aligned tool schemas, and clearer errors.
-  [Learn more](/docs/ai/tools/)
-
-## Admin & security
-
-- **Admin panel** (Filament) for the server owner: a dashboard with sign-up and transaction charts and system health,
-  user management (AI limits, blocking, deletion), an audit log of admin actions, and two-factor authentication for
-  admins.
-- **Server settings:** admins can turn all AI features off, set the default daily AI limit, and close new
-  registrations.
-- **MCP OAuth hardening:** PKCE (S256 only) is required, and the personal token fallback only serves local clients.
-- **Fixes:** a server file-read leak through the Telegram send-file endpoint was closed; recurring payments no longer
-  drift (the 31st no longer becomes the 28th); edits to records with deleted tags work again.
-- Proxy-aware HTTPS URLs, so the app works correctly behind a TLS proxy.
+- **Faster:** tabs load when you open them, and pages are smaller.
+- **Fixes:** budget alerts, the bot, the assistant and reports now count everything you log today; recurring
+  payments on the 31st no longer move to the 28th; editing records with deleted tags works again. Plus security
+  fixes.

@@ -8,7 +8,8 @@
 
             <div class="tabs tabs-box justify-center mb-4">
                 <template v-for="(title, key) in tabs">
-                    <a class="tab" @click="tab = key" :class="{ 'tab-active': tab === key }">
+                    <!-- Slightly tighter than the default padding so all six tabs fit one row on desktop. -->
+                    <a class="tab [--tab-p:0.5rem]" @click="tab = key" :class="{ 'tab-active': tab === key }">
                         {{ title }}
                     </a>
                 </template>
@@ -244,6 +245,8 @@ recurring_transactions</pre>
                     </div>
                 </template>
 
+                <SupportRequests v-else-if="tab === 'support'" :key="supportKey" />
+
                 <template v-else-if="tab === 'report'">
                     <p class="text-sm text-base-content/60 mb-3 break-words whitespace-normal">{{ reportPeriodLabel }}</p>
 
@@ -292,6 +295,7 @@ recurring_transactions</pre>
 <script setup>
 import { Bot, Download, Info, KeyRound, Save, Send, Settings as SettingsIcon } from 'lucide-vue-next'
 import { computed, inject, onMounted, ref, watch } from 'vue'
+import SupportRequests from '../components/SupportRequests.vue'
 import {
     createMcpToken,
     downloadAccountExport,
@@ -312,6 +316,7 @@ import {
     toLocalDateStr,
 } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
+import { settingsTabRequest } from '../services/modal'
 import { reportErrorMessage, requestReport, saveBlob } from '../services/report.js'
 import settings, {
     updateDateFormat,
@@ -333,8 +338,10 @@ const tabs = ref({
     accounts: 'Accounts',
     data: 'Data',
     report: 'Report',
+    support: 'Support',
 })
 const tab = ref('formatting')
+const supportKey = ref(0)
 const exporting = ref(false)
 const reportBusy = ref('')
 
@@ -559,6 +566,12 @@ const bindModalEvents = () => {
     const originalShow = modal.showModal.bind(modal)
     modal.showModal = () => {
         syncFromSettings()
+        if (settingsTabRequest.value) {
+            tab.value = settingsTabRequest.value
+            settingsTabRequest.value = null
+        }
+        // Support: reload the requests on every open (a reply may have come in).
+        supportKey.value++
         if (tab.value === 'accounts') {
             refreshMcpTokenStatus()
             refreshAiQuota()

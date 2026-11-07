@@ -15,6 +15,8 @@
     <RecurringEditModal />
     <SettingsModal />
     <OnboardingModal />
+    <WhatsNewModal />
+    <SupportModal v-if="authStore.isAuthenticated" />
     <AgentDrawer v-if="authStore.isAuthenticated" />
 
     <div class="container mx-auto p-4 flex flex-col min-h-dvh">
@@ -267,6 +269,7 @@ import AppFooter from './components/AppFooter.vue'
 import BootLoader from './components/BootLoader.vue'
 import TagPicker from './components/TagPicker.vue'
 import Toasts from './components/Toasts.vue'
+import WhatsNewModal from './components/WhatsNewModal.vue'
 import AttachmentPreviewModal from './modals/AttachmentPreviewModal.vue'
 import AuthModal from './modals/AuthModal.vue'
 import BudgetAddModal from './modals/BudgetAddModal.vue'
@@ -276,6 +279,7 @@ import RecurringAddModal from './modals/RecurringAddModal.vue'
 import RecurringEditModal from './modals/RecurringEditModal.vue'
 import RecurringModal from './modals/RecurringModal.vue'
 import SettingsModal from './modals/SettingsModal.vue'
+import SupportModal from './modals/SupportModal.vue'
 import TagsAddModal from './modals/TagsAddModal.vue'
 import TagsEditModal from './modals/TagsEditModal.vue'
 import TagsModal from './modals/TagsModal.vue'
@@ -302,6 +306,7 @@ import {
     ready as telegramReady,
 } from './services/telegramWebApp.js'
 import { useTransactionsStore } from './services/transactions.js'
+import { hasUnseenWhatsNew, markWhatsNewSeen } from './services/whatsNew.js'
 import Analytics from './tabs/Analytics.vue'
 import TabLoadError from './tabs/TabLoadError.vue'
 import TabLoading from './tabs/TabLoading.vue'
@@ -470,7 +475,11 @@ watch(
             await bootstrapStores()
 
             if (shouldShowOnboarding(transactionsStore.transactions.length)) {
+                // A brand-new account starts on the current version: no "What's new" for it.
+                markWhatsNewSeen()
                 showModal('onboarding_modal')
+            } else if (hasUnseenWhatsNew.value) {
+                showModal('whats_new_modal')
             }
         } else {
             isBootstrapping.value = false

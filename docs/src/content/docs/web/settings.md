@@ -1,9 +1,9 @@
 ---
 title: Settings
-description: Formatting, themes, linked accounts, MCP token, AI quota, login credentials, and data export in FundsFlow.
+description: Formatting, themes, linked accounts, MCP token, AI quota, login credentials, data export, reports, and support requests in FundsFlow.
 ---
 
-Open **Settings** (⚙️) from the header. It has five tabs.
+Open **Settings** (⚙️) from the header. It has six tabs.
 
 ## Formatting
 
@@ -36,3 +36,9 @@ and recurring rules. Not available inside the Telegram Mini App.
 ## Report
 
 Build a printable report. See [Reports](/docs/web/reports/).
+
+## Support
+
+Your requests to the FundsFlow team and our replies. Click a request to read the conversation and answer; answering
+a closed request opens it again. **New request** opens the same form as **Feedback** at the bottom of the page.
+Replies also come to Telegram when it's linked. See the [FAQ](/docs/help/faq/#how-do-i-report-a-problem-or-send-feedback).

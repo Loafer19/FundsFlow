@@ -48,6 +48,7 @@ class TelegramSetWebhookCommand extends Command
             ['command' => 'unmute', 'description' => 'Turn budget alerts, weekly digest, and recurring notifications back on'],
             ['command' => 'unlink', 'description' => 'Unlink Telegram; account stays on the website'],
             ['command' => 'reset', 'description' => 'Start a new AI conversation (forget earlier messages)'],
+            ['command' => 'support', 'description' => 'Report a problem or send feedback: /support your message'],
             ['command' => 'help', 'description' => 'List commands and quick-add format'],
         ]);
 

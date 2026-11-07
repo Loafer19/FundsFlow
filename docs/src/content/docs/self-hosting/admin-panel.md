@@ -31,6 +31,15 @@ php artisan admin:grant you@example.com [--password] [--revoke] [--reset-mfa]
 
 Blocking (`users.blocked_at`) rejects API tokens, password/OAuth sign-in and Telegram messages.
 
+## Support requests
+
+**Support** lists requests sent from **Feedback** in the web app, `/support` in the bot and the assistant, with
+status filters (New / In progress / Closed) and a badge with the number of new ones. Open a request to read the
+conversation; **Reply** sends your answer to the user's Telegram (when linked) and to **Settings → Support** in the
+web app. New requests and user replies are sent to every admin with a linked Telegram, and to the chat ids in
+`SUPPORT_ADMIN_TELEGRAM_CHAT_ID` (comma-separated, e.g. a group). A user can open up to `SUPPORT_MAX_PER_HOUR`
+(default 5) requests an hour.
+
 ## Environment (backend)
 
 - `SESSION_DRIVER=redis`

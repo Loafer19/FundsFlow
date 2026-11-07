@@ -11,6 +11,8 @@ This page describes how FundsFlow handles your data, based on how the product wo
   preferences like timezone and formats.
 - **Your finance data** — transactions, tags, budgets, recurring rules, and the files you attach (receipts and PDFs).
 - **Telegram** — your chat id, to message you, and short-lived conversation state (pending drafts, kept for minutes).
+- **Support requests** — what you write to us and our replies, with the app version and your browser (web) so we
+  can reproduce a problem.
 - **AI assistant conversation** — the recent messages shared by the web panel and your private Telegram chat, kept in
   the server cache for about an hour after your last message (by default) and cleared by **New chat** or `/reset`.
 
@@ -58,4 +60,4 @@ create or link your account.
 - **Delete data**: delete transactions, tags, budgets, recurring rules, and attachments at any time.
 - **Telegram**: `/mute` stops proactive messages; `/unlink` disconnects the chat.
 - **MCP**: revoke your personal token in **Settings → Accounts → MCP**.
-- **Account deletion**: there's no self-service option yet — contact [@Loafer19](https://t.me/Loafer19).
+- **Account deletion**: there's no self-service option yet. [Send a request](/docs/help/faq/#how-do-i-report-a-problem-or-send-feedback) (or contact [@Loafer19](https://t.me/Loafer19)).
