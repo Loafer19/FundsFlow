@@ -606,7 +606,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         {
             title: 'List budgets',
             description:
-                'List all budgets: spending limits (type "limit") and savings goals (type "goal"). Active limits include current_period: start, end, amount, spent, left, percent (rounded down), days_left, status (on_track|at_risk|over); spent counts expenses on the limit's tags and their child tags (each transaction once), from the start of the current period even if the limit was edited during it; null when paused. Goals include a progress object (contributions on the goal's tags and their child tags): saved, target, remaining, percent, status (completed|paused|on_track|behind|in_progress), days_left, required_amount per week|month, projected_date.',
+                'List all budgets: spending limits (type "limit") and savings goals (type "goal"). Active limits include current_period: start, end, amount, spent, left, percent (rounded down), days_left, status (on_track|at_risk|over); spent counts expenses on the tags assigned to the limit and their child tags (each transaction once), from the start of the current period even if the limit was edited during it; null when paused. Goals include a progress object (contributions on the tags assigned to the goal and their child tags): saved, target, remaining, percent, status (completed|paused|on_track|behind|in_progress), days_left, required_amount per week|month, projected_date.',
             inputSchema: {},
         },
         async () => textResult(unwrapList(await api(token, '/budgets'))),
