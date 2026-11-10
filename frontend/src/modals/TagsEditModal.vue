@@ -1,10 +1,9 @@
 <template>
     <dialog id="tags_edit_modal" class="modal" aria-labelledby="tags_edit_modal_title">
         <div class="modal-box max-w-sm">
-            <h2 id="tags_edit_modal_title" class="card-title mb-4">
-                <Tag :size="24" />
+            <ModalHeader title-id="tags_edit_modal_title" :icon="Tag">
                 Edit Tag
-            </h2>
+            </ModalHeader>
 
             <form ref="formRef" @submit.prevent="handleSubmit">
                 <div class="flex items-end gap-3 mb-4">
@@ -23,15 +22,30 @@
 
                 <LazyEmojiPicker v-if="pickerOpen" class="mb-4" @select="setEmoji" />
 
-                <label class="block mb-4">
-                    <span class="block text-sm text-base-content/60 mb-1">Parent</span>
-                    <select v-model="tag.parent_id" class="select w-full" aria-label="Parent tag">
-                        <option value="">No Parent</option>
-                        <option v-for="parent in parentOptions" :key="parent.id" :value="parent.id">
-                            {{ parent.title }}
-                        </option>
-                    </select>
-                </label>
+                <div class="mb-4">
+                    <div class="text-sm text-base-content/60 mb-1">Parent</div>
+                    <PopoverMenu label="Parent tag" root-class="block">
+                        <template #trigger="{ toggle, open }">
+                            <button type="button" class="badge badge-soft px-2 gap-1 text-base h-8 font-normal"
+                                :class="parentTag ? 'badge-info' : 'badge-neutral'"
+                                :aria-expanded="open" aria-haspopup="dialog" aria-label="Parent tag" @click="toggle">
+                                <template v-if="parentTag">
+                                    <span>{{ parentTag.emoji }}</span>
+                                    <span>{{ parentTag.title }}</span>
+                                </template>
+                                <span v-else>No parent</span>
+                            </button>
+                        </template>
+                        <template #default="{ close }">
+                            <button type="button" class="badge gap-0 px-1 text-lg cursor-pointer mb-2 w-fit"
+                                :class="tag.parent_id ? 'badge-soft badge-neutral' : 'badge-neutral'"
+                                @click="tag.parent_id = ''; close()">
+                                No parent
+                            </button>
+                            <TagPicker v-model="parentIds" single :exclude-ids="excludedParentIds" />
+                        </template>
+                    </PopoverMenu>
+                </div>
 
                 <label class="flex items-center justify-between gap-3 cursor-pointer mb-4">
                     <span class="text-sm">Show in Balances</span>
@@ -39,10 +53,10 @@
                 </label>
 
                 <div class="modal-action">
-                    <button type="submit" class="btn btn-success tg-primary" :disabled="tagsStore.isLoading">
+                    <button type="submit" class="btn btn-primary tg-primary" :disabled="tagsStore.isLoading">
                         <span v-if="tagsStore.isLoading" class="loading loading-spinner"></span>
+                        <Save v-else :size="20" />
                         Update
-                        <Save :size="24" />
                     </button>
                 </div>
             </form>
@@ -61,6 +75,9 @@ import { useDialogOpen } from '../services/dialogOpen.js'
 import { randomEmoji as pickRandomEmoji } from '../services/emojiDefaults.js'
 import { useTagsStore } from './../services/tags.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
+import ModalHeader from '../components/ModalHeader.vue'
+import PopoverMenu from '../components/PopoverMenu.vue'
+import TagPicker from '../components/TagPicker.vue'
 
 const randomEmoji = pickRandomEmoji()
 
@@ -105,28 +122,27 @@ watch(
     },
 )
 
-const parentOptions = computed(() => {
+const parentIds = computed({
+    get: () => (tag.value.parent_id ? [tag.value.parent_id] : []),
+    set: (ids) => {
+        tag.value.parent_id = ids[0] ?? ''
+    },
+})
+const parentTag = computed(() => tagsStore.tags.find((item) => item.id === tag.value.parent_id) ?? null)
+const excludedParentIds = computed(() => {
     const currentId = tag.value.id
     if (!currentId) return []
-
-    const excluded = new Set([currentId])
-    const collectDescendants = (parentId) => {
-        tagsStore.tags.forEach((t) => {
-            if (t.parent_id === parentId && !excluded.has(t.id)) {
-                excluded.add(t.id)
-                collectDescendants(t.id)
+    const excluded = [currentId]
+    const collect = (parentId) => {
+        for (const item of tagsStore.tags) {
+            if (item.parent_id === parentId && !excluded.includes(item.id)) {
+                excluded.push(item.id)
+                collect(item.id)
             }
-        })
+        }
     }
-    collectDescendants(currentId)
-
-    return tagsStore
-        .list()
-        .filter((t) => !excluded.has(t.id))
-        .map((t) => ({
-            id: t.id,
-            title: `${'\u00A0'.repeat(t.depth * 2)}${t.depth > 0 ? '↳ ' : ''}${t.title}`,
-        }))
+    collect(currentId)
+    return excluded
 })
 
 const handleSubmit = async () => {

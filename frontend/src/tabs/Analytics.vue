@@ -1,6 +1,6 @@
 <template>
-    <EmptyState v-if="!hasPeriodData" icon="📊" title="No data for this period"
-        description="Nothing in the selected or previous period. Add a transaction or change the range"
+    <EmptyState v-if="!hasPeriodData" :icon="Presentation" title="No data for this period"
+        description="Nothing in this period. Add a transaction or change the range"
         action-label="Add Transaction" @action="openAdd" />
 
     <div v-else class="flex flex-col gap-3 w-full min-w-0">
@@ -171,7 +171,7 @@
 </template>
 
 <script setup>
-import { ChartPie, ChevronDown, ChevronRight, Flame, Info, Lightbulb, Telescope } from 'lucide-vue-next'
+import { ChartPie, ChevronDown, ChevronRight, Flame, Info, Lightbulb, Presentation, Telescope } from 'lucide-vue-next'
 import { computed, inject, ref } from 'vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatCard from '../components/StatCard.vue'
@@ -292,7 +292,7 @@ const previousToDate = computed(() => {
     return previousTransactions.value.filter((t) => dayOf(t) <= end)
 })
 
-const hasPeriodData = computed(() => filteredTransactions.value.length > 0 || previousTransactions.value.length > 0)
+const hasPeriodData = computed(() => filteredTransactions.value.length > 0)
 
 const totals = (list) => {
     const income = sumIncome(list)

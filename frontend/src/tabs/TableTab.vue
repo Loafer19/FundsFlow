@@ -1,5 +1,5 @@
 <template>
-    <EmptyState v-if="!dateRangeTransactions.length" icon="📋" title="No transactions in this period"
+    <EmptyState v-if="!dateRangeTransactions.length" :icon="List" title="No transactions in this period"
         description="Nothing in this period. Add a transaction or pick another date range"
         action-label="Add Transaction" @action="openAdd" />
 
@@ -32,7 +32,7 @@
             <input ref="importFileInput" type="file" class="hidden" :accept="IMPORT_FILE_ACCEPT" @change="onImportFile" />
         </div>
 
-        <EmptyState v-if="!filteredTransactions.length" icon="🔍" title="No transactions match the current filters"
+        <EmptyState v-if="!filteredTransactions.length" :icon="Search" title="No transactions match the current filters"
             :description="listDay ? 'Try a different search term, clear the tag filter or show the whole period' : 'Try a different search term or clear the tag filter (including Untagged)'" />
 
         <div v-else class="card card-border border-base-300 bg-base-100 overflow-hidden">
@@ -220,21 +220,7 @@
 </template>
 
 <script setup>
-import {
-    Bot,
-    CalendarDays,
-    FileText,
-    Image as ImageIcon,
-    Laptop,
-    Paperclip,
-    Pencil,
-    Repeat,
-    Search,
-    Send,
-    X,
-    Landmark,
-    FileUp,
-} from 'lucide-vue-next'
+import { Bot, CalendarDays, FileText, Image as ImageIcon, Laptop, Paperclip, Pencil, Repeat, Search, Send, X, Landmark, FileUp, List } from 'lucide-vue-next'
 
 import { computed, inject, ref } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'

@@ -1,21 +1,19 @@
 <template>
     <dialog id="budgets_edit_modal" class="modal" aria-labelledby="budgets_edit_modal_title">
         <div class="modal-box max-w-sm">
-            <h2 id="budgets_edit_modal_title" class="card-title mb-4">
-                <Target v-if="form.type === 'goal'" :size="24" />
-                <PiggyBank v-else :size="24" />
+            <ModalHeader title-id="budgets_edit_modal_title" :icon="form.type === 'goal' ? Target : PiggyBank">
                 {{ form.type === 'goal' ? 'Edit Savings Goal' : 'Edit Budget' }}
-            </h2>
+            </ModalHeader>
 
             <form ref="formRef" @submit.prevent="handleSubmit">
                 <BudgetFormFields v-model="form" type-locked />
 
                 <div class="modal-action">
-                    <button type="submit" class="btn btn-success tg-primary"
+                    <button type="submit" class="btn btn-primary tg-primary"
                         :disabled="budgetsStore.isLoading || !(form.tag_ids.length || form.monobank_jar)">
                         <span v-if="budgetsStore.isLoading" class="loading loading-spinner"></span>
+                        <Save v-else :size="20" />
                         Update
-                        <Save :size="24" />
                     </button>
                 </div>
             </form>
@@ -35,6 +33,7 @@ import { useBudgetsStore } from '../services/budgets.js'
 import { nowDateStr } from '../services/formatters.js'
 import { chainStart } from '../services/limits.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
+import ModalHeader from '../components/ModalHeader.vue'
 
 const budgetsStore = useBudgetsStore()
 

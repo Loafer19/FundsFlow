@@ -1,5 +1,5 @@
 <template>
-    <div class="drawer drawer-end">
+    <div class="drawer drawer-end agent-drawer-root" :class="{ 'drawer-open': agent.isOpen }">
         <input id="agent_drawer" type="checkbox" class="drawer-toggle" :checked="agent.isOpen"
             @change="(event) => (event.target.checked ? agent.open() : agent.close())" />
         <div class="drawer-side agent-drawer-side z-[60]">
@@ -1123,5 +1123,23 @@ onBeforeUnmount(() => {
     padding: 0.5rem;
     border-radius: 0.5rem;
     background: color-mix(in oklab, currentColor 10%, transparent);
+}
+
+/* The drawer is a sibling of the page, not a Daisy drawer-content wrapper.
+   Keep the closed panel off the layout so it cannot inflate mobile scrollWidth. */
+.agent-drawer-root {
+    position: fixed;
+    inset: auto 0 0 auto;
+    z-index: 60;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+.agent-drawer-root.drawer-open {
+    inset: 0;
+    width: 100%;
+    height: 100dvh;
+    pointer-events: auto;
 }
 </style>

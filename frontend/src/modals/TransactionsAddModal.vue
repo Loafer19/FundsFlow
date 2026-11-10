@@ -1,10 +1,9 @@
 <template>
     <dialog id="transactions_add_modal" class="modal" aria-labelledby="transactions_add_modal_title">
         <div class="modal-box max-w-sm">
-            <h2 id="transactions_add_modal_title" class="card-title mb-4">
-                <ArrowLeftRight :size="24" />
+            <ModalHeader title-id="transactions_add_modal_title" :icon="ArrowLeftRight">
                 Add Transaction
-            </h2>
+            </ModalHeader>
 
             <form ref="formRef" @submit.prevent="handleSubmit">
                 <DateChips v-model="transaction.at" />
@@ -19,10 +18,10 @@
                 <AttachmentField v-model:pending="pendingFiles" :busy="Boolean(transactionsStore.isLoading)" />
 
                 <div class="modal-action">
-                    <button type="submit" class="btn btn-success tg-primary" :disabled="transactionsStore.isLoading">
+                    <button type="submit" class="btn btn-primary tg-primary" :disabled="transactionsStore.isLoading">
                         <span v-if="transactionsStore.isLoading" class="loading loading-spinner"></span>
+                        <Save v-else :size="20" />
                         Save
-                        <Save :size="24" />
                     </button>
                 </div>
             </form>
@@ -43,6 +42,7 @@ import TagPicker from '../components/TagPicker.vue'
 import { today } from '../services/clock.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
 import { useTransactionsStore } from '../services/transactions.js'
+import ModalHeader from '../components/ModalHeader.vue'
 
 const transactionsStore = useTransactionsStore()
 

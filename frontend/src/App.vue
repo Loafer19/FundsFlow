@@ -40,24 +40,24 @@
                 </button>
 
                 <button @click="showModal('recurring_modal')"
-                    class="btn btn-outline btn-accent btn-square tooltip tooltip-bottom" data-tip="Recurring"
+                    class="btn btn-ghost btn-square tooltip tooltip-bottom" data-tip="Recurring"
                     aria-label="Recurring">
                     <Repeat :size="24" />
                 </button>
 
                 <button @click="showModal('tags_modal')"
-                    class="btn btn-outline btn-info btn-square tooltip tooltip-bottom" data-tip="Tags"
+                    class="btn btn-ghost btn-square tooltip tooltip-bottom" data-tip="Tags"
                     aria-label="Tags">
                     <Tag :size="24" />
                 </button>
 
                 <button @click="showModal('settings_modal')"
-                    class="btn btn-outline btn-warning btn-square tooltip tooltip-bottom" data-tip="Settings"
+                    class="btn btn-ghost btn-square tooltip tooltip-bottom" data-tip="Settings"
                     aria-label="Settings">
                     <Settings :size="24" />
                 </button>
 
-                <button @click="authStore.logout" class="btn btn-outline btn-error btn-square tooltip tooltip-bottom"
+                <button @click="authStore.logout" class="btn btn-ghost btn-square tooltip tooltip-bottom hover:text-error"
                     data-tip="Logout" aria-label="Logout" :disabled="authStore.isLoading">
                     <span v-if="authStore.isLoading" class="loading loading-spinner"></span>
                     <LogOut v-else :size="24" />
@@ -114,29 +114,29 @@
                     </button>
                 </div>
 
-                <div class="dropdown max-md:basis-full md:basis-auto">
-                    <button type="button" tabindex="0"
-                        class="btn border-base-300 text-base-content/50 text-sm max-md:w-full">
-                        <Tag :size="16" />
-                        Filter tags
-                        <span v-if="tagFilterBadgeCount" class="badge badge-outline badge-sm">{{ tagFilterBadgeCount }}</span>
+                <PopoverMenu v-model="tagFilterOpen" label="Filter tags" root-class="max-md:basis-full max-md:w-full md:basis-auto">
+                    <template #trigger="{ toggle, open }">
+                        <button type="button"
+                            class="btn border-base-300 text-base-content/50 text-sm max-md:w-full"
+                            :aria-expanded="open" aria-haspopup="dialog" @click="toggle">
+                            <Tag :size="16" />
+                            Filter tags
+                            <span v-if="tagFilterBadgeCount" class="badge badge-outline badge-sm">{{ tagFilterBadgeCount }}</span>
+                        </button>
+                    </template>
+                    <button type="button" class="badge badge-info gap-0 px-1 text-lg cursor-pointer mb-2 w-fit"
+                        :class="{ 'badge-soft': !transactionsStore.filterUntagged }"
+                        :aria-pressed="transactionsStore.filterUntagged"
+                        @click="transactionsStore.filterUntagged = !transactionsStore.filterUntagged">
+                        <span>🏷️</span>
+                        <span>Untagged</span>
                     </button>
-                    <div tabindex="0"
-                        class="dropdown-content menu bg-base-100 rounded-box z-1 w-64 p-3 border border-base-300">
-                        <button type="button" class="badge badge-info gap-0 px-1 text-lg cursor-pointer mb-2 w-fit"
-                            :class="{ 'badge-soft': !transactionsStore.filterUntagged }"
-                            :aria-pressed="transactionsStore.filterUntagged"
-                            @click="transactionsStore.filterUntagged = !transactionsStore.filterUntagged">
-                            <span>🏷️</span>
-                            <span>Untagged</span>
-                        </button>
-                        <TagPicker v-model="transactionsStore.selectedTagIds" />
-                        <button v-if="transactionsStore.tagFilterActive" type="button" class="btn btn-ghost btn-xs"
-                            @click="transactionsStore.clearTagFilter()">
-                            Clear
-                        </button>
-                    </div>
-                </div>
+                    <TagPicker v-model="transactionsStore.selectedTagIds" />
+                    <button v-if="transactionsStore.tagFilterActive" type="button" class="btn btn-ghost btn-xs"
+                        @click="transactionsStore.clearTagFilter()">
+                        Clear
+                    </button>
+                </PopoverMenu>
 
                 <div v-if="tagFilterChips.length" class="flex flex-wrap items-center gap-1.5 max-md:basis-full">
                     <span v-for="chip in tagFilterChips" :key="chip.key" class="badge badge-info gap-1 pl-2 pr-0.5">
@@ -229,14 +229,8 @@
             </template>
         </main>
 
-        <AppFooter :with-fab="authStore.isAuthenticated && importRoute === null" />
+        <AppFooter />
     </div>
-
-    <button v-if="authStore.isAuthenticated && importRoute === null" type="button"
-        class="btn btn-primary btn-circle btn-lg fixed bottom-6 right-6 z-50"
-        @click="showModal('transactions_add_modal')" aria-label="Add Transaction">
-        <Plus :size="28" />
-    </button>
 </template>
 
 <script setup>
@@ -271,6 +265,7 @@ import AgentDrawer from './components/AgentDrawer.vue'
 import AppFooter from './components/AppFooter.vue'
 import BootLoader from './components/BootLoader.vue'
 import ImportView from './components/ImportView.vue'
+import PopoverMenu from './components/PopoverMenu.vue'
 import TagPicker from './components/TagPicker.vue'
 import Toasts from './components/Toasts.vue'
 import WhatsNewModal from './components/WhatsNewModal.vue'
@@ -410,6 +405,8 @@ const tagFilterChips = computed(() => {
 
     return chips
 })
+
+const tagFilterOpen = ref(false)
 
 const tagFilterBadgeCount = computed(
     () => transactionsStore.selectedTagIds.length + (transactionsStore.filterUntagged ? 1 : 0),

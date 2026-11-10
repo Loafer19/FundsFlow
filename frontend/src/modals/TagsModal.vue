@@ -1,18 +1,17 @@
 <template>
     <dialog id="tags_modal" class="modal" aria-labelledby="tags_modal_title">
         <div class="modal-box max-w-lg">
-            <div class="flex justify-between items-center mb-4">
-                <h2 id="tags_modal_title" class="card-title">
-                    <Tag :size="24" />
-                    Manage Tags
-                </h2>
-                <button type="button" @click="showModal('tags_add_modal')" class="btn btn-primary btn-sm">
-                    <Plus :size="20" />
-                    Add Tag
-                </button>
-            </div>
+            <ModalHeader title-id="tags_modal_title" :icon="Tag">
+                Manage Tags
+                <template #actions>
+                    <button type="button" @click="showModal('tags_add_modal')" class="btn btn-primary btn-sm">
+                        <Plus :size="20" />
+                        Add Tag
+                    </button>
+                </template>
+            </ModalHeader>
 
-            <EmptyState v-if="!tagsStore.list().length" icon="🏷️" title="No tags yet"
+            <EmptyState v-if="!tagsStore.list().length" :icon="Tag" title="No tags yet"
                 description="Create a few to organize transactions" action-label="Add Tag"
                 @action="showModal('tags_add_modal')" />
 
@@ -62,6 +61,7 @@ import DeleteHold from './../components/buttons/DeleteHold.vue'
 import EmptyState from './../components/EmptyState.vue'
 import { showModal } from './../services/modal.js'
 import { useTagsStore } from './../services/tags.js'
+import ModalHeader from '../components/ModalHeader.vue'
 
 const tagsStore = useTagsStore()
 </script>

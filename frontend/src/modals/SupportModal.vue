@@ -1,10 +1,9 @@
 <template>
     <dialog id="support_modal" class="modal" aria-labelledby="support_modal_title" @close="onClose">
         <div class="modal-box max-w-md">
-            <h2 id="support_modal_title" class="card-title mb-1">
-                <LifeBuoy :size="24" />
-                Feedback / Report a problem
-            </h2>
+            <ModalHeader title-id="support_modal_title" :icon="LifeBuoy" dense>
+                Feedback
+            </ModalHeader>
 
             <template v-if="sent">
                 <p class="text-sm text-base-content/60 mb-4">
@@ -56,6 +55,7 @@ import { apiErrorMessage } from '../services/formatters.js'
 import { openSettingsTab } from '../services/modal.js'
 import { createSupportTicket, FAQ_URL } from '../services/support.js'
 import toasts from '../services/toasts.js'
+import ModalHeader from '../components/ModalHeader.vue'
 
 const authStore = useAuthStore()
 

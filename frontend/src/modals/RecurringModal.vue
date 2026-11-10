@@ -1,18 +1,17 @@
 <template>
     <dialog id="recurring_modal" class="modal" aria-labelledby="recurring_modal_title">
         <div class="modal-box max-w-lg">
-            <div class="flex justify-between items-center mb-4">
-                <h2 id="recurring_modal_title" class="card-title">
-                    <Repeat :size="24" />
-                    Recurring
-                </h2>
-                <button type="button" @click="showModal('recurring_add_modal')" class="btn btn-primary btn-sm">
-                    <Plus :size="20" />
-                    Add Recurring
-                </button>
-            </div>
+            <ModalHeader title-id="recurring_modal_title" :icon="Repeat">
+                Recurring
+                <template #actions>
+                    <button type="button" @click="showModal('recurring_add_modal')" class="btn btn-primary btn-sm">
+                        <Plus :size="20" />
+                        Add Recurring
+                    </button>
+                </template>
+            </ModalHeader>
 
-            <EmptyState v-if="!recurringStore.rules.length" icon="🔁" title="No recurring transactions yet"
+            <EmptyState v-if="!recurringStore.rules.length" :icon="Repeat" title="No recurring transactions yet"
                 description="Add rent, salary, or a subscription" action-label="Add Recurring"
                 @action="showModal('recurring_add_modal')" />
 
@@ -76,6 +75,7 @@ import EmptyState from './../components/EmptyState.vue'
 import { formatDate, formatMoney } from './../services/formatters.js'
 import { showModal } from './../services/modal.js'
 import { useRecurringTransactionsStore } from './../services/recurringTransactions.js'
+import ModalHeader from '../components/ModalHeader.vue'
 
 const recurringStore = useRecurringTransactionsStore()
 

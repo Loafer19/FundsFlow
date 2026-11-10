@@ -45,20 +45,10 @@
 
         <template v-else-if="batch">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <div v-for="card in summaryCards" :key="card.key" class="card card-border border-base-300 bg-base-100 min-w-0">
-                    <div class="card-body p-4 gap-1 min-w-0">
-                        <div class="flex items-center gap-2 min-w-0">
-                            <span class="shrink-0 rounded-lg p-1.5" :class="card.iconClass">
-                                <component :is="card.icon" :size="16" />
-                            </span>
-                            <div class="text-xs uppercase tracking-wide text-base-content/60 truncate">{{ card.label }}</div>
-                        </div>
-                        <div class="flex flex-wrap items-baseline gap-x-2 min-w-0">
-                            <span class="text-lg font-semibold tabular-nums" :class="card.valueClass">{{ card.value }}</span>
-                            <span v-if="card.note" class="text-xs text-base-content/60">{{ card.note }}</span>
-                        </div>
-                    </div>
-                </div>
+                <StatCard v-for="card in summaryCards" :key="card.key" :label="card.label" :icon="card.icon"
+                    :icon-component="card.iconComponent" :icon-class="card.iconClass" :current="card.current"
+                    :value="card.value" :value-class="card.valueClass" :note="card.note" :format="card.format || 'money'"
+                    :compare="false" />
             </div>
 
             <div v-if="batch.categories?.length" class="card card-border border-base-300 bg-base-100 mb-4">
@@ -79,13 +69,9 @@
                             class="flex flex-wrap items-center gap-2 py-2">
                             <span class="font-medium min-w-28 truncate" :title="cat.name">{{ cat.name }}</span>
                             <span class="text-xs text-base-content/50 tabular-nums">{{ cat.count }}</span>
-                            <select class="select select-sm select-bordered" :value="cat.action"
-                                :disabled="busy || !editable"
-                                @change="onCategoryAction(cat, $event.target.value)">
-                                <option value="map">Map to a tag</option>
-                                <option value="create">Create as a new tag</option>
-                                <option value="ignore">Ignore</option>
-                            </select>
+                            <SegmentedControl size="sm" label="Category action" :model-value="cat.action"
+                                :options="categoryActionOptions" :class="{ 'pointer-events-none opacity-50': busy || !editable }"
+                                @update:model-value="editable && !busy && onCategoryAction(cat, $event)" />
                             <template v-if="cat.action === 'map'">
                                 <button type="button"
                                     class="badge badge-soft badge-info px-1 gap-1 max-w-full"
@@ -155,15 +141,17 @@
                             <input v-model="ruleMerchant" class="input input-sm input-bordered w-40"
                                 placeholder="Glovo" aria-label="Merchant contains" />
                             <button type="button"
-                                class="btn btn-sm border-base-300 gap-2 font-normal min-w-36 justify-start"
-                                :class="ruleTag ? 'text-base-content' : 'text-base-content/50'"
+                                class="badge badge-soft px-1 gap-1 max-w-full"
+                                :class="ruleTag ? 'badge-info' : 'badge-neutral'"
+                                :style="editable ? 'cursor: pointer' : ''"
                                 :disabled="!editable" aria-label="Choose merchant tag"
-                                @click="openRulePicker($event)">
-                                <span v-if="ruleTag" class="badge badge-soft badge-info px-1 gap-1">
+                                @click="editable && openRulePicker($event)">
+                                <template v-if="ruleTag">
                                     <span>{{ ruleTag.emoji }}</span>
                                     <span>{{ ruleTag.title }}</span>
-                                </span>
+                                </template>
                                 <span v-else>Choose tag</span>
+                                <Pencil v-if="editable" :size="12" class="opacity-60" />
                             </button>
                             <button type="button" class="btn btn-sm btn-primary"
                                 :disabled="busy || !canApplyMerchant" @click="applyMerchant">
@@ -173,8 +161,8 @@
                         <div class="flex flex-wrap items-center gap-2 py-2">
                             <span class="font-medium min-w-28">Skip</span>
                             <span class="text-xs text-base-content/50">before</span>
-                            <input v-model="ruleBefore" type="date" class="input input-sm input-bordered"
-                                aria-label="Skip rows before" />
+                            <DateField v-model="ruleBefore" sm clearable placeholder="Pick a date"
+                                aria-label="Skip rows before" input-class="w-auto min-w-40" />
                             <span class="text-xs text-base-content/50">name contains</span>
                             <input v-model="ruleSkipName" class="input input-sm input-bordered w-40"
                                 placeholder="Olya" aria-label="Skip name contains" />
@@ -186,7 +174,7 @@
                         <div class="flex flex-wrap items-center gap-3 py-2">
                             <span class="font-medium min-w-28">Currency</span>
                             <label class="label cursor-pointer gap-3 py-0 justify-start">
-                                <input type="checkbox" class="toggle toggle-sm"
+                                <input type="checkbox" class="toggle toggle-primary toggle-sm"
                                     :checked="!!batch.options?.include_foreign"
                                     :disabled="busy || !editable" @change="toggleForeign" />
                                 <span>
@@ -211,8 +199,11 @@
                         <span class="badge badge-xs">{{ filter.count }}</span>
                     </button>
                 </div>
-                <input v-model="search" type="search" class="input input-sm input-bordered ml-auto" placeholder="Filter notes"
-                    @change="reload()" />
+                <label class="input input-sm min-w-0 flex-1 max-w-xs border-base-300 text-sm ml-auto">
+                    <Search :size="16" class="text-base-content/60" />
+                    <input v-model="search" type="search" placeholder="Search notes" aria-label="Search notes"
+                        @change="reload()" />
+                </label>
             </div>
 
             <div class="card card-border border-base-300 bg-base-100 overflow-hidden">
@@ -339,6 +330,7 @@ import {
     List,
     ListFilter,
     Pencil,
+    Search,
     Sparkles,
     Tags,
     TrendingDown,
@@ -352,6 +344,9 @@ import { showModal } from '../services/modal.js'
 import { useTagsStore } from '../services/tags.js'
 import toasts from '../services/toasts.js'
 import TagPicker from './TagPicker.vue'
+import StatCard from './StatCard.vue'
+import SegmentedControl from './SegmentedControl.vue'
+import DateField from './DateField.vue'
 
 const props = defineProps({
     uuid: { type: String, default: '' },
@@ -359,6 +354,12 @@ const props = defineProps({
 
 const authStore = useAuthStore()
 const tagsStore = useTagsStore()
+const categoryActionOptions = [
+    { value: 'map', label: 'Map' },
+    { value: 'create', label: 'Create' },
+    { value: 'ignore', label: 'Ignore' },
+]
+
 const batch = ref(null)
 const loading = ref(false)
 const loadError = ref('')
@@ -414,14 +415,14 @@ const summaryCards = computed(() => {
     const s = batch.value?.summary || {}
     const needs = s.needs_tag ? `${s.needs_tag} need a tag` : ''
     return [
-        { key: 'rows', label: 'Rows', value: s.total_rows ?? 0, note: periodLabel.value, icon: List, iconClass: 'bg-base-content/10 text-base-content/70' },
-        { key: 'new', label: 'New', value: s.new ?? 0, note: needs, icon: Sparkles, iconClass: 'bg-success/15 text-success', valueClass: 'text-success' },
-        { key: 'income', label: 'Income', value: formatMoney(s.income_total || 0), icon: TrendingUp, iconClass: 'bg-success/15 text-success', valueClass: 'text-success' },
-        { key: 'expenses', label: 'Expenses', value: formatMoney(Math.abs(s.expense_total || 0)), icon: TrendingDown, iconClass: 'bg-error/15 text-error', valueClass: 'text-error' },
-        { key: 'duplicate', label: 'Duplicates', value: s.duplicate ?? 0, icon: Copy, iconClass: 'bg-base-content/10 text-base-content/70' },
-        { key: 'transfer', label: 'Transfers', value: s.transfer ?? 0, icon: ArrowLeftRight, iconClass: 'bg-info/15 text-info' },
-        { key: 'skipped', label: 'Skipped', value: s.skipped ?? 0, icon: Ban, iconClass: 'bg-base-content/10 text-base-content/70' },
-        { key: 'period', label: 'Period', value: periodLabel.value || '—', icon: CalendarDays, iconClass: 'bg-warning/15 text-warning' },
+        { key: 'rows', label: 'Rows', current: s.total_rows ?? 0, format: 'count', iconComponent: List, iconClass: 'bg-base-content/10 text-base-content/70' },
+        { key: 'new', label: 'New', current: s.new ?? 0, format: 'count', note: needs, iconComponent: Sparkles, iconClass: 'bg-success/15 text-success', valueClass: 'text-success' },
+        { key: 'income', label: 'Income', current: s.income_total || 0, icon: 'income', valueClass: 'text-success' },
+        { key: 'expenses', label: 'Expenses', current: Math.abs(s.expense_total || 0), icon: 'expenses', valueClass: 'text-error' },
+        { key: 'duplicate', label: 'Duplicates', current: s.duplicate ?? 0, format: 'count', iconComponent: Copy, iconClass: 'bg-base-content/10 text-base-content/70' },
+        { key: 'transfer', label: 'Transfers', current: s.transfer ?? 0, format: 'count', iconComponent: ArrowLeftRight, iconClass: 'bg-info/15 text-info' },
+        { key: 'skipped', label: 'Skipped', current: s.skipped ?? 0, format: 'count', iconComponent: Ban, iconClass: 'bg-base-content/10 text-base-content/70' },
+        { key: 'period', label: 'Period', value: periodLabel.value || '—', icon: 'daily' },
     ]
 })
 const filters = computed(() => {

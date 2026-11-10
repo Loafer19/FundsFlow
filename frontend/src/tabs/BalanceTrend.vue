@@ -1,12 +1,12 @@
 <template>
-    <EmptyState v-if="!hasPeriodData" icon="📈" title="No balance data for this period"
-        description="Nothing in the selected or previous period. Add a transaction or change the range"
+    <EmptyState v-if="!hasPeriodData" :icon="TrendingUp" title="No balance data for this period"
+        description="Nothing in this period. Add a transaction or change the range"
         action-label="Add Transaction" @action="openAdd" />
 
     <template v-else>
         <div class="flex flex-wrap items-center gap-3 mb-3">
             <label class="label text-sm cursor-pointer ml-auto report-hide">
-                <input v-model="compare" type="checkbox" class="toggle toggle-sm" />
+                <input v-model="compare" type="checkbox" class="toggle toggle-primary toggle-sm" />
                 Compare with previous period
             </label>
         </div>
@@ -29,6 +29,7 @@
 </template>
 
 <script setup>
+import { TrendingUp } from 'lucide-vue-next'
 import { computed, inject, ref } from 'vue'
 import TrendChart from '../components/charts/TrendChart.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -60,12 +61,8 @@ const compare = ref(true)
 const openAdd = () => transactions_add_modal.showModal()
 
 const hasPeriodData = computed(() => {
-    const { currentStart, currentEnd, previousStart, previousEnd } = props.dateRange
-
-    return (
-        transactionsStore.filteredByDateRangeAndTags(currentStart, currentEnd).length > 0 ||
-        transactionsStore.filteredByDateRangeAndTags(previousStart, previousEnd).length > 0
-    )
+    const { currentStart, currentEnd } = props.dateRange
+    return transactionsStore.filteredByDateRangeAndTags(currentStart, currentEnd).length > 0
 })
 
 // Running (cumulative) net of the period's tag-filtered transactions, one point per day, starting from 0.

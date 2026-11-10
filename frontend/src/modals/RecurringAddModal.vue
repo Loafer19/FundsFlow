@@ -1,10 +1,9 @@
 <template>
     <dialog id="recurring_add_modal" class="modal" aria-labelledby="recurring_add_modal_title">
         <div class="modal-box max-w-sm">
-            <h2 id="recurring_add_modal_title" class="card-title mb-4">
-                <Repeat :size="24" />
+            <ModalHeader title-id="recurring_add_modal_title" :icon="Repeat">
                 Add Recurring
-            </h2>
+            </ModalHeader>
 
             <form ref="formRef" @submit.prevent="handleSubmit">
                 <AmountField v-model="form.amount" :max="99_999_999.99" />
@@ -12,28 +11,19 @@
                 <input type="text" v-model="form.note" placeholder="Note (optional)" aria-label="Note"
                     class="input w-full mb-4" maxlength="255" />
 
-                <label class="block mb-4">
-                    <span class="block text-sm text-base-content/60 mb-1">Frequency</span>
-                    <select v-model="form.frequency" class="select w-full" required aria-label="Recurring frequency">
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                        <option value="yearly">Yearly</option>
-                    </select>
-                </label>
+                <div class="mb-4">
+                    <div class="text-sm text-base-content/60 mb-1">Frequency</div>
+                    <SegmentedControl v-model="form.frequency" block size="sm" label="Recurring frequency"
+                        :options="frequencyOptions" />
+                </div>
 
                 <div class="text-sm text-base-content/60 mb-1">Starts</div>
                 <DateChips v-model="form.starts_at" :presets="startPresets" label="Starts" />
 
                 <div class="text-sm text-base-content/60 mb-1">Ends</div>
-                <div class="join w-full" :class="endMode === 'none' ? 'mb-4' : 'mb-2'">
-                    <button type="button" class="btn btn-sm join-item flex-1" :class="{ 'btn-active': endMode === 'none' }"
-                        @click="endMode = 'none'">No end</button>
-                    <button type="button" class="btn btn-sm join-item flex-1" :class="{ 'btn-active': endMode === 'count' }"
-                        @click="endMode = 'count'">Times</button>
-                    <button type="button" class="btn btn-sm join-item flex-1" :class="{ 'btn-active': endMode === 'date' }"
-                        @click="endMode = 'date'">Date</button>
-                </div>
+                <SegmentedControl v-model="endMode" block size="sm" label="End condition"
+                    :class="endMode === 'none' ? 'mb-4' : 'mb-2'"
+                    :options="endModeOptions" />
 
                 <template v-if="endMode === 'count'">
                     <input type="number" min="1" v-model="occurrences" placeholder="Number of times"
@@ -44,7 +34,7 @@
                 </template>
 
                 <template v-else-if="endMode === 'date'">
-                    <input type="date" v-model="form.ends_at" class="input w-full" aria-label="End date" />
+                    <DateField v-model="form.ends_at" aria-label="End date" placeholder="End date" />
                     <div class="text-xs text-base-content/60 mb-4 mt-1">
                         <template v-if="form.ends_at">~{{ estimatedOccurrences }} occurrence{{ estimatedOccurrences ===
                             1 ? '' : 's' }}</template>
@@ -55,10 +45,10 @@
                 <TagPicker v-model="form.tags" />
 
                 <div class="modal-action">
-                    <button type="submit" class="btn btn-success tg-primary" :disabled="recurringStore.isLoading">
+                    <button type="submit" class="btn btn-primary tg-primary" :disabled="recurringStore.isLoading">
                         <span v-if="recurringStore.isLoading" class="loading loading-spinner"></span>
+                        <Save v-else :size="20" />
                         Save
-                        <Save :size="24" />
                     </button>
                 </div>
             </form>
@@ -81,6 +71,21 @@ import { formatDate, nowDateStr, parseLocalDate, toLocalDateStr } from '../servi
 import { advanceDateStr } from '../services/recurringSchedule.js'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
+import ModalHeader from '../components/ModalHeader.vue'
+import SegmentedControl from '../components/SegmentedControl.vue'
+import DateField from '../components/DateField.vue'
+
+const frequencyOptions = [
+    { value: 'daily', label: 'Daily' },
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'monthly', label: 'Monthly' },
+    { value: 'yearly', label: 'Yearly' },
+]
+const endModeOptions = [
+    { value: 'none', label: 'No end' },
+    { value: 'count', label: 'Times' },
+    { value: 'date', label: 'Date' },
+]
 
 const recurringStore = useRecurringTransactionsStore()
 

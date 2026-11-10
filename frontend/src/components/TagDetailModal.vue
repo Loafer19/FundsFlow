@@ -1,5 +1,5 @@
 <template>
-    <dialog ref="dialog" class="modal" aria-labelledby="tag_detail_modal_title" @close="isOpen = false">
+    <dialog id="tag_detail_modal" ref="dialog" class="modal" aria-labelledby="tag_detail_modal_title" @close="isOpen = false">
         <div class="modal-box max-w-2xl w-full overflow-x-hidden p-4 sm:p-6">
             <template v-if="tag && isOpen">
                 <div class="flex items-start justify-between gap-2 mb-4 min-w-0">

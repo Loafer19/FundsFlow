@@ -1,10 +1,9 @@
 <template>
     <dialog id="transactions_edit_modal" class="modal" aria-labelledby="transactions_edit_modal_title">
         <div class="modal-box max-w-sm">
-            <h2 id="transactions_edit_modal_title" class="card-title mb-4">
-                <ArrowLeftRight :size="24" />
+            <ModalHeader title-id="transactions_edit_modal_title" :icon="ArrowLeftRight">
                 Edit Transaction
-            </h2>
+            </ModalHeader>
 
             <form ref="formRef" @submit.prevent="handleSubmit">
                 <DateChips v-model="transaction.at" />
@@ -23,10 +22,10 @@
                     <DeleteHold v-if="transaction.id" :id="transaction.id" :disabled="transactionsStore.isLoading"
                         :isLoading="transactionsStore.isLoading === transaction.id" @delete="handleDelete" />
 
-                    <button type="submit" class="btn btn-success btn-sm tg-primary" :disabled="transactionsStore.isLoading">
+                    <button type="submit" class="btn btn-primary tg-primary" :disabled="transactionsStore.isLoading">
                         <span v-if="transactionsStore.isLoading" class="loading loading-spinner"></span>
+                        <Save v-else :size="20" />
                         Update
-                        <Save :size="24" />
                     </button>
                 </div>
             </form>
@@ -48,6 +47,7 @@ import TagPicker from '../components/TagPicker.vue'
 import { toLocalDateStr } from '../services/formatters.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
 import { useTransactionsStore } from '../services/transactions.js'
+import ModalHeader from '../components/ModalHeader.vue'
 
 const transactionsStore = useTransactionsStore()
 

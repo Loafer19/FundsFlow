@@ -30,6 +30,19 @@ export const formatDate = (date) => {
     return new Intl.DateTimeFormat(config.locale, config).format(new Date(date))
 }
 
+export const formatDateTime = (value) => {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return String(value ?? '')
+
+    const time = new Intl.DateTimeFormat(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: settings.timezone || undefined,
+    }).format(date)
+
+    return `${formatDate(date)} · ${time}`
+}
+
 export const formatMoneyOptions = {
     '1.234,56': 'de-DE',
     '1 234,56': 'uk-UA',

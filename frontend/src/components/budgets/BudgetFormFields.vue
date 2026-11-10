@@ -18,26 +18,24 @@
     <AmountField v-model="form.amount" :signed="false" :max="99_999_999.99" :autofocus="false"
         :placeholder="goal ? 'Target amount' : 'Amount'" :label="goal ? 'Target amount' : 'Amount'" />
 
+    <div v-if="!goal" class="mb-3">
+        <div class="text-sm text-base-content/60 mb-1">Frequency</div>
+        <SegmentedControl v-model="form.length" block size="sm" label="Budget length" :options="lengthOptions" />
+    </div>
+
     <!-- One row of two fields for both types, so switching Limit/Goal swaps fields in place. -->
     <div class="grid grid-cols-2 gap-3" :class="goal ? 'mb-4' : 'mb-1'">
-        <label v-if="!goal" class="block min-w-0">
-            <span class="block text-sm text-base-content/60 mb-1">Frequency</span>
-            <select v-model="form.length" class="select w-full" required aria-label="Budget length">
-                <option value="week">Weekly</option>
-                <option value="month">Monthly</option>
-                <option value="year">Yearly</option>
-            </select>
-        </label>
         <div class="min-w-0">
             <label :for="startId" class="block text-sm text-base-content/60 mb-1">Start date</label>
-            <input :id="startId" type="date" v-model="form.start_date" class="input w-full" @input="form.start_auto = false"
-                :min="goal ? undefined : form.start_min || undefined" :max="goal ? startMax : today"
-                aria-label="Start date" />
+            <DateField v-model="form.start_date" :input-id="startId" aria-label="Start date"
+                :min="goal ? '' : (form.start_min || '')" :max="goal ? startMax : today"
+                @update:model-value="form.start_auto = false" />
         </div>
-        <label v-if="goal" class="block min-w-0">
-            <span class="block text-sm text-base-content/60 mb-1">Deadline (optional)</span>
-            <input type="date" v-model="form.target_date" class="input w-full" :min="deadlineMin" aria-label="Deadline" />
-        </label>
+        <div v-if="goal" class="min-w-0">
+            <div class="text-sm text-base-content/60 mb-1">Deadline (optional)</div>
+            <DateField v-model="form.target_date" clearable aria-label="Deadline" placeholder="No deadline"
+                :min="deadlineMin || ''" />
+        </div>
     </div>
 
     <p v-if="!goal" class="text-xs text-base-content/60 mb-4">
@@ -85,6 +83,8 @@ import { nowDateStr, parseLocalDate } from '../../services/formatters.js'
 import { bucketBounds } from '../../services/limits.js'
 import AmountField from '../AmountField.vue'
 import TagPicker from '../TagPicker.vue'
+import SegmentedControl from '../SegmentedControl.vue'
+import DateField from '../DateField.vue'
 
 defineProps({
     // Edit modal: a limit cannot turn into a goal or back (the API keeps the type).
@@ -92,6 +92,12 @@ defineProps({
 })
 
 const form = defineModel({ type: Object, required: true })
+
+const lengthOptions = [
+    { value: 'week', label: 'Weekly' },
+    { value: 'month', label: 'Monthly' },
+    { value: 'year', label: 'Yearly' },
+]
 
 const goal = computed(() => form.value.type === 'goal')
 

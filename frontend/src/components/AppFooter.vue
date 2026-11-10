@@ -1,5 +1,5 @@
 <template>
-    <footer class="mt-auto pt-10 text-center" :class="{ 'max-sm:pb-16': withFab }">
+    <footer class="mt-auto pt-10 text-center">
         <div class="flex flex-col items-center gap-1.5 border-t border-base-300 pt-5">
             <div class="flex items-center gap-2">
                 <img src="/logo.png" alt="" width="28" height="28" class="size-7 rounded-lg" />
@@ -29,14 +29,6 @@ import { version } from '../../package.json'
 import { useAuthStore } from '../services/auth.js'
 import { showModal } from '../services/modal.js'
 import { hasUnseenWhatsNew } from '../services/whatsNew.js'
-
-defineProps({
-    // The fixed round "Add Transaction" button sits bottom-right: keep footer content clear of it.
-    withFab: {
-        type: Boolean,
-        default: false,
-    },
-})
 
 const authStore = useAuthStore()
 

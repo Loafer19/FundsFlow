@@ -1,20 +1,26 @@
 <template>
-    <EmptyState v-if="!hasPeriodData" icon="🏷️" title="No tag activity for this period"
-        description="Nothing in the selected or previous period. Add a transaction or change the range"
+    <EmptyState v-if="!hasPeriodData" :icon="Tags" title="No tag activity for this period"
+        description="Nothing in this period. Add a transaction or change the range"
         action-label="Add Transaction" @action="openAdd" />
 
     <template v-else>
-        <select v-if="!forcedViewMode" v-model="viewMode" class="select select-sm w-30 border-base-300 mb-3"
-            aria-label="Tag distribution view">
-            <option value="donuts">Donuts</option>
-            <option value="list">List</option>
-        </select>
+        <div v-if="!forcedViewMode" class="flex flex-wrap items-center gap-3 mb-3">
+            <SegmentedControl v-model="viewMode" size="sm" label="Tag distribution view" :options="viewModeOptions" />
+        </div>
+
+        <div v-if="!inReport" class="grid grid-cols-2 gap-3 mb-3">
+            <StatCard icon="income" label="Income" :current="sectionTotals.income" :previous="null" :compare="false" />
+            <StatCard icon="expenses" label="Expenses" :current="sectionTotals.expenses" :previous="null" :compare="false" />
+        </div>
 
         <div class="card card-border border-base-300 bg-base-100">
             <div class="card-body">
                 <div v-if="viewMode === 'donuts'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <h3 class="text-xl font-medium mb-2">Income</h3>
+                        <h3 class="card-title text-base sm:text-lg mb-2">
+                            <TrendingUp :size="22" class="text-success shrink-0" />
+                            Income
+                        </h3>
                         <div v-if="positiveTagsWithAmount.length > 0">
                             <TagDonutChart :tagsWithAmount="positiveTagsWithAmount" :clickable="!inReport"
                                 @select="openDetail($event, 'income')" />
@@ -22,7 +28,10 @@
                         <div v-else class="text-base-content/60 py-8 text-center">No income in this period</div>
                     </div>
                     <div>
-                        <h3 class="text-xl font-medium mb-2">Expenses</h3>
+                        <h3 class="card-title text-base sm:text-lg mb-2">
+                            <TrendingDown :size="22" class="text-error shrink-0" />
+                            Expenses
+                        </h3>
                         <div v-if="negativeTagsWithAmount.length > 0">
                             <TagDonutChart :tagsWithAmount="negativeTagsWithAmount" :clickable="!inReport"
                                 @select="openDetail($event, 'expenses')" />
@@ -33,7 +42,11 @@
 
                 <div v-else-if="viewMode === 'list'" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div v-for="section in listSections" :key="section.key" class="tags-list min-w-0">
-                        <h3 class="text-xl font-medium mb-2">{{ section.title }}</h3>
+                        <h3 class="card-title text-base sm:text-lg mb-2">
+                            <component :is="section.key === 'income' ? TrendingUp : TrendingDown" :size="22"
+                                class="shrink-0" :class="section.key === 'income' ? 'text-success' : 'text-error'" />
+                            {{ section.title }}
+                        </h3>
                         <table class="table table-sm w-full">
                             <tbody>
                                 <tr v-if="!section.rows.length">
@@ -84,6 +97,7 @@
 </template>
 
 <script setup>
+import { Tags, TrendingDown, TrendingUp } from 'lucide-vue-next'
 import { computed, inject, ref } from 'vue'
 import TagDonutChart from '../components/charts/TagDonutChart.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -91,6 +105,8 @@ import TagDetailModal from '../components/TagDetailModal.vue'
 import { tagChange } from '../services/comparison.js'
 import { useTagsStore } from '../services/tags'
 import { useTransactionsStore } from '../services/transactions'
+import SegmentedControl from '../components/SegmentedControl.vue'
+import StatCard from '../components/StatCard.vue'
 
 const props = defineProps({
     dateRange: {
@@ -119,12 +135,23 @@ const detailModal = ref(null)
 const openDetail = (tag, side) => detailModal.value?.open(tag.id, side)
 
 const hasPeriodData = computed(
-    () =>
-        transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd).length >
-            0 ||
-        transactionsStore.filteredByDateRangeAndTags(props.dateRange.previousStart, props.dateRange.previousEnd)
-            .length > 0,
+    () => transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd).length > 0,
 )
+const viewModeOptions = [
+    { value: 'donuts', label: 'Donuts' },
+    { value: 'list', label: 'List' },
+]
+
+const sectionTotals = computed(() => {
+    const list = transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd)
+    let income = 0
+    let expenses = 0
+    for (const row of list) {
+        if (row.amount >= 0) income += row.amount
+        else expenses += Math.abs(row.amount)
+    }
+    return { income, expenses }
+})
 
 const parentById = computed(() => new Map(tagsStore.tags.map((tag) => [tag.id, tag.parent_id ?? null])))
 

@@ -55,7 +55,7 @@
         </div>
 
         <p v-if="connection.last_synced_at" class="text-xs text-base-content/60 mb-2">
-            Last synced {{ formatWhen(connection.last_synced_at) }}
+            Last synced {{ formatDateTime(connection.last_synced_at) }}
         </p>
         <p v-if="connection.last_error" class="text-xs text-error mb-3">{{ connection.last_error }}</p>
 
@@ -98,16 +98,29 @@
                         </span>
                     </label>
                 </div>
-                <label class="block">
-                    <span class="sr-only">Tag for {{ account.label }}</span>
-                    <select class="select select-sm w-full" :value="account.tag_id ?? ''"
-                        :disabled="busy" @change="mapTag(account, $event.target.value)">
-                        <option value="">No extra tag</option>
-                        <option v-for="tag in tagOptions" :key="tag.id" :value="tag.id">
-                            {{ `${' '.repeat((tag.depth || 0) * 2)}${tag.emoji ? tag.emoji + ' ' : ''}${tag.title}` }}
-                        </option>
-                    </select>
-                </label>
+                <PopoverMenu label="Extra tag" root-class="block w-full">
+                    <template #trigger="{ toggle, open }">
+                        <button type="button" class="badge badge-soft px-2 gap-1 text-base h-8 font-normal"
+                            :class="accountTag(account) ? 'badge-info' : 'badge-neutral'"
+                            :disabled="busy" :aria-expanded="open" aria-haspopup="dialog"
+                            :aria-label="`Tag for ${account.label}`" @click="toggle">
+                            <template v-if="accountTag(account)">
+                                <span>{{ accountTag(account).emoji }}</span>
+                                <span>{{ accountTag(account).title }}</span>
+                            </template>
+                            <span v-else>No extra tag</span>
+                        </button>
+                    </template>
+                    <template #default="{ close }">
+                        <button type="button" class="badge gap-0 px-1 text-lg cursor-pointer mb-2 w-fit"
+                            :class="account.tag_id ? 'badge-soft badge-neutral' : 'badge-neutral'"
+                            @click="mapTag(account, ''); close()">
+                            No extra tag
+                        </button>
+                        <TagPicker :model-value="account.tag_id ? [account.tag_id] : []" single
+                            @update:model-value="onAccountTags(account, $event, close)" />
+                    </template>
+                </PopoverMenu>
             </div>
             <p v-if="!connection.accounts?.length" class="text-xs text-base-content/50">
                 No cards were returned for this token.
@@ -163,7 +176,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { apiErrorMessage, formatMoney } from '../services/formatters'
+import { apiErrorMessage, formatDateTime, formatMoney } from '../services/formatters'
 import { useBudgetsStore } from '../services/budgets'
 import {
     connectMonobank,
@@ -174,6 +187,8 @@ import {
 } from '../services/monobank'
 import { useTagsStore } from '../services/tags'
 import toasts from '../services/toasts'
+import PopoverMenu from './PopoverMenu.vue'
+import TagPicker from './TagPicker.vue'
 
 const empty = { connected: false, accounts: [], jars: [], notify: true, status: 'active' }
 const connection = ref({ ...empty })
@@ -199,11 +214,6 @@ onUnmounted(() => clearInterval(cooldownTimer))
 const tagsStore = useTagsStore()
 const budgetsStore = useBudgetsStore()
 
-const tagOptions = computed(() => {
-    const list = typeof tagsStore.list === 'function' ? tagsStore.list() : (tagsStore.tags || [])
-    return list.filter((tag) => tag && tag.id)
-})
-
 const statusLabel = computed(() => {
     if (connection.value.status === 'syncing') return 'Syncing'
     if (connection.value.status === 'error') return 'Error'
@@ -216,12 +226,13 @@ const statusBadge = computed(() => {
     return 'badge-success'
 })
 
-const formatWhen = (iso) => {
-    try {
-        return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
-    } catch {
-        return iso
-    }
+const accountTag = (account) => tagsStore.tags.find((tag) => Number(tag.id) === Number(account.tag_id)) ?? null
+
+const onAccountTags = (account, ids, close) => {
+    const current = account.tag_id ? Number(account.tag_id) : null
+    const next = (ids || []).map(Number).find((id) => id !== current) ?? (ids || []).map(Number).at(-1)
+    mapTag(account, next ?? '')
+    if (next) close?.()
 }
 
 const apply = (data) => {

@@ -52,9 +52,8 @@
             </button>
         </div>
 
-        <p v-if="!tickets.length" class="text-sm text-base-content/50 text-center py-6">
-            No requests yet. Questions, problems or ideas: send them here and we'll reply.
-        </p>
+        <EmptyState v-if="!tickets.length" :icon="LifeBuoy" size="sm" title="No requests yet"
+            description="Questions, problems or ideas: send them here and we'll reply." />
 
         <ul v-else class="flex flex-col gap-1 support-list overflow-y-auto overflow-x-hidden">
             <li v-for="ticket in tickets" :key="ticket.id">
@@ -80,7 +79,7 @@
 </template>
 
 <script setup>
-import { ChevronLeft, Plus, Send } from 'lucide-vue-next'
+import { ChevronLeft, Plus, Send, LifeBuoy } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { apiErrorMessage, formatDate } from '../services/formatters.js'
 import { showModal } from '../services/modal.js'
@@ -92,6 +91,7 @@ import {
     SUPPORT_STATUS,
 } from '../services/support.js'
 import toasts from '../services/toasts.js'
+import EmptyState from './EmptyState.vue'
 
 const tickets = ref([])
 const loading = ref(false)

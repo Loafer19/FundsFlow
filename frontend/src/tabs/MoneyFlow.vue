@@ -1,17 +1,11 @@
 <template>
-    <EmptyState v-if="!hasPeriodData" icon="💸" title="No money flow in this period"
-        description="Nothing in the selected or previous period. Add a transaction or change the range"
+    <EmptyState v-if="!hasPeriodData" :icon="ArrowLeftRight" title="No money flow in this period"
+        description="Nothing in this period. Add a transaction or change the range"
         action-label="Add Transaction" @action="openAdd" />
 
     <template v-else>
         <div class="flex flex-wrap items-center gap-3 mb-3">
-            <select v-model="groupBy" aria-label="Group money flow by"
-                class="select select-sm w-30 border-base-300 focus:border-base-content cursor-pointer">
-                <option value="day">Day</option>
-                <option value="week" :hidden="dateSelectionType == 'week'">Week</option>
-                <option value="month" :hidden="dateSelectionType == 'week' || dateSelectionType == 'month'">Month
-                </option>
-            </select>
+            <SegmentedControl v-model="groupBy" size="sm" label="Group money flow by" :options="groupByOptions" />
 
             <span v-if="groupBy == 'week'" tabindex="0" class="tooltip tooltip-bottom -ml-1 before:max-w-52"
                 :data-tip="`Weeks run Mon–Sun. The first and last weeks only count days inside this ${dateSelectionType}.`"
@@ -20,14 +14,15 @@
             </span>
 
             <label class="label text-sm cursor-pointer ml-auto report-hide">
-                <input v-model="compare" type="checkbox" class="toggle toggle-sm" />
+                <input v-model="compare" type="checkbox" class="toggle toggle-primary toggle-sm" />
                 Compare with previous period
             </label>
         </div>
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
             <StatCard v-for="item in comparison" :key="item.key" :icon="item.icon" :label="item.label"
-                :current="item.current" :previous="item.previous" :compare="compare" />
+                :current="item.current" :previous="item.previous" :compare="compare"
+                :lower-is-better="item.lowerIsBetter" />
         </div>
 
         <div class="card card-border border-base-300 bg-base-100">
@@ -42,13 +37,14 @@
 </template>
 
 <script setup>
-import { Info } from 'lucide-vue-next'
+import { ArrowLeftRight, Info } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import BarChart from '../components/charts/BarChart.vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatCard from '../components/StatCard.vue'
 import { nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { useTransactionsStore } from '../services/transactions.js'
+import SegmentedControl from '../components/SegmentedControl.vue'
 
 const transactionsStore = useTransactionsStore()
 
@@ -70,12 +66,14 @@ const groupBy = ref('day')
 const compare = ref(true)
 const openAdd = () => transactions_add_modal.showModal()
 const hasPeriodData = computed(
-    () =>
-        transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd).length >
-            0 ||
-        transactionsStore.filteredByDateRangeAndTags(props.dateRange.previousStart, props.dateRange.previousEnd)
-            .length > 0,
+    () => transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd).length > 0,
 )
+
+const groupByOptions = computed(() => [
+    { value: 'day', label: 'Day' },
+    { value: 'week', label: 'Week', hidden: props.dateSelectionType === 'week' },
+    { value: 'month', label: 'Month', hidden: props.dateSelectionType === 'week' || props.dateSelectionType === 'month' },
+])
 
 watch(
     () => props.dateSelectionType,
@@ -187,7 +185,7 @@ const previousFlow = computed(() =>
 const totals = (start, end) =>
     transactionsStore.filteredByDateRangeAndTags(start, end).reduce(
         (acc, t) => {
-            t.amount >= 0 ? (acc.income += t.amount) : (acc.expenses += t.amount)
+            t.amount >= 0 ? (acc.income += t.amount) : (acc.expenses += Math.abs(t.amount))
             return acc
         },
         { income: 0, expenses: 0 },
@@ -212,13 +210,13 @@ const comparison = computed(() => {
 
     return [
         { key: 'income', icon: 'income', label: 'Income', current: cur.income, previous: prev.income },
-        { key: 'expenses', icon: 'expenses', label: 'Expenses', current: cur.expenses, previous: prev.expenses },
+        { key: 'expenses', icon: 'expenses', label: 'Expenses', current: cur.expenses, previous: prev.expenses, lowerIsBetter: true },
         {
             key: 'net',
             icon: 'net',
             label: 'Net',
-            current: cur.income + cur.expenses,
-            previous: prev.income + prev.expenses,
+            current: cur.income - cur.expenses,
+            previous: prev.income - prev.expenses,
         },
         {
             key: 'avg',
@@ -226,6 +224,7 @@ const comparison = computed(() => {
             label: BUCKET_LABELS[groupBy.value],
             current: cur.expenses / elapsedBuckets(currentStart, currentEnd),
             previous: prev.expenses / elapsedBuckets(previousStart, previousEnd),
+            lowerIsBetter: true,
         },
     ]
 })

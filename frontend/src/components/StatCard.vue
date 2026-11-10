@@ -13,7 +13,7 @@
                 </div>
             </div>
             <div class="flex flex-wrap items-baseline gap-x-2 min-w-0">
-                <span class="text-lg font-semibold tabular-nums">{{ display(current) }}</span>
+                <span class="text-lg font-semibold tabular-nums" :class="valueClass">{{ value || display(current) }}</span>
                 <span v-if="note" class="text-xs text-base-content/60">{{ note }}</span>
             </div>
             <div v-if="compare" class="flex flex-wrap items-center gap-2 text-xs">
@@ -53,8 +53,14 @@ import settings from '../services/settings.js'
 const props = defineProps({
     label: { type: String, required: true },
     // null renders as "—" (e.g. a savings rate without income).
-    current: { type: [Number, null], required: true },
-    previous: { type: [Number, null], required: true },
+    current: { type: [Number, null], default: null },
+    previous: { type: [Number, null], default: null },
+    // Preformatted main value (e.g. a date range). When set, `current` is not formatted.
+    value: { type: String, default: '' },
+    valueClass: { type: String, default: '' },
+    // Override the named `icon` with a custom Lucide component + tile class.
+    iconComponent: { type: [Object, Function], default: null },
+    iconClass: { type: String, default: '' },
     // Optional context next to the value / previous value (e.g. the date of a peak).
     note: { type: String, default: '' },
     previousNote: { type: String, default: '' },
@@ -89,7 +95,14 @@ const ICONS = {
     forecast: { component: Telescope, class: 'bg-info/15 text-info' },
 }
 
-const iconMeta = computed(() => ICONS[props.icon] ?? null)
+const iconMeta = computed(() => {
+    if (props.iconComponent) {
+        return { component: props.iconComponent, class: props.iconClass || 'bg-base-content/10 text-base-content/70' }
+    }
+    const named = ICONS[props.icon]
+    if (!named) return null
+    return props.iconClass ? { ...named, class: props.iconClass } : named
+})
 
 const integer = computed(() => new Intl.NumberFormat(settings.moneyFormat, { maximumFractionDigits: 0 }))
 

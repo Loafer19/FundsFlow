@@ -1,10 +1,9 @@
 <template>
     <dialog id="recurring_edit_modal" class="modal" aria-labelledby="recurring_edit_modal_title">
         <div class="modal-box max-w-sm">
-            <h2 id="recurring_edit_modal_title" class="card-title mb-4">
-                <Repeat :size="24" />
+            <ModalHeader title-id="recurring_edit_modal_title" :icon="Repeat">
                 Edit Recurring
-            </h2>
+            </ModalHeader>
 
             <form ref="formRef" @submit.prevent="handleSubmit">
                 <AmountField v-model="form.amount" :max="99_999_999.99" />
@@ -12,21 +11,15 @@
                 <input type="text" v-model="form.note" placeholder="Note (optional)" aria-label="Note"
                     class="input w-full mb-4" maxlength="255" />
 
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                    <label class="block min-w-0">
-                        <span class="block text-sm text-base-content/60 mb-1">Frequency</span>
-                        <select v-model="form.frequency" class="select w-full" required aria-label="Recurring frequency">
-                            <option value="daily">Daily</option>
-                            <option value="weekly">Weekly</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="yearly">Yearly</option>
-                        </select>
-                    </label>
-                    <label class="block min-w-0">
-                        <span class="block text-sm text-base-content/60 mb-1">Ends (optional)</span>
-                        <input type="date" v-model="form.ends_at" class="input w-full" aria-label="End date" />
-                    </label>
+                <div class="mb-4">
+                    <div class="text-sm text-base-content/60 mb-1">Frequency</div>
+                    <SegmentedControl v-model="form.frequency" block size="sm" label="Recurring frequency"
+                        :options="frequencyOptions" />
                 </div>
+                <label class="block mb-4">
+                    <span class="block text-sm text-base-content/60 mb-1">Ends (optional)</span>
+                    <DateField v-model="form.ends_at" clearable aria-label="End date" placeholder="No end date" />
+                </label>
 
                 <div class="text-sm text-base-content/60 mb-1">Tags</div>
                 <TagPicker v-model="form.tags" />
@@ -35,10 +28,10 @@
                     <DeleteHold v-if="form.id" :id="form.id" :disabled="recurringStore.isLoading"
                         :isLoading="recurringStore.isLoading === form.id" @delete="handleDelete" />
 
-                    <button type="submit" class="btn btn-success btn-sm tg-primary" :disabled="recurringStore.isLoading">
+                    <button type="submit" class="btn btn-primary tg-primary" :disabled="recurringStore.isLoading">
                         <span v-if="recurringStore.isLoading" class="loading loading-spinner"></span>
+                        <Save v-else :size="20" />
                         Update
-                        <Save :size="24" />
                     </button>
                 </div>
             </form>
@@ -57,6 +50,16 @@ import DeleteHold from '../components/buttons/DeleteHold.vue'
 import TagPicker from '../components/TagPicker.vue'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
+import ModalHeader from '../components/ModalHeader.vue'
+import SegmentedControl from '../components/SegmentedControl.vue'
+import DateField from '../components/DateField.vue'
+
+const frequencyOptions = [
+    { value: 'daily', label: 'Daily' },
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'monthly', label: 'Monthly' },
+    { value: 'yearly', label: 'Yearly' },
+]
 
 const recurringStore = useRecurringTransactionsStore()
 

@@ -1,10 +1,9 @@
 <template>
     <dialog id="settings_modal" class="modal" aria-labelledby="settings_modal_title">
         <div class="modal-box w-11/12 max-w-2xl">
-            <h2 id="settings_modal_title" class="card-title mb-4">
-                <SettingsIcon :size="24" />
+            <ModalHeader title-id="settings_modal_title" :icon="SettingsIcon">
                 Settings
-            </h2>
+            </ModalHeader>
 
             <div class="tabs tabs-box justify-start sm:justify-center mb-4 flex-nowrap overflow-x-auto">
                 <template v-for="(title, key) in tabs">
@@ -215,7 +214,7 @@
                             required />
 
                         <div class="flex justify-end">
-                            <button type="submit" class="btn btn-success btn-sm" :disabled="savingCredentials">
+                            <button type="submit" class="btn btn-primary btn-sm" :disabled="savingCredentials">
                                 Save
                                 <span v-if="savingCredentials" class="loading loading-spinner loading-xs"></span>
                                 <KeyRound v-else :size="20" />
@@ -285,10 +284,10 @@ recurring_transactions</pre>
             </div>
 
             <div class="modal-action" v-if="tab === 'formatting' || tab === 'theme'">
-                <button type="submit" class="btn btn-success" @click="saveSettings">
-                    <span class="loading loading-spinner" v-if="saving"></span>
+                <button type="submit" class="btn btn-primary" @click="saveSettings">
+                    <span v-if="saving" class="loading loading-spinner"></span>
+                    <Save v-else :size="20" />
                     Save
-                    <Save :size="24" />
                 </button>
             </div>
         </div>
@@ -337,6 +336,7 @@ import { useTagsStore } from '../services/tags'
 import { isTelegramWebApp } from '../services/telegramWebApp.js'
 import toasts from '../services/toasts'
 import { useTransactionsStore } from '../services/transactions'
+import ModalHeader from '../components/ModalHeader.vue'
 
 const authStore = useAuthStore()
 

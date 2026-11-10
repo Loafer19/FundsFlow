@@ -9,11 +9,9 @@
                         @click="isRegister = true">Register</a>
                 </div>
 
-                <h2 id="auth_modal_title" class="card-title mb-4">
-                    <UserPlus v-if="isRegister" :size="24" />
-                    <User v-else :size="24" />
+                <ModalHeader title-id="auth_modal_title" :icon="isRegister ? UserPlus : User">
                     {{ isRegister ? 'Register' : 'Login' }}
-                </h2>
+                </ModalHeader>
 
                 <form @submit.prevent="handleSubmit">
                     <input v-if="isRegister" type="text" v-model="credentials.name" placeholder="Name"
@@ -26,13 +24,11 @@
                         class="input w-full" minlength="8" maxlength="255" required />
 
                     <div class="modal-action">
-                        <button type="submit" class="btn btn-success" :disabled="authStore.isLoading">
+                        <button type="submit" class="btn btn-primary" :disabled="authStore.isLoading">
                             <span v-if="authStore.isLoading" class="loading loading-spinner"></span>
-
+                            <UserPlus v-else-if="isRegister" :size="20" />
+                            <User v-else :size="20" />
                             {{ isRegister ? 'Register' : 'Login' }}
-
-                            <UserPlus v-if="isRegister" :size="24" />
-                            <User v-else :size="24" />
                         </button>
                     </div>
 
@@ -83,10 +79,9 @@
             </template>
 
             <template v-else>
-                <h2 id="auth_modal_title" class="card-title mb-4">
-                    <Send :size="24" />
+                <ModalHeader title-id="auth_modal_title" :icon="Send">
                     Log in with Telegram
-                </h2>
+                </ModalHeader>
 
                 <p class="text-sm text-base-content/60 mb-4">
                     Open <a :href="telegramBotUrl" target="_blank" class="link link-primary">the bot</a>, send
@@ -105,9 +100,9 @@
                             Back
                         </button>
 
-                        <button type="submit" class="btn btn-success" :disabled="authStore.isLoading || normalizeTelegramCode(telegramCode).length !== TELEGRAM_CODE_LENGTH">
+                        <button type="submit" class="btn btn-primary" :disabled="authStore.isLoading || normalizeTelegramCode(telegramCode).length !== TELEGRAM_CODE_LENGTH">
                             <span v-if="authStore.isLoading" class="loading loading-spinner"></span>
-                            <LogIn :size="24" />
+                            <LogIn v-else :size="20" />
                             Log in
                         </button>
                     </div>
@@ -127,6 +122,7 @@ import { useAuthStore } from './../services/auth.js'
 import { formatTelegramCode, normalizeTelegramCode, TELEGRAM_CODE_LENGTH } from './../services/telegramCode.js'
 import { takeStashedInitData } from './../services/telegramWebApp.js'
 import toasts from './../services/toasts.js'
+import ModalHeader from '../components/ModalHeader.vue'
 
 const googleAuthUrl = import.meta.env.VITE_API_URL + '/auth/google'
 const githubAuthUrl = import.meta.env.VITE_API_URL + '/auth/github'

@@ -1,10 +1,9 @@
 <template>
     <dialog id="whats_new_modal" class="modal" aria-labelledby="whats_new_modal_title" @close="markWhatsNewSeen">
         <div class="modal-box max-w-sm">
-            <h2 id="whats_new_modal_title" class="card-title mb-4">
-                <PartyPopper :size="24" />
+            <ModalHeader title-id="whats_new_modal_title" :icon="PartyPopper">
                 What's new
-            </h2>
+            </ModalHeader>
 
             <section v-for="release in shown" :key="release.version" class="mb-4 last:mb-0">
                 <div class="text-xs font-medium text-base-content/50 mb-2 tabular-nums">Version {{ release.version }}</div>
@@ -21,7 +20,10 @@
                     See all
                 </a>
                 <form method="dialog">
-                    <button class="btn btn-primary">Got it</button>
+                    <button class="btn btn-primary">
+                        <Check :size="20" />
+                        Got it
+                    </button>
                 </form>
             </div>
         </div>
@@ -36,6 +38,7 @@ import { Check, PartyPopper } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
 import { useDialogOpen } from '../services/dialogOpen.js'
 import { markWhatsNewSeen, WHATS_NEW_URL, whatsNewReleases } from '../services/whatsNew.js'
+import ModalHeader from '../components/ModalHeader.vue'
 
 // Frozen while open: marking as seen on close must not swap the list during the fade-out.
 const { isOpen } = useDialogOpen('whats_new_modal')

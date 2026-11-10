@@ -1,12 +1,12 @@
 <template>
-    <EmptyState v-if="!hasAnyData" icon="📅" title="No payments yet"
+    <EmptyState v-if="!hasAnyData" :icon="CalendarDays" title="No payments yet"
         description="Add a transaction or a recurring rule to see it on the calendar" action-label="Add Transaction"
         @action="openAdd" />
 
     <template v-else>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
             <StatCard v-for="item in comparison" :key="item.key" :icon="item.key" :label="item.label" :current="item.current"
-                :previous="item.previous" :note="item.note" />
+                :previous="item.previous" :note="item.note" :lower-is-better="item.lowerIsBetter" />
         </div>
 
         <div class="grid grid-cols-1 gap-3 items-start" :class="{ 'lg:grid-cols-[1fr_300px]': dateSelectionType !== 'year' }">
@@ -63,7 +63,7 @@
                 <div>
                     <h3 class="font-semibold text-base mb-2">{{ formatDate(selectedDate) }}</h3>
 
-                    <EmptyState v-if="!selectedItems.length" icon="📭" title="Nothing this day"
+                    <EmptyState v-if="!selectedItems.length" :icon="Inbox" size="sm" title="Nothing this day"
                         description="No transactions or upcoming payments on this date" action-label="Add Transaction"
                         @action="addForSelectedDate" />
 
@@ -112,7 +112,7 @@
                 <div :class="{ 'report-hide': !upcoming.length }">
                     <h3 class="font-semibold text-base mb-2">Upcoming</h3>
 
-                    <EmptyState v-if="!upcoming.length" icon="🔁" title="Nothing upcoming"
+                    <EmptyState v-if="!upcoming.length" :icon="Repeat" size="sm" title="Nothing upcoming"
                         description="No recurring payments due in the next 30 days" action-label="Add Recurring"
                         @action="showModal('recurring_add_modal')" />
 
@@ -147,7 +147,7 @@
 </template>
 
 <script setup>
-import { FileText, Image as ImageIcon, Plus } from 'lucide-vue-next'
+import { CalendarDays, FileText, Image as ImageIcon, Inbox, Plus, Repeat } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import CalendarYearMonths from '../components/CalendarYearMonths.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -289,9 +289,9 @@ const gridCells = computed(() => {
 
 const sumPeriodTotals = (items) => {
     const income = items.filter((i) => i.amount > 0).reduce((sum, i) => sum + i.amount, 0)
-    const expense = items.filter((i) => i.amount < 0).reduce((sum, i) => sum + i.amount, 0)
+    const expense = items.filter((i) => i.amount < 0).reduce((sum, i) => sum + Math.abs(i.amount), 0)
 
-    return { income, expense, total: income + expense }
+    return { income, expense, total: income - expense }
 }
 
 const periodItems = computed(() => itemsInRange(props.dateRange.currentStart, props.dateRange.currentEnd))
@@ -325,6 +325,7 @@ const comparison = computed(() => {
             current: cur.expense,
             previous: prev.expense,
             note: forecastNote(fc.expense),
+            lowerIsBetter: true,
         },
         {
             key: 'net',

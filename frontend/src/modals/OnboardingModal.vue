@@ -2,12 +2,12 @@
     <dialog id="onboarding_modal" class="modal" aria-labelledby="onboarding_modal_title" @close="onDialogClose">
         <div class="modal-box max-w-md">
             <template v-if="step === 'welcome'">
-                <div class="flex items-center gap-3 mb-3">
-                    <img src="/logo.png" alt="FundsFlow" class="w-14 h-14 rounded-2xl" />
-                    <h2 id="onboarding_modal_title" class="card-title mb-0">
-                        Welcome to FundsFlow
-                    </h2>
-                </div>
+                <ModalHeader title-id="onboarding_modal_title" dense>
+                    <template #leading>
+                        <img src="/logo.png" alt="FundsFlow" class="w-14 h-14 rounded-2xl" />
+                    </template>
+                    Welcome to FundsFlow
+                </ModalHeader>
 
                 <p class="text-sm text-base-content/60 mb-4">
                     Starter tags are ready. Add a first transaction to get going.
@@ -38,10 +38,9 @@
             </template>
 
             <template v-else>
-                <h2 id="onboarding_modal_title" class="card-title mb-2">
-                    <Send :size="24" />
+                <ModalHeader title-id="onboarding_modal_title" :icon="Send" dense>
                     Add from Telegram
-                </h2>
+                </ModalHeader>
 
                 <p class="text-sm text-base-content/60 mb-4">
                     Log expenses from chat. Optional, link later in Settings.
@@ -76,6 +75,7 @@ import { showModal } from '../services/modal'
 import { isOnboardingDone, markOnboardingDone } from '../services/onboarding'
 import { useTagsStore } from '../services/tags'
 import toasts from '../services/toasts'
+import ModalHeader from '../components/ModalHeader.vue'
 
 const tagsStore = useTagsStore()
 

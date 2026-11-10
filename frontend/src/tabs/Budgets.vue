@@ -1,5 +1,5 @@
 <template>
-    <EmptyState v-if="!budgetsStore.budgets.length" icon="🐷" title="No budgets or goals yet"
+    <EmptyState v-if="!budgetsStore.budgets.length" :icon="PiggyBank" title="No budgets or goals yet"
         description="Set a spending limit on a few tags, or a savings goal to see how close you are"
         action-label="Add Budget or Goal" @action="openAdd" />
 
@@ -43,7 +43,7 @@
 </template>
 
 <script setup>
-import { Plus } from 'lucide-vue-next'
+import { Plus, PiggyBank } from 'lucide-vue-next'
 import { computed } from 'vue'
 import GoalCard from '../components/budgets/GoalCard.vue'
 import LimitCard from '../components/budgets/LimitCard.vue'

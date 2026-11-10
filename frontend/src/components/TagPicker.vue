@@ -44,6 +44,13 @@ const tagsStore = useTagsStore()
 
 const modelValue = defineModel({ type: Array, default: () => [] })
 
+const props = defineProps({
+    // Pick at most one tag: a new click replaces the current selection (click again to clear).
+    single: { type: Boolean, default: false },
+    // Hide these ids (e.g. a tag cannot be its own parent).
+    excludeIds: { type: Array, default: () => [] },
+})
+
 // Child tags sit collapsed under their parent. A parent opens on its chevron, and on its own when one of
 // its descendants is selected or while searching; a chevron click overrides that automatic state.
 const SEARCH_FROM = 9
@@ -62,12 +69,16 @@ const tree = computed(() => {
 
     const descendants = (id) => (children[id] ?? []).flatMap((childId) => [childId, ...descendants(childId)])
 
-    return list.map((tag) => ({
-        ...tag,
-        hasChildren: Boolean(children[tag.id]),
-        childCount: children[tag.id]?.length ?? 0,
-        descendantIds: descendants(tag.id),
-    }))
+    const excluded = new Set((props.excludeIds ?? []).map(Number))
+
+    return list
+        .filter((tag) => !excluded.has(Number(tag.id)))
+        .map((tag) => ({
+            ...tag,
+            hasChildren: Boolean(children[tag.id]),
+            childCount: (children[tag.id] ?? []).filter((id) => !excluded.has(Number(id))).length,
+            descendantIds: descendants(tag.id).filter((id) => !excluded.has(Number(id))),
+        }))
 })
 
 const hasTree = computed(() => tree.value.some((tag) => tag.hasChildren))
@@ -103,6 +114,11 @@ const visibleTags = computed(() => {
 
 const toggle = (id) => {
     haptic.select()
+
+    if (props.single) {
+        modelValue.value = modelValue.value.includes(id) ? [] : [id]
+        return
+    }
 
     const index = modelValue.value.indexOf(id)
 
