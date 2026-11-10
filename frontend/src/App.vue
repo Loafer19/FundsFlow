@@ -13,15 +13,23 @@
     <RecurringModal />
     <RecurringAddModal />
     <RecurringEditModal />
-    <SettingsModal />
+    <SettingsDrawer />
     <OnboardingModal />
     <WhatsNewModal />
     <SupportModal v-if="authStore.isAuthenticated" />
     <AgentDrawer v-if="authStore.isAuthenticated" />
 
-    <div class="container mx-auto p-4 flex flex-col min-h-dvh">
-        <header class="flex gap-2 justify-end mb-4 flex-wrap">
-            <a href="/docs/" target="_blank" rel="noopener" class="btn btn-ghost btn-square tooltip tooltip-bottom"
+    <div class="container mx-auto p-4 flex flex-col min-h-dvh"
+        :class="{ 'max-md:pb-[calc(6rem+env(safe-area-inset-bottom))]': authStore.isAuthenticated }">
+        <header class="flex gap-2 justify-end mb-4 flex-wrap items-center">
+            <a href="/" class="mr-auto flex items-center gap-2" @click.prevent="goHome">
+                <img src="/logo.png" alt="" width="28" height="28" class="size-7 rounded-lg" />
+                <span class="font-semibold">FundsFlow</span>
+            </a>
+
+            <a href="/docs/" target="_blank" rel="noopener"
+                class="btn btn-ghost btn-square tooltip tooltip-bottom"
+                :class="{ 'max-md:hidden': authStore.isAuthenticated }"
                 data-tip="Docs" aria-label="Docs (opens in a new tab)">
                 <CircleHelp :size="24" />
             </a>
@@ -34,30 +42,31 @@
 
             <template v-if="authStore.isAuthenticated">
                 <button type="button" @click="showModal('transactions_add_modal')"
-                    class="btn btn-primary max-sm:btn-square" aria-label="Add Transaction">
+                    class="btn btn-primary hidden md:inline-flex" aria-label="Add Transaction">
                     <Plus :size="20" />
-                    <span class="hidden sm:inline">Add Transaction</span>
+                    <span>Add Transaction</span>
                 </button>
 
-                <button @click="showModal('recurring_modal')"
+                <button type="button" @click="showModal('recurring_modal')"
                     class="btn btn-ghost btn-square tooltip tooltip-bottom" data-tip="Recurring"
                     aria-label="Recurring">
                     <Repeat :size="24" />
                 </button>
 
-                <button @click="showModal('tags_modal')"
+                <button type="button" @click="showModal('tags_modal')"
                     class="btn btn-ghost btn-square tooltip tooltip-bottom" data-tip="Tags"
                     aria-label="Tags">
                     <Tag :size="24" />
                 </button>
 
-                <button @click="showModal('settings_modal')"
+                <button type="button" @click="openSettings()"
                     class="btn btn-ghost btn-square tooltip tooltip-bottom" data-tip="Settings"
                     aria-label="Settings">
                     <Settings :size="24" />
                 </button>
 
-                <button @click="authStore.logout" class="btn btn-ghost btn-square tooltip tooltip-bottom hover:text-error"
+                <button type="button" @click="authStore.logout"
+                    class="btn btn-ghost btn-square tooltip tooltip-bottom hover:text-error"
                     data-tip="Logout" aria-label="Logout" :disabled="authStore.isLoading">
                     <span v-if="authStore.isLoading" class="loading loading-spinner"></span>
                     <LogOut v-else :size="24" />
@@ -100,7 +109,8 @@
                                 <button type="button"
                                     class="btn btn-ghost w-full sm:w-52 px-2 text-base sm:text-lg font-semibold gap-1 flex-nowrap"
                                     :aria-expanded="isMenuOpen" aria-haspopup="dialog">
-                                    <span class="truncate">{{ periodLabel }}</span>
+                                    <span class="truncate sm:hidden">{{ periodLabelShort }}</span>
+                                    <span class="truncate hidden sm:inline">{{ periodLabel }}</span>
                                     <ChevronDown :size="16" class="shrink-0 opacity-50 transition-transform"
                                         :class="{ 'rotate-180': isMenuOpen }" />
                                 </button>
@@ -153,73 +163,9 @@
                 </div>
             </div>
 
-            <div class="mb-4 -mx-4 px-4 overflow-x-auto">
-                <div class="tabs tabs-box gap-2 p-0 w-max min-w-full sm:w-auto sm:min-w-0" role="radiogroup"
-                    aria-label="Main views">
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === Analytics"
-                            @change="selectedTab = Analytics" />
-
-                        <Presentation :size="22" />
-
-                        Analytics
-                    </label>
-
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === CalendarTab"
-                            @change="selectedTab = CalendarTab" />
-
-                        <CalendarDays :size="22" />
-
-                        Calendar
-                    </label>
-
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === Budgets"
-                            @change="selectedTab = Budgets" />
-
-                        <PiggyBank :size="22" />
-
-                        Budgets
-                    </label>
-
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === TagDistribution"
-                            @change="selectedTab = TagDistribution" />
-
-                        <Tags :size="22" />
-
-                        Tags
-                    </label>
-
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === MoneyFlow"
-                            @change="selectedTab = MoneyFlow" />
-
-                        <ArrowLeftRight :size="22" />
-
-                        Flow
-                    </label>
-
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === BalanceTrend"
-                            @change="selectedTab = BalanceTrend" />
-
-                        <TrendingUp :size="22" />
-
-                        Trend
-                    </label>
-
-                    <label class="tab gap-1 text-base sm:text-lg font-medium hover:text-info shrink-0">
-                        <input type="radio" name="tabs_main" class="tab" :checked="selectedTab === TableTab"
-                            @change="selectedTab = TableTab" />
-
-                        <Table :size="22" />
-
-                        List
-                    </label>
-                </div>
-            </div>
+            <GroupedTabs :groups="viewGroups" :model-value="currentKey" @update:model-value="goView" />
+            <GroupSegments :groups="viewGroups" :active-group="activeGroup" :model-value="currentKey"
+                @update:model-value="goView" />
 
             <!-- First data load: a loader instead of the tab (its empty state would flash). Invisible for the
                  first LOADER_DELAY_MS so fast loads show nothing. -->
@@ -230,6 +176,13 @@
         </main>
 
         <AppFooter />
+
+        <GroupDock v-if="authStore.isAuthenticated" :groups="viewGroups" :active-group="activeGroup"
+            v-model:more-open="moreOpen" @select-group="selectGroup" @add="showModal('transactions_add_modal')"
+            @import="goImport(); moreOpen = false" @recurring="showModal('recurring_modal'); moreOpen = false"
+            @settings="openSettings(); moreOpen = false" @assistant="agentStore.toggle(); moreOpen = false"
+            @tags="showModal('tags_modal'); moreOpen = false" @feedback="showModal('support_modal'); moreOpen = false"
+            @logout="authStore.logout" />
     </div>
 </template>
 
@@ -246,6 +199,7 @@ import {
     ChevronLeft,
     ChevronRight,
     CircleHelp,
+    LayoutDashboard,
     LogIn,
     LogOut,
     PiggyBank,
@@ -264,8 +218,12 @@ import { computed, defineAsyncComponent, markRaw, nextTick, onMounted, provide, 
 import AgentDrawer from './components/AgentDrawer.vue'
 import AppFooter from './components/AppFooter.vue'
 import BootLoader from './components/BootLoader.vue'
+import GroupDock from './components/GroupDock.vue'
+import GroupSegments from './components/GroupSegments.vue'
+import GroupedTabs from './components/GroupedTabs.vue'
 import ImportView from './components/ImportView.vue'
 import PopoverMenu from './components/PopoverMenu.vue'
+import SettingsDrawer from './components/SettingsDrawer.vue'
 import TagPicker from './components/TagPicker.vue'
 import Toasts from './components/Toasts.vue'
 import WhatsNewModal from './components/WhatsNewModal.vue'
@@ -277,7 +235,6 @@ import OnboardingModal from './modals/OnboardingModal.vue'
 import RecurringAddModal from './modals/RecurringAddModal.vue'
 import RecurringEditModal from './modals/RecurringEditModal.vue'
 import RecurringModal from './modals/RecurringModal.vue'
-import SettingsModal from './modals/SettingsModal.vue'
 import SupportModal from './modals/SupportModal.vue'
 import TagsAddModal from './modals/TagsAddModal.vue'
 import TagsEditModal from './modals/TagsEditModal.vue'
@@ -290,7 +247,7 @@ import { bootstrapStores, isBootstrapping } from './services/bootstrap.js'
 import { useBudgetsStore } from './services/budgets.js'
 import { resetCachedNotice } from './services/cache.js'
 import { parseLocalDate } from './services/formatters.js'
-import { showModal } from './services/modal.js'
+import { closeSettings, openSettingsTab, showModal } from './services/modal.js'
 import { shouldShowOnboarding } from './services/onboarding.js'
 import { useRecurringTransactionsStore } from './services/recurringTransactions.js'
 import { useTagsStore } from './services/tags.js'
@@ -352,6 +309,90 @@ const importRoute = ref(parseImportRoute())
 window.addEventListener('popstate', () => {
     importRoute.value = parseImportRoute()
 })
+
+
+const viewItems = {
+    analytics: { key: 'analytics', label: 'Analytics', icon: markRaw(Presentation), tab: Analytics },
+    calendar: { key: 'calendar', label: 'Calendar', icon: markRaw(CalendarDays), tab: CalendarTab },
+    list: { key: 'list', label: 'List', icon: markRaw(Table), tab: TableTab },
+    budgets: { key: 'budgets', label: 'Budgets', icon: markRaw(PiggyBank), tab: Budgets },
+    tags: { key: 'tags', label: 'Tags', icon: markRaw(Tags), tab: TagDistribution },
+    flow: { key: 'flow', label: 'Flow', icon: markRaw(ArrowLeftRight), tab: MoneyFlow },
+    trend: { key: 'trend', label: 'Trend', icon: markRaw(TrendingUp), tab: BalanceTrend },
+}
+const viewGroups = [
+    { id: 'overview', label: 'Overview', icon: markRaw(LayoutDashboard), items: [viewItems.analytics, viewItems.calendar, viewItems.list] },
+    { id: 'plan', label: 'Plan', icon: markRaw(PiggyBank), items: [viewItems.budgets, viewItems.tags] },
+    { id: 'charts', label: 'Charts', icon: markRaw(TrendingUp), items: [viewItems.flow, viewItems.trend] },
+]
+const LAST_TABS_KEY = 'ff:last-tabs'
+const defaultLastTabs = { overview: 'analytics', plan: 'budgets', charts: 'flow' }
+const readLastTabs = () => {
+    try {
+        return { ...defaultLastTabs, ...JSON.parse(sessionStorage.getItem(LAST_TABS_KEY) || '{}') }
+    } catch {
+        return { ...defaultLastTabs }
+    }
+}
+const lastByGroup = ref(readLastTabs())
+watch(lastByGroup, (value) => sessionStorage.setItem(LAST_TABS_KEY, JSON.stringify(value)), { deep: true })
+
+const moreOpen = ref(false)
+
+const currentKey = computed(() => {
+    if (importRoute.value !== null) return 'import'
+    const found = Object.values(viewItems).find((item) => item.tab === selectedTab.value)
+    return found?.key || 'analytics'
+})
+const activeGroup = computed(() => {
+    if (importRoute.value !== null) return ''
+    const group = viewGroups.find((g) => g.items.some((item) => item.key === currentKey.value))
+    return group?.id || 'overview'
+})
+
+const leaveImport = () => {
+    if (importRoute.value === null) return
+    importRoute.value = null
+    if (window.location.pathname !== '/') {
+        window.history.pushState({}, '', '/')
+    }
+}
+
+const goView = (key) => {
+    const item = viewItems[key]
+    if (!item) return
+    selectedTab.value = item.tab
+    const group = viewGroups.find((g) => g.items.some((entry) => entry.key === key))
+    if (group) lastByGroup.value[group.id] = key
+    moreOpen.value = false
+    leaveImport()
+}
+
+const selectGroup = (id) => {
+    moreOpen.value = false
+    const key = lastByGroup.value[id] || viewGroups.find((g) => g.id === id)?.items[0]?.key
+    if (key) goView(key)
+}
+
+const goHome = () => {
+    moreOpen.value = false
+    leaveImport()
+}
+
+const openSettings = () => openSettingsTab()
+
+const goImport = () => {
+    moreOpen.value = false
+    closeSettings()
+    window.history.pushState({}, '', '/import')
+    importRoute.value = ''
+}
+
+watch(currentKey, (key) => {
+    const group = viewGroups.find((g) => g.items.some((item) => item.key === key))
+    if (group) lastByGroup.value[group.id] = key
+})
+
 
 
 watch(selectedTab, () => haptic.select())
@@ -434,6 +475,10 @@ function armLoader(busy) {
 watch(isBootstrapping, armLoader)
 
 onMounted(async () => {
+    const onKeydown = (event) => {
+        if (event.key === 'Escape') moreOpen.value = false
+    }
+    window.addEventListener('keydown', onKeydown)
     armLoader(isBootstrapping.value)
     await restoreSession()
 
@@ -620,12 +665,12 @@ const getDateRange = computed(() => {
 })
 provide('insightDateRange', getDateRange)
 
-const periodLabel = computed(() => {
+const formatPeriodLabel = (monthStyle) => {
     const { currentStart: start, currentEnd: end } = getDateRange.value
 
     if (dateSelectionType.value === 'year') return String(start.getFullYear())
     if (dateSelectionType.value === 'month') {
-        return start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        return start.toLocaleDateString('en-US', { month: monthStyle, year: 'numeric' })
     }
 
     const sameYear = start.getFullYear() === end.getFullYear()
@@ -636,7 +681,9 @@ const periodLabel = computed(() => {
     if (sameYear) return `${month(start)} ${start.getDate()} – ${month(end)} ${end.getDate()}, ${end.getFullYear()}`
 
     return `${month(start)} ${start.getDate()}, ${start.getFullYear()} – ${month(end)} ${end.getDate()}, ${end.getFullYear()}`
-})
+}
+const periodLabel = computed(() => formatPeriodLabel('long'))
+const periodLabelShort = computed(() => formatPeriodLabel('short'))
 provide('insightDateSelectionType', dateSelectionType)
 
 // Screen context for the assistant drawer: which tab, period and tag filter the user is looking at.

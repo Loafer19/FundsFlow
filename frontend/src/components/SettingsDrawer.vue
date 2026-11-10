@@ -1,21 +1,55 @@
 <template>
-    <dialog id="settings_modal" class="modal" aria-labelledby="settings_modal_title">
-        <div class="modal-box w-11/12 max-w-2xl">
-            <ModalHeader title-id="settings_modal_title" :icon="SettingsIcon">
-                Settings
-            </ModalHeader>
-
-            <div class="tabs tabs-box justify-start sm:justify-center mb-4 flex-nowrap overflow-x-auto">
-                <template v-for="(title, key) in tabs">
-                    <!-- Tighter padding + no wrap so seven tabs stay on one desktop row. -->
-                    <a class="tab shrink-0 [--tab-p:0.5rem]" @click="tab = key" :class="{ 'tab-active': tab === key }">
-                        {{ title }}
-                    </a>
-                </template>
+    <div v-if="settingsOpen" class="fixed inset-0 z-[70]" role="presentation">
+        <button type="button" class="absolute inset-0 bg-base-content/30" aria-label="Close settings"
+            @click="closeSettings"></button>
+        <aside class="absolute inset-y-0 right-0 w-full max-w-3xl bg-base-100 shadow-2xl border-l border-base-300 flex flex-col"
+            role="dialog" aria-modal="true" aria-labelledby="settings_drawer_title">
+            <div class="flex items-center gap-2 px-4 py-3 border-b border-base-300">
+                <button v-if="compact && tab" type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Back"
+                    @click="tab = ''">
+                    <ChevronLeft :size="18" />
+                </button>
+                <h2 id="settings_drawer_title" class="card-title flex-1 truncate mb-0">
+                    <SettingsIcon :size="22" class="shrink-0" />
+                    {{ compact && currentSection ? currentSection.title : 'Settings' }}
+                </h2>
+                <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Close" @click="closeSettings">
+                    <X :size="18" />
+                </button>
             </div>
 
-            <div class="modal-content">
-                <template v-if="tab === 'formatting'">
+            <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+                <ul v-if="compact && !tab" class="flex flex-col gap-1 p-3">
+                    <li v-for="item in sections" :key="item.id">
+                        <button type="button"
+                            class="w-full text-left rounded-box border border-base-300 bg-base-100 px-4 py-3 flex items-center gap-3"
+                            @click="tab = item.id">
+                            <span class="shrink-0 rounded-lg p-1.5 bg-primary/15 text-primary">
+                                <component :is="item.icon" :size="18" />
+                            </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="block font-medium">{{ item.title }}</span>
+                                <span class="block text-sm text-base-content/60">{{ item.hint }}</span>
+                            </span>
+                            <ChevronRight :size="18" class="text-base-content/40" />
+                        </button>
+                    </li>
+                </ul>
+
+                <div v-else class="flex gap-0 md:gap-6 items-start p-4 min-h-full">
+                    <nav class="hidden md:flex w-48 shrink-0 flex-col gap-1 sticky top-0" aria-label="Settings sections">
+                        <button v-for="item in sections" :key="item.id" type="button"
+                            class="btn btn-ghost justify-start gap-2 font-medium h-auto min-h-10 py-2"
+                            :class="activeSection === item.id ? 'bg-primary/15 text-primary' : 'text-base-content/80'"
+                            @click="tab = item.id">
+                            <component :is="item.icon" :size="18" />
+                            {{ item.title }}
+                        </button>
+                    </nav>
+
+                    <div class="flex-1 min-w-0">
+                        <template v-if="activeSection === 'appearance'">
+                            
                     <div class="p-3 rounded-box bg-base-200 mb-3">
                         <div class="flex items-center justify-between gap-2 mb-2">
                             <label for="formatDate" class="font-medium text-sm">Date</label>
@@ -56,10 +90,8 @@
                         </select>
                     </div>
 
-                </template>
-
-
-                <template v-else-if="tab === 'theme'">
+                
+                            
                     <template v-if="favoriteThemes.length">
                         <div class="text-xs text-base-content/60 mb-2">Favorites</div>
                         <div class="grid grid-cols-2 gap-2 mb-3">
@@ -103,9 +135,11 @@
                                 @keydown.enter.stop.prevent="toggleFavorite(theme)">☆</span>
                         </button>
                     </div>
-                </template>
+                
+                        </template>
 
-                <template v-else-if="tab === 'accounts'">
+                        <template v-else-if="activeSection === 'accounts'">
+                            
                     <div class="flex flex-col gap-2 mb-4">
                         <div class="flex items-center gap-2 p-3 rounded-box bg-base-200">
                             <span class="font-medium w-24 shrink-0">Google</span>
@@ -221,12 +255,14 @@
                             </button>
                         </div>
                     </form>
-                </template>
+                
+                        </template>
 
-                <template v-else-if="tab === 'data'">
+                        <template v-else-if="activeSection === 'data'">
+                            
                     <p class="text-sm text-base-content/60 mb-3">
                         Import a bank statement on the
-                        <a href="/import" class="link">Import preview</a>
+                        <a href="/import" class="link" @click.prevent="openImportPreview">Import preview</a>
                         page, or send the file to the assistant. Nothing is saved until you review it.
                     </p>
                     <p class="text-sm text-base-content/60 mb-3">All your data as one JSON file</p>
@@ -247,13 +283,15 @@ recurring_transactions</pre>
                             Download JSON
                         </button>
                     </div>
-                </template>
+                
+                        </template>
 
-                <BankSync v-else-if="tab === 'bank'" :key="bankKey" />
+                        <BankSync v-else-if="activeSection === 'bank'" :key="bankKey" />
 
-                <SupportRequests v-else-if="tab === 'support'" :key="supportKey" />
+                        <SupportRequests v-else-if="activeSection === 'support'" :key="supportKey" />
 
-                <template v-else-if="tab === 'report'">
+                        <template v-else-if="activeSection === 'report'">
+                            
                     <p class="text-sm text-base-content/60 mb-3 break-words whitespace-normal">{{ reportPeriodLabel }}</p>
 
                     <div class="p-3 rounded-box bg-base-200 grid grid-cols-2 gap-x-6 gap-y-2 mb-4">
@@ -280,29 +318,28 @@ recurring_transactions</pre>
                             Download PDF
                         </button>
                     </div>
-                </template>
+                
+                        </template>
+                    </div>
+                </div>
             </div>
 
-            <div class="modal-action" v-if="tab === 'formatting' || tab === 'theme'">
-                <button type="submit" class="btn btn-primary" @click="saveSettings">
+            <div v-if="activeSection === 'appearance'" class="border-t border-base-300 px-4 py-3 flex justify-end shrink-0 bg-base-100">
+                <button type="button" class="btn btn-primary" @click="saveSettings" :disabled="saving">
                     <span v-if="saving" class="loading loading-spinner"></span>
                     <Save v-else :size="20" />
                     Save
                 </button>
             </div>
-        </div>
-        <form method="dialog" class="modal-backdrop">
-            <button>close</button>
-        </form>
-    </dialog>
-
+        </aside>
+    </div>
 </template>
 
 <script setup>
-import { Bot, Download, Info, KeyRound, Save, Send, Settings as SettingsIcon } from 'lucide-vue-next'
-import { computed, inject, onMounted, ref, watch } from 'vue'
-import BankSync from '../components/BankSync.vue'
-import SupportRequests from '../components/SupportRequests.vue'
+import { Bot, ChevronLeft, ChevronRight, Database, Download, FileText, Info, KeyRound, Landmark, LifeBuoy, Palette, Save, Send, Settings as SettingsIcon, UserRound, X } from 'lucide-vue-next'
+import { computed, inject, markRaw, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import BankSync from './BankSync.vue'
+import SupportRequests from './SupportRequests.vue'
 import {
     createMcpToken,
     downloadAccountExport,
@@ -323,7 +360,7 @@ import {
     toLocalDateStr,
 } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
-import { settingsTabRequest } from '../services/modal'
+import { closeSettings, settingsOpen, settingsTabRequest } from '../services/modal'
 import { reportErrorMessage, requestReport, saveBlob } from '../services/report.js'
 import settings, {
     updateDateFormat,
@@ -336,20 +373,22 @@ import { useTagsStore } from '../services/tags'
 import { isTelegramWebApp } from '../services/telegramWebApp.js'
 import toasts from '../services/toasts'
 import { useTransactionsStore } from '../services/transactions'
-import ModalHeader from '../components/ModalHeader.vue'
 
 const authStore = useAuthStore()
 
-const tabs = ref({
-    formatting: 'Formatting',
-    theme: 'Theme',
-    accounts: 'Accounts',
-    bank: 'Bank',
-    data: 'Data',
-    report: 'Report',
-    support: 'Support',
-})
-const tab = ref('formatting')
+const sections = [
+    { id: 'appearance', title: 'Appearance', hint: 'Date, money, timezone and theme', icon: markRaw(Palette) },
+    { id: 'accounts', title: 'Accounts', hint: 'Login, linked apps, MCP and AI quota', icon: markRaw(UserRound) },
+    { id: 'bank', title: 'Bank sync', hint: 'Monobank cards and notifications', icon: markRaw(Landmark) },
+    { id: 'data', title: 'Data & import', hint: 'Upload a statement or download a backup', icon: markRaw(Database) },
+    { id: 'report', title: 'Report', hint: 'PDF or Telegram snapshot of this period', icon: markRaw(FileText) },
+    { id: 'support', title: 'Support', hint: 'Feedback and requests', icon: markRaw(LifeBuoy) },
+]
+const TAB_ALIASES = { formatting: 'appearance', theme: 'appearance' }
+const tab = ref('appearance')
+const compact = ref(typeof window !== 'undefined' && window.innerWidth < 768)
+const currentSection = computed(() => sections.find((item) => item.id === tab.value) ?? null)
+const activeSection = computed(() => tab.value || (!compact.value ? 'appearance' : ''))
 const supportKey = ref(0)
 const bankKey = ref(0)
 const exporting = ref(false)
@@ -566,32 +605,60 @@ const onModalClose = () => {
     syncFromSettings()
 }
 
-const bindModalEvents = () => {
-    const modal = document.getElementById('settings_modal')
-    if (!modal || modal.dataset.bound === '1') return
+const resolveTab = (value) => TAB_ALIASES[value] || value || ''
 
-    modal.dataset.bound = '1'
-    modal.addEventListener('close', onModalClose)
-
-    const originalShow = modal.showModal.bind(modal)
-    modal.showModal = () => {
-        syncFromSettings()
-        if (settingsTabRequest.value) {
-            tab.value = settingsTabRequest.value
-            settingsTabRequest.value = null
-        }
-        // Support: reload the requests on every open (a reply may have come in).
-        supportKey.value++
-        bankKey.value++
-        if (tab.value === 'accounts') {
-            refreshMcpTokenStatus()
-            refreshAiQuota()
-        }
-        originalShow()
+const openDrawer = () => {
+    syncFromSettings()
+    const requested = settingsTabRequest.value
+    settingsTabRequest.value = null
+    if (requested) {
+        tab.value = resolveTab(requested)
+    } else if (compact.value) {
+        tab.value = ''
+    } else if (!tab.value) {
+        tab.value = 'appearance'
+    }
+    supportKey.value++
+    bankKey.value++
+    if (activeSection.value === 'accounts') {
+        refreshMcpTokenStatus()
+        refreshAiQuota()
     }
 }
 
-onMounted(bindModalEvents)
+const onKeydown = (event) => {
+    if (event.key === 'Escape' && settingsOpen.value) {
+        event.stopPropagation()
+        closeSettings()
+    }
+}
+
+const syncCompact = () => {
+    compact.value = window.innerWidth < 768
+}
+
+onMounted(() => {
+    syncCompact()
+    window.addEventListener('resize', syncCompact)
+    document.addEventListener('keydown', onKeydown)
+    if (settingsOpen.value) openDrawer()
+})
+
+onBeforeUnmount(() => {
+    window.removeEventListener('resize', syncCompact)
+    document.removeEventListener('keydown', onKeydown)
+})
+
+watch(settingsOpen, (open) => {
+    if (open) openDrawer()
+    else onModalClose()
+})
+
+const openImportPreview = () => {
+    closeSettings()
+    window.history.pushState({}, '', '/import')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+}
 
 const formatDatePreview = computed(() => {
     const config = dateFormatMap[formatDate.value]
@@ -776,17 +843,11 @@ const saveSettings = async () => {
     saving.value = false
     toasts.success('Settings saved successfully!')
     refreshAiQuota()
-    settings_modal.close()
+    closeSettings()
 }
 </script>
 
 <style scoped>
-.modal-content {
-    max-height: 58vh;
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
 .theme-chips {
     border-radius: 0.35rem;
     overflow: hidden;
