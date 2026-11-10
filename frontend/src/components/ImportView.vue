@@ -105,8 +105,12 @@
             </div>
 
             <div v-if="batch.by_tag?.length" class="flex flex-wrap gap-2 mb-4">
-                <span v-for="item in batch.by_tag.slice(0, 12)" :key="item.tag_id ?? 'none'" class="badge badge-ghost gap-1">
-                    {{ item.emoji }} {{ item.title }} · {{ item.count }}
+                <span v-for="item in batch.by_tag.slice(0, 12)" :key="item.tag_id ?? 'none'"
+                    class="badge badge-soft px-1 gap-1"
+                    :class="item.tag_id ? 'badge-info' : ''">
+                    <span v-if="item.emoji">{{ item.emoji }}</span>
+                    <span>{{ item.title }}</span>
+                    <span class="tabular-nums opacity-70">{{ item.count }}</span>
                 </span>
             </div>
 
@@ -130,40 +134,68 @@
             <div v-if="batch.isMutable !== false && ['previewing', 'failed'].includes(batch.status)"
                 class="card card-border border-base-300 bg-base-100 mb-4">
                 <div class="card-body p-4 gap-3">
-                    <h2 class="font-semibold">Bulk rules</h2>
-                    <div class="flex flex-wrap gap-2 items-end">
-                        <label class="form-control">
-                            <span class="label-text text-xs">Merchant contains</span>
-                            <input v-model="ruleMerchant" class="input input-sm input-bordered" placeholder="Glovo" />
-                        </label>
-                        <label class="form-control">
-                            <span class="label-text text-xs">Tag</span>
-                            <input v-model="ruleTag" class="input input-sm input-bordered" placeholder="Food" list="import-tag-titles" />
-                        </label>
-                        <button type="button" class="btn btn-sm btn-outline" :disabled="busy || !ruleMerchant || !ruleTag" @click="applyMerchant">
-                            Apply
-                        </button>
+                    <div class="flex items-start gap-2">
+                        <span class="shrink-0 rounded-lg p-1.5 bg-primary/15 text-primary mt-0.5">
+                            <ListFilter :size="16" />
+                        </span>
+                        <div class="min-w-0">
+                            <h2 class="font-semibold">Bulk rules</h2>
+                            <p class="text-sm text-base-content/60">
+                                Tag a shop in one go, or skip old rows and transfers before you import.
+                            </p>
+                        </div>
                     </div>
-                    <div class="flex flex-wrap gap-2 items-end">
-                        <label class="form-control">
-                            <span class="label-text text-xs">Skip before</span>
-                            <input v-model="ruleBefore" type="date" class="input input-sm input-bordered" />
-                        </label>
-                        <button type="button" class="btn btn-sm btn-outline" :disabled="busy || !ruleBefore" @click="applyBefore">Skip</button>
-                        <label class="form-control">
-                            <span class="label-text text-xs">Skip name</span>
-                            <input v-model="ruleSkipName" class="input input-sm input-bordered" placeholder="Olya" />
-                        </label>
-                        <button type="button" class="btn btn-sm btn-outline" :disabled="busy || !ruleSkipName" @click="applySkipName">Skip</button>
-                        <label class="label cursor-pointer gap-2">
-                            <input type="checkbox" class="toggle toggle-sm" :checked="!!batch.options?.include_foreign" @change="toggleForeign" />
-                            <span class="label-text text-sm">Include non-UAH</span>
-                        </label>
+                    <div class="divide-y divide-base-300">
+                        <div class="flex flex-wrap items-center gap-2 py-2">
+                            <span class="font-medium min-w-28">Tag merchants</span>
+                            <input v-model="ruleMerchant" class="input input-sm input-bordered w-40"
+                                placeholder="Glovo" aria-label="Merchant contains" />
+                            <button type="button"
+                                class="btn btn-sm border-base-300 gap-2 font-normal min-w-36 justify-start"
+                                :class="ruleTag ? 'text-base-content' : 'text-base-content/50'"
+                                :disabled="!editable" aria-label="Choose merchant tag"
+                                @click="openRulePicker($event)">
+                                <span v-if="ruleTag" class="badge badge-soft badge-info px-1 gap-1">
+                                    <span>{{ ruleTag.emoji }}</span>
+                                    <span>{{ ruleTag.title }}</span>
+                                </span>
+                                <span v-else>Choose tag</span>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-primary"
+                                :disabled="busy || !canApplyMerchant" @click="applyMerchant">
+                                Apply
+                            </button>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 py-2">
+                            <span class="font-medium min-w-28">Skip</span>
+                            <span class="text-xs text-base-content/50">before</span>
+                            <input v-model="ruleBefore" type="date" class="input input-sm input-bordered"
+                                aria-label="Skip rows before" />
+                            <span class="text-xs text-base-content/50">name contains</span>
+                            <input v-model="ruleSkipName" class="input input-sm input-bordered w-40"
+                                placeholder="Olya" aria-label="Skip name contains" />
+                            <button type="button" class="btn btn-sm btn-soft"
+                                :disabled="busy || !canSkip" @click="applySkip">
+                                Skip
+                            </button>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3 py-2">
+                            <span class="font-medium min-w-28">Currency</span>
+                            <label class="label cursor-pointer gap-3 py-0 justify-start">
+                                <input type="checkbox" class="toggle toggle-sm"
+                                    :checked="!!batch.options?.include_foreign"
+                                    :disabled="busy || !editable" @change="toggleForeign" />
+                                <span>
+                                    <span class="label-text">Include non-UAH rows</span>
+                                    <span class="block text-xs text-base-content/50 font-normal">Also import amounts in other currencies</span>
+                                </span>
+                            </label>
+                        </div>
                     </div>
-                    <datalist id="import-tag-titles">
-                        <option v-for="tag in tagsStore.tags" :key="tag.id" :value="tag.title" />
-                    </datalist>
-                    <p class="text-xs text-base-content/60">Or tell the assistant “Glovo is Food, skip transfers to Olya”.</p>
+                    <p class="text-xs text-base-content/60 flex items-start gap-1.5">
+                        <Sparkles :size="14" class="shrink-0 mt-px opacity-70" />
+                        <span>Or tell the assistant “Glovo is Food, skip transfers to Olya”.</span>
+                    </p>
                 </div>
             </div>
 
@@ -302,6 +334,7 @@ import {
     CalendarDays,
     Copy,
     List,
+    ListFilter,
     Pencil,
     Sparkles,
     Tags,
@@ -333,7 +366,7 @@ const statusFilter = ref('all')
 const search = ref('')
 const page = ref(1)
 const ruleMerchant = ref('')
-const ruleTag = ref('')
+const ruleTagId = ref(null)
 const ruleBefore = ref('')
 const ruleSkipName = ref('')
 const fileInput = ref(null)
@@ -378,6 +411,9 @@ const filters = computed(() => {
         { id: 'error', label: 'Errors', count: s.error || 0 },
     ]
 })
+const ruleTag = computed(() => (ruleTagId.value == null ? null : tagsStore.tags.find((tag) => Number(tag.id) === Number(ruleTagId.value)) || null))
+const canApplyMerchant = computed(() => Boolean(ruleMerchant.value.trim() && ruleTag.value))
+const canSkip = computed(() => Boolean(ruleBefore.value || ruleSkipName.value.trim()))
 const isIncluded = (row) => ['new', 'needs_tag'].includes(row.status)
 const visibleToggleable = computed(() => (batch.value?.rows || []).filter((row) => row.status !== 'error'))
 const allVisibleIncluded = computed(() => visibleToggleable.value.length > 0 && visibleToggleable.value.every(isIncluded))
@@ -451,9 +487,10 @@ const onFile = async (event) => {
 }
 
 const applyMerchant = async () => {
-    await runRules({ merchant_map: { [ruleMerchant.value]: ruleTag.value } })
+    if (!canApplyMerchant.value) return
+    await runRules({ merchant_map: { [ruleMerchant.value.trim()]: ruleTag.value.title } })
     ruleMerchant.value = ''
-    ruleTag.value = ''
+    ruleTagId.value = null
 }
 const onCategoryAction = async (cat, action) => {
     if (action === 'map') {
@@ -473,11 +510,13 @@ const onCategoryRename = async (cat, title) => {
     if (!name) return
     await runRules({ category: cat.name, category_action: 'create', title: name })
 }
-const applyBefore = async () => {
-    await runRules({ skip_before: ruleBefore.value })
-}
-const applySkipName = async () => {
-    await runRules({ skip_names: [ruleSkipName.value] })
+const applySkip = async () => {
+    if (!canSkip.value) return
+    const rules = {}
+    if (ruleBefore.value) rules.skip_before = ruleBefore.value
+    if (ruleSkipName.value.trim()) rules.skip_names = [ruleSkipName.value.trim()]
+    await runRules(rules)
+    ruleBefore.value = ''
     ruleSkipName.value = ''
 }
 const toggleForeign = async (event) => {
@@ -513,7 +552,9 @@ const placeMenu = (event) => {
 const menuKey = (menu) => {
     if (!menu) return ''
     const ids = (menu.ids || []).map(Number).join(',')
-    return menu.kind === 'row' ? `row:${menu.rowId}:${ids}` : `cat:${menu.name}:${ids}`
+    if (menu.kind === 'row') return `row:${menu.rowId}:${ids}`
+    if (menu.kind === 'category') return `cat:${menu.name}:${ids}`
+    return `rule:${ids}`
 }
 
 const resolveTags = (ids) =>
@@ -529,6 +570,13 @@ const openRowPicker = (row, event) => {
 const openCategoryPicker = (cat, event) => {
     const ids = cat.tag_id ? [Number(cat.tag_id)] : []
     const menu = { kind: 'category', name: cat.name, tagId: cat.tag_id ? Number(cat.tag_id) : null, ids, ...placeMenu(event) }
+    savedMenuKey.value = menuKey(menu)
+    tagMenu.value = menu
+}
+
+const openRulePicker = (event) => {
+    const ids = ruleTagId.value ? [Number(ruleTagId.value)] : []
+    const menu = { kind: 'rule', ids, ...placeMenu(event) }
     savedMenuKey.value = menuKey(menu)
     tagMenu.value = menu
 }
@@ -549,6 +597,16 @@ const applyMenuTags = async (menu, ids) => {
         menu.ids = [Number(next)]
         savedMenuKey.value = menuKey(menu)
         await runRules({ category: menu.name, category_action: 'map', tag_id: Number(next) })
+        return
+    }
+
+    if (menu.kind === 'rule') {
+        const current = ruleTagId.value ? Number(ruleTagId.value) : null
+        const next = ids.find((id) => id !== current) ?? ids[ids.length - 1]
+        ruleTagId.value = next ? Number(next) : null
+        menu.ids = next ? [Number(next)] : []
+        savedMenuKey.value = menuKey(menu)
+        if (next) closeTagMenu()
         return
     }
 

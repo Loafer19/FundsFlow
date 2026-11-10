@@ -229,10 +229,10 @@
             </template>
         </main>
 
-        <AppFooter :with-fab="authStore.isAuthenticated" />
+        <AppFooter :with-fab="authStore.isAuthenticated && importRoute === null" />
     </div>
 
-    <button v-if="authStore.isAuthenticated" type="button"
+    <button v-if="authStore.isAuthenticated && importRoute === null" type="button"
         class="btn btn-primary btn-circle btn-lg fixed bottom-6 right-6 z-50"
         @click="showModal('transactions_add_modal')" aria-label="Add Transaction">
         <Plus :size="28" />
