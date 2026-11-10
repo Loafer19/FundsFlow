@@ -1,36 +1,34 @@
 <template>
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+        <label v-if="dateRangeTransactions.length" class="input input-sm min-w-0 flex-1 max-w-xs border-base-300 text-sm">
+            <Search :size="16" class="text-base-content/60" />
+            <input v-model="searchQuery" type="text" placeholder="Search notes" />
+        </label>
+
+        <span v-if="listDay" class="badge badge-info gap-1 pl-2 pr-0.5">
+            <CalendarDays :size="12" aria-hidden="true" />
+            {{ formatDate(parseLocalDate(listDay)) }}
+            <button type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="Show the whole period"
+                @click="listDay = null">
+                <X :size="12" />
+            </button>
+        </span>
+
+        <button v-if="!inReport" type="button"
+            class="btn btn-sm border-base-300 text-base-content/50 gap-1 tooltip tooltip-bottom report-hide max-sm:btn-square ml-auto"
+            data-tip="Import a bank statement"
+            aria-label="Import a bank statement"
+            @click="goToImport()">
+            <FileUp :size="16" />
+            <span class="max-sm:hidden">Import</span>
+        </button>
+    </div>
+
     <EmptyState v-if="!dateRangeTransactions.length" :icon="List" title="No transactions in this period"
         description="Nothing in this period. Add a transaction or pick another date range"
         action-label="Add Transaction" @action="openAdd" />
 
     <template v-else>
-        <div class="flex flex-wrap items-center gap-2 mb-3">
-            <label class="input input-sm min-w-0 flex-1 max-w-xs border-base-300 text-sm">
-                <Search :size="16" class="text-base-content/60" />
-                <input v-model="searchQuery" type="text" placeholder="Search notes" />
-            </label>
-
-            <span v-if="listDay" class="badge badge-info gap-1 pl-2 pr-0.5">
-                <CalendarDays :size="12" aria-hidden="true" />
-                {{ formatDate(parseLocalDate(listDay)) }}
-                <button type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="Show the whole period"
-                    @click="listDay = null">
-                    <X :size="12" />
-                </button>
-            </span>
-
-            <button v-if="!inReport" type="button"
-                class="btn btn-sm border-base-300 text-base-content/50 gap-1 tooltip tooltip-bottom report-hide max-sm:btn-square"
-                data-tip="Import a bank statement (CSV, Excel, PDF)"
-                aria-label="Import a bank statement (CSV, Excel, PDF)"
-                :disabled="importing"
-                @click="importFileInput?.click()">
-                <span v-if="importing" class="loading loading-spinner loading-xs"></span>
-                <FileUp v-else :size="16" />
-                <span class="max-sm:hidden">Import</span>
-            </button>
-            <input ref="importFileInput" type="file" class="hidden" :accept="IMPORT_FILE_ACCEPT" @change="onImportFile" />
-        </div>
 
         <EmptyState v-if="!filteredTransactions.length" :icon="Search" title="No transactions match the current filters"
             :description="listDay ? 'Try a different search term, clear the tag filter or show the whole period' : 'Try a different search term or clear the tag filter (including Untagged)'" />
@@ -227,9 +225,8 @@ import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
 import TagDetailModal from '../components/TagDetailModal.vue'
 import { today } from '../services/clock.js'
-import { apiErrorMessage, getTransactionSourceLabel, parseLocalDate, toLocalDateStr } from '../services/formatters'
-import { IMPORT_FILE_ACCEPT, startWebImport } from '../services/imports.js'
-import toasts from '../services/toasts.js'
+import { getTransactionSourceLabel, parseLocalDate, toLocalDateStr } from '../services/formatters'
+import { goToImport } from '../services/imports.js'
 import { useTransactionsStore } from '../services/transactions'
 
 const formatMoney = inject('formatMoney')
@@ -372,20 +369,4 @@ const previewAttachments = (transaction) => {
     transactionsStore.openAttachmentPreview(transaction)
 }
 
-const importFileInput = ref(null)
-const importing = ref(false)
-
-const onImportFile = async (event) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-    importing.value = true
-    try {
-        await startWebImport(file)
-    } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Could not read this file'))
-    } finally {
-        importing.value = false
-    }
-}
 </script>

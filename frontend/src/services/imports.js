@@ -2,6 +2,9 @@ import api from './api.js'
 
 const long = { timeout: 120000 }
 
+export const fetchImports = () =>
+    api.get('/imports', { timeout: 20000 }).then((res) => res.data?.data ?? res.data ?? [])
+
 export const fetchImport = (id, params = {}) =>
     api.get(`/imports/${id}`, { params, timeout: 20000 }).then((res) => res.data)
 
@@ -27,14 +30,29 @@ export const undoImport = (id) =>
 // Matches DocumentFile::EXTENSIONS / ImportController file validation.
 export const IMPORT_FILE_ACCEPT = '.csv,.tsv,.txt,.xlsx,.ods,.ofx,.qfx,.qif,.json,.html,.htm,.pdf,.docx'
 
-export const openImportPreview = (id) => {
-    window.history.pushState({}, '', `/import/${id}`)
-    window.location.assign(`/import/${id}`)
+export const IMPORT_FORMATS = [
+    { label: 'CSV, TSV or text', extensions: '.csv, .tsv, .txt' },
+    { label: 'Excel', extensions: '.xlsx' },
+    { label: 'OpenDocument', extensions: '.ods' },
+    { label: 'PDF', extensions: '.pdf' },
+    { label: 'Word', extensions: '.docx' },
+    { label: 'OFX / Quicken', extensions: '.ofx, .qfx' },
+    { label: 'QIF', extensions: '.qif' },
+    { label: 'JSON', extensions: '.json' },
+    { label: 'HTML statement', extensions: '.html, .htm' },
+]
+
+export const goToImport = (id = '') => {
+    const path = id ? `/import/${id}` : '/import'
+    window.history.pushState({}, '', path)
+    window.dispatchEvent(new PopStateEvent('popstate'))
 }
+
+export const openImportPreview = (id) => goToImport(id)
 
 // Shared start used by ImportView (the original web entry) and the List-tab Import button.
 export const startWebImport = async (file) => {
     const created = await uploadImport(file)
-    openImportPreview(created.id)
+    goToImport(created.id)
     return created
 }

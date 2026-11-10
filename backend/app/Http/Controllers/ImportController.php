@@ -18,6 +18,41 @@ use Illuminate\Validation\ValidationException;
 
 class ImportController extends Controller
 {
+    public function index(Request $request): JsonResponse
+    {
+        $batches = $request->user()->importBatches()
+            ->latest()
+            ->limit(50)
+            ->get([
+                'uuid',
+                'filename',
+                'format',
+                'source',
+                'status',
+                'total_rows',
+                'new_count',
+                'committed_at',
+                'undone_at',
+                'created_at',
+            ]);
+
+        return response()->json([
+            'data' => $batches->map(fn (ImportBatch $batch) => [
+                'id' => $batch->uuid,
+                'filename' => $batch->filename,
+                'format' => $batch->format,
+                'source' => $batch->source,
+                'status' => $batch->status,
+                'total_rows' => (int) $batch->total_rows,
+                'imported_count' => (int) $batch->new_count,
+                'can_undo' => $batch->status === ImportBatch::STATUS_COMMITTED,
+                'created_at' => $batch->created_at?->toIso8601String(),
+                'committed_at' => $batch->committed_at?->toIso8601String(),
+                'undone_at' => $batch->undone_at?->toIso8601String(),
+            ])->all(),
+        ]);
+    }
+
     public function show(Request $request, string $import): ImportBatchResource
     {
         return new ImportBatchResource($this->batch($request, $import));

@@ -20,20 +20,85 @@
             </div>
         </div>
 
-        <div v-else-if="!uuid" class="card card-border border-base-300 bg-base-100">
-            <div class="card-body gap-3">
-                <p class="text-sm text-base-content/70">
-                    Upload a bank statement or export (CSV, Excel, OFX, QIF, PDF, and more). You'll get a preview
-                    of every row before anything is saved.
+        <div v-else-if="!uuid" class="flex flex-col gap-4">
+            <div
+                class="rounded-box border-2 border-dashed px-4 py-6 sm:py-12 text-center cursor-pointer transition-colors"
+                :class="dragging ? 'border-primary bg-primary/5' : 'border-base-300 bg-base-100'"
+                role="button"
+                tabindex="0"
+                :aria-disabled="uploading"
+                aria-label="Drop a statement here or click to choose a file"
+                @click="!uploading && fileInput?.click()"
+                @keydown.enter.prevent="!uploading && fileInput?.click()"
+                @keydown.space.prevent="!uploading && fileInput?.click()"
+                @dragenter.prevent="dragging = true"
+                @dragover.prevent="dragging = true"
+                @dragleave.prevent="onDragLeave"
+                @drop.prevent="onDrop">
+                <Upload class="mx-auto mb-3 text-base-content/50" :size="28" />
+                <div class="font-medium">Drop a statement here</div>
+                <p class="text-sm text-base-content/60 mt-1">or click to choose a file</p>
+                <p class="text-xs text-base-content/50 mt-2 max-w-md mx-auto">
+                    You'll preview every row before anything is saved.
                 </p>
-                <input ref="fileInput" type="file" class="file-input file-input-bordered w-full max-w-md"
-                    :accept="IMPORT_FILE_ACCEPT"
-                    @change="onFile" />
-                <p v-if="uploadError" class="text-error text-sm">{{ uploadError }}</p>
-                <p v-if="uploading" class="text-sm flex items-center gap-2">
+                <input ref="fileInput" type="file" class="hidden" :accept="IMPORT_FILE_ACCEPT" @change="onFile" @click.stop />
+                <p v-if="uploadError" class="text-error text-sm mt-3">{{ uploadError }}</p>
+                <p v-if="uploading" class="text-sm flex items-center justify-center gap-2 mt-3">
                     <span class="loading loading-spinner loading-sm"></span>
                     Reading the file…
                 </p>
+            </div>
+
+            <div class="card card-border border-base-300 bg-base-100">
+                <div class="card-body gap-2 py-4">
+                    <h2 class="font-medium text-sm">Supported formats</h2>
+                    <ul class="flex flex-wrap gap-x-5 gap-y-3">
+                        <li v-for="format in IMPORT_FORMATS" :key="format.label" class="min-w-[8.5rem]">
+                            <div class="text-sm text-base-content/80">{{ format.label }}</div>
+                            <div class="font-mono text-xs text-base-content/50">{{ format.extensions }}</div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card card-border border-base-300 bg-base-100">
+                <div class="card-body gap-3 py-4">
+                    <div class="flex items-center justify-between gap-2">
+                        <h2 class="font-medium text-sm">Previous imports</h2>
+                        <span v-if="historyLoading" class="loading loading-spinner loading-xs"></span>
+                    </div>
+                    <p v-if="historyError" class="text-error text-sm">{{ historyError }}</p>
+                    <p v-else-if="!historyLoading && !historyItems.length" class="text-sm text-base-content/60">
+                        No previous imports yet.
+                    </p>
+                    <ul v-else class="flex flex-col gap-2">
+                        <li v-for="item in historyItems" :key="item.id"
+                            class="rounded-box border border-base-300 p-3 flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
+                            <div class="min-w-0 flex-1">
+                                <div class="font-medium truncate" :title="item.filename">{{ item.filename || 'Untitled file' }}</div>
+                                <div class="text-sm text-base-content/60">
+                                    {{ historyDate(item) }}
+                                    <span aria-hidden="true"> · </span>
+                                    {{ historyCounts(item) }}
+                                </div>
+                            </div>
+                            <span class="badge badge-soft w-fit shrink-0" :class="historyStatusBadge(item.status)">
+                                {{ historyStatusLabel(item.status) }}
+                            </span>
+                            <div class="flex flex-wrap gap-1 sm:ml-auto">
+                                <button type="button" class="btn btn-outline btn-xs" @click="openBatch(item.id)">
+                                    Open
+                                </button>
+                                <button v-if="item.can_undo" type="button" class="btn btn-outline btn-error btn-xs"
+                                    :disabled="undoingId === item.id"
+                                    @click="undoBatch(item)">
+                                    <span v-if="undoingId === item.id" class="loading loading-spinner loading-xs"></span>
+                                    Undo
+                                </button>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
 
@@ -335,11 +400,12 @@ import {
     Tags,
     TrendingDown,
     TrendingUp,
+    Upload,
 } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAuthStore } from '../services/auth.js'
 import { apiErrorMessage, formatDate, formatMoney, parseLocalDate } from '../services/formatters.js'
-import { applyImportRules, commitImport, fetchImport, IMPORT_FILE_ACCEPT, startWebImport, undoImport, updateImportRow } from '../services/imports.js'
+import { applyImportRules, commitImport, fetchImport, fetchImports, goToImport, IMPORT_FILE_ACCEPT, IMPORT_FORMATS, startWebImport, undoImport, updateImportRow } from '../services/imports.js'
 import { showModal } from '../services/modal.js'
 import { useTagsStore } from '../services/tags.js'
 import toasts from '../services/toasts.js'
@@ -365,6 +431,11 @@ const loading = ref(false)
 const loadError = ref('')
 const uploadError = ref('')
 const uploading = ref(false)
+const dragging = ref(false)
+const historyItems = ref([])
+const historyLoading = ref(false)
+const historyError = ref('')
+const undoingId = ref('')
 const busy = ref(false)
 const statusFilter = ref('all')
 const search = ref('')
@@ -389,7 +460,7 @@ const importableCount = computed(() => {
     return s ? s.new + s.needs_tag : 0
 })
 const editable = computed(() => ['previewing', 'failed'].includes(batch.value?.status))
-const pageTitle = computed(() => batch.value?.filename || 'Import preview')
+const pageTitle = computed(() => props.uuid ? (batch.value?.filename || 'Import preview') : 'Import')
 const batchStatusLabel = computed(() => {
     switch (batch.value?.status) {
         case 'committing':
@@ -496,17 +567,102 @@ const setFilter = (id) => {
     reload()
 }
 
-const onFile = async (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+const startSelectedFile = async (file) => {
+    if (!file || uploading.value) return
     uploading.value = true
     uploadError.value = ''
+    dragging.value = false
     try {
         await startWebImport(file)
     } catch (error) {
         uploadError.value = apiErrorMessage(error, 'Could not read this file')
     } finally {
         uploading.value = false
+        if (fileInput.value) fileInput.value.value = ''
+    }
+}
+
+const onFile = (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    startSelectedFile(file)
+}
+
+const onDragLeave = (event) => {
+    if (event.currentTarget.contains(event.relatedTarget)) return
+    dragging.value = false
+}
+
+const onDrop = (event) => {
+    dragging.value = false
+    startSelectedFile(event.dataTransfer?.files?.[0])
+}
+
+const loadHistory = async () => {
+    if (props.uuid || !authStore.isAuthenticated) return
+    historyLoading.value = !historyItems.value.length
+    historyError.value = ''
+    try {
+        historyItems.value = await fetchImports()
+    } catch (error) {
+        historyError.value = apiErrorMessage(error, 'Could not load previous imports')
+    } finally {
+        historyLoading.value = false
+    }
+}
+
+const historyStatusLabel = (status) => ({
+    committing: 'Importing…',
+    committed: 'Imported',
+    undone: 'Undone',
+    failed: 'Failed',
+    previewing: 'Draft',
+}[status] || 'Draft')
+
+const historyStatusBadge = (status) => ({
+    committing: 'badge-info',
+    committed: 'badge-success',
+    undone: 'badge-ghost',
+    failed: 'badge-error',
+    previewing: 'badge-warning',
+}[status] || 'badge-ghost')
+
+const historyDate = (item) => {
+    const raw = item.committed_at || item.created_at
+    if (!raw) return '—'
+    try {
+        return formatDate(new Date(raw))
+    } catch {
+        return raw
+    }
+}
+
+const historyCounts = (item) => {
+    const rows = Number(item.total_rows) || 0
+    const imported = Number(item.imported_count) || 0
+    if (item.status === 'committed' || item.status === 'undone') {
+        return `${rows} row${rows === 1 ? '' : 's'} · ${imported} imported`
+    }
+    if (imported) {
+        return `${rows} row${rows === 1 ? '' : 's'} · ${imported} to import`
+    }
+    return `${rows} row${rows === 1 ? '' : 's'}`
+}
+
+const openBatch = (id) => goToImport(id)
+
+const undoBatch = async (item) => {
+    if (!item?.can_undo || undoingId.value) return
+    if (!confirm('Delete every transaction created by this import?')) return
+    undoingId.value = item.id
+    try {
+        await undoImport(item.id)
+        toasts.success('Import undone')
+        await loadHistory()
+    } catch (error) {
+        toasts.error(apiErrorMessage(error, 'Could not undo this import'))
+    } finally {
+        undoingId.value = ''
     }
 }
 
@@ -749,10 +905,14 @@ watch(() => props.uuid, () => {
     batch.value = null
     page.value = 1
     closeTagMenu()
-    reload()
+    if (props.uuid) reload()
+    else loadHistory()
 })
 
-onMounted(reload)
+onMounted(() => {
+    if (props.uuid) reload()
+    else loadHistory()
+})
 onUnmounted(() => {
     stopPoll()
     closeTagMenu()

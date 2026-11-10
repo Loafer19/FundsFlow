@@ -113,6 +113,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->middleware('throttle:6,1,mono-sync:');
     Route::delete('/monobank', [MonobankController::class, 'destroy']);
 
+    Route::get('/imports', [ImportController::class, 'index']);
     Route::get('/imports/{import}', [ImportController::class, 'show'])
         ->where('import', '[0-9a-fA-F-]{36}');
     Route::post('/imports', [ImportController::class, 'store'])

@@ -4,7 +4,7 @@
             @click="closeSettings"></button>
         <aside class="absolute inset-y-0 right-0 w-full max-w-3xl bg-base-100 shadow-2xl border-l border-base-300 flex flex-col"
             role="dialog" aria-modal="true" aria-labelledby="settings_drawer_title">
-            <div class="flex items-center gap-2 px-4 py-3 border-b border-base-300">
+            <div class="flex items-center gap-2 px-4 py-3 border-b border-base-300 shrink-0 bg-base-100 z-10">
                 <button v-if="compact && tab" type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Back"
                     @click="tab = ''">
                     <ChevronLeft :size="18" />
@@ -18,8 +18,7 @@
                 </button>
             </div>
 
-            <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-                <ul v-if="compact && !tab" class="flex flex-col gap-1 p-3">
+            <ul v-if="compact && !tab" class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col gap-1 p-3">
                     <li v-for="item in sections" :key="item.id">
                         <button type="button"
                             class="w-full text-left rounded-box border border-base-300 bg-base-100 px-4 py-3 flex items-center gap-3"
@@ -36,8 +35,8 @@
                     </li>
                 </ul>
 
-                <div v-else class="flex gap-0 md:gap-6 items-start p-4 min-h-full">
-                    <nav class="hidden md:flex w-48 shrink-0 flex-col gap-1 sticky top-0" aria-label="Settings sections">
+            <div v-else class="flex flex-1 min-h-0">
+                    <nav class="hidden md:flex w-48 shrink-0 flex-col gap-1 overflow-y-auto p-4 pr-0" aria-label="Settings sections">
                         <button v-for="item in sections" :key="item.id" type="button"
                             class="btn btn-ghost justify-start gap-2 font-medium h-auto min-h-10 py-2"
                             :class="activeSection === item.id ? 'bg-primary/15 text-primary' : 'text-base-content/80'"
@@ -47,7 +46,7 @@
                         </button>
                     </nav>
 
-                    <div class="flex-1 min-w-0">
+                    <div class="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden p-4">
                         <template v-if="activeSection === 'appearance'">
                             
                     <div class="p-3 rounded-box bg-base-200 mb-3">
@@ -138,9 +137,24 @@
                 
                         </template>
 
-                        <template v-else-if="activeSection === 'accounts'">
-                            
-                    <div class="flex flex-col gap-2 mb-4">
+                        <template v-else-if="activeSection === 'account'">
+                    <form @submit.prevent="saveCredentials" class="mb-4">
+                        <div class="font-medium text-sm mb-2">Login credentials</div>
+                        <input v-model="credentialsForm.email" type="email" placeholder="Email" aria-label="Email"
+                            class="input w-full mb-4" maxlength="255" required />
+                        <input v-model="credentialsForm.password" type="password" placeholder="New password"
+                            aria-label="New password" class="input w-full mb-4" minlength="8" maxlength="255"
+                            required />
+                        <div class="flex justify-end">
+                            <button type="submit" class="btn btn-primary btn-sm" :disabled="savingCredentials">
+                                <span v-if="savingCredentials" class="loading loading-spinner loading-xs"></span>
+                                <KeyRound v-else :size="20" />
+                                Save
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="flex flex-col gap-2">
                         <div class="flex items-center gap-2 p-3 rounded-box bg-base-200">
                             <span class="font-medium w-24 shrink-0">Google</span>
                             <span v-if="googleIdentity" class="badge badge-success badge-sm">Linked</span>
@@ -148,7 +162,6 @@
                             <span v-if="googleLabel" class="ml-auto text-xs text-base-content/50 truncate max-w-[40%]"
                                 :title="googleLabel">{{ googleLabel }}</span>
                         </div>
-
                         <div class="flex items-center gap-2 p-3 rounded-box bg-base-200">
                             <span class="font-medium w-24 shrink-0">GitHub</span>
                             <span v-if="githubIdentity" class="badge badge-success badge-sm">Linked</span>
@@ -156,74 +169,78 @@
                             <span v-if="githubLabel" class="ml-auto text-xs text-base-content/50 truncate max-w-[40%]"
                                 :title="githubLabel">{{ githubLabel }}</span>
                         </div>
+                    </div>
+                        </template>
 
-                        <div class="flex items-center gap-2 p-3 rounded-box bg-base-200">
-                            <span class="font-medium w-24 shrink-0">Telegram</span>
-                            <template v-if="telegramIdentity">
-                                <span class="badge badge-success badge-sm">Linked</span>
-                                <span v-if="telegramLinkLabel"
-                                    class="ml-auto text-xs text-base-content/50 truncate max-w-[40%]"
-                                    :title="telegramLinkLabel">{{ telegramLinkLabel }}</span>
-                            </template>
-                            <template v-else>
-                                <span class="badge badge-ghost badge-sm">Not linked</span>
-                                <button type="button" class="btn btn-primary btn-xs ml-auto"
-                                    @click="openTelegramLink" :disabled="generatingTelegramLink"
-                                    title="Link Telegram to add transactions from chat">
-                                    Open Bot
-                                    <span v-if="generatingTelegramLink"
-                                        class="loading loading-spinner loading-xs"></span>
-                                    <Send v-else :size="14" />
-                                </button>
-                            </template>
+                        <template v-else-if="activeSection === 'connections'">
+                    <div class="flex items-center gap-2 p-3 rounded-box bg-base-200 mb-3">
+                        <span class="font-medium w-24 shrink-0">Telegram</span>
+                        <template v-if="telegramIdentity">
+                            <span class="badge badge-success badge-sm">Linked</span>
+                            <span v-if="telegramLinkLabel"
+                                class="ml-auto text-xs text-base-content/50 truncate max-w-[40%]"
+                                :title="telegramLinkLabel">{{ telegramLinkLabel }}</span>
+                        </template>
+                        <template v-else>
+                            <span class="badge badge-ghost badge-sm">Not linked</span>
+                            <button type="button" class="btn btn-primary btn-xs ml-auto"
+                                @click="openTelegramLink" :disabled="generatingTelegramLink"
+                                title="Link Telegram to add transactions from chat">
+                                Open Bot
+                                <span v-if="generatingTelegramLink"
+                                    class="loading loading-spinner loading-xs"></span>
+                                <Send v-else :size="14" />
+                            </button>
+                        </template>
+                    </div>
+
+                    <div class="mb-4">
+                        <BankSync :key="bankKey" />
+                    </div>
+
+                    <div class="flex flex-col gap-2 p-3 rounded-box bg-base-200 mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium w-24 shrink-0 flex items-center gap-1">
+                                <Bot :size="16" aria-hidden="true" />
+                                MCP
+                            </span>
+                            <span v-if="mcpTokenActive" class="badge badge-success badge-sm">Token active</span>
+                            <span v-else class="badge badge-ghost badge-sm">No token</span>
                         </div>
-
-                        <div class="flex flex-col gap-2 p-3 rounded-box bg-base-200">
-                            <div class="flex items-center gap-2">
-                                <span class="font-medium w-24 shrink-0 flex items-center gap-1">
-                                    <Bot :size="16" aria-hidden="true" />
-                                    MCP
-                                </span>
-                                <span v-if="mcpTokenActive" class="badge badge-success badge-sm">Token active</span>
-                                <span v-else class="badge badge-ghost badge-sm">No token</span>
+                        <div class="flex items-center gap-1 text-xs text-base-content/60">
+                            <span>Personal token for MCP clients</span>
+                            <span class="tooltip before:max-w-56 before:text-left"
+                                :data-tip="mcpHint" tabindex="0" role="img" :aria-label="mcpHint">
+                                <Info :size="14" />
+                            </span>
+                        </div>
+                        <code
+                            class="block text-[11px] font-mono break-all bg-base-100 rounded-box px-2 py-1.5 text-base-content/60">{{
+                                mcpPlainToken ? mcpConnectionUrl : mcpUrl }}</code>
+                        <template v-if="mcpPlainToken">
+                            <div class="text-xs text-warning">
+                                Token is in the URL. Revoke anytime if it leaks.
                             </div>
-                            <div class="flex items-center gap-1 text-xs text-base-content/60">
-                                <span>Personal token for MCP clients</span>
-                                <span class="tooltip before:max-w-56 before:text-left"
-                                    :data-tip="mcpHint" tabindex="0" role="img" :aria-label="mcpHint">
-                                    <Info :size="14" />
-                                </span>
-                            </div>
-
-                            <code
-                                class="block text-[11px] font-mono break-all bg-base-100 rounded-box px-2 py-1.5 text-base-content/60">{{
-                                    mcpPlainToken ? mcpConnectionUrl : mcpUrl }}</code>
-                            <template v-if="mcpPlainToken">
-                                <div class="text-xs text-warning">
-                                    Token is in the URL. Revoke anytime if it leaks.
-                                </div>
-                            </template>
-                            <div class="flex flex-wrap justify-end gap-1">
-                                <button type="button" class="btn btn-outline btn-xs" :disabled="mcpTokenBusy"
-                                    @click="generateMcpToken">
-                                    <span v-if="mcpTokenBusy" class="loading loading-spinner loading-xs"></span>
-                                    {{ mcpTokenActive || mcpPlainToken ? 'Regenerate' : 'Generate token' }}
-                                </button>
-                                <button v-if="mcpPlainToken" type="button" class="btn btn-primary btn-xs"
-                                    @click="copyMcpConnectionUrl">
-                                    {{ mcpCopied === 'url' ? 'Copied' : 'Copy connection URL' }}
-                                </button>
-
-                                <button v-if="mcpTokenActive || mcpPlainToken" type="button"
-                                    class="btn btn-outline btn-error btn-xs" :disabled="mcpTokenBusy"
-                                    @click="revokeMcpTokenAction">
-                                    Revoke
-                                </button>
-                            </div>
+                        </template>
+                        <div class="flex flex-wrap justify-end gap-1">
+                            <button type="button" class="btn btn-outline btn-xs" :disabled="mcpTokenBusy"
+                                @click="generateMcpToken">
+                                <span v-if="mcpTokenBusy" class="loading loading-spinner loading-xs"></span>
+                                {{ mcpTokenActive || mcpPlainToken ? 'Regenerate' : 'Generate token' }}
+                            </button>
+                            <button v-if="mcpPlainToken" type="button" class="btn btn-primary btn-xs"
+                                @click="copyMcpConnectionUrl">
+                                {{ mcpCopied === 'url' ? 'Copied' : 'Copy connection URL' }}
+                            </button>
+                            <button v-if="mcpTokenActive || mcpPlainToken" type="button"
+                                class="btn btn-outline btn-error btn-xs" :disabled="mcpTokenBusy"
+                                @click="revokeMcpTokenAction">
+                                Revoke
+                            </button>
                         </div>
                     </div>
 
-                    <div class="p-3 rounded-box bg-base-200 mb-4">
+                    <div class="p-3 rounded-box bg-base-200">
                         <div class="flex items-center justify-between gap-2 mb-1">
                             <span class="font-medium text-sm">AI assists today</span>
                             <span v-if="aiQuotaLoading" class="loading loading-spinner loading-xs"></span>
@@ -236,64 +253,23 @@
                                 {{ aiQuotaResetLabel }}</template>
                         </p>
                     </div>
-
-                    <div class="divider text-sm text-base-content/60">Login credentials</div>
-
-                    <form @submit.prevent="saveCredentials">
-                        <input v-model="credentialsForm.email" type="email" placeholder="Email" aria-label="Email"
-                            class="input w-full mb-4" maxlength="255" autofocus required />
-
-                        <input v-model="credentialsForm.password" type="password" placeholder="New password"
-                            aria-label="New password" class="input w-full mb-4" minlength="8" maxlength="255"
-                            required />
-
-                        <div class="flex justify-end">
-                            <button type="submit" class="btn btn-primary btn-sm" :disabled="savingCredentials">
-                                Save
-                                <span v-if="savingCredentials" class="loading loading-spinner loading-xs"></span>
-                                <KeyRound v-else :size="20" />
-                            </button>
-                        </div>
-                    </form>
-                
                         </template>
 
                         <template v-else-if="activeSection === 'data'">
-                            
-                    <p class="text-sm text-base-content/60 mb-3">
-                        Import a bank statement on the
-                        <a href="/import" class="link" @click.prevent="openImportPreview">Import preview</a>
-                        page, or send the file to the assistant. Nothing is saved until you review it.
-                    </p>
-                    <p class="text-sm text-base-content/60 mb-3">All your data as one JSON file</p>
+                    <button type="button"
+                        class="w-full text-left rounded-box border border-base-300 bg-base-100 px-4 py-3 flex items-center gap-3 mb-4 hover:bg-base-200"
+                        @click="openImportPreview">
+                        <span class="shrink-0 rounded-lg p-1.5 bg-primary/15 text-primary">
+                            <FileUp :size="18" />
+                        </span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block font-medium">Import statement</span>
+                            <span class="block text-sm text-base-content/60">Review a bank file before anything is saved</span>
+                        </span>
+                    </button>
 
-                    <pre
-                        class="p-3 rounded-box bg-base-200 text-xs text-base-content/60 mb-4 font-mono leading-relaxed whitespace-pre-wrap">version,
-exported_at,
-account,
-tags,
-transactions (incl. attachment metadata),
-budgets,
-recurring_transactions</pre>
-
-                    <div v-if="!inTelegram" class="flex justify-end">
-                        <button type="button" class="btn btn-primary btn-sm" :disabled="exporting" @click="exportData">
-                            <span v-if="exporting" class="loading loading-spinner loading-xs"></span>
-                            <Download v-else :size="20" />
-                            Download JSON
-                        </button>
-                    </div>
-                
-                        </template>
-
-                        <BankSync v-else-if="activeSection === 'bank'" :key="bankKey" />
-
-                        <SupportRequests v-else-if="activeSection === 'support'" :key="supportKey" />
-
-                        <template v-else-if="activeSection === 'report'">
-                            
+                    <div class="font-medium text-sm mb-2">Report</div>
                     <p class="text-sm text-base-content/60 mb-3 break-words whitespace-normal">{{ reportPeriodLabel }}</p>
-
                     <div class="p-3 rounded-box bg-base-200 grid grid-cols-2 gap-x-6 gap-y-2 mb-4">
                         <label v-for="(title, key) in reportSectionTitles" :key="key"
                             class="flex items-center justify-between gap-3 cursor-pointer">
@@ -301,8 +277,7 @@ recurring_transactions</pre>
                             <input v-model="reportSections[key]" type="checkbox" class="toggle toggle-primary toggle-sm" />
                         </label>
                     </div>
-
-                    <div class="flex flex-wrap justify-end gap-2">
+                    <div class="flex flex-wrap justify-end gap-2 mb-6">
                         <button type="button" class="btn btn-outline btn-sm"
                             :disabled="!reportHasSection || reportBusy !== ''"
                             @click="sendReportToTelegram">
@@ -318,10 +293,28 @@ recurring_transactions</pre>
                             Download PDF
                         </button>
                     </div>
-                
-                        </template>
+
+                    <div class="font-medium text-sm mb-2">Backup</div>
+                    <p class="text-sm text-base-content/60 mb-3">All your data as one JSON file</p>
+                    <pre
+                        class="p-3 rounded-box bg-base-200 text-xs text-base-content/60 mb-4 font-mono leading-relaxed whitespace-pre-wrap">version,
+exported_at,
+account,
+tags,
+transactions (incl. attachment metadata),
+budgets,
+recurring_transactions</pre>
+                    <div v-if="!inTelegram" class="flex justify-end">
+                        <button type="button" class="btn btn-primary btn-sm" :disabled="exporting" @click="exportData">
+                            <span v-if="exporting" class="loading loading-spinner loading-xs"></span>
+                            <Download v-else :size="20" />
+                            Download JSON
+                        </button>
                     </div>
-                </div>
+                        </template>
+
+                        <SupportRequests v-else-if="activeSection === 'support'" :key="supportKey" />
+                    </div>
             </div>
 
             <div v-if="activeSection === 'appearance'" class="border-t border-base-300 px-4 py-3 flex justify-end shrink-0 bg-base-100">
@@ -336,7 +329,7 @@ recurring_transactions</pre>
 </template>
 
 <script setup>
-import { Bot, ChevronLeft, ChevronRight, Database, Download, FileText, Info, KeyRound, Landmark, LifeBuoy, Palette, Save, Send, Settings as SettingsIcon, UserRound, X } from 'lucide-vue-next'
+import { Bot, Cable, ChevronLeft, ChevronRight, Database, Download, FileUp, Info, KeyRound, LifeBuoy, Palette, Save, Send, Settings as SettingsIcon, UserRound, X } from 'lucide-vue-next'
 import { computed, inject, markRaw, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import BankSync from './BankSync.vue'
 import SupportRequests from './SupportRequests.vue'
@@ -361,6 +354,7 @@ import {
 } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
 import { closeSettings, settingsOpen, settingsTabRequest } from '../services/modal'
+import { goToImport } from '../services/imports.js'
 import { reportErrorMessage, requestReport, saveBlob } from '../services/report.js'
 import settings, {
     updateDateFormat,
@@ -378,13 +372,18 @@ const authStore = useAuthStore()
 
 const sections = [
     { id: 'appearance', title: 'Appearance', hint: 'Date, money, timezone and theme', icon: markRaw(Palette) },
-    { id: 'accounts', title: 'Accounts', hint: 'Login, linked apps, MCP and AI quota', icon: markRaw(UserRound) },
-    { id: 'bank', title: 'Bank sync', hint: 'Monobank cards and notifications', icon: markRaw(Landmark) },
-    { id: 'data', title: 'Data & import', hint: 'Upload a statement or download a backup', icon: markRaw(Database) },
-    { id: 'report', title: 'Report', hint: 'PDF or Telegram snapshot of this period', icon: markRaw(FileText) },
+    { id: 'account', title: 'Account', hint: 'Login, email, password and social logins', icon: markRaw(UserRound) },
+    { id: 'connections', title: 'Connections', hint: 'Telegram, Monobank, MCP and AI quota', icon: markRaw(Cable) },
+    { id: 'data', title: 'Data & reports', hint: 'Import a statement, export a backup, or download a report', icon: markRaw(Database) },
     { id: 'support', title: 'Support', hint: 'Feedback and requests', icon: markRaw(LifeBuoy) },
 ]
-const TAB_ALIASES = { formatting: 'appearance', theme: 'appearance' }
+const TAB_ALIASES = {
+    formatting: 'appearance',
+    theme: 'appearance',
+    accounts: 'account',
+    bank: 'connections',
+    report: 'data',
+}
 const tab = ref('appearance')
 const compact = ref(typeof window !== 'undefined' && window.innerWidth < 768)
 const currentSection = computed(() => sections.find((item) => item.id === tab.value) ?? null)
@@ -507,7 +506,7 @@ const runReport = async (delivery) => {
     } catch (error) {
         if (error?.response?.status === 422 && error.response.data?.needs_link) {
             toasts.info('Link Telegram first, then send the report again.')
-            tab.value = 'accounts'
+            tab.value = 'connections'
         } else {
             toasts.error(await reportErrorMessage(error))
         }
@@ -620,7 +619,7 @@ const openDrawer = () => {
     }
     supportKey.value++
     bankKey.value++
-    if (activeSection.value === 'accounts') {
+    if (activeSection.value === 'connections') {
         refreshMcpTokenStatus()
         refreshAiQuota()
     }
@@ -760,7 +759,7 @@ const revokeMcpTokenAction = async () => {
 }
 
 watch(tab, (next) => {
-    if (next === 'accounts') {
+    if (next === 'connections') {
         refreshMcpTokenStatus()
         refreshAiQuota()
     }
