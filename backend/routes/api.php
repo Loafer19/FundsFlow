@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BootstrapController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\IdentityController;
+use App\Http\Controllers\ImportController;
 use App\Http\Controllers\MonobankController;
 use App\Http\Controllers\MonobankWebhookController;
 use App\Http\Controllers\RecurringTransactionController;
@@ -111,6 +112,22 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/monobank/sync', [MonobankController::class, 'sync'])
         ->middleware('throttle:6,1,mono-sync:');
     Route::delete('/monobank', [MonobankController::class, 'destroy']);
+
+    Route::get('/imports/{import}', [ImportController::class, 'show'])
+        ->where('import', '[0-9a-fA-F-]{36}');
+    Route::post('/imports', [ImportController::class, 'store'])
+        ->middleware('throttle:10,1,import-create:');
+    Route::patch('/imports/{import}', [ImportController::class, 'update'])
+        ->where('import', '[0-9a-fA-F-]{36}');
+    Route::patch('/imports/{import}/rows/{row}', [ImportController::class, 'updateRow'])
+        ->where('import', '[0-9a-fA-F-]{36}')
+        ->whereNumber('row');
+    Route::post('/imports/{import}/commit', [ImportController::class, 'commit'])
+        ->where('import', '[0-9a-fA-F-]{36}')
+        ->middleware('throttle:6,1,import-commit:');
+    Route::post('/imports/{import}/undo', [ImportController::class, 'undo'])
+        ->where('import', '[0-9a-fA-F-]{36}')
+        ->middleware('throttle:6,1,import-undo:');
 
     // Support requests. New ones are also capped per hour in CreateSupportTicketAction (bot + assistant too).
     Route::get('/support/tickets', [SupportTicketController::class, 'index']);

@@ -71,6 +71,8 @@
         </header>
 
         <main>
+            <ImportView v-if="importRoute !== null" :uuid="importRoute" />
+            <template v-else>
             <div class="flex gap-2 mb-3 items-center flex-wrap">
                 <div class="join" role="radiogroup" aria-label="Date range type">
                     <button v-for="option in periodTypes" :key="option.value" type="button" role="radio"
@@ -224,6 +226,7 @@
             <BootLoader v-if="isBootstrapping" :class="{ invisible: !loaderVisible }" />
             <component v-else :is="selectedTab" :dateRange="getDateRange" :dateSelectionType
                 @jump-to-month="handleJumpToMonth" @jump-to-list="handleJumpToList" />
+            </template>
         </main>
 
         <AppFooter :with-fab="authStore.isAuthenticated" />
@@ -267,6 +270,7 @@ import { computed, defineAsyncComponent, markRaw, nextTick, onMounted, provide, 
 import AgentDrawer from './components/AgentDrawer.vue'
 import AppFooter from './components/AppFooter.vue'
 import BootLoader from './components/BootLoader.vue'
+import ImportView from './components/ImportView.vue'
 import TagPicker from './components/TagPicker.vue'
 import Toasts from './components/Toasts.vue'
 import WhatsNewModal from './components/WhatsNewModal.vue'
@@ -342,6 +346,18 @@ const dateSelectionType = ref('month')
 const datePicker = ref(null)
 const selectedRange = ref(rangeFor('month'))
 const selectedTab = ref(markRaw(Analytics))
+
+const parseImportRoute = () => {
+    const path = window.location.pathname.replace(/\/+$/, '') || '/'
+    if (path === '/import') return ''
+    const match = path.match(/^\/import\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i)
+    return match ? match[1] : null
+}
+const importRoute = ref(parseImportRoute())
+window.addEventListener('popstate', () => {
+    importRoute.value = parseImportRoute()
+})
+
 
 watch(selectedTab, () => haptic.select())
 

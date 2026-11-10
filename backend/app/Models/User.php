@@ -199,6 +199,22 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
+     * @return HasMany<ImportBatch, $this>
+     */
+    public function importBatches(): HasMany
+    {
+        return $this->hasMany(ImportBatch::class);
+    }
+
+    /**
+     * @return HasMany<ImportTemplate, $this>
+     */
+    public function importTemplates(): HasMany
+    {
+        return $this->hasMany(ImportTemplate::class);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

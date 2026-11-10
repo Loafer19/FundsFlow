@@ -181,6 +181,20 @@ export const useAgentStore = defineStore('agent', {
                     this.status = ''
                     this.upsert(data.item)
                     break
+                case 'import_preview':
+                    this.draft = ''
+                    this.status = ''
+                    this.upsert(data.item)
+                    {
+                        const url = data.item?.url
+                        if (url) {
+                            try {
+                                const path = new URL(url, window.location.origin).pathname
+                                if (window.location.pathname !== path) window.location.assign(path)
+                            } catch { /* ignore bad url */ }
+                        }
+                    }
+                    break
                 case 'confirm':
                     this.draft = ''
                     this.status = ''

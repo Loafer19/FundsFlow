@@ -1,15 +1,37 @@
 ---
 title: Files and bulk import
-description: Send statements, spreadsheets, OFX / QIF / JSON exports, bank-app screenshots, or a receipt to the assistant on the web or in Telegram, and import them in one step.
+description: Send statements, spreadsheets, OFX / QIF / JSON exports, bank-app screenshots, or a receipt to the assistant — or upload them on the Import page — then review a preview before anything is saved.
 ---
 
 If you use monobank, [connect it in Settings → Bank](/docs/help/monobank/) instead of uploading statements: new purchases arrive on their own.
 
 The assistant reads files as well as receipt photos, in the [web Assistant panel](/docs/web/assistant/) and in the
-[Telegram bot](/docs/telegram/receipts/). A file is either one receipt or a list of transactions (a bank statement, a
-spreadsheet, an export from another app). A list is shown as **one Confirm card**, and **Confirm** saves every row at
-once. You can send **up to 5 files together**. They become one import, and a transaction that appears in two files is
-imported once.
+[Telegram bot](/docs/telegram/receipts/). You can also upload a file on the dedicated **Import** page (`/import`).
+A file is either one receipt or a list of transactions (a bank statement, a spreadsheet, an export from another app).
+A list is staged as an **import preview**: you see every row, totals, duplicates and transfers *before* anything is
+saved. The assistant opens that page (and the Telegram bot sends a link to it). Nothing is written until you press
+**Import** there. You can send **up to 5 files together**. They become one import, and a transaction that appears in
+two files is imported once.
+
+## Preview page
+
+After a file is read you land on `/import/{id}`:
+
+- A summary: how many rows, the date range, expenses and income, and totals by tag.
+- **Bank categories**: each category from the file, with a default (map to a matching tag, or ignore). You can map it to one of your tags, create it as a new tag (and rename it first), or leave it ignored.
+- A table you can filter (new, duplicate, transfer, skipped, needs a tag, error) and page through.
+- Inline tag edits and bulk rules such as *all Glovo → Food* or *skip before 2025*. A tag you set on one row is kept when you later apply a bulk rule.
+- **Import** saves the new rows (large files run in the background and show progress). New tags from “create” decisions are added then.
+- **Undo import** deletes every transaction created by that batch, and any new tags it created that you are not using elsewhere.
+
+You can refine the same preview in the assistant chat (“Glovo is Food, skip transfers to Olya”) — the page refreshes.
+Saved column mappings (the header signature of each bank export) mean the next file from the same bank usually needs
+no AI, and your category choices for that bank are remembered too. The app is single-currency: non-UAH rows are skipped unless you choose to include them. Rows that look like
+transfers, or that match an existing transaction (same date, amount and a similar description, including monobank
+sync), are held back.
+
+**On Telegram**, sending a statement gets a short summary and the preview link. The bot will not import without that
+review step.
 
 ## Supported files
 
@@ -55,21 +77,16 @@ phrases like these are understood without AI. Anything else uses **one AI assist
 used one (a PDF statement or screenshots). A word or two (*October*, *Monobank card*) is treated as a label, not an
 instruction, and costs nothing. If something can't be applied, the card says so.
 
-## Tags that don't exist yet
+## Bank categories
 
-Tags in the file (a *Tags* or *Category* column, QIF categories, a FundsFlow export) are matched to your tags by name,
-ignoring case. When some don't exist, the assistant asks first:
+If the file has a category column (or QIF categories), the preview lists each name under **Bank categories**. A name
+that matches one of your tags — or a common Ukrainian / Russian equivalent, such as *Продукти* → Groceries or
+*Кафе та ресторани* → Restaurants — is mapped automatically. Anything else is ignored, so those rows stay untagged
+unless a merchant rule (for example *all Glovo → Food*) applies.
 
-> 🏷 These tags don't exist yet: **Cafe** (12 rows), **Taxi** (3 rows). Create them, import without them, or map them
-> to your tags (e.g. *Cafe → Food*)?
-
-- Press **Create them** or **Import without tags** (buttons on the web and in Telegram), or **Cancel**.
-- Or just write the answer: *create Cafe, Taxi → Transport*, *Cafe → Food, the rest without tags*. Other edits work
-  here too (*and skip Rent*).
-- Then the Confirm card appears, with **🆕 Will create tags: …** if any. Nothing is created until you press
-  **Confirm**; new tags get the 🏷 emoji, which you can change later.
-- If you said *create the tags if needed* with the files, the question is skipped. After three replies that don't
-  settle it, the remaining unknown tags are left out.
+You can change any category: map it to an existing tag, create it as a new tag (you can type a different name), or
+ignore it. New tags are created only when you press **Import**, and they are removed again if you undo the import and
+nothing else uses them. A tag you set on a single row is not overwritten by later category or merchant rules.
 
 Tags the AI only guessed (from a PDF or screenshots) are never created on their own: they're kept if you have them.
 Rows that have no tags get **suggestions from your history**: when you've saved the same note before (*Silpo*), the

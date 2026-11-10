@@ -4,6 +4,7 @@ namespace App\Actions\Agent\Web;
 
 use App\Actions\Agent\AgentChannel;
 use App\Actions\Agent\AgentPlanningTools;
+use App\Actions\Imports\ImportAgentTools;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Charts\BuildUserChartAction;
 use App\Actions\Report\BuildUserReportAction;
@@ -61,6 +62,13 @@ final class WebAgentChannel implements AgentChannel
         'delete_recurring' => 'Preparing recurring delete',
         'create_support_ticket' => 'Preparing support request',
         'read_receipt' => 'Reading receipt',
+        'get_import_preview' => 'Reading import preview',
+        'list_import_categories' => 'Reading import categories',
+        'set_import_category' => 'Updating import categories',
+        'apply_import_rules' => 'Updating the import',
+        'update_import_row' => 'Updating an import row',
+        'commit_import' => 'Importing transactions',
+        'undo_import' => 'Undoing import',
     ];
 
     /** Web app tabs the drawer may report as screen context. */
@@ -175,6 +183,7 @@ PROMPT;
             $this->tools->definition('update_transaction'),
             $this->tools->definition('delete_transaction'),
             $this->tools->definition('create_budget'),
+            ...ImportAgentTools::definitions(),
             ...$this->planningDefinitions(read: false),
         ];
     }
@@ -268,6 +277,7 @@ PROMPT;
                 'update_transaction' => $this->stage('update_transaction', $tools->prepareUpdateTransaction($user, $arguments)),
                 'delete_transaction' => $this->stage('delete_transaction', $tools->prepareDeleteTransaction($user, $arguments)),
                 'create_budget' => $this->stage('create_budget', $tools->prepareCreateBudget($user, $arguments)),
+                'get_import_preview', 'list_import_categories', 'set_import_category', 'apply_import_rules', 'update_import_row', 'commit_import', 'undo_import' => $this->runImportTool($user, $name, $arguments),
                 default => AgentToolExecutor::fail("Unknown tool: {$name}"),
             };
         } catch (Throwable $e) {
@@ -505,6 +515,54 @@ PROMPT;
      *
      * @param array{payload: array<string, mixed>, preview: string} $prepared
      */
+    /**
+     * @param  array<string, mixed>  $arguments
+     * @return array<string, mixed>
+     */
+    private function runImportTool(User $user, string $name, array $arguments): array
+    {
+        $result = app(ImportAgentTools::class)->execute($user, $name, $arguments, 'web');
+        if (isset($result['error'])) {
+            return AgentToolExecutor::fail((string) $result['error']);
+        }
+        if (isset($result['url'], $result['import_id'])) {
+            $this->pushImportPreview([
+                'batch_id' => $result['import_id'],
+                'url' => $result['url'],
+                'summary' => $result['summary'] ?? '',
+                'preview' => $result['summary'] ?? '',
+                'filename' => $result['filename'] ?? null,
+                'count' => ($result['new'] ?? 0) + ($result['duplicates'] ?? 0) + ($result['transfers'] ?? 0) + ($result['skipped'] ?? 0),
+                'income_total' => $result['income_total'] ?? 0,
+                'expense_total' => $result['expense_total'] ?? 0,
+            ]);
+        }
+
+        return AgentToolExecutor::ok($result);
+    }
+
+    /**
+     * Show a link card to the dedicated import preview page.
+     *
+     * @param array<string, mixed> $result
+     */
+    public function pushImportPreview(array $result): void
+    {
+        $this->push('import_preview', [
+            'role' => 'assistant',
+            'kind' => 'import_preview',
+            'batch_id' => $result['batch_id'] ?? null,
+            'url' => $result['url'] ?? null,
+            'summary' => $result['summary'] ?? '',
+            'preview' => $result['preview'] ?? ($result['summary'] ?? ''),
+            'filename' => $result['filename'] ?? null,
+            'count' => $result['count'] ?? 0,
+            'income_total' => $result['income_total'] ?? 0,
+            'expense_total' => $result['expense_total'] ?? 0,
+        ]);
+        $this->session->setSummary('Import preview shown.');
+    }
+
     public function stageConfirm(string $action, array $prepared): void
     {
         $this->stage($action, $prepared);

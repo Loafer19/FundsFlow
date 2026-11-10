@@ -225,6 +225,11 @@
                 </template>
 
                 <template v-else-if="tab === 'data'">
+                    <p class="text-sm text-base-content/60 mb-3">
+                        Import a bank statement on the
+                        <a href="/import" class="link">Import preview</a>
+                        page, or send the file to the assistant. Nothing is saved until you review it.
+                    </p>
                     <p class="text-sm text-base-content/60 mb-3">All your data as one JSON file</p>
 
                     <pre

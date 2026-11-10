@@ -7,6 +7,15 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
 **1.13** update that put an AI assistant in the Telegram bot. Self-hosting and technical changes are listed in the
 [GitHub releases](https://github.com/Loafer19/FundsFlow/releases).
 
+## 2.2.0
+
+- **Monobank sync.** Connect a personal token in Settings → Bank: cards sync automatically, including the last 31
+  days, with auto-tagging and optional Telegram pings. UAH jars can be tracked as savings goals.
+  [Learn more](/docs/help/monobank/)
+- **Import preview.** Large statements open a dedicated preview page so you can see what will happen, edit tags,
+  apply bulk rules and then import — or undo the whole batch later. The assistant opens that page; the Telegram bot
+  sends a link instead of importing right away. [Learn more](/docs/web/import/)
+
 ## 2.1.0
 
 - **Ask for help right from the app.** Click **Feedback** in the footer to report a problem or share an idea.

@@ -9,4 +9,5 @@ enum TransactionSource: string
     case Recurring = 'recurring';
     case Mcp = 'mcp';
     case Monobank = 'monobank';
+    case Import = 'import';
 }

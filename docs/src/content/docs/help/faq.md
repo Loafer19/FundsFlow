@@ -24,6 +24,13 @@ Auto-tagging learns from tags you change. Telegram notifications are sent only f
 token is stored encrypted and you can revoke it any time at api.monobank.ua. UAH jars can be tracked as
 savings goals — progress follows the jar balance. Details: [Monobank sync](/docs/help/monobank/).
 
+### How do I import a bank statement?
+
+Upload the file on the [Import](/docs/web/import/) page or send it to the assistant (web or Telegram).
+You'll get a preview of every row — duplicates, transfers and non-UAH lines are flagged — and nothing is saved
+until you press **Import**. The Telegram bot replies with a summary and a link to that page; it will not import
+directly. After import you can **Undo** the whole batch.
+
 ### Which currency does it use?
 
 FundsFlow tracks plain amounts and doesn't convert currencies. Choose how numbers look in

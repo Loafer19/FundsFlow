@@ -229,6 +229,9 @@ final class RunWebReceiptAction
         if (($pending['type'] ?? null) === 'import_tags') {
             return $this->continueImport($user, $channel, $session, $pending, $message);
         }
+        if (($pending['type'] ?? null) === 'import_preview') {
+            return $this->continueImportPreview($user, $channel, $session, $pending, $message);
+        }
 
         if ($files === []) {
             return null;
@@ -250,7 +253,7 @@ final class RunWebReceiptAction
 
     public static function isReceiptPending(mixed $pending): bool
     {
-        return is_array($pending) && in_array($pending['type'] ?? null, ['receipt_album', 'receipt_price', 'import_tags'], true);
+        return is_array($pending) && in_array($pending['type'] ?? null, ['receipt_album', 'receipt_price', 'import_tags', 'import_preview'], true);
     }
 
     /**
@@ -258,6 +261,37 @@ final class RunWebReceiptAction
      *
      * @param array<string, mixed> $pending
      */
+    private function continueImportPreview(User $user, WebAgentChannel $channel, WebAgentSession $session, array $pending, string $message): ?string
+    {
+        $uuid = is_string($pending['batch_id'] ?? null) ? $pending['batch_id'] : null;
+        $batch = $uuid ? $user->importBatches()->where('uuid', $uuid)->first() : null;
+        if (!$batch) {
+            return $this->notice($channel, $session, 'That import preview is no longer available.', 'muted', 'ok');
+        }
+        if (preg_match('/^(cancel|скасу|відмін|отмен)/u', mb_strtolower(trim($message)))) {
+            return $this->notice($channel, $session, 'The preview is still open at ' . $batch->previewUrl() . ' if you want it later.', 'muted', 'ok');
+        }
+        $channel->status('read_document', 'Updating the import');
+        app(\App\Actions\Imports\ApplyImportRulesAction::class)->execute($user, $batch, ['instruction' => $message]);
+        $batch = $batch->fresh();
+        $summary = app(\App\Actions\Imports\CreateImportBatchAction::class)->summaryLine($user, $batch);
+        $session->setPending(['type' => 'import_preview', 'batch_id' => $batch->uuid]);
+        $channel->pushImportPreview([
+            'type' => 'preview',
+            'batch_id' => $batch->uuid,
+            'url' => $batch->previewUrl(),
+            'summary' => $summary,
+            'preview' => $summary . ($batch->filename ? ' from ' . $batch->filename : ''),
+            'count' => $batch->total_rows,
+            'income_total' => (float) $batch->income_total,
+            'expense_total' => (float) $batch->expense_total,
+            'filename' => $batch->filename,
+        ]);
+        $session->setSummary(mb_substr('Import preview updated: ' . $summary, 0, 500));
+
+        return 'import_preview';
+    }
+
     private function continueImport(User $user, WebAgentChannel $channel, WebAgentSession $session, array $pending, string $message): ?string
     {
         $draft = is_array($pending['draft'] ?? null) ? $pending['draft'] : null;
@@ -324,6 +358,13 @@ final class RunWebReceiptAction
      */
     private function presentImport(User $user, WebAgentChannel $channel, WebAgentSession $session, array $result): string
     {
+        if ($result['type'] === 'preview') {
+            $session->setPending(['type' => 'import_preview', 'batch_id' => $result['batch_id']]);
+            $channel->pushImportPreview($result);
+            $session->setSummary(mb_substr('Import preview: ' . $result['summary'], 0, 500));
+
+            return 'import_preview';
+        }
         if ($result['type'] === 'confirm') {
             $channel->stageConfirm('import_transactions', ['payload' => $result['payload'], 'preview' => $result['preview']]);
             $session->setSummary(mb_substr('Import preview: ' . $result['summary'], 0, 500));

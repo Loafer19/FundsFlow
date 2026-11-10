@@ -3,6 +3,7 @@
 namespace App\Actions\Telegram;
 
 use App\Actions\Agent\AgentPlanningTools;
+use App\Actions\Imports\ImportAgentTools;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Agent\Documents\ImportTransactionsAction;
 use App\Actions\Charts\BuildUserChartAction;
@@ -107,6 +108,7 @@ class TelegramAgentToolExecutor
             $this->tools->definition('update_transaction'),
             $this->tools->definition('delete_transaction'),
             $this->tools->definition('create_budget'),
+            ...ImportAgentTools::definitions(),
             ...$this->planningDefinitions(read: false),
         ];
     }
@@ -196,6 +198,7 @@ class TelegramAgentToolExecutor
                 'update_transaction' => AgentToolExecutor::confirmStop($this->stageMutation($identity, $chatId, 'update_transaction', $this->tools->prepareUpdateTransaction($user, $arguments))),
                 'delete_transaction' => AgentToolExecutor::confirmStop($this->stageMutation($identity, $chatId, 'delete_transaction', $this->tools->prepareDeleteTransaction($user, $arguments))),
                 'create_budget' => AgentToolExecutor::confirmStop($this->stageMutation($identity, $chatId, 'create_budget', $this->tools->prepareCreateBudget($user, $arguments))),
+                'get_import_preview', 'list_import_categories', 'set_import_category', 'apply_import_rules', 'update_import_row', 'commit_import', 'undo_import' => $this->runImportTool($user, $name, $arguments),
                 default => AgentToolExecutor::fail("Unknown tool: {$name}"),
             };
         } catch (Throwable $e) {
@@ -206,6 +209,20 @@ class TelegramAgentToolExecutor
 
             return AgentToolExecutor::fail('Tool failed: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $arguments
+     * @return array<string, mixed>
+     */
+    private function runImportTool(User $user, string $name, array $arguments): array
+    {
+        $result = app(ImportAgentTools::class)->execute($user, $name, $arguments, 'telegram');
+        if (isset($result['error'])) {
+            return AgentToolExecutor::fail((string) $result['error']);
+        }
+
+        return AgentToolExecutor::ok($result);
     }
 
     /**

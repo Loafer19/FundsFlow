@@ -1384,6 +1384,11 @@ class MediaHandler
      */
     private function presentImport(User $user, int|string $chatId, int|string $identity, array $result, string $what): void
     {
+        if ($result['type'] === 'preview') {
+            $this->stageImportPreview($user, $chatId, $identity, $result);
+
+            return;
+        }
         if ($result['type'] === 'confirm') {
             $this->stageImport($user, $chatId, $identity, $result);
 
@@ -1419,6 +1424,27 @@ class MediaHandler
     public function handleImportReply(User $user, int|string $chatId, int|string $identity, string $text): bool
     {
         $pending = $this->session->get($identity, $chatId)['pending'] ?? null;
+        if (is_array($pending) && ($pending['type'] ?? null) === 'import_preview' && is_string($pending['batch_id'] ?? null)) {
+            $batch = $user->importBatches()->where('uuid', $pending['batch_id'])->first();
+            if (!$batch) {
+                $this->session->clearPending($identity, $chatId);
+                $this->client->sendMessage($chatId, 'That import preview is no longer available. Send the file again.');
+
+                return true;
+            }
+            $this->history->input($chatId, $user, $text);
+            app(\App\Actions\Imports\ApplyImportRulesAction::class)->execute($user, $batch, ['instruction' => $text]);
+            $batch = $batch->fresh();
+            $summary = app(\App\Actions\Imports\CreateImportBatchAction::class)->summaryLine($user, $batch);
+            $this->client->sendMessage(
+                $chatId,
+                "Updated preview:\n{$summary}\n\nReview and import: {$batch->previewUrl()}\nNothing will be saved until you press Import on that page.",
+            );
+            $this->session->setPending($identity, $chatId, ['type' => 'import_preview', 'batch_id' => $batch->uuid]);
+            $this->session->setSummary($identity, $chatId, mb_substr('Import preview updated: ' . $summary, 0, 500));
+
+            return true;
+        }
         if (!is_array($pending) || ($pending['type'] ?? null) !== 'import_tags' || !is_array($pending['draft'] ?? null)) {
             return false;
         }
@@ -1466,6 +1492,26 @@ class MediaHandler
     /**
      * @param array<string, mixed> $result DocumentImport confirm result
      */
+    /**
+     * @param array<string, mixed> $result DocumentImport preview result
+     */
+    private function stageImportPreview(User $user, int|string $chatId, int|string $identity, array $result): void
+    {
+        $url = (string) ($result['url'] ?? '');
+        $summary = (string) ($result['summary'] ?? '');
+        $name = (string) ($result['filename'] ?? 'your file');
+        $this->session->setPending($identity, $chatId, [
+            'type' => 'import_preview',
+            'batch_id' => $result['batch_id'] ?? null,
+        ]);
+        $this->session->setSummary($identity, $chatId, mb_substr('Import preview: ' . $summary, 0, 500));
+        $this->client->sendMessage(
+            $chatId,
+            "Here's what will happen with {$name}:\n{$summary}\n\nReview the rows, adjust tags, then press Import:\n{$url}\n\nNothing will be saved until you import it on that page. You can also reply here (e.g. “Glovo is Food” or “skip transfers to Olya”).",
+        );
+        $this->history->proposal($chatId, $user, 'Import preview: ' . $summary, (string) ($result['batch_id'] ?? ''));
+    }
+
     private function stageImport(User $user, int|string $chatId, int|string $identity, array $result): void
     {
         $nonce = $this->support->newNonce();

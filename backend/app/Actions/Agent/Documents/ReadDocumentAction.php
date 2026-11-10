@@ -3,6 +3,7 @@
 namespace App\Actions\Agent\Documents;
 
 use App\Actions\Telegram\AnalyzeReceiptAction;
+use App\Models\ImportTemplate;
 use App\Models\User;
 use App\Support\TelegramAiQuota;
 
@@ -119,6 +120,14 @@ final class ReadDocumentAction
         $aiUsed = false;
         $mapping = $this->import->guessMapping($rows);
         if ($mapping === null) {
+            $headerRow = $this->headerCells($rows);
+            $signature = $headerRow !== [] ? ImportTemplate::signature($headerRow) : null;
+            $template = $signature ? $user->importTemplates()->where('header_signature', $signature)->first() : null;
+            if ($template && is_array($template->mapping)) {
+                $mapping = $this->import->acceptMapping($template->mapping + ['header_row' => $template->mapping['header'] ?? null], $rows, count($rows));
+            }
+        }
+        if ($mapping === null) {
             if (!$this->quota->hasQuota($user)) {
                 return ['type' => 'quota', 'message' => $this->quota->exhaustedMessage(
                     $user,
@@ -155,10 +164,12 @@ final class ReadDocumentAction
             return $item;
         }, $parsed['rows']);
 
+        $headerIndex = is_int($mapping['header'] ?? null) ? $mapping['header'] : 0;
         return $this->rows($fileName, $kind, $out, $parsed['skipped'], $parsed['capped'] || $truncated, $aiUsed, [
             'ambiguous' => $parsed['ambiguous'],
             'order' => $parsed['order'],
             'samples' => $parsed['samples'],
+            'mapping' => $mapping + ['header_cells' => $rows[$headerIndex] ?? []],
         ]);
     }
 
@@ -272,12 +283,28 @@ final class ReadDocumentAction
                 'ambiguous' => (bool) ($dates['ambiguous'] ?? false),
                 'order' => $dates['order'] ?? null,
                 'samples' => $dates['samples'] ?? [],
+                'mapping' => $dates['mapping'] ?? null,
             ],
             'rows' => $rows,
             'skipped' => $skipped,
             'capped' => $capped,
             'ai_used' => $aiUsed,
         ];
+    }
+
+    /**
+     * @param list<list<mixed>> $rows
+     * @return list<mixed>
+     */
+    private function headerCells(array $rows): array
+    {
+        foreach (array_slice($rows, 0, 30) as $row) {
+            $filled = array_filter($row, static fn ($cell) => trim((string) $cell) !== '');
+            if (count($filled) >= 2) {
+                return array_values($row);
+            }
+        }
+        return [];
     }
 
     /**

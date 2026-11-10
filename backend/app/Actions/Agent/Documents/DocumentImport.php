@@ -2,6 +2,7 @@
 
 namespace App\Actions\Agent\Documents;
 
+use App\Actions\Imports\CreateImportBatchAction;
 use App\Actions\Tags\ListTagsAction;
 use App\Models\User;
 use App\Support\TelegramAiQuota;
@@ -15,8 +16,8 @@ use App\Support\TelegramAiQuota;
  *  3. ImportPlan builds the Confirm card, or asks what to do with tags that don't exist. The
  *     user's free-text reply edits the same draft (reply()) and a new card is shown.
  *
- * Result: error | quota | single (one file that is one receipt) | confirm | ask (+ draft to keep
- * in the pending slot) | cancelled.
+ * Result: error | quota | single (one file that is one receipt) | preview (staged batch + page URL)
+ * | ask | cancelled.
  */
 final class DocumentImport
 {
@@ -37,6 +38,7 @@ final class DocumentImport
         private readonly DocumentAi $ai,
         private readonly TelegramAiQuota $quota,
         private readonly ListTagsAction $listTags,
+        private readonly CreateImportBatchAction $createBatch,
     ) {}
 
     public static function isListCaption(?string $caption): bool
@@ -251,13 +253,22 @@ final class DocumentImport
         if (isset($built['error'])) {
             return ['type' => 'error', 'message' => $built['error']];
         }
-        if (isset($built['ask'])) {
-            $draft['unknown'] = $built['unknown'];
+        // Unknown tags stay on the preview page as "needs a tag" instead of blocking on a question.
+        $channel = is_string($draft['channel'] ?? null) ? $draft['channel'] : 'assistant';
+        $batch = $this->createBatch->fromDraft($user, $draft, $channel);
 
-            return ['type' => 'ask', 'question' => $built['ask'], 'draft' => $draft, 'suggestions' => self::SUGGESTIONS];
-        }
-
-        return ['type' => 'confirm'] + $built;
+        return [
+            'type' => 'preview',
+            'batch_id' => $batch->uuid,
+            'url' => $batch->previewUrl(),
+            'summary' => $this->createBatch->summaryLine($user, $batch),
+            'preview' => $this->createBatch->summaryLine($user, $batch)
+                . ($batch->filename ? ' from ' . $batch->filename : ''),
+            'count' => $batch->total_rows,
+            'income_total' => (float) $batch->income_total,
+            'expense_total' => (float) $batch->expense_total,
+            'filename' => $batch->filename,
+        ];
     }
 
     /**

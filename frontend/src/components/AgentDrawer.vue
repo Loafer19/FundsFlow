@@ -133,6 +133,18 @@
                             </div>
                         </div>
 
+                        <div v-else-if="item.kind === 'import_preview'" class="card card-border bg-base-100">
+                            <div class="card-body p-3 gap-2">
+                                <div class="flex items-center gap-2">
+                                    <FileSpreadsheet :size="16" class="text-primary" />
+                                    <span class="text-xs uppercase tracking-wide text-base-content/60">Import preview</span>
+                                </div>
+                                <p class="text-sm font-medium">{{ item.filename || 'Statement' }}</p>
+                                <p class="text-sm whitespace-pre-wrap break-words">{{ item.summary || item.preview }}</p>
+                                <a v-if="item.url" :href="item.url" class="btn btn-primary btn-sm w-fit">Open preview</a>
+                            </div>
+                        </div>
+
                         <div v-else-if="item.kind === 'confirm'" class="card card-border bg-base-100"
                             :class="confirmClass(item)">
                             <div class="card-body p-3 gap-2">
@@ -289,6 +301,7 @@ import {
     ArrowDown,
     Check,
     Copy,
+    FileSpreadsheet,
     FileText,
     ImagePlus,
     Paperclip,

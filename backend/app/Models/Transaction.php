@@ -23,6 +23,7 @@ class Transaction extends Model
         'external_source',
         'external_id',
         'external_meta',
+        'import_batch_id',
     ];
 
 

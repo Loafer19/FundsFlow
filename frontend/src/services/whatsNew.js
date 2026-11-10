@@ -15,6 +15,9 @@ export const RELEASES = [
             'Connect monobank with a personal token: cards sync automatically, including the last 31 days.',
             'New purchases can ping you in Telegram so you can change the tag or delete them.',
             'A small Mono badge marks imported transactions in the List.',
+            'Import a large statement and review it on a preview page before anything is saved.',
+            'The assistant and Telegram bot send a link to that page instead of importing right away.',
+            'Map the file’s own categories to your tags, tag a shop in bulk, skip transfers or old rows, then import — and undo the whole batch.',
         ],
     },
     {

@@ -99,6 +99,7 @@ export const transactionSourceLabels = {
     recurring: 'Recurring',
     mcp: 'MCP',
     monobank: 'Monobank',
+    import: 'Import',
 }
 
 export const getTransactionSourceLabel = (source) => transactionSourceLabels[source] ?? transactionSourceLabels.web
