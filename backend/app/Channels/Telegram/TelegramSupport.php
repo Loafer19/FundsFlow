@@ -75,7 +75,7 @@ class TelegramSupport
             . "/month — this month's income, expenses, net, top tags (live widget in a private chat)\n"
             . "/analytics — same as /month\n"
             . "/summary — same as /month\n"
-            . '/recent — last ' . self::RECENT_LIMIT . " transactions\n"
+            . '/recent — last transactions (live widget in a private chat)\n'
             . "/tags — list your tags\n"
             . "/newtag — create a tag: /newtag 🍕 Fast Food > Food\n"
             . "/budgets — spending limits and savings goals (live widget in a private chat)\n"

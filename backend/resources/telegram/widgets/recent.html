@@ -1,0 +1,132 @@
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:10px 12px 12px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color)}
+h3{margin:0 0 8px;font-size:1.05em}
+.item{display:block;width:100%;text-align:left;margin:0 0 6px;padding:8px 10px;border:0;border-radius:10px;background:var(--tg-theme-secondary-bg-color);color:inherit;font:inherit}
+.top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.amt{font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.pos{color:var(--tg-theme-accent-text-color)}
+.neg{color:var(--tg-theme-destructive-text-color)}
+.meta{color:var(--tg-theme-hint-color);font-size:.8em;margin:4px 0 0}
+.empty,.err{font-size:.9em;margin:8px 0 0}
+.empty{color:var(--tg-theme-hint-color)}
+.err{color:var(--tg-theme-destructive-text-color)}
+.actions{display:flex;gap:6px;margin:10px 0 0;flex-wrap:wrap}
+.actions button{flex:1}
+button.back,button.more{margin:0 0 10px}
+.lines p{margin:4px 0;font-size:.95em}
+.warn{margin:8px 0;font-size:.95em}
+</style>
+<div id="root"></div>
+<script>
+const W=window.TelegramWidget;
+let list=[],sel=null,ask=false,err='',busy=false,more=0;
+function parse(s){try{return s?JSON.parse(s):null}catch(e){return null}}
+function cls(a){return 'amt'+((a&&a.charAt(0)==='+')?' pos':' neg')}
+function sd(df){return df?String(df).slice(0,5):''}
+function note(it){return it.fn||it.n||'—'}
+function tags(it){return (it.gs&&it.gs.length)?it.gs.join(' · '):(it.g||'Untagged')}
+function clip(it){return it.f?' · 📎':''}
+function el(tag,clsName,text){const n=document.createElement(tag);if(clsName)n.className=clsName;if(text!=null)n.textContent=text;return n}
+function root(){const n=document.getElementById('root');n.innerHTML='';return n}
+function showList(){
+  const r=root();r.appendChild(el('h3','','Recent'));
+  if(err)r.appendChild(el('p','err',err));
+  if(!list.length){r.appendChild(el('p','empty','No transactions yet'));return}
+  list.forEach(function(it){
+    const b=el('button','item');b.type='button';
+    const top=el('div','top');
+    top.appendChild(el('span',cls(it.a),it.a||''));
+    top.appendChild(el('span','n',it.n||'—'));
+    b.appendChild(top);
+    b.appendChild(el('div','meta',sd(it.df)+(it.g?(' · '+it.g):'')+clip(it)));
+    b.addEventListener('click',function(){sel=it;ask=false;err='';showDetail(it)});
+    r.appendChild(b);
+  });
+  if(more){const m=el('button','more','Load more');m.type='button';m.addEventListener('click',loadMore);r.appendChild(m)}
+}
+function showDetail(it){
+  const r=root();
+  const back=el('button','back','Back');back.type='button';
+  back.addEventListener('click',function(){sel=null;ask=false;err='';showList()});
+  r.appendChild(back);
+  r.appendChild(el('h3',cls(it.a),it.a||''));
+  const box=el('div','lines');
+  box.appendChild(el('p','',note(it)));
+  box.appendChild(el('p','',tags(it)));
+  box.appendChild(el('p','',(it.df||'')+clip(it)));
+  if(err)box.appendChild(el('p','err',err));
+  r.appendChild(box);
+  const act=el('div','actions');
+  const del=el('button','','Delete');del.type='button';
+  del.addEventListener('click',function(){ask=true;err='';showConfirm(it)});
+  const edit=el('button','','Edit tags');edit.type='button';
+  edit.addEventListener('click',function(){openCard(it)});
+  const open=el('button','','Open');open.type='button';
+  open.addEventListener('click',function(){openCard(it)});
+  act.appendChild(del);act.appendChild(edit);act.appendChild(open);r.appendChild(act);
+}
+function showConfirm(it){
+  const r=root();
+  const back=el('button','back','Back');back.type='button';
+  back.addEventListener('click',function(){ask=false;err='';showDetail(it)});
+  r.appendChild(back);
+  r.appendChild(el('h3','','Delete this transaction?'));
+  r.appendChild(el('p','warn',(it.a||'')+' · '+note(it)));
+  if(err)r.appendChild(el('p','err',err));
+  const act=el('div','actions');
+  const yes=el('button','','Delete');yes.type='button';
+  yes.addEventListener('click',function(){doDelete(it)});
+  const no=el('button','','Cancel');no.type='button';
+  no.addEventListener('click',function(){ask=false;err='';showDetail(it)});
+  act.appendChild(yes);act.appendChild(no);r.appendChild(act);
+}
+function askBot(q){
+  if(!W||!W.request)return Promise.reject({code:'Send this in Telegram'});
+  return W.request(q).then(function(a){return parse(a&&a.result)||{}})
+}
+function openCard(it){
+  if(busy)return;busy=true;err='';showDetail(it);
+  askBot('o:'+it.id).then(function(r){
+    busy=false;
+    if(r&&r.ok){err='';showDetail(it);if(W.HapticFeedback&&W.HapticFeedback.notificationOccurred)W.HapticFeedback.notificationOccurred('success');return}
+    err=(r&&r.e)||'Could not open';showDetail(it);
+  },function(e){busy=false;err=(e&&e.code)||'Could not open';showDetail(it)});
+}
+function doDelete(it){
+  if(busy)return;busy=true;err='';showConfirm(it);
+  askBot('x:'+it.id).then(function(r){
+    busy=false;
+    if(r&&r.ok){
+      list=list.filter(function(x){return x.id!==it.id});
+      sel=null;ask=false;err='';
+      if(W.HapticFeedback&&W.HapticFeedback.notificationOccurred)W.HapticFeedback.notificationOccurred('success');
+      showList();return;
+    }
+    err=(r&&r.e)||'Could not delete';showConfirm(it);
+  },function(e){busy=false;err=(e&&e.code)||'Could not delete';showConfirm(it)});
+}
+function loadMore(){
+  if(busy)return;busy=true;err='';showList();
+  askBot('m:'+list.length).then(function(r){
+    busy=false;
+    if(r&&r.ok){list=list.concat(r.i||[]);more=r.more||0;err='';showList();return}
+    err=(r&&r.e)||'Could not load more';showList();
+  },function(e){busy=false;err=(e&&e.code)||'Could not load more';showList()});
+}
+function render(){
+  const d=parse(W&&W.chatData)||{};
+  list=d.i||[];more=d.more||0;
+  if(sel){
+    const fresh=list.filter(function(x){return x.id===sel.id})[0];
+    if(!fresh){sel=null;ask=false;showList();return}
+    sel=Object.assign({},sel,fresh);
+    if(ask)showConfirm(sel);else showDetail(sel);return;
+  }
+  showList();
+}
+if(W&&W.onEvent)W.onEvent('chatDataChanged',render);
+if(W&&W.ready)W.ready();
+render();
+</script>

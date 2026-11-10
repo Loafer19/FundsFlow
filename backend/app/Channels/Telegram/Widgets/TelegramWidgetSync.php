@@ -3,49 +3,17 @@
 namespace App\Channels\Telegram\Widgets;
 
 use App\Models\User;
-use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 /**
- * Refresh open summary/budgets/add widgets after a transaction changes.
- * Coalesces many writes in one request into a single edit per widget.
+ * Refresh open summary/budgets/add/recent widgets after a transaction changes.
  */
 class TelegramWidgetSync
 {
-    /** @var array<int, User> */
-    private static array $pending = [];
-
-    private static bool $registered = false;
-
     public function __construct(
         private readonly TelegramWidgetSender $sender,
         private readonly TelegramWidgetData $data,
     ) {}
-
-    public function schedule(User $user): void
-    {
-        self::$pending[(int) $user->id] = $user;
-
-        if (self::$registered) {
-            return;
-        }
-
-        self::$registered = true;
-        // Normal HTTP/console: flush once the request ends. Jobs that already run
-        // during terminate() (Telegram afterResponse) should call flush() themselves.
-        app()->terminating(fn () => $this->flush());
-    }
-
-    public function flush(): void
-    {
-        $users = self::$pending;
-        self::$pending = [];
-        self::$registered = false;
-
-        foreach ($users as $user) {
-            $this->refresh($user);
-        }
-    }
 
     public function refresh(User $user): void
     {
@@ -57,6 +25,7 @@ class TelegramWidgetSync
 
             return $this->data->add($user, $identity)['chat_data'];
         });
+        $this->refreshKind($user, TelegramWidgetData::KIND_RECENT, fn () => $this->data->recent($user)['chat_data']);
     }
 
     /**
@@ -67,12 +36,6 @@ class TelegramWidgetSync
         $refs = $this->sender->stored($user, $kind);
 
         if ($refs === []) {
-            return;
-        }
-
-        $lock = 'tg_widget_edit:' . $user->id . ':' . $kind;
-
-        if (!Cache::add($lock, 1, now()->addSeconds(2))) {
             return;
         }
 

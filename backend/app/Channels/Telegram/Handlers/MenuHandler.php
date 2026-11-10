@@ -129,6 +129,20 @@ class MenuHandler
     public function sendRecent(User $user, int|string $chatId, int|string|null $telegramUserId = null): void
     {
         $identity = $telegramUserId ?? $chatId;
+
+        if ($this->isPrivateChat($chatId) && $this->widgets->sendRecent($user, $chatId)) {
+            $payload = $this->recentListPayload($user);
+            $this->session->setDomain($identity, $chatId, 'transactions');
+            $this->session->setLastList($identity, $chatId, is_array($payload) ? $payload['list'] : []);
+            $this->session->setSummary(
+                $identity,
+                $chatId,
+                $payload === null ? 'No transactions yet.' : 'Recent transactions listed.',
+            );
+
+            return;
+        }
+
         $payload = $this->recentListPayload($user);
 
         if ($payload === null) {

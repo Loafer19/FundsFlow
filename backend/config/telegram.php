@@ -27,6 +27,17 @@ return [
     'low_quota_threshold' => (int) env('TELEGRAM_LOW_QUOTA_THRESHOLD', 2),
 
     // HTTP timeouts, seconds.
+    // When true AND QUEUE_CONNECTION is not sync, widget refresh is pushed to the
+    // database queue (SyncTelegramWidgetsJob, unique per user for 10s). Default
+    // false: run after the HTTP response, because Dokploy has no queue worker yet.
+    //
+    // Future worker service: same image as the API, command
+    //   php artisan queue:work --tries=3 --max-time=3600
+    // env: QUEUE_CONNECTION=database and TELEGRAM_WIDGETS_QUEUE=true
+    // The web container still runs migrations; a worker container skips them
+    // (see docker/backend-entrypoint.sh).
+    'widgets_queue' => (bool) env('TELEGRAM_WIDGETS_QUEUE', false),
+
     'timeouts' => [
         'xai_chat' => (int) env('TELEGRAM_XAI_CHAT_TIMEOUT', 60),
         'xai_vision' => (int) env('TELEGRAM_XAI_VISION_TIMEOUT', 45),

@@ -31,10 +31,17 @@ function parse(s){try{return s?JSON.parse(s):null}catch(e){return null}}
 function signed(){const n=raw||'0';return (inc?'+':'-')+n}
 function showAmt(){document.getElementById('amt').textContent=raw?signed():'0'}
 function setSt(kind,text){const el=document.getElementById('st');el.className='st'+(kind?' '+kind:'');el.textContent=text||''}
+function tagList(){
+  const d=parse(W&&W.chatData)||{};
+  const keyed=inc?d.i:d.e;
+  return (keyed&&keyed.length)?keyed:(d.tags||[])
+}
 function renderTags(){
   const box=document.getElementById('tags');box.innerHTML='';
+  const list=tagList();
+  if(tag&&!list.some(function(t){return t.id===tag}))tag=null;
   const d=parse(W&&W.chatData)||{};
-  (d.tags||[]).forEach(function(t){
+  list.forEach(function(t){
     const b=document.createElement('button');b.type='button';
     b.textContent=t.n;if(tag===t.id)b.className='on';
     b.addEventListener('click',function(){tag=(tag===t.id)?null:t.id;renderTags()});
@@ -57,8 +64,8 @@ function key(k){
     b.addEventListener('click',function(){key(k)});
     pad.appendChild(b);
   });
-  document.getElementById('ex').addEventListener('click',function(){inc=false;document.getElementById('ex').className='on';document.getElementById('in').className='';showAmt()});
-  document.getElementById('in').addEventListener('click',function(){inc=true;document.getElementById('in').className='on';document.getElementById('ex').className='';showAmt()});
+  document.getElementById('ex').addEventListener('click',function(){inc=false;document.getElementById('ex').className='on';document.getElementById('in').className='';showAmt();renderTags()});
+  document.getElementById('in').addEventListener('click',function(){inc=true;document.getElementById('in').className='on';document.getElementById('ex').className='';showAmt();renderTags()});
   document.getElementById('go').addEventListener('click',function(){
     if(busy)return;
     if(!raw||raw==='0'||raw==='0.'){setSt('err',"Amount can't be zero");return}

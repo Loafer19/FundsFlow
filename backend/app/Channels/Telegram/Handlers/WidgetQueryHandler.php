@@ -3,12 +3,12 @@
 namespace App\Channels\Telegram\Handlers;
 
 use App\Actions\Transactions\CreateTransactionAction;
+use App\Actions\Transactions\DeleteTransactionAction;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramHistory;
 use App\Channels\Telegram\TelegramSupport;
 use App\Channels\Telegram\Widgets\TelegramWidgetData;
 use App\Channels\Telegram\Widgets\TelegramWidgetSender;
-use App\Channels\Telegram\Widgets\TelegramWidgetSync;
 use App\Enums\TransactionSource;
 use App\Models\Tag;
 use App\Models\User;
@@ -21,9 +21,9 @@ class WidgetQueryHandler
         private readonly TelegramClient $client,
         private readonly TelegramSupport $support,
         private readonly CreateTransactionAction $createTransaction,
+        private readonly DeleteTransactionAction $deleteTransaction,
         private readonly TelegramWidgetData $data,
         private readonly TelegramWidgetSender $sender,
-        private readonly TelegramWidgetSync $sync,
         private readonly TelegramHistory $history,
     ) {}
 
@@ -66,6 +66,24 @@ class WidgetQueryHandler
 
             if (preg_match('/^d:(\d{1,10})$/', $data, $matches)) {
                 $this->handleBudgetDetail($user, $queryId, (int) $matches[1]);
+
+                return;
+            }
+
+            if (preg_match('/^x:(\d{1,10})$/', $data, $matches)) {
+                $this->handleRecentDelete($user, $chatId, $queryId, (int) $matches[1]);
+
+                return;
+            }
+
+            if (preg_match('/^o:(\d{1,10})$/', $data, $matches)) {
+                $this->handleRecentOpen($user, $chatId, $queryId, (int) $matches[1]);
+
+                return;
+            }
+
+            if (preg_match('/^m:(\d{1,10})$/', $data, $matches)) {
+                $this->handleRecentMore($user, $queryId, (int) $matches[1]);
 
                 return;
             }
@@ -124,8 +142,6 @@ class WidgetQueryHandler
         }
 
         $this->history->outcome($chatId, $user, 'Saved: ' . TelegramHistory::transactionLine($user, $transaction));
-        $this->sync->schedule($user);
-        $this->sync->flush();
     }
 
     private function handleBudgetDetail(User $user, string $queryId, int $budgetId): void
@@ -139,6 +155,42 @@ class WidgetQueryHandler
         }
 
         $this->answer($queryId, ['ok' => 1] + $item);
+    }
+
+    private function handleRecentDelete(User $user, int|string $chatId, string $queryId, int $transactionId): void
+    {
+        $transaction = $this->support->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction) {
+            $this->answer($queryId, ['ok' => 0, 'e' => 'Transaction not found']);
+
+            return;
+        }
+
+        $remembered = TelegramHistory::transactionLine($user, $transaction);
+        $this->deleteTransaction->execute($user, $transaction);
+        $this->history->outcome($chatId, $user, 'Deleted: ' . $remembered);
+        $this->answer($queryId, ['ok' => 1]);
+    }
+
+    private function handleRecentOpen(User $user, int|string $chatId, string $queryId, int $transactionId): void
+    {
+        $transaction = $this->support->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction) {
+            $this->answer($queryId, ['ok' => 0, 'e' => 'Transaction not found']);
+
+            return;
+        }
+
+        $this->answer($queryId, ['ok' => 1]);
+        $this->support->sendSavedTransaction($chatId, $user, $transaction, 'Transaction', remember: false);
+    }
+
+    private function handleRecentMore(User $user, string $queryId, int $offset): void
+    {
+        $page = $this->data->recentPage($user, max(0, $offset));
+        $this->answer($queryId, ['ok' => 1] + $page);
     }
 
     /**

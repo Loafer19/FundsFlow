@@ -26,19 +26,24 @@ class TelegramWidgetSender
 
     public function sendSummary(User $user, int|string $chatId): bool
     {
-        return $this->send($user, $chatId, TelegramWidgetData::KIND_SUMMARY, $this->data->summary($user), allowQueries: false, height: 280);
+        return $this->send($user, $chatId, TelegramWidgetData::KIND_SUMMARY, $this->data->summary($user), allowQueries: false);
     }
 
     public function sendBudgets(User $user, int|string $chatId): bool
     {
-        return $this->send($user, $chatId, TelegramWidgetData::KIND_BUDGETS, $this->data->budgets($user), allowQueries: true, height: 360);
+        return $this->send($user, $chatId, TelegramWidgetData::KIND_BUDGETS, $this->data->budgets($user), allowQueries: true);
     }
 
     public function sendAdd(User $user, int|string $chatId): bool
     {
         $identity = $this->identityFor($user, $chatId);
 
-        return $this->send($user, $chatId, TelegramWidgetData::KIND_ADD, $this->data->add($user, $identity), allowQueries: true, height: 440);
+        return $this->send($user, $chatId, TelegramWidgetData::KIND_ADD, $this->data->add($user, $identity), allowQueries: true);
+    }
+
+    public function sendRecent(User $user, int|string $chatId): bool
+    {
+        return $this->send($user, $chatId, TelegramWidgetData::KIND_RECENT, $this->data->recent($user), allowQueries: true);
     }
 
     /**
@@ -109,7 +114,7 @@ class TelegramWidgetSender
         string $kind,
         array $payload,
         bool $allowQueries,
-        ?int $height,
+        ?int $height = null,
     ): bool {
         $html = $this->html($kind);
         $raw = strlen($html);

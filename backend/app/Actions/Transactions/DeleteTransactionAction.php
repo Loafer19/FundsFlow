@@ -2,7 +2,7 @@
 
 namespace App\Actions\Transactions;
 
-use App\Channels\Telegram\Widgets\TelegramWidgetSync;
+use App\Events\TransactionsChanged;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
@@ -13,6 +13,7 @@ class DeleteTransactionAction
     {
         Gate::forUser($user)->authorize('delete', $transaction);
 
+        $id = (int) $transaction->id;
         $transaction->loadMissing('attachments');
 
         foreach ($transaction->attachments as $attachment) {
@@ -20,6 +21,6 @@ class DeleteTransactionAction
         }
 
         $transaction->delete();
-        app(TelegramWidgetSync::class)->schedule($user);
+        TransactionsChanged::dispatch((int) $user->id, 'deleted', [$id]);
     }
 }

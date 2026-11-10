@@ -27,6 +27,10 @@ class TelegramWidgetData
 
     public const KIND_ADD = 'add';
 
+    public const KIND_RECENT = 'recent';
+
+    public const RECENT_PAGE = 8;
+
     public function __construct(
         private readonly ListBudgetsAction $listBudgets,
         private readonly CalculateLimitStatusAction $limitStatus,
@@ -40,10 +44,10 @@ class TelegramWidgetData
     {
         $now = $user->nowInTimezone();
         $from = $now->copy()->startOfMonth()->startOfDay();
-        $today = $now->copy()->startOfDay();
+        $to = $now->copy()->endOfMonth()->startOfDay();
         $transactions = $user->transactions()
             ->with('tags')
-            ->onDays($from, $today)
+            ->onDays($from, $to)
             ->get();
 
         $income = (float) $transactions->filter(fn (Transaction $transaction) => $transaction->amount > 0)->sum('amount');
@@ -59,7 +63,7 @@ class TelegramWidgetData
 
         $spark = [];
 
-        for ($day = $from->copy(); $day->lte($today); $day->addDay()) {
+        for ($day = $from->copy(); $day->lte($to); $day->addDay()) {
             $spark[] = (int) round($byDay[$day->toDateString()] ?? 0);
         }
 
@@ -82,7 +86,7 @@ class TelegramWidgetData
 
         $period = $now->format('m.Y');
         $fromLabel = $this->date($from);
-        $toLabel = $this->date($today);
+        $toLabel = $this->date($to);
         $incomeLabel = $this->signedMoney($user, $income);
         $expenseLabel = $this->money($user, abs($expense));
         $netLabel = $this->signedMoney($user, $net);
@@ -108,9 +112,7 @@ class TelegramWidgetData
             $payload['t'] = array_slice($payload['t'], 0, 2);
         }
 
-        $caption = $period . "\nIncome: " . $incomeLabel . "\nExpenses: " . $expenseLabel . "\nNet: " . $netLabel;
-
-        return ['chat_data' => $this->json($payload), 'caption' => $caption];
+        return ['chat_data' => $this->json($payload), 'caption' => 'Month summary'];
     }
 
     /**
@@ -129,17 +131,8 @@ class TelegramWidgetData
         }
 
         $payload = $this->packBudgetItems($items);
-        $lines = ['Limits and savings goals'];
 
-        foreach (array_slice($payload['i'], 0, 6) as $item) {
-            $lines[] = ($item['n'] ?? ('#' . $item['id'])) . ' ' . ($item['p'] ?? 0) . '%';
-        }
-
-        if (($payload['i'] ?? []) === []) {
-            $lines = ['No active budgets or savings goals'];
-        }
-
-        return ['chat_data' => $this->json($payload), 'caption' => implode("\n", $lines)];
+        return ['chat_data' => $this->json($payload), 'caption' => 'Limits and savings goals'];
     }
 
     /**
@@ -163,7 +156,9 @@ class TelegramWidgetData
      */
     public function add(User $user, ?Identity $identity = null): array
     {
-        $tags = $this->frequentTags($user, 6);
+        $expense = $this->frequentTags($user, 5, -1);
+        $income = $this->frequentTags($user, 5, 1);
+        $tags = $this->frequentTags($user, 6, null);
         $last = null;
         $stored = $identity?->meta['widgets']['add_last'] ?? null;
 
@@ -174,17 +169,62 @@ class TelegramWidgetData
             ];
         }
 
-        $payload = ['tags' => $tags];
+        $payload = [];
+
+        if ($expense !== [] || $income !== []) {
+            $payload['e'] = $expense;
+            $payload['i'] = $income;
+        }
+
+        $payload['tags'] = $tags;
 
         if ($last !== null) {
             $payload['last'] = $last;
         }
 
-        while (strlen($this->json($payload)) > 1024 && $payload['tags'] !== []) {
+        while (strlen($this->json($payload)) > 1024) {
+            if (isset($payload['e']) || isset($payload['i'])) {
+                unset($payload['e'], $payload['i']);
+
+                continue;
+            }
+
+            if (($payload['tags'] ?? []) === []) {
+                break;
+            }
+
             array_pop($payload['tags']);
         }
 
         return ['chat_data' => $this->json($payload), 'caption' => 'Quick add a transaction'];
+    }
+
+    /**
+     * @return array{chat_data: string, caption: string}
+     */
+    public function recent(User $user, int $offset = 0): array
+    {
+        return ['chat_data' => $this->json($this->recentPage($user, $offset)), 'caption' => 'Recent transactions'];
+    }
+
+    /**
+     * @return array{i: list<array<string, mixed>>, more?: int}
+     */
+    public function recentPage(User $user, int $offset = 0, int $limit = self::RECENT_PAGE): array
+    {
+        $offset = max(0, $offset);
+        $limit = max(1, min(12, $limit));
+        $rows = $user->transactions()
+            ->with(['tags', 'attachments'])
+            ->latest('at')
+            ->offset($offset)
+            ->limit($limit + 1)
+            ->get();
+        $hasMore = $rows->count() > $limit;
+        $rows = $rows->take($limit);
+        $items = $rows->map(fn (Transaction $transaction) => $this->recentItem($user, $transaction))->all();
+
+        return $this->packRecentItems($items, $hasMore);
     }
 
     /**
@@ -302,15 +342,96 @@ class TelegramWidgetData
     }
 
     /**
+     * @param list<array<string, mixed>> $items
+     * @return array{i: list<array<string, mixed>>, more?: int}
+     */
+    private function packRecentItems(array $items, bool $hasMore): array
+    {
+        // Leave room so a widget query answer can wrap this in {"ok":1,...}.
+        $max = 1000;
+        $payload = ['i' => $items];
+
+        if ($hasMore) {
+            $payload['more'] = 1;
+        }
+
+        if (strlen($this->json($payload)) <= $max) {
+            return $payload;
+        }
+
+        $compact = array_map(static function (array $item): array {
+            unset($item['fn'], $item['gs']);
+
+            return $item;
+        }, $items);
+        $payload = ['i' => $compact];
+
+        if ($hasMore) {
+            $payload['more'] = 1;
+        }
+
+        while (strlen($this->json($payload)) > $max && $compact !== []) {
+            array_pop($compact);
+            $payload = ['i' => $compact, 'more' => 1];
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function recentItem(User $user, Transaction $transaction): array
+    {
+        $note = trim((string) ($transaction->note ?? ''));
+        $tags = $transaction->tags
+            ->map(fn (Tag $tag) => $this->clip(trim($tag->emoji . ' ' . $tag->title), 22))
+            ->filter()
+            ->values()
+            ->all();
+        $item = [
+            'id' => (int) $transaction->id,
+            'a' => $this->signedMoney($user, (float) $transaction->amount),
+            'n' => $note === '' ? '—' : $this->clip($note, 28),
+            'df' => $transaction->at->format('d.m.Y'),
+            'g' => $tags[0] ?? 'Untagged',
+        ];
+
+        if ($note !== '' && mb_strlen($note) > 28) {
+            $item['fn'] = $this->clip($note, 80);
+        }
+
+        if (count($tags) > 1) {
+            $item['gs'] = array_slice($tags, 0, 6);
+        }
+
+        if ($transaction->relationLoaded('attachments') && $transaction->attachments->isNotEmpty()) {
+            $item['f'] = 1;
+        }
+
+        return $item;
+    }
+
+    /**
      * @return list<array{id: int, n: string}>
      */
-    private function frequentTags(User $user, int $limit): array
+    private function frequentTags(User $user, int $limit, ?int $sign = null): array
     {
         $counts = [];
         $labels = [];
         $recent = $user->transactions()->with('tags')->latest('at')->limit(120)->get();
 
         foreach ($recent as $transaction) {
+            if ($sign !== null) {
+                if ($sign < 0 && $transaction->amount >= 0) {
+                    continue;
+                }
+
+                if ($sign > 0 && $transaction->amount <= 0) {
+                    continue;
+                }
+            }
+
             foreach ($transaction->tags as $tag) {
                 $id = (int) $tag->id;
                 $counts[$id] = ($counts[$id] ?? 0) + 1;
@@ -328,7 +449,7 @@ class TelegramWidgetData
             $out[$id] = ['id' => $id, 'n' => $labels[$id]];
         }
 
-        if (count($out) < $limit) {
+        if ($sign === null && count($out) < $limit) {
             $user->tags()
                 ->orderBy('title')
                 ->limit($limit)

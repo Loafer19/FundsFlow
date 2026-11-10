@@ -38,7 +38,7 @@ class TelegramSetWebhookCommand extends Command
             ['command' => 'month', 'description' => "This month's income, expenses, net, and top tags"],
             ['command' => 'analytics', 'description' => 'Same as /month'],
             ['command' => 'summary', 'description' => 'Same as /month (live widget in a private chat)'],
-            ['command' => 'recent', 'description' => 'Last 10 transactions'],
+            ['command' => 'recent', 'description' => 'Last transactions (live widget in a private chat)'],
             ['command' => 'tags', 'description' => 'List your tags'],
             ['command' => 'newtag', 'description' => 'Create a tag: /newtag 🍕 Fast Food > Food'],
             ['command' => 'budgets', 'description' => 'Active budgets and savings goals'],

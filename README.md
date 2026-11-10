@@ -76,6 +76,9 @@ docker compose -f docker/compose.gotenberg.yml up -d
 Configuration (env vars, Telegram, MCP, AI) is covered in the [docs](https://fundsflow.fun/docs/).
 The backend Docker image runs `php artisan migrate --force` on container start (it waits up to ~30s for the database); set `AUTO_MIGRATE=false` to opt out and run it by hand.
 
+There is no queue worker on Dokploy yet. Telegram updates, Monobank webhooks, large import commits and Telegram widget refresh run after the HTTP response. To add a worker later: same Docker image, command `php artisan queue:work --tries=3 --max-time=3600`, env `QUEUE_CONNECTION=database` and `TELEGRAM_WIDGETS_QUEUE=true`. The `jobs` / `job_batches` / `failed_jobs` tables ship with the app; the web container runs migrations, a worker container skips them.
+
+
 ## Self-hosting
 
 Report PDFs are rendered by Gotenberg from the real app — see [Report PDF (Gotenberg)](https://fundsflow.fun/docs/self-hosting/report-pdf/). The operator-only Filament panel at `/admin` on the API host is described in [Admin panel (Filament)](https://fundsflow.fun/docs/self-hosting/admin-panel/).

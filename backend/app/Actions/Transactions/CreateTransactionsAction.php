@@ -2,7 +2,6 @@
 
 namespace App\Actions\Transactions;
 
-use App\Channels\Telegram\Widgets\TelegramWidgetSync;
 use App\Enums\TransactionSource;
 use App\Models\Transaction;
 use App\Models\User;
@@ -21,7 +20,7 @@ class CreateTransactionsAction
      */
     public function execute(User $user, array $items, TransactionSource $source): Collection
     {
-        $created = DB::transaction(function () use ($user, $items, $source) {
+        return DB::transaction(function () use ($user, $items, $source) {
             $created = collect();
 
             foreach ($items as $item) {
@@ -30,9 +29,5 @@ class CreateTransactionsAction
 
             return $created;
         });
-
-        app(TelegramWidgetSync::class)->flush();
-
-        return $created;
     }
 }

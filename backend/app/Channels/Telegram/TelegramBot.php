@@ -6,7 +6,6 @@ use App\Channels\Telegram\Handlers\CallbackHandler;
 use App\Channels\Telegram\Handlers\MediaHandler;
 use App\Channels\Telegram\Handlers\MessageHandler;
 use App\Channels\Telegram\Handlers\WidgetQueryHandler;
-use App\Channels\Telegram\Widgets\TelegramWidgetSync;
 use App\Support\UserActivity;
 
 class TelegramBot
@@ -18,7 +17,6 @@ class TelegramBot
         private readonly WidgetQueryHandler $widgetQueryHandler,
         private readonly TelegramSupport $support,
         private readonly TelegramClient $client,
-        private readonly TelegramWidgetSync $widgetSync,
     ) {}
 
     /**
@@ -26,11 +24,7 @@ class TelegramBot
      */
     public function handle(array $update): void
     {
-        try {
-            $this->handleUpdate($update);
-        } finally {
-            $this->widgetSync->flush();
-        }
+        $this->handleUpdate($update);
     }
 
     /**
