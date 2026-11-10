@@ -5,7 +5,7 @@
 
     <template v-else>
         <div class="flex flex-wrap items-center gap-2 mb-3">
-            <label class="input input-sm w-full max-w-xs border-base-300 text-sm">
+            <label class="input input-sm min-w-0 flex-1 max-w-xs border-base-300 text-sm">
                 <Search :size="16" class="text-base-content/60" />
                 <input v-model="searchQuery" type="text" placeholder="Search notes" />
             </label>
@@ -18,6 +18,18 @@
                     <X :size="12" />
                 </button>
             </span>
+
+            <button v-if="!inReport" type="button"
+                class="btn btn-sm border-base-300 text-base-content/50 gap-1 tooltip tooltip-bottom report-hide max-sm:btn-square"
+                data-tip="Import a bank statement (CSV, Excel, PDF)"
+                aria-label="Import a bank statement (CSV, Excel, PDF)"
+                :disabled="importing"
+                @click="importFileInput?.click()">
+                <span v-if="importing" class="loading loading-spinner loading-xs"></span>
+                <FileUp v-else :size="16" />
+                <span class="max-sm:hidden">Import</span>
+            </button>
+            <input ref="importFileInput" type="file" class="hidden" :accept="IMPORT_FILE_ACCEPT" @change="onImportFile" />
         </div>
 
         <EmptyState v-if="!filteredTransactions.length" icon="🔍" title="No transactions match the current filters"
@@ -229,7 +241,9 @@ import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
 import TagDetailModal from '../components/TagDetailModal.vue'
 import { today } from '../services/clock.js'
-import { getTransactionSourceLabel, parseLocalDate, toLocalDateStr } from '../services/formatters'
+import { apiErrorMessage, getTransactionSourceLabel, parseLocalDate, toLocalDateStr } from '../services/formatters'
+import { IMPORT_FILE_ACCEPT, startWebImport } from '../services/imports.js'
+import toasts from '../services/toasts.js'
 import { useTransactionsStore } from '../services/transactions'
 
 const formatMoney = inject('formatMoney')
@@ -370,5 +384,22 @@ const editTransaction = (transaction) => {
 
 const previewAttachments = (transaction) => {
     transactionsStore.openAttachmentPreview(transaction)
+}
+
+const importFileInput = ref(null)
+const importing = ref(false)
+
+const onImportFile = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    importing.value = true
+    try {
+        await startWebImport(file)
+    } catch (error) {
+        toasts.error(apiErrorMessage(error, 'Could not read this file'))
+    } finally {
+        importing.value = false
+    }
 }
 </script>

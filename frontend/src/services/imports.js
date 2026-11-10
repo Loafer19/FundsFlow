@@ -23,3 +23,18 @@ export const commitImport = (id) =>
 
 export const undoImport = (id) =>
     api.post(`/imports/${id}/undo`, {}, long).then((res) => res.data)
+
+// Matches DocumentFile::EXTENSIONS / ImportController file validation.
+export const IMPORT_FILE_ACCEPT = '.csv,.tsv,.txt,.xlsx,.ods,.ofx,.qfx,.qif,.json,.html,.htm,.pdf,.docx'
+
+export const openImportPreview = (id) => {
+    window.history.pushState({}, '', `/import/${id}`)
+    window.location.assign(`/import/${id}`)
+}
+
+// Shared start used by ImportView (the original web entry) and the List-tab Import button.
+export const startWebImport = async (file) => {
+    const created = await uploadImport(file)
+    openImportPreview(created.id)
+    return created
+}

@@ -1,12 +1,16 @@
 <template>
     <div>
-        <div class="flex items-center gap-2 mb-4 flex-wrap">
-            <a href="/" class="btn btn-ghost btn-sm gap-1" @click.prevent="goHome">
-                <ArrowLeft :size="16" />
-                Back
-            </a>
-            <h1 class="text-xl font-semibold">Import preview</h1>
-            <span v-if="batch?.filename" class="text-sm text-base-content/50 truncate max-w-xs">{{ batch.filename }}</span>
+        <div class="mb-4 min-w-0">
+            <nav class="text-sm text-base-content/50 mb-1">
+                <a href="/" class="hover:text-base-content hover:underline" @click.prevent="goHome">Transactions</a>
+                <span class="mx-1.5" aria-hidden="true">›</span>
+                <span>Import</span>
+            </nav>
+            <div class="flex items-center gap-2 min-w-0">
+                <h1 class="text-2xl font-semibold truncate min-w-0"
+                    :title="pageTitle">{{ pageTitle }}</h1>
+                <span v-if="batch" class="badge badge-soft shrink-0" :class="batchStatusBadge">{{ batchStatusLabel }}</span>
+            </div>
         </div>
 
         <div v-if="!authStore.isAuthenticated" class="card card-border border-base-300 bg-base-100">
@@ -23,7 +27,7 @@
                     of every row before anything is saved.
                 </p>
                 <input ref="fileInput" type="file" class="file-input file-input-bordered w-full max-w-md"
-                    accept=".csv,.tsv,.txt,.xlsx,.ods,.ofx,.qfx,.qif,.json,.html,.htm,.pdf,.docx"
+                    :accept="IMPORT_FILE_ACCEPT"
                     @change="onFile" />
                 <p v-if="uploadError" class="text-error text-sm">{{ uploadError }}</p>
                 <p v-if="uploading" class="text-sm flex items-center gap-2">
@@ -328,7 +332,6 @@
 
 <script setup>
 import {
-    ArrowLeft,
     ArrowLeftRight,
     Ban,
     CalendarDays,
@@ -344,7 +347,7 @@ import {
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAuthStore } from '../services/auth.js'
 import { apiErrorMessage, formatDate, formatMoney, parseLocalDate } from '../services/formatters.js'
-import { applyImportRules, commitImport, fetchImport, undoImport, updateImportRow, uploadImport } from '../services/imports.js'
+import { applyImportRules, commitImport, fetchImport, IMPORT_FILE_ACCEPT, startWebImport, undoImport, updateImportRow } from '../services/imports.js'
 import { showModal } from '../services/modal.js'
 import { useTagsStore } from '../services/tags.js'
 import toasts from '../services/toasts.js'
@@ -385,6 +388,28 @@ const importableCount = computed(() => {
     return s ? s.new + s.needs_tag : 0
 })
 const editable = computed(() => ['previewing', 'failed'].includes(batch.value?.status))
+const pageTitle = computed(() => batch.value?.filename || 'Import preview')
+const batchStatusLabel = computed(() => {
+    switch (batch.value?.status) {
+        case 'committing':
+            return 'Importing…'
+        case 'committed':
+            return 'Imported'
+        case 'undone':
+            return 'Undone'
+        case 'failed':
+            return 'Failed'
+        default:
+            return 'Draft'
+    }
+})
+const batchStatusBadge = computed(() => ({
+    'Importing…': 'badge-info',
+    Imported: 'badge-success',
+    Undone: '',
+    Failed: 'badge-error',
+    Draft: 'badge-warning',
+}[batchStatusLabel.value] || ''))
 const summaryCards = computed(() => {
     const s = batch.value?.summary || {}
     const needs = s.needs_tag ? `${s.needs_tag} need a tag` : ''
@@ -476,9 +501,7 @@ const onFile = async (event) => {
     uploading.value = true
     uploadError.value = ''
     try {
-        const created = await uploadImport(file)
-        window.history.pushState({}, '', `/import/${created.id}`)
-        window.location.assign(`/import/${created.id}`)
+        await startWebImport(file)
     } catch (error) {
         uploadError.value = apiErrorMessage(error, 'Could not read this file')
     } finally {

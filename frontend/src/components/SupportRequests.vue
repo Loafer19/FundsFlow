@@ -11,20 +11,20 @@
                 <ChevronLeft :size="20" />
             </button>
             <div class="min-w-0 flex-1">
-                <div class="font-medium break-words">{{ active.subject }}</div>
+                <div class="font-medium break-words [overflow-wrap:anywhere]">{{ active.subject }}</div>
                 <div class="text-xs text-base-content/50">#{{ active.id }} · {{ formatDate(active.created_at) }}</div>
             </div>
             <span class="badge badge-sm shrink-0" :class="statusOf(active).badge">{{ statusOf(active).label }}</span>
         </div>
 
-        <div ref="threadRef" class="support-thread overflow-y-auto mb-3 -mx-1 px-1">
+        <div ref="threadRef" class="support-thread overflow-y-auto overflow-x-hidden mb-3">
             <div v-for="message in thread" :key="message.key" class="chat"
                 :class="message.author === 'admin' ? 'chat-start' : 'chat-end'">
                 <div class="chat-header text-xs text-base-content/50 mb-0.5">
                     {{ message.author === 'admin' ? 'FundsFlow support' : 'You' }}
                     <time class="ml-1">{{ formatDate(message.created_at) }}</time>
                 </div>
-                <div class="chat-bubble text-sm whitespace-pre-wrap break-words"
+                <div class="chat-bubble text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere] max-w-[85%]"
                     :class="message.author === 'admin' ? 'chat-bubble-info' : ''">{{ message.body }}</div>
             </div>
         </div>
@@ -56,7 +56,7 @@
             No requests yet. Questions, problems or ideas: send them here and we'll reply.
         </p>
 
-        <ul v-else class="flex flex-col gap-1 support-list overflow-y-auto">
+        <ul v-else class="flex flex-col gap-1 support-list overflow-y-auto overflow-x-hidden">
             <li v-for="ticket in tickets" :key="ticket.id">
                 <button type="button"
                     class="w-full text-left rounded-box px-3 py-2 hover:bg-base-200 focus-visible:bg-base-200 flex items-center gap-3"

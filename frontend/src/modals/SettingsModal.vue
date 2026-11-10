@@ -784,6 +784,7 @@ const saveSettings = async () => {
 .modal-content {
     max-height: 58vh;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .theme-chips {
