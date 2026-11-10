@@ -10,10 +10,13 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
 ## 2.2.0
 
 - **Monobank sync.** Connect a personal token in Settings → Bank: cards sync automatically, including the last 31
-  days, with auto-tagging and optional Telegram pings. UAH jars can be tracked as savings goals.
+  days, with auto-tagging and optional Telegram pings. UAH jars can be tracked as savings goals. Purchases you
+  delete stay deleted, even after **Sync now**. A small bank icon in the List shows where a transaction came from.
   [Learn more](/docs/help/monobank/)
-- **Import preview.** Large statements open a dedicated preview page so you can see what will happen, edit tags,
-  apply bulk rules and then import — or undo the whole batch later. The assistant opens that page; the Telegram bot
+- **Import preview.** Click **Import** on the List tab (or send a file to the assistant) and a preview page opens
+  before anything is saved. It finds duplicates and transfers between your own cards, lets you match the bank's
+  categories to your tags, tag a shop in bulk or skip rows, and then import — or undo the whole batch later. The
+  bank's file format is remembered for next time. The assistant opens that page; the Telegram bot
   sends a link instead of importing right away. [Learn more](/docs/web/import/)
 
 ## 2.1.0
