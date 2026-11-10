@@ -125,7 +125,7 @@
         <div v-if="!inReport || balancesByTags.length" class="card card-border border-base-300 bg-base-100 min-w-0 overflow-hidden">
             <div class="card-body p-4 gap-3 min-w-0">
                 <div class="flex flex-wrap items-center gap-2 min-w-0">
-                    <button type="button" class="card-title text-base sm:text-lg min-w-0 cursor-pointer"
+                    <button type="button" class="card-title text-base sm:text-lg min-w-0 cursor-pointer rounded-field px-1 -mx-1 hover:bg-base-200 disabled:hover:bg-transparent"
                         :aria-expanded="balancesOpen" aria-controls="analytics-tag-balances"
                         :disabled="inReport" @click="toggleBalances">
                         <ChevronDown :size="20" class="shrink-0 transition-transform report-hide"

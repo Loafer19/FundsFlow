@@ -100,10 +100,44 @@ const balanceTrend = computed(() => {
     }
 })
 
-const chartBalances = computed(() => ({
-    currentBalances: balanceTrend.value.currentBalances,
-    previousBalances: compare.value ? balanceTrend.value.previousBalances : {},
-}))
+// Linear projection from today's net using the same average daily change as the Forecast card.
+// Empty when the period is fully in the past or today is the last day (nothing left to project).
+const forecastBalances = computed(() => {
+    const current = balanceTrend.value.currentBalances
+    const dates = Object.keys(current)
+    const todayIdx = dates.indexOf(nowDateStr())
+    if (todayIdx === -1 || todayIdx >= dates.length - 1) return {}
+
+    const elapsedDays = todayIdx + 1
+    const netToday = current[dates[todayIdx]]
+    const avg = elapsedDays ? netToday / elapsedDays : 0
+    const out = {}
+    for (let i = todayIdx; i < dates.length; i++) {
+        out[dates[i]] = netToday + avg * (i - todayIdx)
+    }
+    return out
+})
+
+const chartBalances = computed(() => {
+    const current = balanceTrend.value.currentBalances
+    const forecast = forecastBalances.value
+    const hasForecast = Object.keys(forecast).length > 0
+    const todayIdx = Object.keys(current).indexOf(nowDateStr())
+
+    let currentForChart = current
+    if (hasForecast) {
+        currentForChart = {}
+        Object.keys(current).forEach((date, i) => {
+            currentForChart[date] = i <= todayIdx ? current[date] : null
+        })
+    }
+
+    return {
+        currentBalances: currentForChart,
+        previousBalances: compare.value ? balanceTrend.value.previousBalances : {},
+        forecastBalances: forecast,
+    }
+})
 
 // Lowest / highest running net and the first day it was reached (null for an empty list).
 const extreme = (balances, pick) => {

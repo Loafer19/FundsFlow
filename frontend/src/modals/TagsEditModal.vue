@@ -37,7 +37,7 @@
                             </button>
                         </template>
                         <template #default="{ close }">
-                            <button type="button" class="badge gap-0 px-1 text-lg cursor-pointer mb-2 w-fit"
+                            <button type="button" class="badge gap-0 px-1 text-lg cursor-pointer mb-2 w-fit hover:opacity-80"
                                 :class="tag.parent_id ? 'badge-soft badge-neutral' : 'badge-neutral'"
                                 @click="tag.parent_id = ''; close()">
                                 No parent
@@ -47,7 +47,7 @@
                     </PopoverMenu>
                 </div>
 
-                <label class="flex items-center justify-between gap-3 cursor-pointer mb-4">
+                <label class="flex items-center justify-between gap-3 cursor-pointer mb-4 rounded-field px-1 -mx-1 hover:bg-base-200">
                     <span class="text-sm">Show in Balances</span>
                     <input v-model="tag.calc_balance" type="checkbox" class="toggle toggle-primary toggle-sm" />
                 </label>

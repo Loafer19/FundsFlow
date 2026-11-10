@@ -1,6 +1,6 @@
 <template>
     <details class="limit-history mt-1" :open="open">
-        <summary class="text-xs text-base-content/60 cursor-pointer select-none flex items-center gap-1">
+        <summary class="text-xs text-base-content/60 cursor-pointer select-none flex items-center gap-1 rounded-field px-1 -mx-1 py-0.5 hover:bg-base-200">
             <ChevronRight :size="14" class="limit-history__chevron shrink-0" />
             History
             <span class="ml-auto tabular-nums truncate">

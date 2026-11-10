@@ -22,7 +22,7 @@
     <div class="container mx-auto p-4 flex flex-col min-h-dvh"
         :class="{ 'max-md:pb-[calc(6rem+env(safe-area-inset-bottom))]': authStore.isAuthenticated }">
         <header class="flex gap-2 justify-end mb-4 flex-wrap items-center">
-            <a href="/" class="mr-auto flex items-center gap-2" @click.prevent="goHome">
+            <a href="/" class="mr-auto flex items-center gap-2 rounded-field hover:bg-base-200 px-1.5 py-1 -ml-1.5" @click.prevent="goHome">
                 <img src="/logo.png" alt="" width="28" height="28" class="size-7 rounded-lg" />
                 <span class="font-semibold">FundsFlow</span>
             </a>
@@ -86,7 +86,7 @@
                 <div class="join" role="radiogroup" aria-label="Date range type">
                     <button v-for="option in periodTypes" :key="option.value" type="button" role="radio"
                         class="join-item btn btn-square border-base-300 tooltip tooltip-bottom"
-                        :class="dateSelectionType === option.value ? 'btn-primary' : 'bg-base-100'"
+                        :class="dateSelectionType === option.value ? 'btn-primary' : 'bg-base-100 hover:bg-base-200'"
                         :data-tip="option.label" :aria-label="option.label"
                         :aria-checked="dateSelectionType === option.value" @click="setDateSelectionType(option.value)">
                         <component :is="option.icon" :size="18" />
@@ -134,7 +134,7 @@
                             <span v-if="tagFilterBadgeCount" class="badge badge-outline badge-sm">{{ tagFilterBadgeCount }}</span>
                         </button>
                     </template>
-                    <button type="button" class="badge badge-info gap-0 px-1 text-lg cursor-pointer mb-2 w-fit"
+                    <button type="button" class="badge badge-info gap-0 px-1 text-lg cursor-pointer mb-2 w-fit hover:opacity-80"
                         :class="{ 'badge-soft': !transactionsStore.filterUntagged }"
                         :aria-pressed="transactionsStore.filterUntagged"
                         @click="transactionsStore.filterUntagged = !transactionsStore.filterUntagged">

@@ -41,7 +41,7 @@
             </div>
 
             <div class="flex items-center gap-1 flex-wrap">
-                <button v-for="tag in tags" :key="tag.id" type="button" class="tooltip cursor-pointer"
+                <button v-for="tag in tags" :key="tag.id" type="button" class="tooltip cursor-pointer hover:opacity-70"
                     :data-tip="tag.title" @click="$emit('view-tags', tags)">{{ tag.emoji }}</button>
                 <div class="badge badge-sm ml-auto" :class="statusBadge">{{ statusLabel }}</div>
             </div>

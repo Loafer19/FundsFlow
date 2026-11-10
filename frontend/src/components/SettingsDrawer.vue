@@ -21,7 +21,7 @@
             <ul v-if="compact && !tab" class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col gap-1 p-3">
                     <li v-for="item in sections" :key="item.id">
                         <button type="button"
-                            class="w-full text-left rounded-box border border-base-300 bg-base-100 px-4 py-3 flex items-center gap-3"
+                            class="w-full text-left rounded-box border border-base-300 bg-base-100 px-4 py-3 flex items-center gap-3 hover:bg-base-200"
                             @click="tab = item.id">
                             <span class="shrink-0 rounded-lg p-1.5 bg-primary/15 text-primary">
                                 <component :is="item.icon" :size="18" />
@@ -73,7 +73,7 @@
                                 {{ title }}
                             </button>
                         </div>
-                        <label class="flex items-center justify-between gap-3 cursor-pointer">
+                        <label class="flex items-center justify-between gap-3 cursor-pointer rounded-field px-1 -mx-1 hover:bg-base-content/5">
                             <span class="text-sm">Show decimals</span>
                             <input v-model="decimals" type="checkbox" class="toggle toggle-primary toggle-sm" />
                         </label>
@@ -106,7 +106,7 @@
                                     <span class="chip bg-base-100 border border-base-300"></span>
                                 </span>
                                 <span class="text-sm truncate flex-1 text-left">{{ themeLabel(theme) }}</span>
-                                <span class="text-sm shrink-0" role="button" tabindex="0"
+                                <span class="text-sm shrink-0 hover:opacity-70" role="button" tabindex="0"
                                     :aria-label="'Unfavorite ' + theme"
                                     @click.stop="toggleFavorite(theme)"
                                     @keydown.enter.stop.prevent="toggleFavorite(theme)">★</span>
@@ -128,7 +128,7 @@
                                 <span class="chip bg-base-100 border border-base-300"></span>
                             </span>
                             <span class="text-sm truncate flex-1 text-left">{{ themeLabel(theme) }}</span>
-                            <span class="text-sm shrink-0 opacity-50" role="button" tabindex="0"
+                            <span class="text-sm shrink-0 opacity-50 hover:opacity-100" role="button" tabindex="0"
                                 :aria-label="'Favorite ' + theme"
                                 @click.stop="toggleFavorite(theme)"
                                 @keydown.enter.stop.prevent="toggleFavorite(theme)">☆</span>
@@ -138,6 +138,20 @@
                         </template>
 
                         <template v-else-if="activeSection === 'account'">
+                    <div class="p-3 rounded-box bg-base-200 mb-4">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <span class="font-medium text-sm">AI assists today</span>
+                            <span v-if="aiQuotaLoading" class="loading loading-spinner loading-xs"></span>
+                            <span v-else class="text-sm font-mono tabular-nums">
+                                {{ aiQuotaUsed }} / {{ aiQuotaLimit }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-base-content/60">
+                            Receipts, voice and text help<template v-if="aiQuotaResetLabel"> · resets
+                                {{ aiQuotaResetLabel }}</template>
+                        </p>
+                    </div>
+
                     <form @submit.prevent="saveCredentials" class="mb-4">
                         <div class="font-medium text-sm mb-2">Login credentials</div>
                         <input v-model="credentialsForm.email" type="email" placeholder="Email" aria-label="Email"
@@ -194,10 +208,6 @@
                         </template>
                     </div>
 
-                    <div class="mb-4">
-                        <BankSync :key="bankKey" />
-                    </div>
-
                     <div class="flex flex-col gap-2 p-3 rounded-box bg-base-200 mb-3">
                         <div class="flex items-center gap-2">
                             <span class="font-medium w-24 shrink-0 flex items-center gap-1">
@@ -240,18 +250,8 @@
                         </div>
                     </div>
 
-                    <div class="p-3 rounded-box bg-base-200">
-                        <div class="flex items-center justify-between gap-2 mb-1">
-                            <span class="font-medium text-sm">AI assists today</span>
-                            <span v-if="aiQuotaLoading" class="loading loading-spinner loading-xs"></span>
-                            <span v-else class="text-sm font-mono tabular-nums">
-                                {{ aiQuotaUsed }} / {{ aiQuotaLimit }}
-                            </span>
-                        </div>
-                        <p class="text-xs text-base-content/60">
-                            Receipts, voice and text help<template v-if="aiQuotaResetLabel"> · resets
-                                {{ aiQuotaResetLabel }}</template>
-                        </p>
+                    <div class="mb-4">
+                        <BankSync :key="bankKey" />
                     </div>
                         </template>
 
@@ -272,7 +272,7 @@
                     <p class="text-sm text-base-content/60 mb-3 break-words whitespace-normal">{{ reportPeriodLabel }}</p>
                     <div class="p-3 rounded-box bg-base-200 grid grid-cols-2 gap-x-6 gap-y-2 mb-4">
                         <label v-for="(title, key) in reportSectionTitles" :key="key"
-                            class="flex items-center justify-between gap-3 cursor-pointer">
+                            class="flex items-center justify-between gap-3 cursor-pointer rounded-field px-1 -mx-1 hover:bg-base-content/5">
                             <span class="text-sm">{{ title }}</span>
                             <input v-model="reportSections[key]" type="checkbox" class="toggle toggle-primary toggle-sm" />
                         </label>
@@ -372,8 +372,8 @@ const authStore = useAuthStore()
 
 const sections = [
     { id: 'appearance', title: 'Appearance', hint: 'Date, money, timezone and theme', icon: markRaw(Palette) },
-    { id: 'account', title: 'Account', hint: 'Login, email, password and social logins', icon: markRaw(UserRound) },
-    { id: 'connections', title: 'Connections', hint: 'Telegram, Monobank, MCP and AI quota', icon: markRaw(Cable) },
+    { id: 'account', title: 'Account', hint: 'Login, email, password, social logins and AI quota', icon: markRaw(UserRound) },
+    { id: 'connections', title: 'Connections', hint: 'Telegram, MCP and Monobank', icon: markRaw(Cable) },
     { id: 'data', title: 'Data & reports', hint: 'Import a statement, export a backup, or download a report', icon: markRaw(Database) },
     { id: 'support', title: 'Support', hint: 'Feedback and requests', icon: markRaw(LifeBuoy) },
 ]
@@ -621,6 +621,8 @@ const openDrawer = () => {
     bankKey.value++
     if (activeSection.value === 'connections') {
         refreshMcpTokenStatus()
+    }
+    if (activeSection.value === 'connections' || activeSection.value === 'account') {
         refreshAiQuota()
     }
 }
@@ -761,6 +763,8 @@ const revokeMcpTokenAction = async () => {
 watch(tab, (next) => {
     if (next === 'connections') {
         refreshMcpTokenStatus()
+    }
+    if (next === 'connections' || next === 'account') {
         refreshAiQuota()
     }
 })

@@ -47,7 +47,7 @@
             </div>
 
             <div class="flex items-center gap-1 flex-wrap">
-                <button v-for="tag in progress.tags" :key="tag.id" type="button" class="tooltip cursor-pointer"
+                <button v-for="tag in progress.tags" :key="tag.id" type="button" class="tooltip cursor-pointer hover:opacity-70"
                     :data-tip="tag.title" @click="$emit('view-tags', progress.tags)">{{ tag.emoji }}</button>
                 <span v-if="budget.monobank_jar" class="badge badge-sm badge-outline gap-1"
                     :class="budget.monobank_jar.linked ? '' : 'badge-warning'"

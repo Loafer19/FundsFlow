@@ -39,7 +39,7 @@
                     <thead>
                         <tr>
                             <th></th>
-                            <th role="button" tabindex="0" class="cursor-pointer"
+                            <th role="button" tabindex="0" class="cursor-pointer hover:bg-base-200"
                                 :aria-sort="sortConfig.key === 'at' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'"
                                 @click="sortBy('at')" @keydown.enter.prevent="sortBy('at')"
                                 @keydown.space.prevent="sortBy('at')">
@@ -48,7 +48,7 @@
                                     {{ sortConfig.direction === 'asc' ? '↑' : '↓' }}
                                 </span>
                             </th>
-                            <th role="button" tabindex="0" class="cursor-pointer"
+                            <th role="button" tabindex="0" class="cursor-pointer hover:bg-base-200"
                                 :aria-sort="sortConfig.key === 'amount' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'"
                                 @click="sortBy('amount')" @keydown.enter.prevent="sortBy('amount')"
                                 @keydown.space.prevent="sortBy('amount')">

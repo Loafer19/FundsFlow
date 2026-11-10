@@ -15,7 +15,7 @@
         <div v-else-if="!uuid" class="flex flex-col gap-4">
             <div
                 class="rounded-box border-2 border-dashed px-4 py-6 sm:py-12 text-center cursor-pointer transition-colors"
-                :class="dragging ? 'border-primary bg-primary/5' : 'border-base-300 bg-base-100'"
+                :class="dragging ? 'border-primary bg-primary/5' : 'border-base-300 bg-base-100 hover:border-primary/60 hover:bg-base-200'"
                 role="button"
                 tabindex="0"
                 :aria-disabled="uploading"
@@ -303,7 +303,7 @@
                                     <div class="flex flex-wrap gap-2 items-center">
                                         <button type="button"
                                             class="flex flex-wrap gap-2 items-center text-left min-w-0"
-                                            :class="editable ? 'cursor-pointer' : 'cursor-default'"
+                                            :class="editable ? 'cursor-pointer rounded-field hover:bg-base-200' : 'cursor-default'"
                                             :disabled="!editable"
                                             :aria-label="editable ? 'Edit tags' : 'Tags'"
                                             @click="editable && openRowPicker(row, $event)">

@@ -10,7 +10,7 @@
                         </div>
                         <div class="tabs tabs-box gap-1.5 p-0" role="radiogroup" :aria-label="group.label">
                             <label v-for="item in group.items" :key="item.key"
-                                class="tab gap-1 text-base font-medium hover:text-info shrink-0">
+                                class="tab gap-1 text-base font-medium hover:text-info hover:bg-base-200 shrink-0">
                                 <input type="radio" :name="'tabs_' + group.id" class="tab" :checked="item.key === modelValue"
                                     @change="$emit('update:modelValue', item.key)" />
                                 <component :is="item.icon" :size="20" />

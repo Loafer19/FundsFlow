@@ -67,7 +67,7 @@
     </template>
 
     <details v-if="goal && !jarLinked" class="mb-2" :open="showMore" @toggle="showMore = $event.target.open">
-        <summary class="text-sm text-base-content/60 cursor-pointer mb-2">More options</summary>
+        <summary class="text-sm text-base-content/60 cursor-pointer mb-2 rounded-field px-1 -mx-1 py-0.5 hover:bg-base-200">More options</summary>
         <label class="block">
             <span class="block text-sm text-base-content/60 mb-1">Already saved</span>
             <AmountField v-model="form.start_amount" :signed="false" :max="99_999_999.99" :autofocus="false"

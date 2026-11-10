@@ -4,7 +4,7 @@
             <button v-for="m in months" :key="m.month" type="button"
                 class="month-card tooltip rounded-box border-2 px-1.5 pt-2 pb-1.5 flex flex-col items-center gap-0.5 cursor-pointer transition-colors"
                 :class="[
-                    m.isCurrent ? 'border-primary bg-primary/20' : 'border-base-300 bg-base-100 hover:border-primary/60',
+                    m.isCurrent ? 'border-primary bg-primary/20 hover:bg-primary/30' : 'border-base-300 bg-base-100 hover:border-primary/60 hover:bg-base-200',
                     m.isFuture && 'opacity-60 hover:opacity-100',
                 ]"
                 :aria-label="ariaLabel(m)" :aria-current="m.isCurrent ? 'date' : undefined" @click="emit('pick', m)">

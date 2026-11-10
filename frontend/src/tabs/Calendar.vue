@@ -69,7 +69,7 @@
 
                     <div v-else class="grid grid-cols-2 gap-2">
                         <div v-for="item in selectedItems" :key="item.key" role="button" tabindex="0"
-                            class="card card-border border-base-300 bg-base-100 p-2 justify-between text-center cursor-pointer hover:border-primary"
+                            class="card card-border border-base-300 bg-base-100 p-2 justify-between text-center cursor-pointer hover:border-primary hover:bg-base-200"
                             :aria-label="itemAriaLabel(item)" @click="openItem(item)"
                             @keydown.enter.prevent="openItem(item)" @keydown.space.prevent="openItem(item)">
                             <div class="flex flex-wrap justify-center gap-1 mb-1">
@@ -118,7 +118,7 @@
 
                     <div v-else class="flex flex-col gap-2">
                         <button v-for="item in upcoming" :key="item.key" type="button"
-                            class="card card-border border-base-300 bg-base-100 flex-row items-center gap-2 p-2 text-left cursor-pointer hover:border-primary"
+                            class="card card-border border-base-300 bg-base-100 flex-row items-center gap-2 p-2 text-left cursor-pointer hover:border-primary hover:bg-base-200"
                             :aria-label="itemAriaLabel(item)" @click="openItem(item)">
                             <div class="radial-progress shrink-0 text-[10px]" :class="ringClass(item)"
                                 :style="{ '--value': ringValue(item), '--size': '2.5rem', '--thickness': '3px' }">
@@ -465,6 +465,7 @@ watch(
 
 .day-cell:hover {
     border-color: var(--color-primary);
+    background-color: var(--color-base-200);
 }
 
 .day-dot {

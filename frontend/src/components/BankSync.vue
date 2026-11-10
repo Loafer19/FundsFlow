@@ -3,175 +3,166 @@
         <span class="loading loading-dots loading-md text-base-content/40"></span>
     </div>
 
-    <template v-else-if="!connection.connected">
-        <p class="text-sm text-base-content/70 mb-3">
-            Import your monobank cards automatically. New purchases show up in FundsFlow,
-            and you can change the tag from the web app or Telegram.
-        </p>
+    <div v-else class="flex flex-col gap-2 p-3 rounded-box bg-base-200">
+        <div class="flex items-center gap-2">
+            <span class="font-medium w-24 shrink-0">Monobank</span>
+            <template v-if="connection.connected">
+                <span class="badge badge-sm" :class="statusBadge">{{ statusLabel }}</span>
+                <span v-if="connection.last_synced_at"
+                    class="ml-auto text-xs text-base-content/50 truncate max-w-[50%]"
+                    :title="'Last synced ' + formatDateTime(connection.last_synced_at)">
+                    Last synced {{ formatDateTime(connection.last_synced_at) }}
+                </span>
+            </template>
+            <span v-else class="badge badge-ghost badge-sm">Not connected</span>
+        </div>
 
-        <ol class="text-sm text-base-content/70 list-decimal pl-5 mb-4 space-y-1.5">
-            <li>
-                Open
-                <a href="https://api.monobank.ua" target="_blank" rel="noopener noreferrer"
-                    class="link link-primary">api.monobank.ua</a>
-            </li>
-            <li>Sign in with the monobank app or Diia</li>
-            <li>Copy your personal token (it stays on our server, encrypted)</li>
-            <li>Paste it below</li>
-        </ol>
+        <p v-if="connection.connected && connection.last_error" class="text-xs text-error">{{ connection.last_error }}</p>
 
-        <form class="flex flex-col gap-3" @submit.prevent="connect">
-            <input v-model="token" type="password" autocomplete="off" spellcheck="false"
-                class="input input-sm w-full font-mono" aria-label="Monobank personal token"
-                placeholder="Personal token" maxlength="512" required />
-            <div class="flex justify-end">
-                <button type="submit" class="btn btn-primary btn-sm" :disabled="busy || !token.trim()">
-                    <span v-if="busy" class="loading loading-spinner loading-xs"></span>
-                    Connect
+        <template v-if="!connection.connected">
+            <p class="text-sm text-base-content/70">
+                Import your monobank cards automatically. New purchases show up in FundsFlow,
+                and you can change the tag from the web app or Telegram.
+            </p>
+
+            <ol class="text-sm text-base-content/70 list-decimal pl-5 space-y-1.5">
+                <li>
+                    Open
+                    <a href="https://api.monobank.ua" target="_blank" rel="noopener noreferrer"
+                        class="link link-primary">api.monobank.ua</a>
+                </li>
+                <li>Sign in with the monobank app or Diia</li>
+                <li>Copy your personal token (it stays on our server, encrypted)</li>
+                <li>Paste it below</li>
+            </ol>
+
+            <form class="flex flex-col gap-3" @submit.prevent="connect">
+                <input v-model="token" type="password" autocomplete="off" spellcheck="false"
+                    class="input input-sm w-full font-mono" aria-label="Monobank personal token"
+                    placeholder="Personal token" maxlength="512" required />
+                <div class="flex justify-end">
+                    <button type="submit" class="btn btn-primary btn-sm" :disabled="busy || !token.trim()">
+                        <span v-if="busy" class="loading loading-spinner loading-xs"></span>
+                        Connect
+                    </button>
+                </div>
+            </form>
+
+            <details class="rounded-box bg-base-100 px-3 py-2">
+                <summary class="text-sm font-medium cursor-pointer py-1 rounded-field hover:bg-base-200 -mx-1 px-1">How it works</summary>
+                <ul class="text-sm text-base-content/70 list-disc pl-5 pb-2 space-y-1.5">
+                    <li v-for="item in howItWorks" :key="item">{{ item }}</li>
+                </ul>
+            </details>
+        </template>
+
+        <template v-else>
+            <details class="rounded-box bg-base-100 px-3 py-2">
+                <summary class="text-sm font-medium cursor-pointer py-1 rounded-field hover:bg-base-200 -mx-1 px-1">How it works</summary>
+                <ul class="text-sm text-base-content/70 list-disc pl-5 pb-2 space-y-1.5">
+                    <li v-for="item in howItWorks" :key="item">{{ item }}</li>
+                </ul>
+            </details>
+
+            <label class="flex items-center justify-between gap-3 p-3 rounded-box bg-base-100 cursor-pointer hover:bg-base-content/5">
+                <span class="text-sm">Notify in Telegram</span>
+                <input type="checkbox" class="toggle toggle-primary toggle-sm"
+                    :checked="connection.notify" :disabled="busy" @change="toggleNotify($event.target.checked)" />
+            </label>
+
+            <div class="flex flex-col gap-2">
+                <div v-for="account in connection.accounts" :key="account.id"
+                    class="p-3 rounded-box bg-base-100">
+                    <div class="flex items-start justify-between gap-3 mb-2">
+                        <label class="flex items-start gap-2 min-w-0 cursor-pointer"
+                            :class="{ 'opacity-60': !account.syncable }">
+                            <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5"
+                                :checked="account.enabled" :disabled="busy || !account.syncable"
+                                @change="toggleAccount(account, $event.target.checked)" />
+                            <span>
+                                <span class="text-sm font-medium block">{{ account.label }}</span>
+                                <span class="text-xs text-base-content/50">
+                                    {{ account.currency }}
+                                    <template v-if="!account.syncable"> · UAH only — this card isn’t imported</template>
+                                </span>
+                            </span>
+                        </label>
+                    </div>
+                    <PopoverMenu label="Extra tag" root-class="block w-full">
+                        <template #trigger="{ toggle, open }">
+                            <button type="button" class="btn btn-xs border-base-300 font-normal gap-1"
+                                :class="accountTag(account) ? '' : 'text-base-content/50'"
+                                :disabled="busy" :aria-expanded="open" aria-haspopup="dialog"
+                                :aria-label="`Tag for ${account.label}`" @click="toggle">
+                                <template v-if="accountTag(account)">
+                                    <span>{{ accountTag(account).emoji }}</span>
+                                    <span>{{ accountTag(account).title }}</span>
+                                </template>
+                                <span v-else>No extra tag</span>
+                            </button>
+                        </template>
+                        <template #default="{ close }">
+                            <button type="button" class="badge gap-0 px-1 text-lg cursor-pointer mb-2 w-fit hover:opacity-80"
+                                :class="account.tag_id ? 'badge-soft badge-neutral' : 'badge-neutral'"
+                                @click="mapTag(account, ''); close()">
+                                No extra tag
+                            </button>
+                            <TagPicker :model-value="account.tag_id ? [account.tag_id] : []" single
+                                @update:model-value="onAccountTags(account, $event, close)" />
+                        </template>
+                    </PopoverMenu>
+                </div>
+                <p v-if="!connection.accounts?.length" class="text-xs text-base-content/50">
+                    No cards were returned for this token
+                </p>
+            </div>
+
+            <div v-if="connection.jars?.length">
+                <h3 class="text-sm font-medium mb-1">Jars</h3>
+                <p class="text-xs text-base-content/60 mb-2">
+                    Track a UAH jar as a savings goal. Progress follows the jar balance — you can set a target and deadline on the goal.
+                </p>
+                <div class="flex flex-col gap-2">
+                    <div v-for="jar in connection.jars" :key="jar.id" class="p-3 rounded-box bg-base-100">
+                        <label class="flex items-start justify-between gap-3 cursor-pointer"
+                            :class="{ 'opacity-60': !jar.syncable }">
+                            <span class="min-w-0">
+                                <span class="text-sm font-medium block">{{ jar.label }}</span>
+                                <span class="text-xs text-base-content/50">
+                                    {{ jar.currency }}
+                                    <template v-if="jar.balance != null">
+                                        · {{ formatMoney(jar.balance) }}
+                                    </template>
+                                    <template v-if="jar.goal_amount">
+                                        of {{ formatMoney(jar.goal_amount) }}
+                                    </template>
+                                    <template v-if="!jar.syncable"> · UAH only</template>
+                                </span>
+                            </span>
+                            <span class="flex items-center gap-2 shrink-0">
+                                <span class="text-xs text-base-content/60 hidden sm:inline">Track as goal</span>
+                                <input type="checkbox" class="toggle toggle-primary toggle-sm"
+                                    :checked="jar.track_as_goal"
+                                    :disabled="busy || !jar.syncable"
+                                    :aria-label="`Track ${jar.label} as goal`"
+                                    @change="toggleJar(jar, $event.target.checked)" />
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap justify-end gap-2 pt-1">
+                <button type="button" class="btn btn-outline btn-sm" :disabled="busy || cooldown > 0" @click="syncNow">
+                    <span v-if="syncing" class="loading loading-spinner loading-xs"></span>
+                    {{ cooldown > 0 ? `Sync in ${cooldown}s` : 'Sync now' }}
+                </button>
+                <button type="button" class="btn btn-outline btn-error btn-sm" :disabled="busy" @click="disconnect">
+                    Disconnect
                 </button>
             </div>
-        </form>
-
-                <details class="rounded-box bg-base-200 px-3 py-2 mt-4">
-            <summary class="text-sm font-medium cursor-pointer py-1">How it works</summary>
-            <ul class="text-sm text-base-content/70 list-disc pl-5 pb-2 space-y-1.5">
-                <li>Transfers between your own cards and jars are not counted as income or expenses.</li>
-                <li>Only UAH cards are synced. Foreign-currency cards are listed but left off.</li>
-                <li>Pending (hold) purchases appear immediately; the amount updates when they settle.</li>
-                <li>The last 31 days are imported when you connect. New purchases arrive instantly after that.</li>
-                <li>Auto-tagging learns from the tags you change on imported purchases.</li>
-                <li>Deleted purchases stay deleted: Sync now won't bring them back.</li>
-                <li>Telegram notifications are sent only for new purchases, not the first import or Sync now.</li>
-                <li>Your token is stored encrypted. You can revoke it any time at api.monobank.ua.</li>
-                <li>UAH jars can be tracked as savings goals: progress follows the jar balance in monobank.</li>
-            </ul>
-        </details>
-    </template>
-
-    <template v-else>
-        <div class="flex items-center gap-2 mb-3">
-            <span class="font-medium text-sm">Monobank</span>
-            <span class="badge badge-sm" :class="statusBadge">{{ statusLabel }}</span>
-        </div>
-
-        <p v-if="connection.last_synced_at" class="text-xs text-base-content/60 mb-2">
-            Last synced {{ formatDateTime(connection.last_synced_at) }}
-        </p>
-        <p v-if="connection.last_error" class="text-xs text-error mb-3">{{ connection.last_error }}</p>
-
-                <details class="rounded-box bg-base-200 px-3 py-2 mb-3">
-            <summary class="text-sm font-medium cursor-pointer py-1">How it works</summary>
-            <ul class="text-sm text-base-content/70 list-disc pl-5 pb-2 space-y-1.5">
-                <li>Transfers between your own cards and jars are not counted as income or expenses.</li>
-                <li>Only UAH cards are synced. Foreign-currency cards are listed but left off.</li>
-                <li>Pending (hold) purchases appear immediately; the amount updates when they settle.</li>
-                <li>The last 31 days are imported when you connect. New purchases arrive instantly after that.</li>
-                <li>Auto-tagging learns from the tags you change on imported purchases.</li>
-                <li>Deleted purchases stay deleted: Sync now won't bring them back.</li>
-                <li>Telegram notifications are sent only for new purchases, not the first import or Sync now.</li>
-                <li>Your token is stored encrypted. You can revoke it any time at api.monobank.ua.</li>
-                <li>UAH jars can be tracked as savings goals: progress follows the jar balance in monobank.</li>
-            </ul>
-        </details>
-
-        <label class="flex items-center justify-between gap-3 p-3 rounded-box bg-base-200 mb-3 cursor-pointer">
-            <span class="text-sm">Notify in Telegram</span>
-            <input type="checkbox" class="toggle toggle-primary toggle-sm"
-                :checked="connection.notify" :disabled="busy" @change="toggleNotify($event.target.checked)" />
-        </label>
-
-        <div class="flex flex-col gap-2 mb-4">
-            <div v-for="account in connection.accounts" :key="account.id"
-                class="p-3 rounded-box bg-base-200">
-                <div class="flex items-start justify-between gap-3 mb-2">
-                    <label class="flex items-start gap-2 min-w-0 cursor-pointer"
-                        :class="{ 'opacity-60': !account.syncable }">
-                        <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5"
-                            :checked="account.enabled" :disabled="busy || !account.syncable"
-                            @change="toggleAccount(account, $event.target.checked)" />
-                        <span>
-                            <span class="text-sm font-medium block">{{ account.label }}</span>
-                            <span class="text-xs text-base-content/50">
-                                {{ account.currency }}
-                                <template v-if="!account.syncable"> · UAH only — this card isn’t imported</template>
-                            </span>
-                        </span>
-                    </label>
-                </div>
-                <PopoverMenu label="Extra tag" root-class="block w-full">
-                    <template #trigger="{ toggle, open }">
-                        <button type="button" class="badge badge-soft px-2 gap-1 text-base h-8 font-normal"
-                            :class="accountTag(account) ? 'badge-info' : 'badge-neutral'"
-                            :disabled="busy" :aria-expanded="open" aria-haspopup="dialog"
-                            :aria-label="`Tag for ${account.label}`" @click="toggle">
-                            <template v-if="accountTag(account)">
-                                <span>{{ accountTag(account).emoji }}</span>
-                                <span>{{ accountTag(account).title }}</span>
-                            </template>
-                            <span v-else>No extra tag</span>
-                        </button>
-                    </template>
-                    <template #default="{ close }">
-                        <button type="button" class="badge gap-0 px-1 text-lg cursor-pointer mb-2 w-fit"
-                            :class="account.tag_id ? 'badge-soft badge-neutral' : 'badge-neutral'"
-                            @click="mapTag(account, ''); close()">
-                            No extra tag
-                        </button>
-                        <TagPicker :model-value="account.tag_id ? [account.tag_id] : []" single
-                            @update:model-value="onAccountTags(account, $event, close)" />
-                    </template>
-                </PopoverMenu>
-            </div>
-            <p v-if="!connection.accounts?.length" class="text-xs text-base-content/50">
-                No cards were returned for this token
-            </p>
-        </div>
-
-        <div v-if="connection.jars?.length" class="mb-4">
-            <h3 class="text-sm font-medium mb-1">Jars</h3>
-            <p class="text-xs text-base-content/60 mb-2">
-                Track a UAH jar as a savings goal. Progress follows the jar balance — you can set a target and deadline on the goal.
-            </p>
-            <div class="flex flex-col gap-2">
-                <div v-for="jar in connection.jars" :key="jar.id" class="p-3 rounded-box bg-base-200">
-                    <label class="flex items-start justify-between gap-3 cursor-pointer"
-                        :class="{ 'opacity-60': !jar.syncable }">
-                        <span class="min-w-0">
-                            <span class="text-sm font-medium block">{{ jar.label }}</span>
-                            <span class="text-xs text-base-content/50">
-                                {{ jar.currency }}
-                                <template v-if="jar.balance != null">
-                                    · {{ formatMoney(jar.balance) }}
-                                </template>
-                                <template v-if="jar.goal_amount">
-                                    of {{ formatMoney(jar.goal_amount) }}
-                                </template>
-                                <template v-if="!jar.syncable"> · UAH only</template>
-                            </span>
-                        </span>
-                        <span class="flex items-center gap-2 shrink-0">
-                            <span class="text-xs text-base-content/60 hidden sm:inline">Track as goal</span>
-                            <input type="checkbox" class="toggle toggle-primary toggle-sm"
-                                :checked="jar.track_as_goal"
-                                :disabled="busy || !jar.syncable"
-                                :aria-label="`Track ${jar.label} as goal`"
-                                @change="toggleJar(jar, $event.target.checked)" />
-                        </span>
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <div class="flex flex-wrap justify-end gap-2">
-            <button type="button" class="btn btn-outline btn-sm" :disabled="busy || cooldown > 0" @click="syncNow">
-                <span v-if="syncing" class="loading loading-spinner loading-xs"></span>
-                {{ cooldown > 0 ? `Sync in ${cooldown}s` : 'Sync now' }}
-            </button>
-            <button type="button" class="btn btn-outline btn-error btn-sm" :disabled="busy" @click="disconnect">
-                Disconnect
-            </button>
-        </div>
-    </template>
+        </template>
+    </div>
 </template>
 
 <script setup>
@@ -189,6 +180,18 @@ import { useTagsStore } from '../services/tags'
 import toasts from '../services/toasts'
 import PopoverMenu from './PopoverMenu.vue'
 import TagPicker from './TagPicker.vue'
+
+const howItWorks = [
+    'Transfers between your own cards and jars are not counted as income or expenses.',
+    'Only UAH cards are synced. Foreign-currency cards are listed but left off.',
+    'Pending (hold) purchases appear immediately; the amount updates when they settle.',
+    'The last 31 days are imported when you connect. New purchases arrive instantly after that.',
+    'Auto-tagging learns from the tags you change on imported purchases.',
+    "Deleted purchases stay deleted: Sync now won't bring them back.",
+    'Telegram notifications are sent only for new purchases, not the first import or Sync now.',
+    'Your token is stored encrypted. You can revoke it any time at api.monobank.ua.',
+    'UAH jars can be tracked as savings goals: progress follows the jar balance in monobank.',
+]
 
 const empty = { connected: false, accounts: [], jars: [], notify: true, status: 'active' }
 const connection = ref({ ...empty })

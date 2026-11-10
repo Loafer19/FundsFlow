@@ -30,8 +30,12 @@ const formatMoney = inject('formatMoney')
 
 const { colors, narrow } = useChartTheme()
 
+const hasForecast = computed(() =>
+    Object.values(props.balances.forecastBalances || {}).some((value) => value != null),
+)
+
 const chartData = computed(() => {
-    const { currentBalances, previousBalances } = props.balances
+    const { currentBalances, previousBalances, forecastBalances = {} } = props.balances
     const currentLabels = Object.keys(currentBalances)
     const previousLabels = Object.keys(previousBalances)
 
@@ -40,42 +44,68 @@ const chartData = computed(() => {
     // Dots only while they stay readable; long ranges (a year) are a plain line with a hover dot.
     const pointRadius = labels.length > 45 || narrow.value ? 0 : 2
 
+    const pad = (values) =>
+        values.length >= labels.length ? values : [...values, ...Array(labels.length - values.length).fill(null)]
+
+    const datasets = [
+        {
+            label: 'This period',
+            data: pad(Object.values(currentBalances)),
+            borderColor: colors.value.success,
+            backgroundColor: colors.value.success,
+            borderWidth: 2,
+            pointRadius,
+            pointHoverRadius: 4,
+            tension: 0.1,
+            tooltip: {
+                callbacks: {
+                    label: (context) =>
+                        `${formatDate(currentLabels[context.dataIndex])}: ${formatMoney(context.raw)}`,
+                },
+            },
+        },
+    ]
+
+    if (hasForecast.value) {
+        datasets.push({
+            label: 'Forecast',
+            data: pad(currentLabels.map((date) => (forecastBalances[date] != null ? forecastBalances[date] : null))),
+            borderColor: colors.value.muted,
+            backgroundColor: colors.value.muted,
+            borderWidth: 2,
+            borderDash: [6, 4],
+            pointRadius,
+            pointHoverRadius: 4,
+            tension: 0.1,
+            tooltip: {
+                callbacks: {
+                    label: (context) =>
+                        `Forecast · ${formatDate(currentLabels[context.dataIndex])}: ${formatMoney(context.raw)}`,
+                },
+            },
+        })
+    }
+
+    datasets.push({
+        label: 'Previous period',
+        data: Object.values(previousBalances),
+        borderColor: colors.value.error,
+        backgroundColor: colors.value.error,
+        borderWidth: 2,
+        pointRadius,
+        pointHoverRadius: 4,
+        tension: 0.1,
+        tooltip: {
+            callbacks: {
+                label: (context) =>
+                    `Previous · ${formatDate(previousLabels[context.dataIndex])}: ${formatMoney(context.raw)}`,
+            },
+        },
+    })
+
     return {
         labels: labels.map((date) => formatDate(date)),
-        datasets: [
-            {
-                label: 'This period',
-                data: Object.values(currentBalances),
-                borderColor: colors.value.success,
-                backgroundColor: colors.value.success,
-                borderWidth: 2,
-                pointRadius,
-                pointHoverRadius: 4,
-                tension: 0.1,
-                tooltip: {
-                    callbacks: {
-                        label: (context) =>
-                            `${formatDate(currentLabels[context.dataIndex])}: ${formatMoney(context.raw)}`,
-                    },
-                },
-            },
-            {
-                label: 'Previous period',
-                data: Object.values(previousBalances),
-                borderColor: colors.value.error,
-                backgroundColor: colors.value.error,
-                borderWidth: 2,
-                pointRadius,
-                pointHoverRadius: 4,
-                tension: 0.1,
-                tooltip: {
-                    callbacks: {
-                        label: (context) =>
-                            `Previous · ${formatDate(previousLabels[context.dataIndex])}: ${formatMoney(context.raw)}`,
-                    },
-                },
-            },
-        ],
+        datasets,
     }
 })
 
@@ -113,7 +143,16 @@ const chartOptions = computed(() => ({
     },
     plugins: {
         legend: {
-            display: false,
+            display: hasForecast.value,
+            position: 'top',
+            align: 'end',
+            labels: {
+                boxWidth: 14,
+                boxHeight: 2,
+                padding: 10,
+                color: colors.value.text,
+                font: { size: narrow.value ? 10 : 12 },
+            },
         },
         tooltip: {
             displayColors: false,
