@@ -1,0 +1,68 @@
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:10px 12px 12px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color)}
+.h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 10px}
+h3{margin:0;font-size:1.05em;font-weight:650}
+.d{color:var(--tg-theme-hint-color);font-size:.8em}
+.row{display:flex;gap:6px}
+.card{flex:1;min-width:0;background:var(--tg-theme-secondary-bg-color);border-radius:10px;padding:8px}
+.l{color:var(--tg-theme-hint-color);font-size:.72em;margin:0 0 2px}
+.v{font-size:1.05em;font-weight:650;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pos{color:var(--tg-theme-accent-text-color)}
+.neg{color:var(--tg-theme-destructive-text-color)}
+svg{display:block;width:100%;height:52px;margin:10px 0 4px}
+.tags{margin:0;padding:0;list-style:none}
+.tags li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid var(--tg-theme-section-separator-color);font-size:.9em}
+.tags b{font-weight:650;font-variant-numeric:tabular-nums}
+.empty{color:var(--tg-theme-hint-color);font-size:.9em;margin:8px 0 0}
+</style>
+<div class="h"><h3 id="p">This month</h3><span class="d" id="r"></span></div>
+<div class="row">
+<div class="card"><div class="l">Income</div><div class="v pos" id="i">—</div></div>
+<div class="card"><div class="l">Expenses</div><div class="v neg" id="e">—</div></div>
+<div class="card"><div class="l">Balance</div><div class="v" id="b">—</div></div>
+</div>
+<svg id="c" viewBox="0 0 280 52" preserveAspectRatio="none"></svg>
+<ul class="tags" id="t"></ul>
+<p class="empty" id="z" hidden>No transactions this month</p>
+<script>
+const W=window.TelegramWidget;
+function parse(s){try{return s?JSON.parse(s):null}catch(e){return null}}
+function spark(el,pts){
+  el.innerHTML='';
+  if(!pts||!pts.length)return;
+  const w=280,h=52,p=3;
+  let min=Math.min.apply(null,pts),max=Math.max.apply(null,pts);
+  if(min===max){min-=1;max+=1}
+  const n=pts.length,sx=(w-2*p)/Math.max(1,n-1),sy=(h-2*p)/(max-min);
+  let d='',i=0;
+  for(;i<n;i++){const x=p+i*sx,y=h-p-(pts[i]-min)*sy;d+=(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)}
+  const mid=h-p-(0-min)*sy;
+  el.innerHTML='<path d="M'+p+' '+mid.toFixed(1)+' H'+(w-p)+'" fill="none" stroke="var(--tg-theme-section-separator-color)" stroke-width="1"/><path d="'+d+'" fill="none" stroke="var(--tg-theme-accent-text-color)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+}
+function render(){
+  const d=parse(W&&W.chatData)||{};
+  document.getElementById('p').textContent=d.p||'This month';
+  document.getElementById('r').textContent=(d.f&&d.to)?(d.f+' – '+d.to):'';
+  document.getElementById('i').textContent=d.i||'—';
+  document.getElementById('e').textContent=d.e||'—';
+  const b=document.getElementById('b');
+  b.textContent=d.b||'—';
+  b.className='v'+(d.bn<0?' neg':d.bn>0?' pos':'');
+  spark(document.getElementById('c'),d.s||[]);
+  const ul=document.getElementById('t');
+  ul.innerHTML='';
+  (d.t||[]).forEach(function(row){
+    const li=document.createElement('li');
+    const a=document.createElement('span');
+    const c=document.createElement('b');
+    a.textContent=row[0];
+    c.textContent=row[1];
+    li.appendChild(a);li.appendChild(c);ul.appendChild(li);
+  });
+  document.getElementById('z').hidden=!!((d.t&&d.t.length)||(d.s&&d.s.some(function(v){return v!==0})));
+}
+if(W&&W.onEvent)W.onEvent('chatDataChanged',render);
+if(W&&W.ready)W.ready();
+render();
+</script>

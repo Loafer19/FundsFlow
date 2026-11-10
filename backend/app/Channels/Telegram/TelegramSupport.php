@@ -72,12 +72,14 @@ class TelegramSupport
         $this->client->sendMessage(
             $chatId,
             "Commands\n"
-            . "/month — this month's income, expenses, net, top tags\n"
+            . "/month — this month's income, expenses, net, top tags (live widget in a private chat)\n"
             . "/analytics — same as /month\n"
+            . "/summary — same as /month\n"
             . '/recent — last ' . self::RECENT_LIMIT . " transactions\n"
             . "/tags — list your tags\n"
             . "/newtag — create a tag: /newtag 🍕 Fast Food > Food\n"
-            . "/budgets — spending limits and savings goals\n"
+            . "/budgets — spending limits and savings goals (live widget in a private chat)\n"
+            . "/add — quick-add keypad widget (private chat)\n"
             . "/recurring — recurring rules\n"
             . "/app — open the Web UI from the menu button\n"
             . "/website — one-time web login code\n"
@@ -258,7 +260,6 @@ class TelegramSupport
         );
     }
 
-
     /**
      * $remember: also note it in the assistant memory ("Saved: …", "Receipt saved: …"); off when
      * the card only re-shows an existing transaction.
@@ -402,7 +403,6 @@ class TelegramSupport
         ];
     }
 
-
     /**
      * Confirm keyboard for agent-staged mutations (transactions, budgets, …).
      *
@@ -441,6 +441,7 @@ class TelegramSupport
     public function nlAskSuggestionsKeyboard(array $suggestions): array
     {
         $buttons = [];
+
         foreach (array_values($suggestions) as $index => $label) {
             $buttons[] = [
                 'text' => mb_substr((string) $label, 0, 64),
@@ -486,13 +487,16 @@ class TelegramSupport
         ];
 
         $note = $draft['note'] ?? null;
+
         if (is_string($note) && $note !== '') {
             $lines[] = '📝 ' . $this->escapeHtml($note);
         }
 
         $titles = $draft['suggested_tag_titles'] ?? [];
+
         if (is_array($titles) && $titles !== []) {
             $matched = $this->matchSuggestedTagTitles($user, $titles);
+
             if ($matched !== []) {
                 $label = implode(', ', array_map(
                     fn (Tag $tag) => $this->escapeHtml(trim($tag->emoji . ' ' . $tag->title)),
@@ -621,7 +625,7 @@ class TelegramSupport
     }
 
     /**
-     * @return array{at: string, amount: float, note: ?string}|array{error: string}|null
+     * @return null|array{at: string, amount: float, note: ?string}|array{error: string}
      */
     public function parseQuickAdd(string $text, ?User $user = null): ?array
     {

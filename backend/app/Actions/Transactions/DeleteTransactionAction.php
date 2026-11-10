@@ -2,6 +2,7 @@
 
 namespace App\Actions\Transactions;
 
+use App\Channels\Telegram\Widgets\TelegramWidgetSync;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
@@ -19,6 +20,6 @@ class DeleteTransactionAction
         }
 
         $transaction->delete();
+        app(TelegramWidgetSync::class)->schedule($user);
     }
 }
-

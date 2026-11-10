@@ -2,6 +2,7 @@
 
 namespace App\Actions\Transactions;
 
+use App\Channels\Telegram\Widgets\TelegramWidgetSync;
 use App\Enums\TransactionSource;
 use App\Models\Transaction;
 use App\Models\User;
@@ -27,7 +28,9 @@ class CreateTransactionAction
         $transaction->tags()->attach($tags);
 
         // Reload from DB so the response reflects stored amount (not in-memory input).
-        return $transaction->fresh()->load(['tags', 'attachments']);
+        $transaction = $transaction->fresh()->load(['tags', 'attachments']);
+        app(TelegramWidgetSync::class)->schedule($user);
+
+        return $transaction;
     }
 }
-

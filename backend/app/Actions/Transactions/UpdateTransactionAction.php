@@ -3,6 +3,7 @@
 namespace App\Actions\Transactions;
 
 use App\Actions\Monobank\LearnMonobankTagRuleAction;
+use App\Channels\Telegram\Widgets\TelegramWidgetSync;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Support\TagIds;
@@ -37,7 +38,8 @@ class UpdateTransactionAction
             app(LearnMonobankTagRuleAction::class)->execute($user, $transaction);
         }
 
+        app(TelegramWidgetSync::class)->schedule($user);
+
         return $transaction;
     }
 }
-

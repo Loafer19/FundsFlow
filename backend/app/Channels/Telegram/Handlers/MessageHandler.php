@@ -50,30 +50,6 @@ class MessageHandler
     }
 
     /**
-     * @param array<string, mixed> $message
-     */
-    private function messageId(array $message): ?int
-    {
-        return is_int($message['message_id'] ?? null) ? $message['message_id'] : null;
-    }
-
-    /**
-     * Text of the bot message the user replied to (context for the assistant), cut short.
-     *
-     * @param array<string, mixed> $message
-     */
-    private function quotedBotText(array $message): ?string
-    {
-        $replied = $message['reply_to_message'] ?? null;
-        if (!is_array($replied) || ($replied['from']['is_bot'] ?? false) !== true) {
-            return null;
-        }
-        $text = trim((string) ($replied['text'] ?? $replied['caption'] ?? ''));
-
-        return $text !== '' ? mb_substr($text, 0, 500) : null;
-    }
-
-    /**
      * Telegram voice note or audio file → STT → same path as typed text.
      *
      * @param array<string, mixed> $message
@@ -173,10 +149,36 @@ class MessageHandler
         // Otherwise hint here when STT alone left the budget low.
         if ($this->transcribeAudio->quota()->remaining($user) === $remainingAfterStt) {
             $hint = $this->transcribeAudio->quota()->lowRemainingHint($user);
+
             if ($hint !== null) {
                 $this->client->sendMessage($chatId, $hint);
             }
         }
+    }
+
+    /**
+     * @param array<string, mixed> $message
+     */
+    private function messageId(array $message): ?int
+    {
+        return is_int($message['message_id'] ?? null) ? $message['message_id'] : null;
+    }
+
+    /**
+     * Text of the bot message the user replied to (context for the assistant), cut short.
+     *
+     * @param array<string, mixed> $message
+     */
+    private function quotedBotText(array $message): ?string
+    {
+        $replied = $message['reply_to_message'] ?? null;
+
+        if (!is_array($replied) || ($replied['from']['is_bot'] ?? false) !== true) {
+            return null;
+        }
+        $text = trim((string) ($replied['text'] ?? $replied['caption'] ?? ''));
+
+        return $text !== '' ? mb_substr($text, 0, 500) : null;
     }
 
     /**
@@ -235,22 +237,25 @@ class MessageHandler
 
         // Menu views: one line each in the assistant memory shared with the web chat.
         $view = match (true) {
-            $text === '/month' || $text === '/analytics' || $text === TelegramSupport::MENU_MONTH => 'Month summary',
+            $text === '/month' || $text === '/analytics' || $text === '/summary' || $text === TelegramSupport::MENU_MONTH => 'Month summary',
             $text === '/recent' || $text === TelegramSupport::MENU_RECENT => 'Recent transactions',
             $text === '/tags' || $text === TelegramSupport::MENU_TAGS => 'Tags',
             $text === '/budgets' || $text === TelegramSupport::MENU_BUDGETS => 'Budgets',
             $text === '/recurring' || $text === TelegramSupport::MENU_RECURRING => 'Recurring rules',
+            $text === '/add' => 'Quick add',
             default => null,
         };
+
         if ($view !== null) {
             $this->notes->outcome($chatId, $user, "Shown in Telegram: {$view}");
         }
 
         match (true) {
-            $text === '/month' || $text === '/analytics' || $text === TelegramSupport::MENU_MONTH => $this->menuHandler->sendMonthSummary($user, $chatId, $telegramUserId),
+            $text === '/month' || $text === '/analytics' || $text === '/summary' || $text === TelegramSupport::MENU_MONTH => $this->menuHandler->sendMonthSummary($user, $chatId, $telegramUserId),
             $text === '/recent' || $text === TelegramSupport::MENU_RECENT => $this->menuHandler->sendRecent($user, $chatId, $telegramUserId),
             $text === '/tags' || $text === TelegramSupport::MENU_TAGS => $this->menuHandler->sendTags($user, $chatId, $telegramUserId),
             $text === '/budgets' || $text === TelegramSupport::MENU_BUDGETS => $this->menuHandler->sendBudgets($user, $chatId, $telegramUserId),
+            $text === '/add' => $this->menuHandler->sendAddWidget($user, $chatId),
             $text === '/recurring' || $text === TelegramSupport::MENU_RECURRING => $this->menuHandler->sendRecurring($user, $chatId),
             $text === TelegramSupport::MENU_WEB => $this->support->sendMiniAppHint($chatId),
             $text === '/website' => $this->authHandler->sendWebsiteLoginCode($user, $chatId),
@@ -343,7 +348,7 @@ class MessageHandler
 
     /**
      * @param array<string, mixed> $message
-     * @return array{file_id: string, name: string, mime: string, file_size: int}|null
+     * @return null|array{file_id: string, name: string, mime: string, file_size: int}
      */
     private function extractVoiceOrAudioFile(array $message): ?array
     {
@@ -378,7 +383,7 @@ class MessageHandler
      * Download without receipt JPEG/PDF MIME rules.
      *
      * @param array{file_id: string, name: string, mime: string, file_size: int} $file
-     * @return array{0: string, 1: array{name: string, mime: string}}|null
+     * @return null|array{0: string, 1: array{name: string, mime: string}}
      */
     private function downloadVoiceFile(int|string $chatId, array $file): ?array
     {

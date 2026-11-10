@@ -5,6 +5,8 @@ namespace App\Channels\Telegram;
 use App\Channels\Telegram\Handlers\CallbackHandler;
 use App\Channels\Telegram\Handlers\MediaHandler;
 use App\Channels\Telegram\Handlers\MessageHandler;
+use App\Channels\Telegram\Handlers\WidgetQueryHandler;
+use App\Channels\Telegram\Widgets\TelegramWidgetSync;
 use App\Support\UserActivity;
 
 class TelegramBot
@@ -13,8 +15,10 @@ class TelegramBot
         private readonly CallbackHandler $callbackHandler,
         private readonly MessageHandler $messageHandler,
         private readonly MediaHandler $mediaHandler,
+        private readonly WidgetQueryHandler $widgetQueryHandler,
         private readonly TelegramSupport $support,
         private readonly TelegramClient $client,
+        private readonly TelegramWidgetSync $widgetSync,
     ) {}
 
     /**
@@ -22,12 +26,30 @@ class TelegramBot
      */
     public function handle(array $update): void
     {
+        try {
+            $this->handleUpdate($update);
+        } finally {
+            $this->widgetSync->flush();
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $update
+     */
+    private function handleUpdate(array $update): void
+    {
         if ($this->rejectBlocked($update)) {
             return;
         }
 
         if (isset($update['callback_query'])) {
             $this->callbackHandler->handleCallbackQuery($update['callback_query']);
+
+            return;
+        }
+
+        if (isset($update['widget_query']) && is_array($update['widget_query'])) {
+            $this->widgetQueryHandler->handle($update['widget_query']);
 
             return;
         }
@@ -65,9 +87,10 @@ class TelegramBot
     private function rejectBlocked(array $update): bool
     {
         $callback = is_array($update['callback_query'] ?? null) ? $update['callback_query'] : null;
+        $widgetQuery = is_array($update['widget_query'] ?? null) ? $update['widget_query'] : null;
         $chatId = $callback
             ? ($callback['message']['chat']['id'] ?? null)
-            : ($update['message']['chat']['id'] ?? null);
+            : ($widgetQuery['chat']['id'] ?? $widgetQuery['from']['id'] ?? $update['message']['chat']['id'] ?? null);
 
         $user = $chatId === null ? null : $this->support->resolveUser($chatId);
 
@@ -82,6 +105,8 @@ class TelegramBot
 
         if ($callback && isset($callback['id'])) {
             $this->client->answerCallbackQuery((string) $callback['id'], 'Account blocked');
+        } elseif ($widgetQuery && isset($widgetQuery['id'])) {
+            $this->client->answerWidgetQuery((string) $widgetQuery['id'], '{"ok":0,"e":"Account blocked"}');
         } else {
             $this->client->sendMessage($chatId, 'Account blocked.');
         }

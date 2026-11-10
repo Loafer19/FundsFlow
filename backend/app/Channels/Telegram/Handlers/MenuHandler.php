@@ -12,6 +12,7 @@ use App\Actions\Transactions\ListTransactionsAction;
 use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
+use App\Channels\Telegram\Widgets\TelegramWidgetSender;
 use App\Models\Budget;
 use App\Models\BudgetPeriod;
 use App\Models\RecurringTransaction;
@@ -35,11 +36,20 @@ class MenuHandler
         private readonly CalculateLimitStatusAction $limitStatus,
         private readonly TelegramChatSession $session,
         private readonly CalculateGoalProgressAction $goalProgress,
+        private readonly TelegramWidgetSender $widgets,
     ) {}
 
     public function sendMonthSummary(User $user, int|string $chatId, int|string|null $telegramUserId = null): void
     {
         $identity = $telegramUserId ?? $chatId;
+
+        if ($this->isPrivateChat($chatId) && $this->widgets->sendSummary($user, $chatId)) {
+            $this->session->setDomain($identity, $chatId, 'analytics');
+            $this->session->setSummary($identity, $chatId, 'Month summary sent.');
+
+            return;
+        }
+
         $month = $user->nowInTimezone()->format('Y-m');
 
         $transactions = $this->listTransactions->execute($user)
@@ -142,7 +152,7 @@ class MenuHandler
     }
 
     /**
-     * @return array{text: string, reply_markup: array<string, mixed>, list: list<array{id: int, title: string}>}|null
+     * @return null|array{text: string, reply_markup: array<string, mixed>, list: list<array{id: int, title: string}>}
      */
     public function recentListPayload(User $user): ?array
     {
@@ -163,6 +173,7 @@ class MenuHandler
 
         $list = $transactions->map(function (Transaction $transaction) use ($user): array {
             $title = trim((string) ($transaction->note ?? ''));
+
             if ($title === '') {
                 $title = UserFormatter::formatMoney($user, $transaction->amount);
             }
@@ -214,6 +225,16 @@ class MenuHandler
 
         $this->session->setDomain($identity, $chatId, 'budgets');
         $this->session->setLastList($identity, $chatId, $list);
+
+        if ($this->isPrivateChat($chatId) && $this->widgets->sendBudgets($user, $chatId)) {
+            $this->session->setSummary(
+                $identity,
+                $chatId,
+                $blocks === [] && $goals === [] ? 'No active budgets or savings goals.' : 'Budgets listed.',
+            );
+
+            return;
+        }
 
         if ($blocks === [] && $goals === []) {
             $this->session->setSummary($identity, $chatId, 'No active budgets or savings goals.');
@@ -329,6 +350,19 @@ class MenuHandler
         $this->client->sendMessage($chatId, "✅ Tag created: {$tag->emoji} {$tag->title}");
     }
 
+    public function sendAddWidget(User $user, int|string $chatId): void
+    {
+        if ($this->isPrivateChat($chatId) && $this->widgets->sendAdd($user, $chatId)) {
+            return;
+        }
+
+        $this->client->sendMessage(
+            $chatId,
+            'Quick add works as an interactive widget in a private chat with the bot. '
+            . 'Here, send a message like -350 groceries or +15000 salary.',
+        );
+    }
+
     /**
      * <b>Groceries</b>
      * ███████░░░ 72%
@@ -358,5 +392,14 @@ class MenuHandler
         return '<b>' . $this->support->escapeHtml($label) . "</b>\n"
             . $this->support->progressBar($ratio) . ' ' . $progress['percent'] . "%\n"
             . implode("\n", array_map(fn (string $line) => $this->support->escapeHtml($line), $lines));
+    }
+
+    /**
+     * Widgets currently work in production only in the private chat with the bot.
+     * Telegram private chats use the user's positive id as chat_id.
+     */
+    private function isPrivateChat(int|string $chatId): bool
+    {
+        return (int) $chatId > 0;
     }
 }

@@ -17,7 +17,7 @@ class TelegramClient
     }
 
     /**
-     * @param array<string, mixed>|null $replyMarkup
+     * @param null|array<string, mixed> $replyMarkup
      */
     public function sendMessage(
         int|string $chatId,
@@ -33,12 +33,11 @@ class TelegramClient
         ]));
     }
 
-
     /**
      * sendMessage that reports back: the decoded response, or ok:false on a network error.
      * $replyTo makes it a reply (still sent if that message is gone).
      *
-     * @param array<string, mixed>|null $replyMarkup
+     * @param null|array<string, mixed> $replyMarkup
      * @return array<string, mixed>
      */
     public function sendMessageResult(
@@ -73,7 +72,7 @@ class TelegramClient
      * $replyTo, only the last carries $replyMarkup. A part Telegram can't parse
      * (400 "can't parse entities") is resent as plain text.
      *
-     * @param array<string, mixed>|null $replyMarkup
+     * @param null|array<string, mixed> $replyMarkup
      */
     public function sendFormatted(int|string $chatId, string $markdown, ?array $replyMarkup = null, ?int $replyTo = null): void
     {
@@ -84,6 +83,7 @@ class TelegramClient
             $markup = $i === $last ? $replyMarkup : null;
             $reply = $i === 0 ? $replyTo : null;
             $result = $this->sendMessageResult($chatId, $html, $markup, 'HTML', $reply);
+
             if (($result['ok'] ?? false) === true) {
                 continue;
             }
@@ -92,6 +92,7 @@ class TelegramClient
                 'error_code' => $result['error_code'] ?? null,
                 'description' => mb_substr((string) ($result['description'] ?? ''), 0, 200),
             ]);
+
             if (($result['error_code'] ?? null) === 400) {
                 $this->sendMessageResult($chatId, mb_substr(TelegramHtml::toPlain($html), 0, TelegramHtml::LIMIT), $markup, null, $reply);
             }
@@ -130,7 +131,6 @@ class TelegramClient
         }
     }
 
-
     public function answerCallbackQuery(string $callbackQueryId, ?string $text = null): void
     {
         Http::post($this->baseUrl . 'answerCallbackQuery', array_filter([
@@ -140,7 +140,7 @@ class TelegramClient
     }
 
     /**
-     * @param array<string, mixed>|null $replyMarkup
+     * @param null|array<string, mixed> $replyMarkup
      */
     public function editMessageReplyMarkup(int|string $chatId, int $messageId, ?array $replyMarkup = null): void
     {
@@ -152,7 +152,7 @@ class TelegramClient
     }
 
     /**
-     * @param array<string, mixed>|null $replyMarkup
+     * @param null|array<string, mixed> $replyMarkup
      */
     public function editMessageText(
         int|string $chatId,
@@ -197,6 +197,136 @@ class TelegramClient
     /**
      * @return array<string, mixed>
      */
+    public function getFile(string $fileId): array
+    {
+        return Http::get($this->baseUrl . 'getFile', [
+            'file_id' => $fileId,
+        ])->throw()->json();
+    }
+
+    public function downloadFile(string $filePath): string
+    {
+        $token = config('services.telegram.bot_token');
+        $response = Http::get('https://api.telegram.org/file/bot' . $token . '/' . ltrim($filePath, '/'))
+            ->throw();
+
+        return $response->body();
+    }
+
+    /**
+     * Bot API 10.4: send an HTML widget. Returns the decoded API payload.
+     *
+     * @return array<string, mixed>
+     */
+    public function sendWidget(
+        int|string $chatId,
+        string $html,
+        ?string $chatData = null,
+        ?string $caption = null,
+        bool $allowQueries = false,
+        ?int $height = null,
+        ?string $parseMode = null,
+    ): array {
+        try {
+            $response = Http::post($this->baseUrl . 'sendWidget', array_filter([
+                'chat_id' => $chatId,
+                'html' => $html,
+                'chat_data' => $chatData,
+                'caption' => $caption,
+                'parse_mode' => $parseMode,
+                'allow_queries' => $allowQueries ?: null,
+                'height' => $height,
+            ], static fn ($value) => $value !== null && $value !== ''));
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'description' => $e->getMessage()];
+        }
+
+        $json = $response->json();
+
+        return is_array($json) ? $json : ['ok' => false, 'error_code' => $response->status()];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function editMessageWidgetData(int|string $chatId, int $messageId, ?string $chatData = null, ?string $publicData = null): array
+    {
+        try {
+            $payload = [
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+            ];
+
+            if ($chatData !== null) {
+                $payload['chat_data'] = $chatData;
+            }
+
+            if ($publicData !== null) {
+                $payload['public_data'] = $publicData;
+            }
+            $response = Http::post($this->baseUrl . 'editMessageWidgetData', $payload);
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'description' => $e->getMessage()];
+        }
+
+        $json = $response->json();
+
+        return is_array($json) ? $json : ['ok' => false, 'error_code' => $response->status()];
+    }
+
+    public function answerWidgetQuery(string $widgetQueryId, ?string $data = null): void
+    {
+        try {
+            Http::timeout(10)->post($this->baseUrl . 'answerWidgetQuery', array_filter([
+                'widget_query_id' => $widgetQueryId,
+                'data' => $data,
+            ], static fn ($value) => $value !== null && $value !== ''));
+        } catch (\Throwable $e) {
+            Log::warning('TelegramClient: answerWidgetQuery failed', [
+                'description' => mb_substr($e->getMessage(), 0, 200),
+            ]);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function setWebhook(string $url, string $secretToken): array
+    {
+        return Http::post($this->baseUrl . 'setWebhook', [
+            'url' => $url,
+            'secret_token' => $secretToken,
+        ])->json();
+    }
+
+    /**
+     * @param array<int, array{command: string, description: string}> $commands
+     * @return array<string, mixed>
+     */
+    public function setMyCommands(array $commands): array
+    {
+        return Http::post($this->baseUrl . 'setMyCommands', [
+            'commands' => json_encode($commands),
+        ])->json();
+    }
+
+    /**
+     * Set the chat menu button (omit chatId to set the default for all private chats).
+     *
+     * @param array<string, mixed> $menuButton
+     * @return array<string, mixed>
+     */
+    public function setChatMenuButton(?int $chatId, array $menuButton): array
+    {
+        return Http::post($this->baseUrl . 'setChatMenuButton', array_filter([
+            'chat_id' => $chatId,
+            'menu_button' => json_encode($menuButton),
+        ], static fn ($value) => $value !== null))->json();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function sendMultipart(
         string $method,
         string $field,
@@ -225,61 +355,5 @@ class TelegramClient
         }
 
         return $json;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function getFile(string $fileId): array
-    {
-        return Http::get($this->baseUrl . 'getFile', [
-            'file_id' => $fileId,
-        ])->throw()->json();
-    }
-
-    public function downloadFile(string $filePath): string
-    {
-        $token = config('services.telegram.bot_token');
-        $response = Http::get('https://api.telegram.org/file/bot' . $token . '/' . ltrim($filePath, '/'))
-            ->throw();
-
-        return $response->body();
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function setWebhook(string $url, string $secretToken): array
-    {
-        return Http::post($this->baseUrl . 'setWebhook', [
-            'url' => $url,
-            'secret_token' => $secretToken,
-        ])->json();
-    }
-
-
-    /**
-     * @param array<int, array{command: string, description: string}> $commands
-     * @return array<string, mixed>
-     */
-    public function setMyCommands(array $commands): array
-    {
-        return Http::post($this->baseUrl . 'setMyCommands', [
-            'commands' => json_encode($commands),
-        ])->json();
-    }
-
-    /**
-     * Set the chat menu button (omit chatId to set the default for all private chats).
-     *
-     * @param array<string, mixed> $menuButton
-     * @return array<string, mixed>
-     */
-    public function setChatMenuButton(?int $chatId, array $menuButton): array
-    {
-        return Http::post($this->baseUrl . 'setChatMenuButton', array_filter([
-            'chat_id' => $chatId,
-            'menu_button' => json_encode($menuButton),
-        ], static fn ($value) => $value !== null))->json();
     }
 }

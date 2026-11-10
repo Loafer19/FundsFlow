@@ -1,0 +1,89 @@
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:10px 12px 12px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color)}
+h3{margin:0 0 8px;font-size:1.05em}
+.item{display:block;width:100%;text-align:left;margin:0 0 8px;padding:8px 10px;border:0;border-radius:10px;background:var(--tg-theme-secondary-bg-color);color:inherit;font:inherit}
+.item .n{display:flex;justify-content:space-between;gap:8px;font-weight:650;margin:0 0 6px}
+.bar{height:6px;background:var(--tg-theme-section-separator-color);border-radius:99px;overflow:hidden}
+.fill{height:100%;width:0;background:var(--tg-theme-button-color);border-radius:99px}
+.fill.ar{background:var(--tg-theme-accent-text-color)}
+.fill.ov{background:var(--tg-theme-destructive-text-color)}
+.meta{color:var(--tg-theme-hint-color);font-size:.8em;margin:6px 0 0}
+.empty{color:var(--tg-theme-hint-color)}
+.err{color:var(--tg-theme-destructive-text-color);font-size:.85em;margin:6px 0 0}
+button.back{margin:0 0 10px}
+.lines p{margin:4px 0;font-size:.95em}
+</style>
+<div id="root"></div>
+<script>
+const W=window.TelegramWidget;
+let list=[],sel=null,extra=null,err='';
+function parse(s){try{return s?JSON.parse(s):null}catch(e){return null}}
+function esc(){return document.createElement('div')}
+function fillClass(s){return s==='ov'?'fill ov':s==='ar'?'fill ar':'fill'}
+function bar(p,s){
+  const wrap=document.createElement('div');wrap.className='bar';
+  const f=document.createElement('div');f.className=fillClass(s);
+  f.style.width=Math.max(0,Math.min(100,p||0))+'%';
+  wrap.appendChild(f);return wrap;
+}
+function showList(){
+  const root=document.getElementById('root');root.innerHTML='';
+  const h=document.createElement('h3');h.textContent='Budgets';root.appendChild(h);
+  if(err){const e=document.createElement('p');e.className='err';e.textContent=err;root.appendChild(e)}
+  if(!list.length){const p=document.createElement('p');p.className='empty';p.textContent='No active budgets or savings goals';root.appendChild(p);return}
+  list.forEach(function(it){
+    const b=document.createElement('button');b.className='item';b.type='button';
+    const n=document.createElement('div');n.className='n';
+    const t=document.createElement('span');t.textContent=it.n||('#'+it.id);
+    const p=document.createElement('span');p.textContent=(it.p||0)+'%';
+    n.appendChild(t);n.appendChild(p);b.appendChild(n);
+    b.appendChild(bar(it.p,it.s));
+    b.addEventListener('click',function(){open(it)});
+    root.appendChild(b);
+  });
+}
+function line(root,text){const p=document.createElement('p');p.textContent=text;root.appendChild(p)}
+function showDetail(it,x){
+  const root=document.getElementById('root');root.innerHTML='';
+  const back=document.createElement('button');back.className='back';back.type='button';back.textContent='Back';
+  back.addEventListener('click',function(){sel=null;extra=null;err='';showList()});
+  root.appendChild(back);
+  const h=document.createElement('h3');h.textContent=(x&&x.n)||it.n||('#'+it.id);root.appendChild(h);
+  const pct=(x&&x.p!=null)?x.p:it.p;
+  const st=(x&&x.s)||it.s;
+  root.appendChild(bar(pct,st));
+  const box=document.createElement('div');box.className='lines';
+  if(x&&x.sp&&x.lim)line(box,x.sp+' / '+x.lim);
+  if(x&&x.left)line(box,x.left);
+  if(x&&x.f&&x.to)line(box,x.f+' – '+x.to);
+  if(x&&x.days)line(box,x.days);
+  if(err){const e=document.createElement('p');e.className='err';e.textContent=err;box.appendChild(e)}
+  root.appendChild(box);
+}
+function hasDetails(x){return !!(x&&x.sp&&x.lim)}
+function open(it){
+  err='';
+  if(hasDetails(it)){sel=it;extra=it;showDetail(it,it);return}
+  if(!W||!W.request){err='Could not load details';sel=it;extra=it;showDetail(it,it);return}
+  W.request('d:'+it.id).then(function(a){
+    const r=parse(a&&a.result);
+    if(r&&r.ok){sel=it;extra=r;err='';showDetail(it,r);return}
+    err=(r&&r.e)||'Could not load details';sel=it;extra=it;showDetail(it,it);
+  },function(e){err=(e&&e.code)||'Could not load details';sel=it;extra=it;showDetail(it,it)});
+}
+function render(){
+  const d=parse(W&&W.chatData)||{};
+  list=d.i||[];
+  if(sel){
+    const fresh=list.filter(function(x){return x.id===sel.id})[0];
+    if(fresh)sel=fresh;
+    if(hasDetails(sel))extra=sel;
+    showDetail(sel,extra||sel);return;
+  }
+  showList();
+}
+if(W&&W.onEvent)W.onEvent('chatDataChanged',render);
+if(W&&W.ready)W.ready();
+render();
+</script>
