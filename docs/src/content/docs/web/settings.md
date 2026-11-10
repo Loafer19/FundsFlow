@@ -1,9 +1,9 @@
 ---
 title: Settings
-description: Formatting, themes, linked accounts, MCP token, AI quota, login credentials, data export, reports, and support requests in FundsFlow.
+description: Formatting, themes, linked accounts, monobank sync, MCP token, AI quota, login credentials, data export, reports, and support requests in FundsFlow.
 ---
 
-Open **Settings** (⚙️) from the header. It has six tabs.
+Open **Settings** (⚙️) from the header. It has seven tabs.
 
 ## Formatting
 
@@ -27,6 +27,13 @@ Click **Save** to apply.
   by the Telegram bot and the web [AI assistant](/docs/web/assistant/).
 - **Login credentials** — set an email and password, so you can log in without Telegram, Google, or GitHub. This is also
   what MCP OAuth sign-in uses.
+
+## Bank
+
+Connect monobank with a personal token so new transactions are imported automatically. Only UAH cards
+are synced; transfers between your own cards and jars are not counted; pending purchases appear right
+away and update when they settle; jars can be tracked as savings goals. See
+[Monobank sync](/docs/help/monobank/).
 
 ## Data
 

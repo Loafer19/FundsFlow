@@ -35,6 +35,13 @@ class BudgetResource extends JsonResource
             // Limits: day the weekly/monthly/yearly buckets of all periods repeat from;
             // null = calendar weeks/months/years.
             'anchor_date' => $isGoal ? null : $this->anchor_date?->toDateString(),
+            'monobank_jar' => $this->when($isGoal && $this->monobank_jar_id, fn () => [
+                'id' => $this->monobank_jar_id,
+                'linked' => $this->monobank_jar_unlinked_at === null,
+                'unlinked' => $this->monobank_jar_unlinked_at !== null,
+                'balance' => $this->monobank_jar_balance === null ? null : (float) $this->monobank_jar_balance,
+                'balance_at_link' => $this->monobank_jar_balance_at_link === null ? null : (float) $this->monobank_jar_balance_at_link,
+            ]),
             'periods' => BudgetPeriodResource::collection($this->whenLoaded('periods')),
             // Server-side goal progress (API / MCP clients); the web app recomputes it live.
             'progress' => $this->when($isGoal, fn () => $this->goalProgress($request)),

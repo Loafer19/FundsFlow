@@ -20,6 +20,9 @@ class Transaction extends Model
         'amount',
         'note',
         'source',
+        'external_source',
+        'external_id',
+        'external_meta',
     ];
 
 
@@ -27,6 +30,7 @@ class Transaction extends Model
         'at' => 'datetime',
         'amount' => 'decimal:2',
         'source' => TransactionSource::class,
+        'external_meta' => 'array',
     ];
 
     /**

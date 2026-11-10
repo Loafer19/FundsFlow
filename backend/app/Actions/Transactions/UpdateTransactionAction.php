@@ -2,6 +2,7 @@
 
 namespace App\Actions\Transactions;
 
+use App\Actions\Monobank\LearnMonobankTagRuleAction;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Support\TagIds;
@@ -30,7 +31,13 @@ class UpdateTransactionAction
         }
 
         // Reload from DB so the response reflects stored amount (not in-memory input).
-        return $transaction->fresh()->load(['tags', 'attachments']);
+        $transaction = $transaction->fresh()->load(['tags', 'attachments']);
+
+        if ($syncTags) {
+            app(LearnMonobankTagRuleAction::class)->execute($user, $transaction);
+        }
+
+        return $transaction;
     }
 }
 

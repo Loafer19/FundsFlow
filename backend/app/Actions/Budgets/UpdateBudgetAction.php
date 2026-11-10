@@ -21,11 +21,14 @@ class UpdateBudgetAction
         Gate::forUser($user)->authorize('update', $budget);
 
         $current = $budget->currentPeriod;
-        $newTagIds = collect(TagIds::forSync($user, $data['tag_ids'], $current?->tags->pluck('id') ?? []))
+        $incomingTags = array_key_exists('tag_ids', $data)
+            ? $data['tag_ids']
+            : ($current?->tags->pluck('id')->all() ?? []);
+        $newTagIds = collect(TagIds::forSync($user, $incomingTags, $current?->tags->pluck('id') ?? []))
             ->sort()
             ->values();
 
-        if ($newTagIds->isEmpty()) {
+        if ($newTagIds->isEmpty() && !$budget->isMonobankJar()) {
             throw ValidationException::withMessages(['tag_ids' => 'Pick at least one existing tag.']);
         }
 

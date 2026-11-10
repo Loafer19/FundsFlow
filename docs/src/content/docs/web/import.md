@@ -3,6 +3,8 @@ title: Files and bulk import
 description: Send statements, spreadsheets, OFX / QIF / JSON exports, bank-app screenshots, or a receipt to the assistant on the web or in Telegram, and import them in one step.
 ---
 
+If you use monobank, [connect it in Settings → Bank](/docs/help/monobank/) instead of uploading statements: new purchases arrive on their own.
+
 The assistant reads files as well as receipt photos, in the [web Assistant panel](/docs/web/assistant/) and in the
 [Telegram bot](/docs/telegram/receipts/). A file is either one receipt or a list of transactions (a bank statement, a
 spreadsheet, an export from another app). A list is shown as **one Confirm card**, and **Confirm** saves every row at

@@ -10,6 +10,7 @@ use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -179,6 +180,22 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function supportTickets(): HasMany
     {
         return $this->hasMany(SupportTicket::class);
+    }
+
+    /**
+     * @return HasOne<MonobankConnection, $this>
+     */
+    public function monobankConnection(): HasOne
+    {
+        return $this->hasOne(MonobankConnection::class);
+    }
+
+    /**
+     * @return HasMany<MonobankTagRule, $this>
+     */
+    public function monobankTagRules(): HasMany
+    {
+        return $this->hasMany(MonobankTagRule::class);
     }
 
     /**

@@ -1,6 +1,6 @@
 ---
 title: Notifications
-description: Budget alerts, weekly digest, and recurring notifications from the FundsFlow bot.
+description: Budget alerts, weekly digest, recurring and monobank notifications from the FundsFlow bot.
 ---
 
 When your Telegram chat is linked, the bot can message you on its own:
@@ -11,6 +11,7 @@ When your Telegram chat is linked, the bot can message you on its own:
 | **🎯 Savings goal reached** | Checked hourly. 🎉 once when a savings goal reaches its target (sent again only if you raise the target and reach it). |
 | **📬 Weekly digest** | Mondays at 09:00 UTC: last week's income, expenses, net, top expense tag (top-level, child tags included), and the change vs the week before, then your active limits and savings goals. Skipped if you had no transactions last week. |
 | **🔁 Added automatically** | When [recurring rules](/docs/web/recurring/) create transactions (runs daily at 06:00 UTC). |
+| **🏦 Monobank** | When a new purchase is imported from a connected monobank card. Includes buttons to change the tag or delete it. Turn these off in **Settings → Bank** without muting the rest. |
 
 Use `/mute` to turn all of them off and `/unmute` to turn them back on. Muting doesn't affect replies to your own
 messages.

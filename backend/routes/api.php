@@ -6,6 +6,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BootstrapController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\IdentityController;
+use App\Http\Controllers\MonobankController;
+use App\Http\Controllers\MonobankWebhookController;
 use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SupportTicketController;
@@ -42,6 +44,13 @@ Route::prefix('auth')->group(function () {
 
 Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle'])
     ->middleware('throttle:60,1,tg-webhook:');
+
+Route::get('/webhooks/monobank/{uuid}', [MonobankWebhookController::class, 'challenge'])
+    ->where('uuid', '[0-9a-fA-F-]{36}')
+    ->middleware('throttle:60,1,mono-webhook:');
+Route::post('/webhooks/monobank/{uuid}', [MonobankWebhookController::class, 'handle'])
+    ->where('uuid', '[0-9a-fA-F-]{36}')
+    ->middleware('throttle:60,1,mono-webhook:');
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/bootstrap', BootstrapController::class);
@@ -94,6 +103,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/account/mcp-token', [AccountController::class, 'revokeMcpToken']);
     Route::get('/account/export', [AccountController::class, 'export'])
         ->middleware('throttle:10,1,export:');
+
+    Route::get('/monobank', [MonobankController::class, 'show']);
+    Route::post('/monobank/connect', [MonobankController::class, 'connect'])
+        ->middleware('throttle:10,1,mono-connect:');
+    Route::patch('/monobank', [MonobankController::class, 'update']);
+    Route::post('/monobank/sync', [MonobankController::class, 'sync'])
+        ->middleware('throttle:6,1,mono-sync:');
+    Route::delete('/monobank', [MonobankController::class, 'destroy']);
 
     // Support requests. New ones are also capped per hour in CreateSupportTicketAction (bot + assistant too).
     Route::get('/support/tickets', [SupportTicketController::class, 'index']);

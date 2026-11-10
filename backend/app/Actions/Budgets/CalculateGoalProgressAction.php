@@ -23,6 +23,9 @@ use Carbon\CarbonImmutable;
  *   withdrawal back to the wallet takes 200 off.
  * - Progress = start_amount + saved, never below zero. Pausing a goal does not
  *   reset it: progress always counts from the original start.
+ * - A goal linked to a monobank jar (budgets.monobank_jar_id) uses the jar
+ *   balance from client-info instead of tagged contributions. Deadline,
+ *   required pace and the projected date still run off that saved amount.
  * - Pace = contributions over the last ~3 months (or since start when newer),
  *   per day over at least 30 days, so one early transfer does not project an
  *   unrealistic rate.
@@ -62,15 +65,23 @@ class CalculateGoalProgressAction
         $target = $latest ? (float) $latest->amount : 0.0;
         $startAmount = (float) ($budget->start_amount ?? 0);
 
-        $windowStart = $today->subDays(self::PACE_WINDOW_DAYS - 1);
-        $windowStart = $windowStart->lessThan($startedAt) ? $startedAt : $windowStart;
+        if ($budget->isMonobankJar()) {
+            $startAmount = (float) ($budget->monobank_jar_balance_at_link ?? 0);
+            $saved = max(0.0, round((float) ($budget->monobank_jar_balance ?? 0), 2));
+            $contributed = round($saved - $startAmount, 2);
+            $windowContributed = $contributed > 0 ? $contributed : 0.0;
+            $windowStart = $startedAt;
+        } else {
+            $windowStart = $today->subDays(self::PACE_WINDOW_DAYS - 1);
+            $windowStart = $windowStart->lessThan($startedAt) ? $startedAt : $windowStart;
 
-        $contributed = $this->contributed($user, $tagIds, $startedAt, $today);
-        $windowContributed = $windowStart->equalTo($startedAt)
-            ? $contributed
-            : $this->contributed($user, $tagIds, $windowStart, $today);
+            $contributed = $this->contributed($user, $tagIds, $startedAt, $today);
+            $windowContributed = $windowStart->equalTo($startedAt)
+                ? $contributed
+                : $this->contributed($user, $tagIds, $windowStart, $today);
 
-        $saved = max(0.0, round($startAmount + $contributed, 2));
+            $saved = max(0.0, round($startAmount + $contributed, 2));
+        }
         $remaining = max(0.0, round($target - $saved, 2));
         $completed = $target > 0 && $saved >= $target;
 
@@ -120,6 +131,8 @@ class CalculateGoalProgressAction
             'monthly_pace' => round($perDay * self::DAYS_PER_MONTH, 2),
             'projected_date' => $projected,
             'tag_ids' => $tagIds,
+            'monobank_jar' => $budget->isMonobankJar(),
+            'monobank_jar_linked' => $budget->monobankJarLinked(),
         ];
     }
 

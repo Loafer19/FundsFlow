@@ -10,6 +10,14 @@ import { useAuthStore } from './auth.js'
  */
 export const RELEASES = [
     {
+        version: '2.2.0',
+        items: [
+            'Connect monobank with a personal token: cards sync automatically, including the last 31 days.',
+            'New purchases can ping you in Telegram so you can change the tag or delete them.',
+            'A small Mono badge marks imported transactions in the List.',
+        ],
+    },
+    {
         version: '2.1.0',
         items: [
             'Report a problem or send feedback right from the app: Feedback in the footer.',

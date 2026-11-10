@@ -176,7 +176,7 @@ class AuthHandler
         $identity->update(['meta' => [...($identity->meta ?? []), 'muted' => $muted]]);
 
         $this->client->sendMessage($chatId, $muted
-            ? '🔕 Notifications muted. Use /unmute to turn budget alerts, weekly digest, and recurring auto-add notifications back on'
-            : '🔔 Notifications unmuted — budget alerts, weekly digest, and recurring auto-add notifications are on');
+            ? '🔕 Notifications muted. Use /unmute to turn budget alerts, weekly digest, recurring auto-add, and bank sync notifications back on'
+            : '🔔 Notifications unmuted — budget alerts, weekly digest, recurring auto-add, and bank sync notifications are on');
     }
 }

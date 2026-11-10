@@ -15,6 +15,7 @@ final class DashboardCharts
         'telegram' => '#0ea5e9',
         'recurring' => '#a855f7',
         'mcp' => '#10b981',
+        'monobank' => '#f97316',
         'amber' => '#f59e0b',
         'gray' => '#9ca3af',
         'red' => '#ef4444',

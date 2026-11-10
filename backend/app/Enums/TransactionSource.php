@@ -8,4 +8,5 @@ enum TransactionSource: string
     case Telegram = 'telegram';
     case Recurring = 'recurring';
     case Mcp = 'mcp';
+    case Monobank = 'monobank';
 }

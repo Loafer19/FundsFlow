@@ -69,6 +69,10 @@ Saving money is usually logged as a transfer *out* of your wallet, i.e. an expen
 
 Tip: create a dedicated tag (e.g. 🏦 Savings, or one tag per goal) and put every transfer to savings on it.
 
+A goal linked to a monobank jar is different: progress is the jar's current balance from monobank, not
+tagged transactions. The card shows a **Mono jar** badge. You can still set a deadline; required pace and
+the projected date use that balance. See [Jars as savings goals](/docs/help/monobank/#jars-as-savings-goals).
+
 ### The goal card
 
 - **Saved X of Y** with a progress bar and percentage, and the amount **left to save**;

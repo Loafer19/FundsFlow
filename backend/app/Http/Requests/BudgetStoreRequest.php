@@ -37,11 +37,14 @@ class BudgetStoreRequest extends FormRequest
      */
     public function rules(): array
     {
+        $existing = $this->route('budget');
+        $jarGoal = $existing instanceof Budget && $existing->isMonobankJar();
+
         $rules = [
             'type' => ['sometimes', Rule::enum(BudgetType::class)],
             'title' => 'nullable|string|max:255',
             'amount' => 'required|numeric|min:0.01|max:99999999.99',
-            'tag_ids' => 'required|array|min:1',
+            'tag_ids' => $jarGoal ? 'sometimes|array' : 'required|array|min:1',
             'tag_ids.*' => [
                 'integer',
                 Rule::exists('tags', 'id')->where('user_id', $this->user()->id),

@@ -16,6 +16,7 @@ class TransactionsChart extends ChartWidget
         'telegram' => 'Telegram',
         'mcp' => 'MCP / AI clients',
         'recurring' => 'Recurring',
+        'monobank' => 'Monobank',
     ];
 
     protected static ?int $sort = 3;

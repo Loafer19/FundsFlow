@@ -1,15 +1,15 @@
 <template>
     <dialog id="settings_modal" class="modal" aria-labelledby="settings_modal_title">
-        <div class="modal-box max-w-md">
+        <div class="modal-box w-11/12 max-w-2xl">
             <h2 id="settings_modal_title" class="card-title mb-4">
                 <SettingsIcon :size="24" />
                 Settings
             </h2>
 
-            <div class="tabs tabs-box justify-center mb-4">
+            <div class="tabs tabs-box justify-start sm:justify-center mb-4 flex-nowrap overflow-x-auto">
                 <template v-for="(title, key) in tabs">
-                    <!-- Slightly tighter than the default padding so all six tabs fit one row on desktop. -->
-                    <a class="tab [--tab-p:0.5rem]" @click="tab = key" :class="{ 'tab-active': tab === key }">
+                    <!-- Tighter padding + no wrap so seven tabs stay on one desktop row. -->
+                    <a class="tab shrink-0 [--tab-p:0.5rem]" @click="tab = key" :class="{ 'tab-active': tab === key }">
                         {{ title }}
                     </a>
                 </template>
@@ -245,6 +245,8 @@ recurring_transactions</pre>
                     </div>
                 </template>
 
+                <BankSync v-else-if="tab === 'bank'" :key="bankKey" />
+
                 <SupportRequests v-else-if="tab === 'support'" :key="supportKey" />
 
                 <template v-else-if="tab === 'report'">
@@ -295,6 +297,7 @@ recurring_transactions</pre>
 <script setup>
 import { Bot, Download, Info, KeyRound, Save, Send, Settings as SettingsIcon } from 'lucide-vue-next'
 import { computed, inject, onMounted, ref, watch } from 'vue'
+import BankSync from '../components/BankSync.vue'
 import SupportRequests from '../components/SupportRequests.vue'
 import {
     createMcpToken,
@@ -336,12 +339,14 @@ const tabs = ref({
     formatting: 'Formatting',
     theme: 'Theme',
     accounts: 'Accounts',
+    bank: 'Bank',
     data: 'Data',
     report: 'Report',
     support: 'Support',
 })
 const tab = ref('formatting')
 const supportKey = ref(0)
+const bankKey = ref(0)
 const exporting = ref(false)
 const reportBusy = ref('')
 
@@ -572,6 +577,7 @@ const bindModalEvents = () => {
         }
         // Support: reload the requests on every open (a reply may have come in).
         supportKey.value++
+        bankKey.value++
         if (tab.value === 'accounts') {
             refreshMcpTokenStatus()
             refreshAiQuota()

@@ -27,6 +27,10 @@ class Budget extends Model
         'target_date',
         'start_amount',
         'anchor_date',
+        'monobank_jar_id',
+        'monobank_jar_balance',
+        'monobank_jar_balance_at_link',
+        'monobank_jar_unlinked_at',
     ];
 
     protected $attributes = [
@@ -38,11 +42,25 @@ class Budget extends Model
         'target_date' => 'date',
         'start_amount' => 'decimal:2',
         'anchor_date' => 'date',
+        'monobank_jar_balance' => 'decimal:2',
+        'monobank_jar_balance_at_link' => 'decimal:2',
+        'monobank_jar_unlinked_at' => 'datetime',
     ];
 
     public function isGoal(): bool
     {
         return $this->type === BudgetType::Goal;
+    }
+
+    /** Progress comes from a monobank jar balance (live or last known after unlink). */
+    public function isMonobankJar(): bool
+    {
+        return $this->isGoal() && $this->monobank_jar_id !== null;
+    }
+
+    public function monobankJarLinked(): bool
+    {
+        return $this->isMonobankJar() && $this->monobank_jar_unlinked_at === null;
     }
 
     /**

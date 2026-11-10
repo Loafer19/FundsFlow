@@ -51,6 +51,13 @@
         </template>
     </p>
 
+    <template v-if="jarLinked">
+        <p class="text-sm text-base-content/70 mb-4">
+            <span class="badge badge-sm badge-outline mr-1 align-middle">{{ jarLinked.linked ? 'Mono jar' : 'Unlinked jar' }}</span>
+            Progress follows the jar balance in monobank. You can still set a target and a deadline.
+        </p>
+    </template>
+    <template v-else>
     <div class="flex items-center gap-1 text-sm text-base-content/60 mb-1">
         <span>Tags</span>
         <span class="tooltip tooltip-right before:max-w-56 before:text-left" :data-tip="tagsHint" tabindex="0"
@@ -59,8 +66,9 @@
         </span>
     </div>
     <TagPicker v-model="form.tag_ids" />
+    </template>
 
-    <details v-if="goal" class="mb-2" :open="showMore" @toggle="showMore = $event.target.open">
+    <details v-if="goal && !jarLinked" class="mb-2" :open="showMore" @toggle="showMore = $event.target.open">
         <summary class="text-sm text-base-content/60 cursor-pointer mb-2">More options</summary>
         <label class="block">
             <span class="block text-sm text-base-content/60 mb-1">Already saved</span>
@@ -86,6 +94,8 @@ defineProps({
 const form = defineModel({ type: Object, required: true })
 
 const goal = computed(() => form.value.type === 'goal')
+
+const jarLinked = computed(() => form.value.monobank_jar ?? null)
 
 const today = computed(() => nowDateStr())
 

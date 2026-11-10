@@ -49,6 +49,11 @@
             <div class="flex items-center gap-1 flex-wrap">
                 <button v-for="tag in progress.tags" :key="tag.id" type="button" class="tooltip cursor-pointer"
                     :data-tip="tag.title" @click="$emit('view-tags', progress.tags)">{{ tag.emoji }}</button>
+                <span v-if="budget.monobank_jar" class="badge badge-sm badge-outline gap-1"
+                    :class="budget.monobank_jar.linked ? '' : 'badge-warning'"
+                    :title="budget.monobank_jar.linked ? 'Progress follows this monobank jar' : 'This jar is no longer in monobank — using the last known balance'">
+                    {{ budget.monobank_jar.linked ? 'Mono jar' : 'Unlinked jar' }}
+                </span>
                 <div class="badge badge-sm ml-auto gap-1" :class="statusBadge">
                     <PartyPopper v-if="progress.completed" :size="12" />
                     {{ goalStatusLabel(progress.status) }}

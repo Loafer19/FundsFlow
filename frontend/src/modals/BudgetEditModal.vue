@@ -12,7 +12,7 @@
 
                 <div class="modal-action">
                     <button type="submit" class="btn btn-success tg-primary"
-                        :disabled="budgetsStore.isLoading || !form.tag_ids.length">
+                        :disabled="budgetsStore.isLoading || !(form.tag_ids.length || form.monobank_jar)">
                         <span v-if="budgetsStore.isLoading" class="loading loading-spinner"></span>
                         Update
                         <Save :size="24" />
@@ -52,7 +52,7 @@ useTelegramPrimary('budgets_edit_modal', {
     text: 'Update',
     form: formRef,
     busy: () => Boolean(budgetsStore.isLoading),
-    enabled: () => form.value.tag_ids.length > 0,
+    enabled: () => form.value.tag_ids.length > 0 || Boolean(form.value.monobank_jar),
 })
 
 watch(
@@ -93,6 +93,7 @@ watch(
             target_date: budget.target_date ?? '',
             target_original: budget.target_date ?? '',
             start_amount: budget.start_amount ?? '',
+            monobank_jar: budget.monobank_jar ?? null,
         }
     },
 )

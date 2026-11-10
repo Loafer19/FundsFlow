@@ -10,13 +10,17 @@ This page describes how FundsFlow handles your data, based on how the product wo
 - **Account** — name, email, and a hashed password if you set one; linked Google, GitHub, and Telegram identities;
   preferences like timezone and formats.
 - **Your finance data** — transactions, tags, budgets, recurring rules, and the files you attach (receipts and PDFs).
+- **Monobank** — if you connect it, an encrypted copy of your personal API token, the list of cards you
+  chose to sync, and merchant-to-tag rules learned from your corrections. The token is never shown again,
+  included in a data export, or sent to an AI provider. Disconnecting deletes the token.
 - **Telegram** — your chat id, to message you, and short-lived conversation state (pending drafts, kept for minutes).
 - **Support requests** — what you write to us and our replies, with the app version and your browser (web) so we
   can reproduce a problem.
 - **AI assistant conversation** — the recent messages shared by the web panel and your private Telegram chat, kept in
   the server cache for about an hour after your last message (by default) and cleared by **New chat** or `/reset`.
 
-FundsFlow doesn't connect to banks and never asks for bank credentials.
+FundsFlow never asks for your monobank password. Connecting monobank uses a personal token that you copy
+from [api.monobank.ua](https://api.monobank.ua/). See [Monobank sync](/docs/help/monobank/).
 
 ## AI processing (xAI)
 

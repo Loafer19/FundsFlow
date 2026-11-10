@@ -59,7 +59,10 @@
                     <tbody>
                         <tr v-for="transaction in filteredTransactions" :key="transaction.id">
                             <td>
-                                <span class="tooltip tooltip-right" :data-tip="sourceLabel(transaction.source)"
+                                <span v-if="transaction.source === 'monobank'"
+                                    class="badge badge-sm badge-soft badge-info font-medium"
+                                    :aria-label="sourceLabel(transaction.source)">Mono</span>
+                                <span v-else class="tooltip tooltip-right" :data-tip="sourceLabel(transaction.source)"
                                     :aria-label="sourceLabel(transaction.source)">
                                     <component :is="sourceIcon(transaction.source)" :size="18" aria-hidden="true" />
                                 </span>

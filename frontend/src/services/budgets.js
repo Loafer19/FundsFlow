@@ -18,6 +18,16 @@ export const useBudgetsStore = defineStore('budgets', {
             persistCache(CACHE, this.budgets)
         },
 
+        async reload() {
+            try {
+                const response = await api.get('/budgets')
+                this.budgets = response.data
+                this.persist()
+            } catch (error) {
+                toasts.error(apiErrorMessage(error, 'Failed to load budgets: '))
+            }
+        },
+
         async create(payload) {
             this.isLoading = true
 

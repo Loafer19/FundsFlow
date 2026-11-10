@@ -98,6 +98,7 @@ export const transactionSourceLabels = {
     telegram: 'Telegram',
     recurring: 'Recurring',
     mcp: 'MCP',
+    monobank: 'Monobank',
 }
 
 export const getTransactionSourceLabel = (source) => transactionSourceLabels[source] ?? transactionSourceLabels.web

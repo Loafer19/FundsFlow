@@ -10,6 +10,8 @@ import { useTagsStore } from './tags.js'
 // into savings is logged as an expense, so saved = -(net of those
 // transactions): a -500 transfer adds 500, a +200 withdrawal takes 200 off.
 // Progress = start_amount + saved, never below zero.
+// A goal with budget.monobank_jar uses the jar balance from client-info
+// instead of tagged contributions (same branch as CalculateGoalProgressAction).
 
 const PACE_WINDOW_DAYS = 90
 const MIN_PACE_DAYS = 30
@@ -32,6 +34,8 @@ const latestOf = (a, b) => [a, b].sort()[1]
 const daysBetween = (start, end) => Math.round((parseLocalDate(end) - parseLocalDate(start)) / 86400000)
 
 export const isGoal = (budget) => budget?.type === 'goal'
+
+export const isMonobankJarGoal = (budget) => Boolean(budget?.monobank_jar?.id)
 
 const contributedBetween = (transactions, tagIds, from, to) => {
     if (!tagIds.size || from > to) return 0
@@ -64,15 +68,26 @@ export const goalProgress = (budget, transactions, today = nowDateStr()) => {
     // A goal's tags include their child tags.
     const tagIds = useTagsStore().expandIds((latest?.tags ?? []).map((tag) => tag.id))
     const target = Number(latest?.amount ?? 0)
-    const startAmount = Number(budget.start_amount ?? 0)
+    const jar = budget.monobank_jar
+    let startAmount = Number(budget.start_amount ?? 0)
+    let contributed
+    let windowContributed
+    let windowStart
+    let saved
 
-    const windowStart = latestOf(addDays(today, -(PACE_WINDOW_DAYS - 1)), startedAt)
-
-    const contributed = contributedBetween(transactions, tagIds, startedAt, today)
-    const windowContributed =
-        windowStart === startedAt ? contributed : contributedBetween(transactions, tagIds, windowStart, today)
-
-    const saved = Math.max(0, round2(startAmount + contributed))
+    if (jar) {
+        startAmount = Number(jar.balance_at_link ?? 0)
+        saved = Math.max(0, round2(Number(jar.balance ?? 0)))
+        contributed = round2(saved - startAmount)
+        windowContributed = contributed > 0 ? contributed : 0
+        windowStart = startedAt
+    } else {
+        windowStart = latestOf(addDays(today, -(PACE_WINDOW_DAYS - 1)), startedAt)
+        contributed = contributedBetween(transactions, tagIds, startedAt, today)
+        windowContributed =
+            windowStart === startedAt ? contributed : contributedBetween(transactions, tagIds, windowStart, today)
+        saved = Math.max(0, round2(startAmount + contributed))
+    }
     const remaining = Math.max(0, round2(target - saved))
     const completed = target > 0 && saved >= target
 

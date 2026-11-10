@@ -8,9 +8,21 @@ Telegram.
 
 ### Does FundsFlow connect to my bank?
 
-No. You add transactions yourself: in the web app, in the Telegram bot (text, receipt photos, voice), with
-recurring rules, through the [AI assistant](/docs/web/assistant/), or by
-[importing a bank statement](/docs/web/import/) or screenshots of your bank app.
+You can connect **monobank** with a personal token from [api.monobank.ua](https://api.monobank.ua/).
+New purchases are imported automatically, transfers between your own cards and jars are skipped, and UAH
+jars can be tracked as savings goals. See [Monobank sync](/docs/help/monobank/). Other banks are not
+connected: add those transactions yourself in the web app or Telegram, with recurring rules, through the
+[AI assistant](/docs/web/assistant/), or by [importing a statement](/docs/web/import/).
+
+### How do I connect monobank?
+
+Open **Settings → Bank**, get a personal token at [api.monobank.ua](https://api.monobank.ua/), and paste
+it. FundsFlow imports the last 31 days, then new items arrive on their own. Only UAH cards are synced
+(foreign-currency cards are listed but left off). Transfers between your own cards and jars are not
+counted. Pending (hold) purchases appear immediately and the amount updates when they settle.
+Auto-tagging learns from tags you change. Telegram notifications are sent only for new purchases. Your
+token is stored encrypted and you can revoke it any time at api.monobank.ua. UAH jars can be tracked as
+savings goals — progress follows the jar balance. Details: [Monobank sync](/docs/help/monobank/).
 
 ### Which currency does it use?
 
@@ -30,9 +42,12 @@ day. Check that the rule isn't paused and that its start date has come in **Recu
 
 ### My savings goal shows less than I saved.
 
-A goal counts transactions with the goal's tags (and their child tags) since its start date, plus **Already saved**.
+A regular goal counts transactions with the goal's tags (and their child tags) since its start date, plus **Already saved**.
 Transfers to savings are usually logged as expenses (−500 adds 500 to the goal), so put the goal's tag, or one of its
-child tags, on each transfer and check that the transfer is dated on or after the goal's start date. See [How progress is counted](/docs/web/budgets/#how-progress-is-counted).
+child tags, on each transfer and check that the transfer is dated on or after the goal's start date.
+If the goal is linked to a monobank jar (**Mono jar** on the card), progress is the jar's current balance
+instead of tagged contributions. See [How progress is counted](/docs/web/budgets/#how-progress-is-counted)
+and [Jars as savings goals](/docs/help/monobank/#jars-as-savings-goals).
 
 ### The bot or the Assistant says I've used my AI requests for today.
 
