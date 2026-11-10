@@ -24,6 +24,7 @@ Only **UAH** cards are synced. A dollar or euro card stays in the list so you ca
 - Pending (hold) purchases appear immediately; the amount updates when they settle.
 - The last 31 days are imported when you connect. New purchases arrive instantly after that.
 - Auto-tagging learns from the tags you change on imported purchases.
+- Deleted purchases stay deleted: **Sync now** won't bring them back.
 - Telegram notifications are sent only for new purchases, not the first import or **Sync now**.
 - Your token is stored encrypted. You can revoke it any time at [api.monobank.ua](https://api.monobank.ua/).
 - UAH jars can be tracked as savings goals: progress follows the jar balance in monobank.

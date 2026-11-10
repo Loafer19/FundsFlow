@@ -18,6 +18,7 @@ class MonobankAccount extends Model
         'goal_amount',
         'enabled',
         'tag_id',
+        'last_item_time',
     ];
 
     protected function casts(): array
@@ -28,6 +29,7 @@ class MonobankAccount extends Model
             'goal_amount' => 'decimal:2',
             'enabled' => 'boolean',
             'tag_id' => 'integer',
+            'last_item_time' => 'integer',
         ];
     }
 

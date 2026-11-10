@@ -79,6 +79,10 @@ class FundsFlowStats extends StatsOverviewWidget
                 ->descriptionIcon(Heroicon::PaperAirplane)
                 ->icon(Heroicon::OutlinedPaperAirplane)
                 ->url(UserResource::getUrl('index', ['filters' => ['telegram' => ['value' => 1]]])),
+            Stat::make('Monobank connected', number_format($m['monobank'] ?? 0))
+                ->description($m['users'] > 0 ? round(($m['monobank'] ?? 0) / $m['users'] * 100) . '% of users' : '—')
+                ->descriptionIcon(Heroicon::CreditCard)
+                ->icon(Heroicon::OutlinedCreditCard),
             Stat::make('Per active user', (string) $perActive)
                 ->description("transactions in the last {$days} days")
                 ->descriptionIcon(Heroicon::Calculator)

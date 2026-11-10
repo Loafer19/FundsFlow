@@ -59,10 +59,7 @@
                     <tbody>
                         <tr v-for="transaction in filteredTransactions" :key="transaction.id">
                             <td>
-                                <span v-if="transaction.source === 'monobank'"
-                                    class="badge badge-sm badge-soft badge-info font-medium"
-                                    :aria-label="sourceLabel(transaction.source)">Mono</span>
-                                <span v-else class="tooltip tooltip-right" :data-tip="sourceLabel(transaction.source)"
+                                <span class="tooltip tooltip-right" :data-tip="sourceLabel(transaction.source)"
                                     :aria-label="sourceLabel(transaction.source)">
                                     <component :is="sourceIcon(transaction.source)" :size="18" aria-hidden="true" />
                                 </span>
@@ -223,6 +220,8 @@ import {
     Search,
     Send,
     X,
+    Landmark,
+    FileUp,
 } from 'lucide-vue-next'
 
 import { computed, inject, ref } from 'vue'
@@ -237,7 +236,7 @@ const formatMoney = inject('formatMoney')
 const formatDate = inject('formatDate')
 const sourceLabel = getTransactionSourceLabel
 
-const sourceIcons = { web: Laptop, telegram: Send, recurring: Repeat, mcp: Bot }
+const sourceIcons = { web: Laptop, telegram: Send, recurring: Repeat, mcp: Bot, monobank: Landmark, import: FileUp }
 const sourceIcon = (source) => sourceIcons[source] ?? sourceIcons.web
 
 const transactionsStore = useTransactionsStore()

@@ -69,7 +69,15 @@ class ProcessMonobankWebhookAction
             notify: true,
             ownIbans: $ownIbans,
             jarTitles: $jarTitles,
+            // A resent update for an old item the user deleted (10 min grace for out-of-order delivery).
+            skipNewBefore: $account->last_item_time ? (int) $account->last_item_time - 600 : null,
         );
+
+        $itemTime = (int) ($item['time'] ?? 0);
+
+        if ($itemTime > (int) ($account->last_item_time ?? 0)) {
+            $account->forceFill(['last_item_time' => $itemTime])->save();
+        }
 
         if ($result['status'] === 'created') {
             $connection->forceFill([

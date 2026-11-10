@@ -49,14 +49,17 @@ class SyncMonobankConnectionAction
 
             $now = time();
             $maxWindow = (int) config('monobank.statement_max_seconds', 2682000);
-            $from = $full || !$connection->last_synced_at
-                ? $now - $maxWindow
-                : max($now - $maxWindow, $connection->last_synced_at->timestamp - 3600);
+            $oldest = $now - $maxWindow;
 
             foreach ($connection->accounts->where('enabled', true) as $account) {
                 if ($account->isJar() || !$account->isUah()) {
                     continue;
                 }
+
+                // Only fetch items newer than the last one we saw, so deleted ones don't come back.
+                $from = $full || !$account->last_item_time
+                    ? $oldest
+                    : max($oldest, (int) $account->last_item_time + 1);
 
                 $this->importAccount($connection, $account, $from, $now, $ownIbans, $jarTitles);
             }
@@ -96,6 +99,7 @@ class SyncMonobankConnectionAction
         array $jarTitles,
     ): void {
         $windowTo = $to;
+        $newest = (int) ($account->last_item_time ?? 0);
 
         while ($windowTo >= $from) {
             $this->client->throttle($connection->id);
@@ -108,6 +112,7 @@ class SyncMonobankConnectionAction
             );
 
             foreach ($items as $item) {
+                $newest = max($newest, (int) ($item['time'] ?? 0));
                 $this->importItem->execute(
                     $connection->user,
                     $connection,
@@ -125,6 +130,10 @@ class SyncMonobankConnectionAction
 
             $oldest = min(array_map(fn (array $item) => (int) ($item['time'] ?? $from), $items));
             $windowTo = $oldest - 1;
+        }
+
+        if ($newest > 0) {
+            $account->forceFill(['last_item_time' => $newest])->save();
         }
     }
 }

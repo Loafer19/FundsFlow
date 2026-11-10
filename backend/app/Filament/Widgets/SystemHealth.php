@@ -125,7 +125,7 @@ class SystemHealth extends StatsOverviewWidget
                 return [
                     'state' => 'No queue tables',
                     'color' => 'gray',
-                    'hint' => "Queue: {$connection}. Telegram updates run right after the HTTP response.",
+                    'hint' => "No queue worker ({$connection}). Telegram, Monobank webhooks and large import commits run after the HTTP response. Scheduler runs every minute via Dokploy cron.",
                 ];
             }
 

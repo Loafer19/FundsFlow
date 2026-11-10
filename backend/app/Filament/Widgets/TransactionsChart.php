@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Enums\TransactionSource;
 use App\Filament\Widgets\Concerns\HasDashboardPeriod;
 use App\Support\Admin\DashboardCharts;
 use App\Support\Admin\DashboardMetrics;
@@ -10,14 +11,6 @@ use Filament\Widgets\ChartWidget;
 class TransactionsChart extends ChartWidget
 {
     use HasDashboardPeriod;
-
-    private const LABELS = [
-        'web' => 'Web app',
-        'telegram' => 'Telegram',
-        'mcp' => 'MCP / AI clients',
-        'recurring' => 'Recurring',
-        'monobank' => 'Monobank',
-    ];
 
     protected static ?int $sort = 3;
 
@@ -44,10 +37,12 @@ class TransactionsChart extends ChartWidget
         $datasets = [];
 
         foreach ($bySource as $source => $days) {
+            $enum = TransactionSource::tryFrom((string) $source);
+
             $datasets[] = [
-                'label' => self::LABELS[$source] ?? ucfirst($source),
+                'label' => $enum?->label() ?? ucfirst((string) $source),
                 'data' => array_values($days),
-                'backgroundColor' => DashboardCharts::COLORS[$source] ?? DashboardCharts::COLORS['gray'],
+                'backgroundColor' => $enum?->chartColor() ?? DashboardCharts::colorFor((string) $source),
                 'borderRadius' => 3,
                 'maxBarThickness' => 18,
             ];

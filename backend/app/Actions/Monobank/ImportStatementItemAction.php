@@ -33,6 +33,7 @@ class ImportStatementItemAction
         bool $notify,
         array $ownIbans,
         array $jarTitles,
+        ?int $skipNewBefore = null,
     ): array {
         $externalId = isset($item['id']) ? (string) $item['id'] : '';
 
@@ -66,6 +67,11 @@ class ImportStatementItemAction
         }
 
         if (!isset($item['time'])) {
+            return ['status' => 'skipped', 'transaction' => null];
+        }
+
+        // Older than what we already fetched and not in the ledger: the user deleted it.
+        if ($skipNewBefore !== null && (int) $item['time'] < $skipNewBefore) {
             return ['status' => 'skipped', 'transaction' => null];
         }
 

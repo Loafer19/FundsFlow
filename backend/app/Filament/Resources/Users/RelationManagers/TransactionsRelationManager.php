@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\Users\RelationManagers;
 
+use App\Enums\TransactionSource;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class TransactionsRelationManager extends ReadOnlyRelationManager
@@ -22,8 +24,18 @@ class TransactionsRelationManager extends ReadOnlyRelationManager
                 TextColumn::make('tags')
                     ->state(fn ($record): string => $record->tags->map(fn ($t) => trim($t->emoji . ' ' . $t->title))->implode(', '))
                     ->placeholder('—'),
-                TextColumn::make('source')->badge(),
+                TextColumn::make('source')
+                    ->badge()
+                    ->formatStateUsing(function (mixed $state): string {
+                        $source = TransactionSource::tryFromMixed($state);
+
+                        return $source?->label() ?? ($state ? ucfirst((string) $state) : '—');
+                    })
+                    ->color(fn (mixed $state): string => TransactionSource::tryFromMixed($state)?->badgeColor() ?? 'gray'),
                 TextColumn::make('created_at')->label('Added')->since()->sortable(),
+            ])
+            ->filters([
+                SelectFilter::make('source')->options(TransactionSource::options()),
             ])
             ->paginated([10, 25, 50]);
     }

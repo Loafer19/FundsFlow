@@ -6,6 +6,7 @@ use App\Actions\Admin\DeleteUserAction;
 use App\Filament\Resources\Users\Pages\ListUsers;
 use App\Filament\Resources\Users\Pages\ViewUser;
 use App\Filament\Resources\Users\RelationManagers\BudgetsRelationManager;
+use App\Filament\Resources\Users\RelationManagers\ImportBatchesRelationManager;
 use App\Filament\Resources\Users\RelationManagers\RecurringTransactionsRelationManager;
 use App\Filament\Resources\Users\RelationManagers\TagsRelationManager;
 use App\Filament\Resources\Users\RelationManagers\TransactionsRelationManager;
@@ -115,6 +116,7 @@ class UserResource extends Resource
             TagsRelationManager::class,
             BudgetsRelationManager::class,
             RecurringTransactionsRelationManager::class,
+            ImportBatchesRelationManager::class,
         ];
     }
 

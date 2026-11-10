@@ -52,6 +52,13 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Amber,
                 'gray' => Color::Stone,
+                // TransactionSource badge colors (match TransactionSource::chartColor()).
+                'web' => Color::Blue,
+                'telegram' => Color::Sky,
+                'recurring' => Color::Purple,
+                'mcp' => Color::Emerald,
+                'monobank' => Color::Orange,
+                'import' => Color::Pink,
             ])
             ->darkMode(true)
             ->defaultThemeMode(ThemeMode::Dark)

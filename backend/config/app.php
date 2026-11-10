@@ -28,7 +28,17 @@ return [
     'env' => env('APP_ENV', 'production'),
 
     // Build identifier shown on the admin dashboard (e.g. a git SHA or tag set at deploy).
-    'version' => env('APP_VERSION'),
+    'version' => (function () {
+        foreach ([__DIR__.'/../storage/app-version.json', __DIR__.'/../../frontend/package.json'] as $file) {
+            $json = is_file($file) ? json_decode((string) file_get_contents($file), true) : null;
+
+            if (is_array($json) && !empty($json['version'])) {
+                return (string) $json['version'];
+            }
+        }
+
+        return env('APP_VERSION');
+    })(),
 
     /*
     |--------------------------------------------------------------------------

@@ -11,6 +11,8 @@ RUN echo "memory_limit = 4G" >> /usr/local/etc/php/conf.d/memory-limit.ini && \
 WORKDIR /app
 
 COPY backend /app
+# App version shown in /admin comes from the frontend's package.json (single place to bump).
+COPY frontend/package.json /app/storage/app-version.json
 COPY docker/Caddyfile /etc/frankenphp/Caddyfile
 
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer

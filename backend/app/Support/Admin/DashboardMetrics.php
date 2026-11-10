@@ -56,7 +56,7 @@ class DashboardMetrics
 
     /**
      * @return array{
-     *     users: int, blocked: int, telegram: int,
+     *     users: int, blocked: int, telegram: int, monobank: int,
      *     signups: array<string, int>, signups_total: int, signups_previous: int,
      *     transactions: array<string, int>, transactions_total: int, transactions_previous: int,
      *     active: int, active_today: int, active_telegram: int,
@@ -75,6 +75,7 @@ class DashboardMetrics
                 'users' => DB::table('users')->count(),
                 'blocked' => DB::table('users')->whereNotNull('blocked_at')->count(),
                 'telegram' => DB::table('identities')->where('provider', 'telegram')->distinct()->count('user_id'),
+                'monobank' => DB::table('monobank_connections')->count(),
                 'signups' => $signups,
                 'signups_total' => array_sum($signups),
                 'signups_previous' => DB::table('users')

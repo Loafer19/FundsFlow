@@ -45,7 +45,7 @@ class UsersByChannelChart extends ChartWidget
     protected function getData(): array
     {
         $c = DashboardMetrics::channels();
-        $colors = DashboardCharts::COLORS;
+        $colors = DashboardCharts::colors();
 
         $slices = $this->filter === 'login'
             ? [

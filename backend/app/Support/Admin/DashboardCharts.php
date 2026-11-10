@@ -2,6 +2,7 @@
 
 namespace App\Support\Admin;
 
+use App\Enums\TransactionSource;
 use Carbon\CarbonImmutable;
 
 /**
@@ -9,19 +10,38 @@ use Carbon\CarbonImmutable;
  */
 final class DashboardCharts
 {
-    /** Readable on both the light and the dark theme. */
-    public const COLORS = [
-        'web' => '#3b82f6',
-        'telegram' => '#0ea5e9',
-        'recurring' => '#a855f7',
-        'mcp' => '#10b981',
-        'monobank' => '#f97316',
+    /** Non-source colors, readable on both the light and the dark theme. */
+    private const NAMED = [
         'amber' => '#f59e0b',
         'gray' => '#9ca3af',
         'red' => '#ef4444',
         'github' => '#6b7280',
         'google' => '#ea4335',
     ];
+
+    /**
+     * Chart colors, including every TransactionSource (new cases fail the enum match
+     * instead of rendering gray).
+     *
+     * @return array<string, string>
+     */
+    public static function colors(): array
+    {
+        $colors = self::NAMED;
+
+        foreach (TransactionSource::cases() as $source) {
+            $colors[$source->value] = $source->chartColor();
+        }
+
+        return $colors;
+    }
+
+    public static function colorFor(string $source): string
+    {
+        $colors = self::colors();
+
+        return $colors[$source] ?? $colors['gray'];
+    }
 
     /**
      * @param list<string> $days Y-m-d

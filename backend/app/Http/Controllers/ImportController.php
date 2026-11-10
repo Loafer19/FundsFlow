@@ -78,6 +78,10 @@ class ImportController extends Controller
             'tag_id' => 'sometimes|nullable|integer',
             'title' => 'sometimes|nullable|string|max:80',
             'tag_title' => 'sometimes|nullable|string|max:80',
+            'include_ids' => 'sometimes|array',
+            'include_ids.*' => 'integer',
+            'skip_ids' => 'sometimes|array',
+            'skip_ids.*' => 'integer',
         ]);
         $batch = $apply->execute($request->user(), $batch, $data);
 

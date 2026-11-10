@@ -1,21 +1,22 @@
 <template>
-    <div class="max-w-5xl mx-auto">
+    <div>
         <div class="flex items-center gap-2 mb-4 flex-wrap">
             <a href="/" class="btn btn-ghost btn-sm gap-1" @click.prevent="goHome">
                 <ArrowLeft :size="16" />
                 Back
             </a>
             <h1 class="text-xl font-semibold">Import preview</h1>
+            <span v-if="batch?.filename" class="text-sm text-base-content/50 truncate max-w-xs">{{ batch.filename }}</span>
         </div>
 
-        <div v-if="!authStore.isAuthenticated" class="card bg-base-100 border border-base-300">
+        <div v-if="!authStore.isAuthenticated" class="card card-border border-base-300 bg-base-100">
             <div class="card-body">
                 <p>Log in to upload a statement or review an import.</p>
                 <button type="button" class="btn btn-primary w-fit" @click="showModal('auth_modal')">Log in</button>
             </div>
         </div>
 
-        <div v-else-if="!uuid" class="card bg-base-100 border border-base-300">
+        <div v-else-if="!uuid" class="card card-border border-base-300 bg-base-100">
             <div class="card-body gap-3">
                 <p class="text-sm text-base-content/70">
                     Upload a bank statement or export (CSV, Excel, OFX, QIF, PDF, and more). You'll get a preview
@@ -39,62 +40,65 @@
         <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
 
         <template v-else-if="batch">
-            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-4">
-                <div class="stat bg-base-100 border border-base-300 rounded-box p-3">
-                    <div class="stat-title">Rows</div>
-                    <div class="stat-value text-2xl">{{ batch.summary.total_rows }}</div>
-                    <div class="stat-desc">{{ periodLabel }}</div>
-                </div>
-                <div class="stat bg-base-100 border border-base-300 rounded-box p-3">
-                    <div class="stat-title">New</div>
-                    <div class="stat-value text-2xl text-success">{{ batch.summary.new }}</div>
-                    <div v-if="batch.summary.needs_tag" class="stat-desc">{{ batch.summary.needs_tag }} need a tag</div>
-                </div>
-                <div class="stat bg-base-100 border border-base-300 rounded-box p-3">
-                    <div class="stat-title">Expenses</div>
-                    <div class="stat-value text-2xl text-error">{{ formatMoney(batch.summary.expense_total) }}</div>
-                    <div class="stat-desc">Income {{ formatMoney(batch.summary.income_total) }}</div>
-                </div>
-                <div class="stat bg-base-100 border border-base-300 rounded-box p-3">
-                    <div class="stat-title">Held back</div>
-                    <div class="stat-value text-2xl">{{ heldBack }}</div>
-                    <div class="stat-desc">{{ batch.summary.duplicate }} dup · {{ batch.summary.transfer }} transfer · {{ batch.summary.skipped }} skipped</div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div v-for="card in summaryCards" :key="card.key" class="card card-border border-base-300 bg-base-100 min-w-0">
+                    <div class="card-body p-4 gap-1 min-w-0">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="shrink-0 rounded-lg p-1.5" :class="card.iconClass">
+                                <component :is="card.icon" :size="16" />
+                            </span>
+                            <div class="text-xs uppercase tracking-wide text-base-content/60 truncate">{{ card.label }}</div>
+                        </div>
+                        <div class="flex flex-wrap items-baseline gap-x-2 min-w-0">
+                            <span class="text-lg font-semibold tabular-nums" :class="card.valueClass">{{ card.value }}</span>
+                            <span v-if="card.note" class="text-xs text-base-content/60">{{ card.note }}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div v-if="batch.categories?.length" class="card bg-base-100 border border-base-300 mb-4">
+            <div v-if="batch.categories?.length" class="card card-border border-base-300 bg-base-100 mb-4">
                 <div class="card-body p-4 gap-3">
-                    <div>
-                        <h2 class="font-semibold">Bank categories</h2>
-                        <p class="text-sm text-base-content/70">
-                            How the file's own categories should be tagged. A shop rule still wins when one matches.
-                        </p>
+                    <div class="flex items-start gap-2">
+                        <span class="shrink-0 rounded-lg p-1.5 bg-info/15 text-info mt-0.5">
+                            <Tags :size="16" />
+                        </span>
+                        <div class="min-w-0">
+                            <h2 class="font-semibold">Bank categories</h2>
+                            <p class="text-sm text-base-content/60">
+                                How the file’s own categories should be tagged. A shop rule still wins when one matches.
+                            </p>
+                        </div>
                     </div>
-                    <div v-for="cat in batch.categories" :key="cat.name" class="flex flex-wrap items-center gap-2">
-                        <span class="font-medium min-w-32">{{ cat.name }}</span>
-                        <span class="badge badge-ghost">{{ cat.count }}</span>
-                        <select class="select select-sm select-bordered" :value="cat.action" :disabled="busy || !editable"
-                            @change="onCategoryAction(cat, $event.target.value)">
-                            <option value="map">Map to a tag</option>
-                            <option value="create">Create as a new tag</option>
-                            <option value="ignore">Ignore</option>
-                        </select>
-                        <template v-if="cat.action === 'map'">
-                            <span v-if="cat.tag" class="badge badge-ghost">{{ cat.tag.emoji }} {{ cat.tag.title }}</span>
-                            <span v-else class="text-xs text-base-content/60">Choose a tag</span>
-                            <button v-if="editable" type="button" class="btn btn-ghost btn-xs"
-                                @click="categoryPicker = categoryPicker === cat.name ? null : cat.name">
-                                {{ categoryPicker === cat.name ? 'Close' : 'Choose tag' }}
-                            </button>
-                        </template>
-                        <template v-else-if="cat.action === 'create'">
-                            <input class="input input-sm input-bordered" :value="cat.title || cat.name"
-                                :disabled="busy || !editable" placeholder="New tag name"
+                    <div class="divide-y divide-base-300">
+                        <div v-for="cat in batch.categories" :key="cat.name"
+                            class="flex flex-wrap items-center gap-2 py-2">
+                            <span class="font-medium min-w-28 truncate" :title="cat.name">{{ cat.name }}</span>
+                            <span class="text-xs text-base-content/50 tabular-nums">{{ cat.count }}</span>
+                            <select class="select select-sm select-bordered" :value="cat.action"
+                                :disabled="busy || !editable"
+                                @change="onCategoryAction(cat, $event.target.value)">
+                                <option value="map">Map to a tag</option>
+                                <option value="create">Create as a new tag</option>
+                                <option value="ignore">Ignore</option>
+                            </select>
+                            <template v-if="cat.action === 'map'">
+                                <button type="button"
+                                    class="badge badge-soft badge-info px-1 gap-1 max-w-full"
+                                    :class="editable ? 'cursor-pointer hover:bg-info/25' : 'pointer-events-none'"
+                                    :disabled="!editable"
+                                    @click="editable && openCategoryPicker(cat, $event)">
+                                    <template v-if="cat.tag">
+                                        <span>{{ cat.tag.emoji }}</span>
+                                        <span>{{ cat.tag.title }}</span>
+                                    </template>
+                                    <span v-else>Choose tag</span>
+                                    <Pencil v-if="editable" :size="12" class="opacity-60" />
+                                </button>
+                            </template>
+                            <input v-else-if="cat.action === 'create'" class="input input-sm input-bordered w-40"
+                                :value="cat.title || cat.name" :disabled="busy || !editable" placeholder="New tag name"
                                 @change="onCategoryRename(cat, $event.target.value)" />
-                        </template>
-                        <div v-if="categoryPicker === cat.name && editable" class="w-full p-2 bg-base-200 rounded-box">
-                            <TagPicker :model-value="cat.tag_id ? [cat.tag_id] : []" searchable
-                                @update:model-value="ids => onCategoryTag(cat, ids)" />
                         </div>
                     </div>
                 </div>
@@ -124,7 +128,7 @@
             <div v-else-if="batch.status === 'failed'" class="alert alert-error mb-4">{{ batch.error_message }}</div>
 
             <div v-if="batch.isMutable !== false && ['previewing', 'failed'].includes(batch.status)"
-                class="card bg-base-100 border border-base-300 mb-4">
+                class="card card-border border-base-300 bg-base-100 mb-4">
                 <div class="card-body p-4 gap-3">
                     <h2 class="font-semibold">Bulk rules</h2>
                     <div class="flex flex-wrap gap-2 items-end">
@@ -175,81 +179,140 @@
                     @change="reload()" />
             </div>
 
-            <div class="overflow-x-auto border border-base-300 rounded-box bg-base-100">
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>Line</th>
-                            <th>Date</th>
-                            <th>Amount</th>
-                            <th>Note</th>
-                            <th>Tags</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="row in batch.rows" :key="row.id" :class="rowClass(row)">
-                            <td>{{ row.line }}</td>
-                            <td class="whitespace-nowrap">{{ row.at || '—' }}</td>
-                            <td class="whitespace-nowrap" :class="row.amount > 0 ? 'text-success' : 'text-error'">
-                                {{ row.amount == null ? '—' : formatMoney(row.amount) }}
-                            </td>
-                            <td class="max-w-xs truncate" :title="row.note">{{ row.note || '—' }}</td>
-                            <td>
-                                <div class="flex flex-wrap gap-1 items-center">
-                                    <span v-for="tag in row.tags" :key="tag.id" class="badge badge-ghost badge-sm">{{ tag.emoji }} {{ tag.title }}</span>
-                                    <span v-for="title in row.new_tag_titles" :key="title" class="badge badge-warning badge-sm">New: {{ title }}</span>
-                                    <span v-if="row.manual" class="text-xs text-base-content/50">edited</span>
-                                    <button v-if="editable" type="button" class="btn btn-ghost btn-xs" @click="editing = editing === row.id ? null : row.id">
-                                        Edit
-                                    </button>
-                                </div>
-                                <div v-if="editing === row.id" class="mt-2 p-2 bg-base-200 rounded-box max-w-sm">
-                                    <TagPicker :model-value="row.tag_ids" searchable @update:model-value="ids => saveTags(row, ids)" />
-                                </div>
-                            </td>
-                            <td>
-                                <span class="badge badge-sm" :class="statusBadge(row.status)">{{ row.status.replace('_', ' ') }}</span>
-                                <div v-if="row.skip_reason || row.error" class="text-xs text-base-content/60">{{ row.skip_reason || row.error }}</div>
-                                <button v-if="editable && row.status !== 'new'" type="button" class="btn btn-link btn-xs px-0" @click="setRowStatus(row, 'new')">
-                                    Import anyway
-                                </button>
-                                <button v-else-if="editable && row.status === 'new'" type="button" class="btn btn-link btn-xs px-0" @click="setRowStatus(row, 'skipped')">
-                                    Skip
-                                </button>
-                            </td>
-                        </tr>
-                        <tr v-if="!batch.rows.length">
-                            <td colspan="6" class="text-center text-base-content/60">No rows in this filter</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="card card-border border-base-300 bg-base-100 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th class="whitespace-nowrap">Date</th>
+                                <th>Amount</th>
+                                <th>Note</th>
+                                <th>Tags</th>
+                                <th>Status</th>
+                                <th class="text-center w-0">
+                                    <label class="flex flex-col items-center gap-1 cursor-pointer">
+                                        <input type="checkbox" class="checkbox checkbox-sm"
+                                            :checked="allVisibleIncluded"
+                                            :indeterminate.prop="someVisibleIncluded && !allVisibleIncluded"
+                                            :disabled="!editable || !visibleToggleable.length"
+                                            :aria-label="allVisibleIncluded ? 'Exclude all rows on this page' : 'Include all rows on this page'"
+                                            @change="toggleAllVisible($event.target.checked)" />
+                                        <span class="text-[10px] font-normal normal-case tracking-normal text-base-content/50">Include</span>
+                                    </label>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in batch.rows" :key="row.id" :class="rowClass(row)">
+                                <td class="whitespace-nowrap">{{ formatRowDate(row.at) }}</td>
+                                <td class="whitespace-nowrap">
+                                    <div v-if="row.amount == null" class="text-base-content/50">—</div>
+                                    <div v-else class="badge badge-outline font-semibold"
+                                        :class="row.amount > 0 ? 'badge-success' : 'badge-error'">
+                                        {{ row.amount > 0 ? '+' : '' }}{{ formatMoney(row.amount) }}
+                                    </div>
+                                </td>
+                                <td class="max-w-xs" :title="row.note || undefined">
+                                    <span class="line-clamp-2 whitespace-normal break-words">{{ row.note || '—' }}</span>
+                                </td>
+                                <td>
+                                    <div class="flex flex-wrap gap-2 items-center">
+                                        <button type="button"
+                                            class="flex flex-wrap gap-2 items-center text-left min-w-0"
+                                            :class="editable ? 'cursor-pointer' : 'cursor-default'"
+                                            :disabled="!editable"
+                                            :aria-label="editable ? 'Edit tags' : 'Tags'"
+                                            @click="editable && openRowPicker(row, $event)">
+                                            <span v-for="tag in row.tags" :key="tag.id"
+                                                class="badge badge-soft badge-info px-1 gap-1">
+                                                <span>{{ tag.emoji }}</span>
+                                                <span>{{ tag.title }}</span>
+                                            </span>
+                                            <span v-for="title in row.new_tag_titles" :key="title"
+                                                class="badge badge-soft badge-warning px-1 gap-1">
+                                                New: {{ title }}
+                                            </span>
+                                            <span v-if="!row.tags?.length && !row.new_tag_titles?.length"
+                                                class="text-xs text-base-content/40">No tags</span>
+                                            <Pencil v-if="editable" :size="14" class="opacity-40 shrink-0" />
+                                        </button>
+                                        <span v-if="row.manual" class="tooltip tooltip-top" data-tip="Changed by you">
+                                            <span class="block w-1.5 h-1.5 rounded-full bg-info" aria-label="Changed by you"></span>
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge badge-sm tooltip tooltip-left whitespace-nowrap"
+                                        :class="statusBadge(row.status)" :data-tip="statusTip(row)">
+                                        {{ statusLabel(row.status) }}
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <input type="checkbox" class="checkbox checkbox-sm"
+                                        :checked="isIncluded(row)"
+                                        :disabled="!editable || row.status === 'error'"
+                                        :aria-label="`Include line ${row.line}`"
+                                        @change="toggleInclude(row, $event.target.checked)" />
+                                </td>
+                            </tr>
+                            <tr v-if="!batch.rows.length">
+                                <td colspan="6" class="text-center text-base-content/60">No rows in this filter</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <div class="flex items-center justify-between mt-3">
+            <div class="flex items-center justify-between mt-3 mb-20">
                 <div class="join" v-if="batch.meta.last_page > 1">
                     <button type="button" class="join-item btn btn-sm" :disabled="page <= 1" @click="page--; reload()">Prev</button>
                     <button type="button" class="join-item btn btn-sm btn-ghost">{{ page }} / {{ batch.meta.last_page }}</button>
                     <button type="button" class="join-item btn btn-sm" :disabled="page >= batch.meta.last_page" @click="page++; reload()">Next</button>
                 </div>
-                <button v-if="['previewing', 'failed'].includes(batch.status)" type="button" class="btn btn-primary ml-auto"
-                    :disabled="busy || !importableCount" @click="onCommit">
+            </div>
+
+            <div v-if="['previewing', 'failed'].includes(batch.status)"
+                class="sticky bottom-0 z-20 -mx-4 px-4 py-3 mt-4 bg-base-100/95 backdrop-blur border-t border-base-300 flex items-center justify-end gap-2">
+                <button type="button" class="btn btn-ghost" :disabled="busy" @click="goHome">Cancel</button>
+                <button type="button" class="btn btn-primary" :disabled="busy || !importableCount" @click="onCommit">
                     <span v-if="busy" class="loading loading-spinner loading-sm"></span>
                     Import {{ importableCount }} transaction{{ importableCount === 1 ? '' : 's' }}
                 </button>
             </div>
         </template>
+
+        <Teleport to="body">
+            <div v-if="tagMenu" class="fixed inset-0 z-50" @mousedown.self="closeTagMenu">
+                <div class="fixed bg-base-100 rounded-box w-64 p-3 border border-base-300 shadow-lg"
+                    role="dialog" aria-label="Choose tags"
+                    :style="{ top: tagMenu.top + 'px', left: tagMenu.left + 'px' }"
+                    @mousedown.stop>
+                    <TagPicker v-model="tagMenu.ids" searchable />
+                </div>
+            </div>
+        </Teleport>
     </div>
 </template>
 
 <script setup>
-import { ArrowLeft } from 'lucide-vue-next'
+import {
+    ArrowLeft,
+    ArrowLeftRight,
+    Ban,
+    CalendarDays,
+    Copy,
+    List,
+    Pencil,
+    Sparkles,
+    Tags,
+    TrendingDown,
+    TrendingUp,
+} from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAuthStore } from '../services/auth.js'
-import { formatMoney } from '../services/formatters.js'
+import { apiErrorMessage, formatDate, formatMoney, parseLocalDate } from '../services/formatters.js'
 import { applyImportRules, commitImport, fetchImport, undoImport, updateImportRow, uploadImport } from '../services/imports.js'
 import { showModal } from '../services/modal.js'
-import { apiErrorMessage } from '../services/formatters.js'
 import { useTagsStore } from '../services/tags.js'
 import toasts from '../services/toasts.js'
 import TagPicker from './TagPicker.vue'
@@ -269,29 +332,40 @@ const busy = ref(false)
 const statusFilter = ref('all')
 const search = ref('')
 const page = ref(1)
-const editing = ref(null)
 const ruleMerchant = ref('')
 const ruleTag = ref('')
 const ruleBefore = ref('')
 const ruleSkipName = ref('')
 const fileInput = ref(null)
-const categoryPicker = ref(null)
+const tagMenu = ref(null)
+const savedMenuKey = ref('')
 let pollTimer = null
+let saveSeq = 0
 
-const heldBack = computed(() => {
-    const s = batch.value?.summary
-    return s ? s.duplicate + s.transfer + s.skipped + s.error : 0
-})
 const periodLabel = computed(() => {
     const s = batch.value?.summary
     if (!s?.period_from) return batch.value?.filename || ''
-    return s.period_from === s.period_to ? s.period_from : `${s.period_from} – ${s.period_to}`
+    return s.period_from === s.period_to ? formatRowDate(s.period_from) : `${formatRowDate(s.period_from)} – ${formatRowDate(s.period_to)}`
 })
 const importableCount = computed(() => {
     const s = batch.value?.summary
     return s ? s.new + s.needs_tag : 0
 })
 const editable = computed(() => ['previewing', 'failed'].includes(batch.value?.status))
+const summaryCards = computed(() => {
+    const s = batch.value?.summary || {}
+    const needs = s.needs_tag ? `${s.needs_tag} need a tag` : ''
+    return [
+        { key: 'rows', label: 'Rows', value: s.total_rows ?? 0, note: periodLabel.value, icon: List, iconClass: 'bg-base-content/10 text-base-content/70' },
+        { key: 'new', label: 'New', value: s.new ?? 0, note: needs, icon: Sparkles, iconClass: 'bg-success/15 text-success', valueClass: 'text-success' },
+        { key: 'income', label: 'Income', value: formatMoney(s.income_total || 0), icon: TrendingUp, iconClass: 'bg-success/15 text-success', valueClass: 'text-success' },
+        { key: 'expenses', label: 'Expenses', value: formatMoney(Math.abs(s.expense_total || 0)), icon: TrendingDown, iconClass: 'bg-error/15 text-error', valueClass: 'text-error' },
+        { key: 'duplicate', label: 'Duplicates', value: s.duplicate ?? 0, icon: Copy, iconClass: 'bg-base-content/10 text-base-content/70' },
+        { key: 'transfer', label: 'Transfers', value: s.transfer ?? 0, icon: ArrowLeftRight, iconClass: 'bg-info/15 text-info' },
+        { key: 'skipped', label: 'Skipped', value: s.skipped ?? 0, icon: Ban, iconClass: 'bg-base-content/10 text-base-content/70' },
+        { key: 'period', label: 'Period', value: periodLabel.value || '—', icon: CalendarDays, iconClass: 'bg-warning/15 text-warning' },
+    ]
+})
 const filters = computed(() => {
     const s = batch.value?.summary || {}
     return [
@@ -304,10 +378,23 @@ const filters = computed(() => {
         { id: 'error', label: 'Errors', count: s.error || 0 },
     ]
 })
+const isIncluded = (row) => ['new', 'needs_tag'].includes(row.status)
+const visibleToggleable = computed(() => (batch.value?.rows || []).filter((row) => row.status !== 'error'))
+const allVisibleIncluded = computed(() => visibleToggleable.value.length > 0 && visibleToggleable.value.every(isIncluded))
+const someVisibleIncluded = computed(() => visibleToggleable.value.some(isIncluded))
 
 const goHome = () => {
     window.history.pushState({}, '', '/')
     window.location.assign('/')
+}
+
+const formatRowDate = (value) => {
+    if (!value) return '—'
+    try {
+        return formatDate(parseLocalDate(value))
+    } catch {
+        return value
+    }
 }
 
 const params = () => ({
@@ -373,11 +460,10 @@ const onCategoryAction = async (cat, action) => {
         if (cat.tag_id) {
             await runRules({ category: cat.name, category_action: 'map', tag_id: cat.tag_id })
         } else {
-            categoryPicker.value = cat.name
+            openCategoryPicker(cat, { currentTarget: null })
         }
         return
     }
-    categoryPicker.value = null
     const payload = { category: cat.name, category_action: action }
     if (action === 'create') payload.title = cat.title || cat.name
     await runRules(payload)
@@ -386,12 +472,6 @@ const onCategoryRename = async (cat, title) => {
     const name = (title || '').trim()
     if (!name) return
     await runRules({ category: cat.name, category_action: 'create', title: name })
-}
-const onCategoryTag = async (cat, ids) => {
-    const next = ids.find((id) => id !== cat.tag_id) ?? ids[ids.length - 1]
-    if (!next) return
-    await runRules({ category: cat.name, category_action: 'map', tag_id: next })
-    categoryPicker.value = null
 }
 const applyBefore = async () => {
     await runRules({ skip_before: ruleBefore.value })
@@ -415,27 +495,113 @@ const runRules = async (rules) => {
     }
 }
 
-const saveTags = async (row, ids) => {
-    busy.value = true
+const placeMenu = (event) => {
+    const el = event?.currentTarget
+    const rect = el?.getBoundingClientRect?.()
+    const width = 256
+    const estimated = 340
+    const left = rect
+        ? Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - width - 8))
+        : Math.max(8, (window.innerWidth - width) / 2)
+    let top = rect ? rect.bottom + 8 : 80
+    if (top + estimated > window.innerHeight - 8) {
+        top = Math.max(8, (rect ? rect.top : estimated + 16) - estimated - 8)
+    }
+    return { top, left }
+}
+
+const menuKey = (menu) => {
+    if (!menu) return ''
+    const ids = (menu.ids || []).map(Number).join(',')
+    return menu.kind === 'row' ? `row:${menu.rowId}:${ids}` : `cat:${menu.name}:${ids}`
+}
+
+const resolveTags = (ids) =>
+    ids.map((id) => tagsStore.tags.find((tag) => Number(tag.id) === Number(id))).filter(Boolean)
+
+const openRowPicker = (row, event) => {
+    const ids = [...(row.tag_ids || [])].map(Number)
+    const menu = { kind: 'row', rowId: row.id, ids, ...placeMenu(event) }
+    savedMenuKey.value = menuKey(menu)
+    tagMenu.value = menu
+}
+
+const openCategoryPicker = (cat, event) => {
+    const ids = cat.tag_id ? [Number(cat.tag_id)] : []
+    const menu = { kind: 'category', name: cat.name, tagId: cat.tag_id ? Number(cat.tag_id) : null, ids, ...placeMenu(event) }
+    savedMenuKey.value = menuKey(menu)
+    tagMenu.value = menu
+}
+
+const closeTagMenu = () => {
+    tagMenu.value = null
+}
+
+const applyMenuTags = async (menu, ids) => {
+    const key = menuKey({ ...menu, ids })
+    if (key === savedMenuKey.value) return
+    savedMenuKey.value = key
+
+    if (menu.kind === 'category') {
+        const next = ids.find((id) => id !== menu.tagId) ?? ids[ids.length - 1]
+        if (!next) return
+        menu.tagId = Number(next)
+        menu.ids = [Number(next)]
+        savedMenuKey.value = menuKey(menu)
+        await runRules({ category: menu.name, category_action: 'map', tag_id: Number(next) })
+        return
+    }
+
+    const row = batch.value?.rows?.find((item) => item.id === menu.rowId)
+    if (row) {
+        row.tag_ids = ids
+        row.tags = resolveTags(ids)
+        row.new_tag_titles = []
+        row.manual = true
+        if (row.status === 'needs_tag' && ids.length) row.status = 'new'
+    }
+
+    const seq = ++saveSeq
     try {
-        batch.value = await updateImportRow(props.uuid, row.id, { tag_ids: ids })
-        editing.value = null
+        const updated = await updateImportRow(props.uuid, menu.rowId, { tag_ids: ids })
+        if (seq !== saveSeq) return
+        if (updated?.summary && batch.value) {
+            batch.value.summary = updated.summary
+            if (updated.by_tag) batch.value.by_tag = updated.by_tag
+            const fresh = updated.rows?.find((item) => item.id === menu.rowId)
+            if (fresh && row) Object.assign(row, fresh)
+        }
     } catch (error) {
+        if (seq !== saveSeq) return
         toasts.error(apiErrorMessage(error, 'Could not update tags'))
-    } finally {
-        busy.value = false
+        await reload()
     }
 }
 
-const setRowStatus = async (row, status) => {
+watch(
+    () => tagMenu.value?.ids,
+    (ids) => {
+        if (!tagMenu.value || !ids) return
+        applyMenuTags(tagMenu.value, [...ids].map(Number))
+    },
+    { deep: true },
+)
+
+const toggleInclude = async (row, include) => {
     busy.value = true
     try {
-        batch.value = await updateImportRow(props.uuid, row.id, { status })
+        batch.value = await updateImportRow(props.uuid, row.id, { status: include ? 'new' : 'skipped' })
     } catch (error) {
         toasts.error(apiErrorMessage(error, 'Could not update the row'))
     } finally {
         busy.value = false
     }
+}
+
+const toggleAllVisible = async (include) => {
+    const ids = visibleToggleable.value.map((row) => row.id)
+    if (!ids.length) return
+    await runRules(include ? { include_ids: ids } : { skip_ids: ids })
 }
 
 const onCommit = async () => {
@@ -469,6 +635,14 @@ const rowClass = (row) => ({
     'bg-warning/10': row.status === 'needs_tag',
     'bg-error/10': row.status === 'error',
 })
+const statusLabel = (status) => ({
+    new: 'New',
+    duplicate: 'Duplicate',
+    transfer: 'Transfer',
+    skipped: 'Skipped',
+    needs_tag: 'Needs tag',
+    error: 'Error',
+}[status] || status)
 const statusBadge = (status) => ({
     new: 'badge-success',
     duplicate: 'badge-ghost',
@@ -477,13 +651,28 @@ const statusBadge = (status) => ({
     needs_tag: 'badge-warning',
     error: 'badge-error',
 }[status] || 'badge-ghost')
+const statusTip = (row) => {
+    if (row.status === 'duplicate') {
+        return row.at ? `Matches a saved transaction on ${formatRowDate(row.at)}` : (row.skip_reason || 'Already saved')
+    }
+    if (row.status === 'transfer') return row.skip_reason || 'Transfer to own card'
+    if (row.status === 'skipped') return row.skip_reason || 'Skipped by you'
+    if (row.status === 'needs_tag') return 'Needs a tag before import'
+    if (row.status === 'error') return row.error || 'Could not read this row'
+    if (row.status === 'new') return row.skip_reason || 'Will be imported'
+    return row.skip_reason || row.error || ''
+}
 
 watch(() => props.uuid, () => {
     batch.value = null
     page.value = 1
+    closeTagMenu()
     reload()
 })
 
 onMounted(reload)
-onUnmounted(stopPoll)
+onUnmounted(() => {
+    stopPoll()
+    closeTagMenu()
+})
 </script>

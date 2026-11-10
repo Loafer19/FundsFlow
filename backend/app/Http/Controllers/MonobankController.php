@@ -77,6 +77,7 @@ class MonobankController extends Controller
         if ($wait > 0) {
             return response()->json([
                 'message' => "Monobank allows one refresh per minute. Try again in {$wait} seconds.",
+                'retry_after' => $wait,
             ], 429)->header('Retry-After', (string) $wait);
         }
 

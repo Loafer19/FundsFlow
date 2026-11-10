@@ -40,6 +40,7 @@
                 <li>Pending (hold) purchases appear immediately; the amount updates when they settle.</li>
                 <li>The last 31 days are imported when you connect. New purchases arrive instantly after that.</li>
                 <li>Auto-tagging learns from the tags you change on imported purchases.</li>
+                <li>Deleted purchases stay deleted: Sync now won't bring them back.</li>
                 <li>Telegram notifications are sent only for new purchases, not the first import or Sync now.</li>
                 <li>Your token is stored encrypted. You can revoke it any time at api.monobank.ua.</li>
                 <li>UAH jars can be tracked as savings goals: progress follows the jar balance in monobank.</li>
@@ -66,6 +67,7 @@
                 <li>Pending (hold) purchases appear immediately; the amount updates when they settle.</li>
                 <li>The last 31 days are imported when you connect. New purchases arrive instantly after that.</li>
                 <li>Auto-tagging learns from the tags you change on imported purchases.</li>
+                <li>Deleted purchases stay deleted: Sync now won't bring them back.</li>
                 <li>Telegram notifications are sent only for new purchases, not the first import or Sync now.</li>
                 <li>Your token is stored encrypted. You can revoke it any time at api.monobank.ua.</li>
                 <li>UAH jars can be tracked as savings goals: progress follows the jar balance in monobank.</li>
@@ -148,9 +150,9 @@
         </div>
 
         <div class="flex flex-wrap justify-end gap-2">
-            <button type="button" class="btn btn-outline btn-sm" :disabled="busy" @click="syncNow">
+            <button type="button" class="btn btn-outline btn-sm" :disabled="busy || cooldown > 0" @click="syncNow">
                 <span v-if="syncing" class="loading loading-spinner loading-xs"></span>
-                Sync now
+                {{ cooldown > 0 ? `Sync in ${cooldown}s` : 'Sync now' }}
             </button>
             <button type="button" class="btn btn-outline btn-error btn-sm" :disabled="busy" @click="disconnect">
                 Disconnect
@@ -160,7 +162,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { apiErrorMessage, formatMoney } from '../services/formatters'
 import { useBudgetsStore } from '../services/budgets'
 import {
@@ -180,6 +182,20 @@ const loading = ref(false)
 const loaded = ref(false)
 const busy = ref(false)
 const syncing = ref(false)
+const cooldown = ref(0)
+let cooldownTimer = null
+
+const startCooldown = (seconds) => {
+    cooldown.value = Math.max(0, Math.ceil(Number(seconds) || 0))
+    clearInterval(cooldownTimer)
+    if (cooldown.value <= 0) return
+    cooldownTimer = setInterval(() => {
+        cooldown.value -= 1
+        if (cooldown.value <= 0) clearInterval(cooldownTimer)
+    }, 1000)
+}
+
+onUnmounted(() => clearInterval(cooldownTimer))
 const tagsStore = useTagsStore()
 const budgetsStore = useBudgetsStore()
 
@@ -301,8 +317,15 @@ const syncNow = async () => {
         apply(data)
         await budgetsStore.reload()
         toasts.success('Sync started. New items appear in a minute or two.')
+        startCooldown(60)
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Could not sync: '))
+        if (error.response?.status === 429) {
+            const wait = error.response?.data?.retry_after ?? error.retryAfter ?? 60
+            startCooldown(wait)
+            toasts.info(`Monobank allows one refresh per minute. Sync will be available in ${Math.ceil(wait)}s.`)
+        } else {
+            toasts.error(apiErrorMessage(error, 'Could not sync: '))
+        }
     } finally {
         busy.value = false
         syncing.value = false

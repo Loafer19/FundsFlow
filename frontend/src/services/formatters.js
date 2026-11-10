@@ -98,8 +98,8 @@ export const transactionSourceLabels = {
     telegram: 'Telegram',
     recurring: 'Recurring',
     mcp: 'MCP',
-    monobank: 'Monobank',
-    import: 'Import',
+    monobank: 'Bank: Monobank',
+    import: 'File import',
 }
 
 export const getTransactionSourceLabel = (source) => transactionSourceLabels[source] ?? transactionSourceLabels.web
@@ -121,7 +121,11 @@ export const apiErrorMessage = (error, prefix = '') => {
         const base =
             (data && typeof data === 'object' && !(data instanceof Blob) && (data.error || data.message)) ||
             'Too many requests.'
-        const wait = Number.isFinite(sec) ? ` Try again in ${sec}s.` : ' Try again shortly.'
+        const wait = /try again/i.test(base)
+            ? ''
+            : Number.isFinite(sec)
+              ? ` Try again in ${sec}s.`
+              : ' Try again shortly.'
 
         return prefix + base + wait
     }

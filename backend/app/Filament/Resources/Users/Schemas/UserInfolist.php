@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\Users\Schemas;
 
 use App\Filament\Resources\Users\UserResource;
+use App\Models\MonobankAccount;
+use App\Models\MonobankConnection;
 use App\Models\User;
 use App\Support\TelegramAiQuota;
 use Filament\Infolists\Components\IconEntry;
@@ -75,6 +77,88 @@ class UserInfolist
                         TextEntry::make('recurring_count')->label('Recurring')->state(fn (User $r): int => $r->recurringTransactions()->count()),
                         TextEntry::make('attachments_count')->label('Attachments')->state(fn (User $r): int => $r->attachments()->count()),
                     ]),
+                Section::make('Monobank')
+                    ->columns(4)
+                    ->columnSpanFull()
+                    ->schema([
+                        TextEntry::make('mono_connected')
+                            ->label('Connected')
+                            ->state(fn (User $record): string => self::connection($record) ? 'Yes' : 'No')
+                            ->badge()
+                            ->color(fn (User $record): string => self::connection($record) ? 'success' : 'gray')
+                            ->placeholder('Not connected'),
+                        TextEntry::make('mono_status')
+                            ->label('Status')
+                            ->state(fn (User $record): ?string => self::connection($record)?->status)
+                            ->formatStateUsing(fn (?string $state): string => match ($state) {
+                                MonobankConnection::STATUS_ACTIVE => 'Active',
+                                MonobankConnection::STATUS_SYNCING => 'Syncing',
+                                MonobankConnection::STATUS_ERROR => 'Error',
+                                default => $state ? ucfirst($state) : '—',
+                            })
+                            ->badge()
+                            ->color(fn (?string $state): string => match ($state) {
+                                MonobankConnection::STATUS_ACTIVE => 'success',
+                                MonobankConnection::STATUS_SYNCING => 'info',
+                                MonobankConnection::STATUS_ERROR => 'danger',
+                                default => 'gray',
+                            })
+                            ->visible(fn (User $record): bool => self::connection($record) !== null),
+                        TextEntry::make('mono_last_synced_at')
+                            ->label('Last synced')
+                            ->state(fn (User $record) => self::connection($record)?->last_synced_at)
+                            ->dateTime()
+                            ->placeholder('Never')
+                            ->visible(fn (User $record): bool => self::connection($record) !== null),
+                        IconEntry::make('mono_notify')
+                            ->label('Notify')
+                            ->state(fn (User $record): bool => (bool) (self::connection($record)?->notify))
+                            ->boolean()
+                            ->falseColor('gray')
+                            ->visible(fn (User $record): bool => self::connection($record) !== null),
+                        TextEntry::make('mono_cards')
+                            ->label('Cards')
+                            ->state(function (User $record): string {
+                                $cards = self::accounts($record)->filter(fn (MonobankAccount $account): bool => !$account->isJar());
+
+                                return $cards->where('enabled', true)->count() . ' / ' . $cards->count();
+                            })
+                            ->helperText('Enabled / total')
+                            ->visible(fn (User $record): bool => self::connection($record) !== null),
+                        TextEntry::make('mono_jars')
+                            ->label('Jars')
+                            ->state(fn (User $record): int => self::accounts($record)->filter(fn (MonobankAccount $account): bool => $account->isJar())->count())
+                            ->visible(fn (User $record): bool => self::connection($record) !== null),
+                        TextEntry::make('mono_linked_goals')
+                            ->label('Linked jar goals')
+                            ->state(fn (User $record): int => $record->budgets()
+                                ->whereNotNull('monobank_jar_id')
+                                ->whereNull('monobank_jar_unlinked_at')
+                                ->count())
+                            ->visible(fn (User $record): bool => self::connection($record) !== null),
+                        TextEntry::make('mono_last_error')
+                            ->label('Last error')
+                            ->state(fn (User $record): ?string => self::connection($record)?->last_error)
+                            ->placeholder('—')
+                            ->color(fn (User $record): string => filled(self::connection($record)?->last_error) ? 'danger' : 'gray')
+                            ->columnSpanFull()
+                            ->visible(fn (User $record): bool => self::connection($record) !== null && filled(self::connection($record)?->last_error)),
+                    ]),
             ]);
+    }
+
+    private static function connection(User $user): ?MonobankConnection
+    {
+        $user->loadMissing('monobankConnection.accounts');
+
+        return $user->monobankConnection;
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, MonobankAccount>
+     */
+    private static function accounts(User $user)
+    {
+        return self::connection($user)?->accounts ?? collect();
     }
 }

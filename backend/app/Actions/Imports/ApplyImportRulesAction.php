@@ -5,6 +5,7 @@ namespace App\Actions\Imports;
 use App\Actions\Agent\Documents\ImportInstructions;
 use App\Actions\Tags\ListTagsAction;
 use App\Models\ImportBatch;
+use App\Models\ImportRow;
 use App\Models\MonobankTagRule;
 use App\Models\User;
 use App\Services\Monobank\MerchantNormalizer;
@@ -113,9 +114,70 @@ class ApplyImportRulesAction
         }
 
         $batch->save();
-        $this->batches->rebuildRows($user, $batch);
+        if ($this->shouldRebuild($rules, $text)) {
+            $this->batches->rebuildRows($user, $batch);
+        }
+        if ($this->applyInclusion($batch, $rules)) {
+            $this->batches->recalculate($batch);
+        }
 
         return $batch->fresh();
+    }
+
+    /**
+     * @param  array<string, mixed>  $rules
+     */
+    private function shouldRebuild(array $rules, string $text): bool
+    {
+        foreach (['include_foreign', 'skip_transfers', 'skip_before', 'merchant_map', 'skip_names', 'instruction', 'category_map', 'category'] as $key) {
+            if (array_key_exists($key, $rules)) {
+                if ($key === 'category' && (!is_string($rules['category']) || trim($rules['category']) === '')) {
+                    continue;
+                }
+                if ($key === 'instruction') {
+                    continue;
+                }
+
+                return true;
+            }
+        }
+
+        return $text !== '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $rules
+     */
+    private function applyInclusion(ImportBatch $batch, array $rules): bool
+    {
+        $include = array_values(array_unique(array_map('intval', $rules['include_ids'] ?? [])));
+        $skip = array_values(array_unique(array_map('intval', $rules['skip_ids'] ?? [])));
+        if ($include === [] && $skip === []) {
+            return false;
+        }
+
+        $changed = false;
+        $rows = $batch->rows()->whereIn('id', array_values(array_unique([...$include, ...$skip])))->get();
+        foreach ($rows as $row) {
+            $id = (int) $row->id;
+            if (in_array($id, $skip, true)) {
+                $row->status = ImportRow::STATUS_SKIPPED;
+                $row->skip_reason = $row->skip_reason ?: 'Skipped by you';
+                $row->manual = true;
+                $row->save();
+                $changed = true;
+                continue;
+            }
+            if (in_array($id, $include, true) && $row->status !== ImportRow::STATUS_ERROR) {
+                $row->status = ImportRow::STATUS_NEW;
+                $row->skip_reason = null;
+                $row->manual = true;
+                $row->save();
+                $changed = true;
+            }
+        }
+
+        return $changed;
     }
 
     /**
