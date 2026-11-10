@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 
 class RefreshMonobankJarsCommand extends Command
 {
-    protected $signature = 'monobank:refresh-jars';
+    protected $signature = 'monobank:refresh-jars {--pending : Only connections flagged by a webhook}';
 
     protected $description = 'Refresh monobank jar balances used by linked savings goals (client-info, respects the 60s rate limit)';
 
@@ -20,7 +20,14 @@ class RefreshMonobankJarsCommand extends Command
             ->pluck('monobank_connection_id');
 
         foreach ($ids as $id) {
-            RefreshMonobankJarsJob::dispatch((int) $id);
+            $key = 'monobank:jar-refresh:'.$id;
+
+            if ($this->option('pending') && ! \Illuminate\Support\Facades\Cache::has($key)) {
+                continue;
+            }
+
+            \Illuminate\Support\Facades\Cache::forget($key);
+            RefreshMonobankJarsJob::dispatchSync((int) $id);
         }
 
         return self::SUCCESS;

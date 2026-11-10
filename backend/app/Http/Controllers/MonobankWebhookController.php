@@ -27,7 +27,7 @@ class MonobankWebhookController extends Controller
             $payload = $request->all();
 
             if (is_array($payload)) {
-                ProcessMonobankWebhookJob::dispatch($connection->id, $payload);
+                ProcessMonobankWebhookJob::dispatch($connection->id, $payload)->afterResponse();
             }
         }
 

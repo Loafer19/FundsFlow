@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schedule;
 
 Schedule::command(CheckBudgetThresholdsCommand::class)->hourly();
 Schedule::command(RefreshMonobankJarsCommand::class)->hourly();
+Schedule::command(RefreshMonobankJarsCommand::class, ['--pending'])->everyFiveMinutes();
 Schedule::command(SendWeeklyDigestCommand::class)->weeklyOn(1, '09:00');
 Schedule::command(GenerateRecurringTransactionsCommand::class)->dailyAt('06:00');
 // Leftover one-time report:print tokens (normally revoked within seconds) and expired logins.

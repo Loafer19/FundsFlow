@@ -2,7 +2,6 @@
 
 namespace App\Actions\Monobank;
 
-use App\Jobs\RefreshMonobankJarsJob;
 use App\Models\MonobankConnection;
 
 class ProcessMonobankWebhookAction
@@ -87,6 +86,7 @@ class ProcessMonobankWebhookAction
 
     private function scheduleJarRefresh(int $connectionId): void
     {
-        RefreshMonobankJarsJob::dispatch($connectionId)->delay(now()->addSeconds(65));
+        // No queue worker on prod: flag it, the scheduler picks it up within a few minutes.
+        \Illuminate\Support\Facades\Cache::put('monobank:jar-refresh:'.$connectionId, true, now()->addHours(2));
     }
 }
