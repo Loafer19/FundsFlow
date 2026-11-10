@@ -90,11 +90,11 @@ const onPick = async (event) => {
 
     for (const file of picked.slice(0, room)) {
         if (!ALLOWED_MIMES.has(file.type)) {
-            toasts.error(`${file.name}: only JPEG, PNG, WebP, and PDF are allowed!`)
+            toasts.error(`Could not add ${file.name}: only JPEG, PNG, WebP, and PDF are allowed`)
             continue
         }
         if (file.size > MAX_BYTES) {
-            toasts.error(`${file.name}: must be 8 MB or smaller!`)
+            toasts.error(`Could not add ${file.name}: must be 8 MB or smaller`)
             continue
         }
         accepted.push(file)

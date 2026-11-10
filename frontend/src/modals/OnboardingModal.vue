@@ -117,7 +117,7 @@ const linkTelegram = async () => {
         await openTelegramLinkBot()
         finish()
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Failed to generate link: '))
+        toasts.error(apiErrorMessage(error, 'Could not generate link: '))
     } finally {
         linkingTelegram.value = false
     }

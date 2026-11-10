@@ -149,8 +149,8 @@ const resetText = computed(() => {
 
 const tagsHint = computed(() =>
     goal.value
-        ? 'Transactions with these tags since the start date count: expenses (transfers into savings) add to the goal, income (withdrawals) takes from it.'
-        : 'Spending on these tags counts toward the limit.',
+        ? 'Transactions with these tags since the start date count: expenses (transfers into savings) add to the goal, income (withdrawals) takes from it'
+        : 'Spending on these tags counts toward the limit',
 )
 
 const validStart = computed(() => /^\d{4}-\d{2}-\d{2}$/.test(form.value.start_date ?? ''))

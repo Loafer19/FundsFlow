@@ -6,6 +6,10 @@ import toasts from './toasts.js'
 
 const CACHE = 'budgets'
 
+const isGoal = (item, payload) => (payload?.type ?? item?.type) === 'goal'
+const noun = (item, payload) => (isGoal(item, payload) ? 'goal' : 'budget')
+const Noun = (item, payload) => (isGoal(item, payload) ? 'Goal' : 'Budget')
+
 export const useBudgetsStore = defineStore('budgets', {
     state: () => ({
         budgets: [],
@@ -24,7 +28,7 @@ export const useBudgetsStore = defineStore('budgets', {
                 this.budgets = response.data
                 this.persist()
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to load budgets: '))
+                toasts.error(apiErrorMessage(error, 'Could not load budgets: '))
             }
         },
 
@@ -37,11 +41,11 @@ export const useBudgetsStore = defineStore('budgets', {
                 this.budgets.push(response.data)
                 this.persist()
 
-                toasts.success(payload?.type === 'goal' ? 'Savings goal created!' : 'Budget created successfully!')
+                toasts.success(`${Noun(null, payload)} created!`)
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to create budget: '))
+                toasts.error(apiErrorMessage(error, `Could not create ${noun(null, payload)}: `))
 
                 return false
             } finally {
@@ -59,11 +63,11 @@ export const useBudgetsStore = defineStore('budgets', {
                 this.budgets[index] = response.data
                 this.persist()
 
-                toasts.success(payload?.type === 'goal' ? 'Savings goal updated!' : 'Budget updated successfully!')
+                toasts.success(`${Noun(this.budgets.find((b) => b.id === id), payload)} updated!`)
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to update budget: '))
+                toasts.error(apiErrorMessage(error, `Could not update ${noun(this.budgets.find((b) => b.id === id), payload)}: `))
 
                 return false
             } finally {
@@ -73,6 +77,7 @@ export const useBudgetsStore = defineStore('budgets', {
 
         async pause(id) {
             this.isLoading = id
+            const item = this.budgets.find((b) => b.id === id)
 
             try {
                 const response = await api.post('/budgets/' + id + '/pause')
@@ -81,11 +86,11 @@ export const useBudgetsStore = defineStore('budgets', {
                 this.budgets[index] = response.data
                 this.persist()
 
-                toasts.info('Budget paused successfully!')
+                toasts.info(`${Noun(item)} paused!`)
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to pause budget: '))
+                toasts.error(apiErrorMessage(error, `Could not pause ${noun(item)}: `))
 
                 return false
             } finally {
@@ -95,6 +100,7 @@ export const useBudgetsStore = defineStore('budgets', {
 
         async resume(id) {
             this.isLoading = id
+            const item = this.budgets.find((b) => b.id === id)
 
             try {
                 const response = await api.post('/budgets/' + id + '/resume')
@@ -103,11 +109,11 @@ export const useBudgetsStore = defineStore('budgets', {
                 this.budgets[index] = response.data
                 this.persist()
 
-                toasts.success('Budget resumed successfully!')
+                toasts.success(`${Noun(item)} resumed!`)
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to resume budget: '))
+                toasts.error(apiErrorMessage(error, `Could not resume ${noun(item)}: `))
 
                 return false
             } finally {
@@ -117,6 +123,7 @@ export const useBudgetsStore = defineStore('budgets', {
 
         async delete(id) {
             this.isLoading = id
+            const item = this.budgets.find((b) => b.id === id)
 
             try {
                 await api.delete('/budgets/' + id)
@@ -124,11 +131,11 @@ export const useBudgetsStore = defineStore('budgets', {
                 this.budgets = this.budgets.filter((b) => b.id !== id)
                 this.persist()
 
-                toasts.info('Budget deleted successfully!')
+                toasts.info(`${Noun(item)} deleted!`)
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to delete budget: '))
+                toasts.error(apiErrorMessage(error, `Could not delete ${noun(item)}: `))
 
                 return false
             } finally {

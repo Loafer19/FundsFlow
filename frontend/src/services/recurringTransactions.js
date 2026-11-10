@@ -27,11 +27,11 @@ export const useRecurringTransactionsStore = defineStore('recurringTransactions'
                 this.rules.push(response.data)
                 this.persist()
 
-                toasts.success('Recurring transaction created successfully!')
+                toasts.success('Recurring payment created!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to create recurring transaction: '))
+                toasts.error(apiErrorMessage(error, 'Could not create recurring payment: '))
 
                 return false
             } finally {
@@ -49,11 +49,11 @@ export const useRecurringTransactionsStore = defineStore('recurringTransactions'
                 this.rules[index] = response.data
                 this.persist()
 
-                toasts.success('Recurring transaction updated successfully!')
+                toasts.success('Recurring payment updated!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to update recurring transaction: '))
+                toasts.error(apiErrorMessage(error, 'Could not update recurring payment: '))
 
                 return false
             } finally {
@@ -81,13 +81,13 @@ export const useRecurringTransactionsStore = defineStore('recurringTransactions'
 
                 toasts.info(
                     response.data.active
-                        ? 'Recurring transaction resumed successfully!'
-                        : 'Recurring transaction paused successfully!',
+                        ? 'Recurring payment resumed!'
+                        : 'Recurring payment paused!',
                 )
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to update recurring transaction: '))
+                toasts.error(apiErrorMessage(error, 'Could not update recurring payment: '))
 
                 return false
             } finally {
@@ -104,11 +104,11 @@ export const useRecurringTransactionsStore = defineStore('recurringTransactions'
                 this.rules = this.rules.filter((r) => r.id !== id)
                 this.persist()
 
-                toasts.info('Recurring transaction deleted successfully!')
+                toasts.info('Recurring payment deleted!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to delete recurring transaction: '))
+                toasts.error(apiErrorMessage(error, 'Could not delete recurring payment: '))
 
                 return false
             } finally {

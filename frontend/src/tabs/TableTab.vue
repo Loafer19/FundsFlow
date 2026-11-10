@@ -25,7 +25,7 @@
     </div>
 
     <EmptyState v-if="!dateRangeTransactions.length" :icon="List" title="No transactions in this period"
-        description="Nothing in this period. Add a transaction or pick another date range"
+        description="Nothing in this period. Add a transaction or pick another date range."
         action-label="Add Transaction" @action="openAdd" />
 
     <template v-else>

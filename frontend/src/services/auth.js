@@ -24,11 +24,11 @@ export const useAuthStore = defineStore('auth', {
                 this.setToken(response.data.token)
                 applyUserPreferences(this.user?.preferences)
 
-                toasts.success('Logged in successfully!')
+                toasts.success('Logged in!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to log in: '))
+                toasts.error(apiErrorMessage(error, 'Could not log in: '))
 
                 return false
             } finally {
@@ -46,11 +46,11 @@ export const useAuthStore = defineStore('auth', {
                 this.setToken(response.data.token)
                 applyUserPreferences(this.user?.preferences)
 
-                toasts.success('Registered successfully!')
+                toasts.success('Registered!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to register: '))
+                toasts.error(apiErrorMessage(error, 'Could not register: '))
 
                 return false
             } finally {
@@ -68,11 +68,11 @@ export const useAuthStore = defineStore('auth', {
                 this.setToken(response.data.token)
                 applyUserPreferences(this.user?.preferences)
 
-                toasts.success('Logged in successfully!')
+                toasts.success('Logged in!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to log in: '))
+                toasts.error(apiErrorMessage(error, 'Could not log in: '))
 
                 return false
             } finally {
@@ -96,7 +96,7 @@ export const useAuthStore = defineStore('auth', {
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to log in with Telegram Mini App: '))
+                toasts.error(apiErrorMessage(error, 'Could not log in with Telegram: '))
 
                 return false
             } finally {
@@ -112,7 +112,7 @@ export const useAuthStore = defineStore('auth', {
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to link Telegram: '))
+                toasts.error(apiErrorMessage(error, 'Could not link Telegram: '))
 
                 return false
             }
@@ -126,11 +126,11 @@ export const useAuthStore = defineStore('auth', {
 
                 this.clearSession()
 
-                toasts.info('Logged out successfully!')
+                toasts.info('Logged out!')
             } catch (error) {
                 this.clearSession()
 
-                toasts.error(apiErrorMessage(error, 'Failed to log out: '))
+                toasts.error(apiErrorMessage(error, 'Could not log out: '))
             } finally {
                 this.isLoading = false
             }

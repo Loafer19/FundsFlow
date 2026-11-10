@@ -64,11 +64,11 @@ export const useTagsStore = defineStore('tags', {
                 this.tags.push(response.data)
                 this.persist()
 
-                toasts.success('Tag created successfully!')
+                toasts.success('Tag created!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to create tag: '))
+                toasts.error(apiErrorMessage(error, 'Could not create tag: '))
 
                 return false
             } finally {
@@ -86,11 +86,11 @@ export const useTagsStore = defineStore('tags', {
                 this.tags[index] = response.data
                 this.persist()
 
-                toasts.success('Tag updated successfully!')
+                toasts.success('Tag updated!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to update tag: '))
+                toasts.error(apiErrorMessage(error, 'Could not update tag: '))
 
                 return false
             } finally {
@@ -120,11 +120,11 @@ export const useTagsStore = defineStore('tags', {
                 this.tags = this.tags.filter((t) => !toRemove.has(t.id))
                 this.persist()
 
-                toasts.info('Tag deleted successfully!')
+                toasts.info('Tag deleted!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to delete tag: '))
+                toasts.error(apiErrorMessage(error, 'Could not delete tag: '))
 
                 return false
             } finally {

@@ -4,7 +4,7 @@
             <p class="font-semibold text-sm">{{ item.title }}</p>
 
             <template v-if="item.view === 'transactions'">
-                <p v-if="!transactions.length" class="text-sm text-base-content/60">No transactions yet.</p>
+                <p v-if="!transactions.length" class="text-sm text-base-content/60">No transactions yet</p>
                 <ul v-else class="flex flex-col divide-y divide-base-200">
                     <li v-for="tx in transactions" :key="tx.id" class="flex justify-between gap-2 py-1.5 text-sm">
                         <div class="min-w-0">
@@ -22,7 +22,7 @@
             </template>
 
             <template v-else-if="item.view === 'budgets'">
-                <p v-if="!budgets.length" class="text-sm text-base-content/60">No budgets or savings goals yet.</p>
+                <p v-if="!budgets.length" class="text-sm text-base-content/60">No budgets or savings goals yet</p>
                 <ul v-else class="flex flex-col gap-2">
                     <li v-for="budget in budgets" :key="budget.id" class="text-sm flex flex-col gap-1">
                         <template v-if="budget.type === 'goal'">
@@ -61,14 +61,14 @@
             </template>
 
             <template v-else-if="item.view === 'tags'">
-                <p v-if="!tags.length" class="text-sm text-base-content/60">No tags yet.</p>
+                <p v-if="!tags.length" class="text-sm text-base-content/60">No tags yet</p>
                 <div v-else class="flex flex-wrap gap-1.5">
                     <span v-for="tag in tags" :key="tag.id" class="badge badge-soft">{{ tag.emoji }} {{ tag.title }}</span>
                 </div>
             </template>
 
             <template v-else-if="item.view === 'recurring'">
-                <p v-if="!recurring.length" class="text-sm text-base-content/60">No recurring rules yet.</p>
+                <p v-if="!recurring.length" class="text-sm text-base-content/60">No recurring rules yet</p>
                 <ul v-else class="flex flex-col divide-y divide-base-200">
                     <li v-for="rule in recurring" :key="rule.id" class="flex justify-between gap-2 py-1.5 text-sm"
                         :class="{ 'opacity-50': !rule.active }">
@@ -114,7 +114,7 @@
 
             <template v-else-if="item.view === 'budget_status'">
                 <p v-if="data.error || !budgets.length" class="text-sm text-base-content/60">
-                    {{ data.error || 'No active budgets or savings goals.' }}
+                    {{ data.error || 'No active budgets or savings goals' }}
                 </p>
                 <ul v-else class="flex flex-col gap-3">
                     <li v-for="budget in budgets" :key="budget.id" class="text-sm flex flex-col gap-1">
@@ -169,7 +169,7 @@
                 <p class="text-xs text-base-content/60">
                     {{ formatDate(data.from) }} – {{ formatDate(data.to) }}
                 </p>
-                <p v-if="!upcoming.length" class="text-sm text-base-content/60">Nothing scheduled in this window.</p>
+                <p v-if="!upcoming.length" class="text-sm text-base-content/60">Nothing scheduled in this window</p>
                 <ul v-else class="flex flex-col divide-y divide-base-200">
                     <li v-for="(row, index) in upcoming" :key="`${row.rule_id}-${row.date}-${index}`"
                         class="flex justify-between gap-2 py-1.5 text-sm">

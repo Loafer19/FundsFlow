@@ -29,7 +29,7 @@
                     aria-label="Message"
                     placeholder="What happened, and what did you expect? Steps to repeat it help a lot."></textarea>
 
-                <p class="text-xs text-base-content/50">App version (v{{ version }}) and browser are added automatically.</p>
+                <p class="text-xs text-base-content/50">App version (v{{ version }}) and browser are added automatically</p>
 
                 <div class="modal-action">
                     <button type="submit" class="btn btn-primary" :disabled="sending || !canSend">

@@ -17,7 +17,7 @@ export const requestReport = async (request, delivery = 'download', endpoint = '
 
     if (delivery === 'telegram') {
         const { data } = await api.post(endpoint, body, { timeout: REPORT_TIMEOUT_MS })
-        return data?.message || 'Report sent to Telegram.'
+        return data?.message || 'Report sent!'
     }
 
     const { data } = await api.post(endpoint, body, { timeout: REPORT_TIMEOUT_MS, responseType: 'blob' })
@@ -25,7 +25,7 @@ export const requestReport = async (request, delivery = 'download', endpoint = '
 }
 
 /** Error text for a failed report request (blob responses carry their JSON error as a Blob). */
-export const reportErrorMessage = async (error, prefix = 'Failed to build the report: ') => {
+export const reportErrorMessage = async (error, prefix = 'Could not build the report: ') => {
     const body = error?.response?.data
     if (body instanceof Blob) {
         try {

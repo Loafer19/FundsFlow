@@ -54,7 +54,7 @@ export const bootstrapStores = async () => {
         persistCache('recurring', recurringStore.rules)
     } catch (error) {
         if (hadCache) noticeCachedData()
-        else toasts.error(apiErrorMessage(error, 'Failed to load data: '))
+        else toasts.error(apiErrorMessage(error, 'Could not load data: '))
     } finally {
         tagsStore.isLoading = false
         transactionsStore.isLoading = false
@@ -94,7 +94,7 @@ const runRefresh = async () => {
         persistCache('budgets', budgetsStore.budgets)
         persistCache('recurring', recurringStore.rules)
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Saved, but failed to refresh the data: '))
+        toasts.error(apiErrorMessage(error, 'Saved, but could not refresh the data: '))
     } finally {
         for (const resolve of waiters) resolve()
     }

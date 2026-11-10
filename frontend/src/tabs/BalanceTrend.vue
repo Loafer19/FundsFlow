@@ -1,6 +1,6 @@
 <template>
     <EmptyState v-if="!hasPeriodData" :icon="TrendingUp" title="No balance data for this period"
-        description="Nothing in this period. Add a transaction or change the range"
+        description="Nothing in this period. Add a transaction or change the range."
         action-label="Add Transaction" @action="openAdd" />
 
     <template v-else>

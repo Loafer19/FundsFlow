@@ -124,7 +124,7 @@ export const useAgentStore = defineStore('agent', {
                 this.quota = data.quota ?? null
                 this.historyLoaded = true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to load the assistant chat: '))
+                toasts.error(apiErrorMessage(error, 'Could not load the assistant chat: '))
             } finally {
                 this.isLoadingHistory = false
             }
@@ -309,7 +309,7 @@ export const useAgentStore = defineStore('agent', {
                     if (response.status === 401) {
                         const { useAuthStore } = await import('./auth.js')
                         useAuthStore().clearSession()
-                        toasts.info('Session expired, please log in again!')
+                        toasts.info('Session expired, please log in again')
                     }
 
                     if (response.status === 429) detail = 'Too many messages. Wait a minute and try again.'
@@ -322,7 +322,7 @@ export const useAgentStore = defineStore('agent', {
                     this.items = this.items.filter((item) => item.id !== localUserId)
                     if (dropped) this.items.push(...dropped)
                     if (rewind && response.status === 409 && detail) toasts.info(detail)
-                    else toasts.error(detail || `Assistant request failed (${response.status}).`)
+                    else toasts.error(detail || `Could not reach the assistant (${response.status})`)
                     return false
                 }
 
@@ -385,9 +385,9 @@ export const useAgentStore = defineStore('agent', {
                 if (error?.response?.status === 409) {
                     item.status = 'outdated'
                     const data = error.response.data ?? {}
-                    toasts.info(data.message || 'This preview is outdated.')
+                    toasts.info(data.message || 'This preview is outdated')
                 } else {
-                    toasts.error(apiErrorMessage(error, 'Failed to apply the change: '))
+                    toasts.error(apiErrorMessage(error, 'Could not apply the change: '))
                 }
             } finally {
                 this.busyPendingId = null
@@ -429,7 +429,7 @@ export const useAgentStore = defineStore('agent', {
                 this.draft = ''
                 this.status = ''
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to reset the chat: '))
+                toasts.error(apiErrorMessage(error, 'Could not reset the chat: '))
             }
         },
 

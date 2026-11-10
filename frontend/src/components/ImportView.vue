@@ -1,11 +1,6 @@
 <template>
     <div>
         <div class="mb-4 min-w-0">
-            <nav class="text-sm text-base-content/50 mb-1">
-                <a href="/" class="hover:text-base-content hover:underline" @click.prevent="goHome">Transactions</a>
-                <span class="mx-1.5" aria-hidden="true">›</span>
-                <span>Import</span>
-            </nav>
             <div class="flex items-center gap-2 min-w-0">
                 <h1 class="text-2xl font-semibold truncate min-w-0"
                     :title="pageTitle">{{ pageTitle }}</h1>
@@ -13,12 +8,9 @@
             </div>
         </div>
 
-        <div v-if="!authStore.isAuthenticated" class="card card-border border-base-300 bg-base-100">
-            <div class="card-body">
-                <p>Log in to upload a statement or review an import.</p>
-                <button type="button" class="btn btn-primary w-fit" @click="showModal('auth_modal')">Log in</button>
-            </div>
-        </div>
+        <EmptyState v-if="!authStore.isAuthenticated" :icon="FileUp" title="Log in to import a statement"
+            description="Upload a bank statement and preview every row before anything is saved."
+            action-label="Log in" :action-icon="LogIn" @action="showModal('auth_modal')" />
 
         <div v-else-if="!uuid" class="flex flex-col gap-4">
             <div
@@ -39,7 +31,7 @@
                 <div class="font-medium">Drop a statement here</div>
                 <p class="text-sm text-base-content/60 mt-1">or click to choose a file</p>
                 <p class="text-xs text-base-content/50 mt-2 max-w-md mx-auto">
-                    You'll preview every row before anything is saved.
+                    You'll preview every row before anything is saved
                 </p>
                 <input ref="fileInput" type="file" class="hidden" :accept="IMPORT_FILE_ACCEPT" @change="onFile" @click.stop />
                 <p v-if="uploadError" class="text-error text-sm mt-3">{{ uploadError }}</p>
@@ -69,7 +61,7 @@
                     </div>
                     <p v-if="historyError" class="text-error text-sm">{{ historyError }}</p>
                     <p v-else-if="!historyLoading && !historyItems.length" class="text-sm text-base-content/60">
-                        No previous imports yet.
+                        No previous imports yet
                     </p>
                     <ul v-else class="flex flex-col gap-2">
                         <li v-for="item in historyItems" :key="item.id"
@@ -179,7 +171,7 @@
                 <span>Imported. You can undo the whole batch.</span>
                 <button type="button" class="btn btn-sm btn-ghost" :disabled="busy" @click="onUndo">Undo import</button>
             </div>
-            <div v-else-if="batch.status === 'undone'" class="alert mb-4">This import was undone.</div>
+            <div v-else-if="batch.status === 'undone'" class="alert mb-4">This import was undone</div>
             <div v-else-if="batch.status === 'committing'" class="alert mb-4">
                 <span class="loading loading-spinner loading-sm"></span>
                 Importing… {{ batch.progress }}%
@@ -196,7 +188,7 @@
                         <div class="min-w-0">
                             <h2 class="font-semibold">Bulk rules</h2>
                             <p class="text-sm text-base-content/60">
-                                Tag a shop in one go, or skip old rows and transfers before you import.
+                                Tag a shop in one go, or skip old rows and transfers before you import
                             </p>
                         </div>
                     </div>
@@ -251,7 +243,7 @@
                     </div>
                     <p class="text-xs text-base-content/60 flex items-start gap-1.5">
                         <Sparkles :size="14" class="shrink-0 mt-px opacity-70" />
-                        <span>Or tell the assistant “Glovo is Food, skip transfers to Olya”.</span>
+                        <span>Or tell the assistant “Glovo is Food, skip transfers to Olya”</span>
                     </p>
                 </div>
             </div>
@@ -392,8 +384,10 @@ import {
     Ban,
     CalendarDays,
     Copy,
+    FileUp,
     List,
     ListFilter,
+    LogIn,
     Pencil,
     Search,
     Sparkles,
@@ -409,6 +403,7 @@ import { applyImportRules, commitImport, fetchImport, fetchImports, goToImport, 
 import { showModal } from '../services/modal.js'
 import { useTagsStore } from '../services/tags.js'
 import toasts from '../services/toasts.js'
+import EmptyState from './EmptyState.vue'
 import TagPicker from './TagPicker.vue'
 import StatCard from './StatCard.vue'
 import SegmentedControl from './SegmentedControl.vue'
@@ -546,7 +541,7 @@ const reload = async () => {
         if (batch.value.status === 'committing') startPoll()
         else stopPoll()
     } catch (error) {
-        loadError.value = apiErrorMessage(error, 'Could not load this import')
+        loadError.value = apiErrorMessage(error, 'Could not load this import: ')
     } finally {
         loading.value = false
     }
@@ -575,7 +570,7 @@ const startSelectedFile = async (file) => {
     try {
         await startWebImport(file)
     } catch (error) {
-        uploadError.value = apiErrorMessage(error, 'Could not read this file')
+        uploadError.value = apiErrorMessage(error, 'Could not read this file: ')
     } finally {
         uploading.value = false
         if (fileInput.value) fileInput.value.value = ''
@@ -605,7 +600,7 @@ const loadHistory = async () => {
     try {
         historyItems.value = await fetchImports()
     } catch (error) {
-        historyError.value = apiErrorMessage(error, 'Could not load previous imports')
+        historyError.value = apiErrorMessage(error, 'Could not load previous imports: ')
     } finally {
         historyLoading.value = false
     }
@@ -657,10 +652,10 @@ const undoBatch = async (item) => {
     undoingId.value = item.id
     try {
         await undoImport(item.id)
-        toasts.success('Import undone')
+        toasts.success('Import undone!')
         await loadHistory()
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Could not undo this import'))
+        toasts.error(apiErrorMessage(error, 'Could not undo this import: '))
     } finally {
         undoingId.value = ''
     }
@@ -706,9 +701,9 @@ const runRules = async (rules) => {
     busy.value = true
     try {
         batch.value = await applyImportRules(props.uuid, rules)
-        toasts.success('Preview updated')
+        toasts.success('Preview updated!')
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Could not apply the rule'))
+        toasts.error(apiErrorMessage(error, 'Could not apply the rule: '))
     } finally {
         busy.value = false
     }
@@ -811,7 +806,7 @@ const applyMenuTags = async (menu, ids) => {
         }
     } catch (error) {
         if (seq !== saveSeq) return
-        toasts.error(apiErrorMessage(error, 'Could not update tags'))
+        toasts.error(apiErrorMessage(error, 'Could not update tags: '))
         await reload()
     }
 }
@@ -830,7 +825,7 @@ const toggleInclude = async (row, include) => {
     try {
         batch.value = await updateImportRow(props.uuid, row.id, { status: include ? 'new' : 'skipped' })
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Could not update the row'))
+        toasts.error(apiErrorMessage(error, 'Could not update the row: '))
     } finally {
         busy.value = false
     }
@@ -846,10 +841,10 @@ const onCommit = async () => {
     busy.value = true
     try {
         batch.value = await commitImport(props.uuid)
-        toasts.success('Imported')
+        toasts.success('Imported!')
         if (batch.value.status === 'committing') startPoll()
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Could not import'))
+        toasts.error(apiErrorMessage(error, 'Could not import: '))
     } finally {
         busy.value = false
     }
@@ -860,9 +855,9 @@ const onUndo = async () => {
     busy.value = true
     try {
         batch.value = await undoImport(props.uuid)
-        toasts.success('Import undone')
+        toasts.success('Import undone!')
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Could not undo'))
+        toasts.error(apiErrorMessage(error, 'Could not undo: '))
     } finally {
         busy.value = false
     }

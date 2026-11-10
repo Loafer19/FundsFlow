@@ -505,7 +505,7 @@ const runReport = async (delivery) => {
         return await requestReport(reportRequest(), delivery)
     } catch (error) {
         if (error?.response?.status === 422 && error.response.data?.needs_link) {
-            toasts.info('Link Telegram first, then send the report again.')
+            toasts.info('Link Telegram first, then send the report again')
             tab.value = 'connections'
         } else {
             toasts.error(await reportErrorMessage(error))
@@ -708,7 +708,7 @@ const copyText = async (value, key) => {
             if (mcpCopied.value === key) mcpCopied.value = ''
         }, 1500)
     } catch {
-        toasts.error('Failed to copy!')
+        toasts.error('Could not copy')
     }
 }
 
@@ -735,9 +735,9 @@ const generateMcpToken = async () => {
         const response = await createMcpToken()
         mcpPlainToken.value = response.data.token
         mcpTokenActive.value = true
-        toasts.success(response.data.message || 'MCP token created successfully!')
+        toasts.success(response.data.message || 'MCP token created!')
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Failed to create MCP token: '))
+        toasts.error(apiErrorMessage(error, 'Could not create MCP token: '))
     } finally {
         mcpTokenBusy.value = false
     }
@@ -750,9 +750,9 @@ const revokeMcpTokenAction = async () => {
         await revokeMcpToken()
         mcpPlainToken.value = ''
         mcpTokenActive.value = false
-        toasts.success('MCP token revoked successfully!')
+        toasts.success('MCP token revoked!')
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Failed to revoke MCP token: '))
+        toasts.error(apiErrorMessage(error, 'Could not revoke MCP token: '))
     } finally {
         mcpTokenBusy.value = false
     }
@@ -771,7 +771,7 @@ const openTelegramLink = async () => {
     try {
         await openTelegramLinkBot()
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Failed to generate link: '))
+        toasts.error(apiErrorMessage(error, 'Could not generate link: '))
     } finally {
         generatingTelegramLink.value = false
     }
@@ -788,10 +788,10 @@ const saveCredentials = async () => {
 
         authStore.user.email = response.data.user.email
 
-        toasts.success('Credentials saved successfully!')
+        toasts.success('Credentials saved!')
         credentialsForm.value = { email: response.data.user.email, password: '' }
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Failed to save: '))
+        toasts.error(apiErrorMessage(error, 'Could not save: '))
     } finally {
         savingCredentials.value = false
     }
@@ -802,9 +802,9 @@ const exportData = async () => {
 
     try {
         await downloadAccountExport()
-        toasts.success('Export downloaded successfully!')
+        toasts.success('Export downloaded!')
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Failed to export: '))
+        toasts.error(apiErrorMessage(error, 'Could not export: '))
     } finally {
         exporting.value = false
     }
@@ -835,12 +835,12 @@ const saveSettings = async () => {
                 authStore.user = response.data.user
             }
         } catch {
-            toasts.info('Saved locally; failed to sync formatting preferences!')
+            toasts.info('Saved locally, but could not sync formatting preferences')
         }
     }
 
     saving.value = false
-    toasts.success('Settings saved successfully!')
+    toasts.success('Settings saved!')
     refreshAiQuota()
     closeSettings()
 }

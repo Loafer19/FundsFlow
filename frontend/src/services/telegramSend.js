@@ -12,7 +12,7 @@ export const hasTelegramLinked = () => {
 export const requireTelegramLinked = () => {
     if (hasTelegramLinked()) return true
 
-    toasts.info('Link Telegram in Settings → Accounts first!')
+    toasts.info('Link Telegram in Settings → Connections first')
     return false
 }
 
@@ -27,10 +27,10 @@ export const sendAttachmentToTelegram = async (transactionId, attachmentId, capt
             timeout: 120_000,
         })
 
-        toasts.success(response.data?.message || 'Sent to Telegram successfully!')
+        toasts.success(response.data?.message || 'Sent to Telegram!')
         return { ok: true }
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Failed to send to Telegram: '))
+        toasts.error(apiErrorMessage(error, 'Could not send to Telegram: '))
         return { ok: false, error }
     }
 }

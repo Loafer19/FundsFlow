@@ -1,6 +1,6 @@
 <template>
     <EmptyState v-if="!hasPeriodData" :icon="Presentation" title="No data for this period"
-        description="Nothing in this period. Add a transaction or change the range"
+        description="Nothing in this period. Add a transaction or change the range."
         action-label="Add Transaction" @action="openAdd" />
 
     <div v-else class="flex flex-col gap-3 w-full min-w-0">
@@ -319,7 +319,7 @@ const statCards = computed(() => {
             current: savingsRate(cur),
             previous: savingsRate(prev),
             format: 'percent',
-            hint: 'Share of income kept (net ÷ income). Change in percentage points',
+            hint: 'Share of income kept (net ÷ income). Change in percentage points.',
         },
         {
             key: 'count',

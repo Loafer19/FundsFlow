@@ -134,7 +134,7 @@ const load = async () => {
         blobUrl.value = url
     } catch {
         if (id !== loadId) return
-        error.value = 'Failed to open attachment!'
+        error.value = 'Could not open the attachment'
     } finally {
         if (id === loadId) loading.value = false
     }

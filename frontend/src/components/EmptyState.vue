@@ -9,7 +9,7 @@
                 {{ description }}
             </p>
             <button v-if="actionLabel" type="button" class="btn btn-primary btn-sm mt-2" @click="$emit('action')">
-                <Plus :size="20" />
+                <component :is="actionIcon || Plus" :size="20" />
                 {{ actionLabel }}
             </button>
         </div>
@@ -26,6 +26,8 @@ defineProps({
     title: { type: String, required: true },
     description: { type: String, default: '' },
     actionLabel: { type: String, default: '' },
+    // Lucide component for the action button; defaults to Plus.
+    actionIcon: { type: [Object, Function], default: null },
     size: { type: String, default: 'md' },
 })
 

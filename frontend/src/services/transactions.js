@@ -107,7 +107,7 @@ export const useTransactionsStore = defineStore('transactions', {
                     const uploaded = await this.uploadAttachment(transaction.id, file, { silent: true })
 
                     if (!uploaded) {
-                        toasts.error('Transaction saved, but some attachments failed to upload!')
+                        toasts.error('Transaction saved, but could not upload some attachments')
 
                         break
                     }
@@ -119,11 +119,11 @@ export const useTransactionsStore = defineStore('transactions', {
                     markOnboardingDone()
                 }
 
-                toasts.success('Transaction created successfully!')
+                toasts.success('Transaction created!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to create transaction: '))
+                toasts.error(apiErrorMessage(error, 'Could not create transaction: '))
 
                 return false
             } finally {
@@ -150,12 +150,12 @@ export const useTransactionsStore = defineStore('transactions', {
                 }
 
                 if (!silent) {
-                    toasts.success('Attachment uploaded successfully!')
+                    toasts.success('Attachment uploaded!')
                 }
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to upload attachment: '))
+                toasts.error(apiErrorMessage(error, 'Could not upload attachment: '))
 
                 return false
             }
@@ -174,11 +174,11 @@ export const useTransactionsStore = defineStore('transactions', {
                     this.persist()
                 }
 
-                toasts.info('Attachment removed successfully!')
+                toasts.info('Attachment removed!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to delete attachment: '))
+                toasts.error(apiErrorMessage(error, 'Could not delete attachment: '))
 
                 return false
             }
@@ -229,11 +229,11 @@ export const useTransactionsStore = defineStore('transactions', {
 
                 this.mergeTransaction({ ...response.data, attachments })
 
-                toasts.success('Transaction updated successfully!')
+                toasts.success('Transaction updated!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to update transaction: '))
+                toasts.error(apiErrorMessage(error, 'Could not update transaction: '))
 
                 return false
             } finally {
@@ -250,11 +250,11 @@ export const useTransactionsStore = defineStore('transactions', {
                 this.transactions = this.transactions.filter((t) => t.id !== id)
                 this.persist()
 
-                toasts.info('Transaction deleted successfully!')
+                toasts.info('Transaction deleted!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Failed to delete transaction: '))
+                toasts.error(apiErrorMessage(error, 'Could not delete transaction: '))
 
                 return false
             } finally {

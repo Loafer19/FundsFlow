@@ -7,7 +7,7 @@
             </div>
 
             <template v-if="chart.type === 'expenses_by_tag'">
-                <p v-if="!tagRows.length" class="text-sm text-base-content/60">No expenses in this period.</p>
+                <p v-if="!tagRows.length" class="text-sm text-base-content/60">No expenses in this period</p>
                 <ul v-else-if="chart.style === 'compare'" class="flex flex-col gap-2">
                     <li v-for="row in tagRows" :key="row.id" class="text-xs">
                         <div class="flex justify-between gap-2">
@@ -34,7 +34,7 @@
             </template>
 
             <template v-else-if="chart.type === 'income_vs_expenses'">
-                <p v-if="!hasBuckets" class="text-sm text-base-content/60">No transactions in this period.</p>
+                <p v-if="!hasBuckets" class="text-sm text-base-content/60">No transactions in this period</p>
                 <BarChart v-else :balances="bars" />
             </template>
 

@@ -53,7 +53,7 @@
         </div>
 
         <EmptyState v-if="!tickets.length" :icon="LifeBuoy" size="sm" title="No requests yet"
-            description="Questions, problems or ideas: send them here and we'll reply." />
+            description="Questions, problems or ideas: send them here and we'll reply" />
 
         <ul v-else class="flex flex-col gap-1 support-list overflow-y-auto overflow-x-hidden">
             <li v-for="ticket in tickets" :key="ticket.id">

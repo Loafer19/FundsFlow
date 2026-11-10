@@ -123,7 +123,7 @@
                 </PopoverMenu>
             </div>
             <p v-if="!connection.accounts?.length" class="text-xs text-base-content/50">
-                No cards were returned for this token.
+                No cards were returned for this token
             </p>
         </div>
 
@@ -311,7 +311,7 @@ const toggleJar = async (jar, track) => {
         const { data } = await updateMonobank({ jars: [{ id: jar.id, track_as_goal: track }] })
         apply(data)
         await budgetsStore.reload()
-        toasts.success(track ? 'Jar tracked as a savings goal.' : 'Jar unlinked from its goal. The goal is kept.')
+        toasts.success(track ? 'Goal linked!' : 'Jar unlinked from its goal. The goal is kept.')
     } catch (error) {
         toasts.error(apiErrorMessage(error, 'Could not save: '))
     } finally {
@@ -352,7 +352,7 @@ const disconnect = async () => {
         const { data } = await disconnectMonobank()
         apply(data)
         await budgetsStore.reload()
-        toasts.success('Monobank disconnected.')
+        toasts.success('Monobank disconnected!')
     } catch (error) {
         toasts.error(apiErrorMessage(error, 'Could not disconnect: '))
     } finally {

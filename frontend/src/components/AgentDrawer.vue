@@ -608,10 +608,10 @@ const addDocument = (files) => {
     )
     if (!docs.length) return false
     if (attachments.value.length || preparing.value) {
-        toasts.error('Send files on their own, without photos.')
+        toasts.error('Send files on their own, without photos')
         return true
     }
-    if (files.length > docs.length) toasts.info('Files and photos go in separate messages: only the files were added.')
+    if (files.length > docs.length) toasts.info('Files and photos go in separate messages: only the files were added')
     for (const file of docs) {
         const name = file.name || 'The file'
         const hint = legacyDocumentHint(file)
@@ -620,20 +620,20 @@ const addDocument = (files) => {
             continue
         }
         if (attachedDocuments.value.length >= MAX_DOCUMENTS) {
-            toasts.info(`Up to ${MAX_DOCUMENTS} files per message.`)
+            toasts.info(`Up to ${MAX_DOCUMENTS} files per message`)
             break
         }
         if (!file.size) {
-            toasts.error(`${name} is empty.`)
+            toasts.error(`${name} is empty`)
             continue
         }
         if (file.size > documentLimit(file)) {
-            toasts.error(`${name} is larger than ${formatSize(documentLimit(file))}.`)
+            toasts.error(`${name} is larger than ${formatSize(documentLimit(file))}`)
             continue
         }
         const total = attachedDocuments.value.reduce((sum, doc) => sum + doc.size, 0) + file.size
         if (total > MAX_DOCUMENTS_TOTAL_BYTES) {
-            toasts.error(`Files in one message can be up to ${formatSize(MAX_DOCUMENTS_TOTAL_BYTES)} together.`)
+            toasts.error(`Files in one message can be up to ${formatSize(MAX_DOCUMENTS_TOTAL_BYTES)} together`)
             continue
         }
         attachedDocuments.value = [...attachedDocuments.value, file]
@@ -653,28 +653,28 @@ const addFiles = async (list) => {
     const files = [...(list ?? [])]
     if (!files.length) return
     if (agent.quotaExhausted) {
-        toasts.info('No AI assists left today: photos can be sent again after the reset.')
+        toasts.info('No AI assists left today: photos can be sent again after the reset')
         return
     }
 
     if (addDocument(files)) return
     if (attachedDocument.value) {
-        toasts.error('Send photos separately from the file.')
+        toasts.error('Send photos separately from the file')
         return
     }
 
     const images = files.filter(isSupportedImage)
     if (images.length < files.length) {
-        toasts.error('Attach JPEG, PNG, WebP or HEIC photos, or PDF, Word, CSV, Excel, JSON, OFX, QIF or HTML files.')
+        toasts.error('Attach JPEG, PNG, WebP or HEIC photos, or PDF, Word, CSV, Excel, JSON, OFX, QIF or HTML files')
     }
 
     const room = MAX_IMAGES - attachments.value.length - preparing.value
-    if (images.length > room) toasts.error(`Up to ${MAX_IMAGES} photos per message.`)
+    if (images.length > room) toasts.error(`Up to ${MAX_IMAGES} photos per message`)
 
     for (const file of images.slice(0, Math.max(0, room))) {
         const name = file.name || 'Photo'
         if (file.size > MAX_INPUT_BYTES) {
-            toasts.error(`${name} is larger than 10 MB.`)
+            toasts.error(`${name} is larger than 10 MB`)
             continue
         }
 
@@ -686,7 +686,7 @@ const addFiles = async (list) => {
             toasts.error(
                 heic
                     ? `This browser cannot open HEIC photos (${name}). Send it as JPEG or PNG.`
-                    : `Couldn't read ${name}.`,
+                    : `Couldn't read ${name}`,
             )
         } finally {
             preparing.value--
@@ -904,7 +904,7 @@ const copyText = async (text) => {
 // Copies the markdown source (what the assistant wrote), not the rendered HTML.
 const copyAnswer = async (item) => {
     if (!(await copyText(String(item.text ?? '')))) {
-        toasts.error('Could not copy to the clipboard.')
+        toasts.error('Could not copy')
         return
     }
     copiedId.value = item.id
@@ -923,7 +923,7 @@ const editNote = computed(() => {
     if (editing.value.blocker === 'receipt')
         return 'That message answered a receipt question, so this goes as a new message.'
     if (editing.value.blocker === 'applied') return 'A change from that turn was saved, so this goes as a new message.'
-    return 'This goes as a new message.'
+    return 'This goes as a new message'
 })
 
 const editLast = (event) => {
