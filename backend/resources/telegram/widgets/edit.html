@@ -1,0 +1,91 @@
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:10px 12px 12px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color)}
+.h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 6px}
+h3{margin:0;font-size:1.05em;font-weight:650}
+.hint{color:var(--tg-theme-hint-color);font-size:.8em}
+.amt{display:block;width:100%;border:0;background:none;color:inherit;font:inherit;font-size:1.7em;font-weight:700;font-variant-numeric:tabular-nums;text-align:center;padding:2px 0 6px}
+.amt.ed{color:var(--tg-theme-button-color)}
+.row{display:flex;gap:6px;margin:0 0 8px}
+.row button{flex:1}
+.off{background:var(--tg-theme-secondary-bg-color);color:var(--tg-theme-text-color)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 8px}
+.pad button{padding:10px 0;font-size:1.1em;font-weight:650}
+.date{display:flex;align-items:center;gap:6px;margin:0 0 8px}
+.date span{flex:1;text-align:center;font-variant-numeric:tabular-nums}
+.date button{width:44px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.tags button{padding:6px 8px;font-size:.85em}
+.note{display:block;width:100%;text-align:left;margin:0 0 10px;padding:8px 10px;font-size:.9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.del{background:var(--tg-theme-secondary-bg-color);color:var(--tg-theme-destructive-text-color)}
+.st{min-height:1.2em;margin:8px 0 0;font-size:.85em;text-align:center;color:var(--tg-theme-hint-color)}
+.st.ok{color:var(--tg-theme-accent-text-color)}
+.st.err{color:var(--tg-theme-destructive-text-color)}
+.x{text-align:center;color:var(--tg-theme-hint-color);padding:14px 0}
+</style>
+<div id="root"></div>
+<script>
+const W=window.TelegramWidget;
+let S=null,raw='',inc=false,day='',sel=[],pad=false,fresh=true,busy=false,msg=['',''];
+function parse(s){try{return s?JSON.parse(s):null}catch(e){return null}}
+function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+function btn(t,c,f){const b=el('button',c,t);b.type='button';b.addEventListener('click',f);return b}
+function ymd(d){return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')}
+function toD(s){return new Date(+s.slice(0,4),+s.slice(4,6)-1,+s.slice(6,8))}
+function shift(n){const d=toD(day);d.setDate(d.getDate()+n);const v=ymd(d);if(v>S.td)return;day=v;draw()}
+function dlabel(){const t=day.slice(6,8)+'.'+day.slice(4,6)+'.'+day.slice(0,4);const y=ymd(new Date(toD(S.td).getTime()-864e5));return t+(day===S.td?' · Today':day===y?' · Yesterday':'')}
+function load(){
+  S=parse(W&&W.chatData);if(!S)return;
+  const a=String(S.a||'');inc=a.charAt(0)!=='-';raw=a.replace(/^[+-]/,'');day=S.d||S.td;sel=(S.s||[]).slice();pad=false;fresh=true;
+}
+function key(k){
+  if(fresh){raw='';fresh=false}
+  if(k==='←'){raw=raw.slice(0,-1);draw();return}
+  if(k==='.'){if(raw.indexOf('.')<0)raw=raw?raw+'.':'0.';draw();return}
+  if(raw==='0')raw='';
+  if(raw.indexOf('.')>=0&&raw.split('.')[1].length>=2)return;
+  if(raw.replace('.','').length>=10)return;
+  raw+=k;draw();
+}
+function chips(){const l=(inc?S.i:S.e)||[],o=(inc?S.e:S.i)||[];return l.concat(o.filter(function(t){return sel.indexOf(t[0])>=0&&!l.some(function(u){return u[0]===t[0]})}))}
+function q(data,ok){
+  if(busy)return;if(!W||!W.request){msg=['err','Open this in Telegram'];draw();return}
+  busy=true;msg=['','Saving…'];draw();
+  W.request(data).then(function(a){busy=false;const r=parse(a&&a.result);
+    if(r&&r.ok){msg=['ok',r.m||'Saved!'];if(ok)ok(r);if(W.HapticFeedback&&W.HapticFeedback.notificationOccurred)W.HapticFeedback.notificationOccurred('success')}
+    else msg=['err',(r&&r.e)||'Could not save'];draw()},
+  function(e){busy=false;msg=['err',(e&&e.code)||'Could not save'];draw()});
+}
+function save(){
+  const n=parseFloat(raw);if(!raw||!(n>0)){msg=['err',"Amount can't be zero"];draw();return}
+  const d='es:'+(inc?'':'-')+raw.replace(/\.$/,'')+':'+day.slice(2)+':'+sel.join(',');
+  if(d.length>64){msg=['err','Too many tags, keep 4 or fewer'];draw();return}
+  q(d);
+}
+function draw(){
+  const r=document.getElementById('root');r.innerHTML='';
+  if(!S){r.appendChild(el('p','x','Nothing to edit'));return}
+  if(S.x){r.appendChild(el('p','x',S.x));return}
+  const h=el('div','h');h.appendChild(el('h3','',S.k==='d'?'Edit receipt':'Edit transaction'));h.appendChild(el('span','hint',pad?'Type the amount':'Tap the amount to change it'));r.appendChild(h);
+  r.appendChild(btn((inc?'+':'−')+(raw||'0'),'amt'+(pad?' ed':''),function(){pad=!pad;draw()}));
+  if(pad){const p=el('div','pad');['1','2','3','4','5','6','7','8','9','.','0','←'].forEach(function(k){p.appendChild(btn(k,'',function(){key(k)}))});r.appendChild(p)}
+  const t=el('div','row');
+  t.appendChild(btn((inc?'':'✓ ')+'Expense',inc?'off':'',function(){inc=false;draw()}));
+  t.appendChild(btn((inc?'✓ ':'')+'Income',inc?'':'off',function(){inc=true;draw()}));r.appendChild(t);
+  const d=el('div','date');d.appendChild(btn('‹','',function(){shift(-1)}));d.appendChild(el('span','',dlabel()));
+  const nx=btn('›','',function(){shift(1)});if(day>=S.td)nx.disabled=true;d.appendChild(nx);r.appendChild(d);
+  const g=el('div','tags');
+  chips().forEach(function(c){const on=sel.indexOf(c[0])>=0;g.appendChild(btn((on?'✓ ':'')+c[1],on?'':'off',function(){const i=sel.indexOf(c[0]);if(i>=0)sel.splice(i,1);else sel.push(c[0]);draw()}))});
+  if(S.k==='t')g.appendChild(btn('All tags…','off',function(){q('et')}));
+  r.appendChild(g);
+  r.appendChild(btn('📝 '+(S.n||'Add a note'),'note off',function(){q('en')}));
+  const b=el('div','row');
+  b.appendChild(btn(S.k==='d'?'Discard':'Delete','del',function(){q('ed')}));
+  b.appendChild(btn('Save','',save));r.appendChild(b);
+  r.appendChild(el('p','st'+(msg[0]?' '+msg[0]:''),msg[1]));
+}
+// A pushed state (note changed, deleted) keeps what is typed but not saved yet
+if(W&&W.onEvent)W.onEvent('chatDataChanged',function(){const n=parse(W.chatData);if(!S||!n){load()}else S=n;draw()});
+if(W&&W.ready)W.ready();
+load();draw();
+</script>

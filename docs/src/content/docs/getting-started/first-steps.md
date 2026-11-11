@@ -32,10 +32,10 @@ See [Transactions](/docs/web/transactions/) for details.
 Send the bot a message like:
 
 ```text
--350 groceries
+350 groceries
 ```
 
-See [Quick add](/docs/telegram/quick-add/).
+or tap **➕ Add**. See [Adding transactions](/docs/telegram/quick-add/).
 
 ## Explore
 

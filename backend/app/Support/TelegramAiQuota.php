@@ -43,7 +43,7 @@ final class TelegramAiQuota
     /** AI_RECEIPT_DAILY_LIMIT from env/config. */
     public function envDefaultLimit(): int
     {
-        return max(0, (int) config('services.ai_receipt.daily_limit', 5));
+        return max(0, (int) config('services.ai_receipt.daily_limit', 10));
     }
 
     /** Global AI switch (admin → Settings); on unless an admin turned it off. */

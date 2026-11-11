@@ -40,6 +40,6 @@ return [
 
     // Shared daily AI budget for Telegram receipt vision + text intents + voice STT.
     'ai_receipt' => [
-        'daily_limit' => (int) env('AI_RECEIPT_DAILY_LIMIT', 5),
+        'daily_limit' => (int) env('AI_RECEIPT_DAILY_LIMIT', 10),
     ],
 ];

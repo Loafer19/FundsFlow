@@ -1,40 +1,33 @@
 ---
-title: Quick add
-description: Exact message syntax for adding transactions to FundsFlow from Telegram.
+title: Adding transactions
+description: Log expenses and income in Telegram by writing, speaking, sending a receipt, or with the ➕ Add keypad.
 ---
 
-Send the bot a single message with an amount and an optional note. It is saved right away — no AI involved, and it
-doesn't count toward the [daily AI limit](/docs/telegram/ai-assistant/#daily-ai-limit).
-
-## Syntax
-
-```text
-[DD.MM[.YYYY]] AMOUNT [NOTE]
-```
+There is no special syntax: write the transaction the way you'd say it, and the
+[AI assistant](/docs/telegram/ai-assistant/) saves it.
 
 | Message | Result |
 | --- | --- |
-| `-350 groceries` | Expense of 350, note “groceries”, today |
-| `+15000 salary` | Income of 15000, note “salary”, today |
-| `350 coffee` | No sign means **expense**: −350, note “coffee” |
-| `-12.50 lunch` or `-12,5 lunch` | Up to 2 decimals; `.` or `,` as the decimal separator |
-| `-350` | Expense with no note |
-| `20.08 -350 groceries` | Expense on 20 August of the current year |
-| `20.08.2025 -350 groceries` | Expense on 20 August 2025 |
+| `350 groceries` | Expense of 350, note “groceries”, today |
+| `кава 80` | Expense of 80, any language works |
+| `+15000 salary` | Income of 15000 |
+| `40 taxi yesterday` | Expense dated yesterday |
+| `20.08 350 groceries` | Expense on 20 August of the current year |
 
-Rules:
+- A number without a sign, or with a minus, is an **expense**. A plus, or words like *salary*, *income* or *refund*,
+  make it **income**.
+- A date at the start (`DD.MM` or `DD.MM.YYYY`) or words like *yesterday* set the day; otherwise it's **today in your
+  timezone** (set in [Settings → Formatting](/docs/web/settings/)). Dates can't be in the future.
+- Matching tags are added when the words fit one of your existing tags; nothing new is created.
+- If the amount or direction is unclear, the assistant asks first.
 
-- **Minus is an expense, plus is income.** A number without a sign is treated as an expense.
-- The amount must be digits only — **don't use thousand separators or spaces** inside the number: write `-1500 rent`,
-  not `-1 500 rent` or `-1,500 rent`.
-- The amount can't be zero.
-- The note is everything after the amount, up to 255 characters.
-- An optional date prefix uses `DD.MM` or `DD.MM.YYYY`. Without it the transaction is dated **today in your timezone**
-  (set in [Settings → Formatting](/docs/web/settings/)).
-- Tags are not parsed from the text. Add them with the **🏷 Tags** button after saving.
+Each message like this uses one assist from the [daily AI limit](/docs/telegram/ai-assistant/#daily-ai-limit).
+[Voice notes](/docs/telegram/voice/) work the same way.
 
-If the message doesn't match this format, the bot tries the [AI assistant](/docs/telegram/ai-assistant/) for anything
-that looks like a sentence, or replies with a format hint.
+## ➕ Add keypad (no AI)
+
+Tap **➕ Add** in the menu or send `/add` for the keypad widget: type the amount, pick **Expense** or **Income** and
+one of your frequent tags, then **Add**. It never uses the AI limit, so it keeps working when the limit is reached.
 
 ## After saving
 
@@ -45,4 +38,4 @@ The bot answers **✅ Saved** with a transaction card and three buttons:
   (an expense stays an expense).
 - **🗑** — delete. The bot asks for confirmation: **✅ Delete** or **↩️ Cancel**.
 
-You can open the same card later from `/recent` (**Open 1…5** buttons).
+You can open the same card later by tapping a transaction in the `/recent` widget.

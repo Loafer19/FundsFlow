@@ -11,25 +11,21 @@ Send a photo or a file to the bot to create a transaction with that file attache
   becomes a draft card, and a list of transactions becomes one card that imports them all on **Confirm**. Up to 5
   files sent together become one import. See [Files and bulk import](/docs/web/import/).
 
-## With an amount in the caption (instant, no AI)
+## AI draft
 
-Add a caption in [quick add](/docs/telegram/quick-add/) format, for example `-350 groceries` or
-`20.08 -350 groceries`. The transaction is created immediately with the file attached. No AI is used and no
-[AI quota](/docs/telegram/ai-assistant/#daily-ai-limit) is spent.
-
-## Without an amount (AI draft)
-
-Send a JPEG or PNG photo with no caption, or with a caption that is just a hint (e.g. `dinner with friends`):
+Send a JPEG or PNG photo, with or without a caption. A caption helps: an amount in it (`350 groceries`,
+`20.08 350 groceries`) wins over what the AI reads on the image, a date in it sets the day, and its words become the
+note and tags. A hint like `dinner with friends` works too.
 
 1. The bot replies *Reading receipt…* and AI vision extracts the **total**, the **date** if clearly visible, a short
    **note** (merchant or place), and up to three **suggested tags**, which are matched to your existing tags.
 2. You get a draft card with **✅ Confirm**, **✏️ Edit amount**, and **Cancel**.
 3. On **Confirm** the transaction is saved with the photo attached.
 
-If the AI can't find a clear total (for example a photo of food), it asks you to send the amount like `-350`, or
+If the AI can't find a clear total (for example a photo of food), it asks you to send the amount, like `350`, or
 choose **−100**, **−500**, **Other**, or **Cancel**.
 
-A **PDF** without an amount is read by its text (a scanned PDF by its first page) and gets the same draft card, or a
+A **PDF** is read by its text (a scanned PDF by its first page) and gets the same draft card, or a
 bulk import card when it's a statement.
 
 The bot falls back to the same amount buttons, without AI, when:

@@ -9,6 +9,7 @@ use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Support\QuickAddParser;
+use App\Support\TelegramAiQuota;
 use App\Support\UserFormatter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -57,7 +58,7 @@ class TelegramSupport
         ['command' => 'website', 'description' => 'One-time code to log in on the website'],
         ['command' => 'reset', 'description' => 'Start a new AI conversation'],
         ['command' => 'support', 'description' => 'Report a problem or send feedback'],
-        ['command' => 'help', 'description' => 'All commands and the quick-add format'],
+        ['command' => 'help', 'description' => 'All commands and tips'],
         ['command' => 'unlink', 'description' => 'Unlink Telegram; the account stays on the website'],
     ];
 
@@ -68,6 +69,9 @@ class TelegramSupport
 
     public const NOTE_LIST_MAX = 28;
 
+    /** ↩️ Undo on a freshly saved card works this long. */
+    public const UNDO_SECONDS = 300;
+
     private const TAGS_PER_PAGE = 8;
 
     public function __construct(
@@ -77,72 +81,70 @@ class TelegramSupport
         private readonly MatchTagTitlesAction $matchTags,
     ) {}
 
-    public function sendWelcome(int|string $chatId, string $headline): void
+    /**
+     * /start reply: a headline (account created, linked, already linked) and the same short blocks.
+     */
+    public function sendWelcome(int|string $chatId, string $headline, bool $newAccount = false): void
     {
         $this->client->sendMessage(
             $chatId,
-            "{$headline}\n\n" . $this->usageInfo(),
+            $headline . "\n\n" . $this->welcomeBlocks($newAccount),
             $this->menuKeyboard(),
+            self::PARSE_HTML,
         );
     }
 
-    public function usageInfo(): string
+    /**
+     * Telegram HTML; English UI copy.
+     */
+    public function welcomeBlocks(bool $newAccount = false): string
     {
-        return "Send a message like \"-350 groceries\" to log an expense, or \"+15000 salary\" for income.\n"
-            . "Prefix a date for a past entry: \"20.08 -350 groceries\" (DD.MM or DD.MM.YYYY).\n"
-            . "Or send a photo/PDF with that caption to attach a receipt.\n"
-            . "Photo without an amount: AI draft (limited per day), then Confirm.\n"
-            . "Album of photos: choose one receipt or separate transactions.\n"
-            . "Voice notes work too — same commands as typing (shared daily AI limit).\n"
-            . "Natural language: ask about your finances, show recent/budgets/menu/tags, rename tags, month summary.\n"
-            . "AI has a daily limit; Settings shows quota, and the bot says when you're out.\n\n"
-            . 'Use the menu below, or /help for all commands.';
+        return "<b>➕ Add</b>\n"
+            . "Just write or say it: <i>350 groceries yesterday</i>\n"
+            . "Send a receipt photo or PDF\n"
+            . "Or tap ➕ Add for the keypad\n\n"
+            . "<b>💬 Ask</b>\n"
+            . "<i>How much did I spend on food this month?</i>\n"
+            . "<i>Set a 5000 limit on cafes</i>\n\n"
+            . ($newAccount
+                ? "<b>🌐 Website</b>\n/website gives a one-time code to log in on the web\n\n"
+                : '')
+            . "<b>⚡ AI limit</b>\n"
+            . "Text, voice and receipts use your daily AI limit. ➕ Add is free\n\n"
+            . 'Menu below, /help for all commands';
+    }
+
+    public function helpText(): string
+    {
+        return "<b>Add &amp; view</b>\n"
+            . "/add — keypad, no AI needed\n"
+            . "/recent — latest transactions\n"
+            . "/month — this month at a glance\n"
+            . "/tags — expenses and income by tag\n\n"
+            . "<b>Plan</b>\n"
+            . "/budgets — limits and savings goals\n"
+            . "/recurring — repeating payments\n\n"
+            . "<b>Settings &amp; account</b>\n"
+            . "/notifications — alerts on or off\n"
+            . "/website — code to log in on the web\n"
+            . "/reset — new AI conversation\n"
+            . "/support — report a problem or idea\n"
+            . "/unlink — unlink Telegram\n\n"
+            . "<b>Tips</b>\n"
+            . "Write or say it: <i>350 groceries yesterday</i>, <i>+15000 salary</i>\n"
+            . "Send a receipt photo or PDF, a caption helps\n"
+            . "Ask anything: <i>where did my money go this week?</i>\n"
+            . "Reply to a bot message to ask about it\n"
+            . '<blockquote expandable>Text, voice notes and receipts share a daily AI limit; Settings in the Web UI shows what is left. '
+            . '➕ Add and the menu buttons never use it. '
+            . 'The assistant remembers the last hour, shared with the web chat; /reset clears it. '
+            . 'Live widgets work in a private chat with the bot; in groups, commands answer with text. '
+            . 'Limit alerts come at 80% and 100%; /notifications turns them off</blockquote>';
     }
 
     public function sendHelp(int|string $chatId): void
     {
-        $this->client->sendMessage(
-            $chatId,
-            "Commands\n"
-            . "/add — quick-add keypad (private chat)\n"
-            . "/recent — recent transactions: open, edit tags, delete\n"
-            . "/month — this month's income, expenses, net, top tags\n"
-            . "/budgets — spending limits and savings goals\n"
-            . "/tags — your tags with this month's expenses and income; tap a tag for its subtags\n"
-            . "/recurring — recurring payments: next dates, pause or resume\n"
-            . "/notifications — turn alerts, the weekly digest and recurring notifications on or off (/mute, /unmute also work)\n"
-            . "/website — one-time web login code\n"
-            . "/reset — start a new AI conversation (alias /new)\n"
-            . "/support — report a problem or send feedback: /support The report doesn't open\n"
-            . "/help — this list\n"
-            . "/unlink — unlink Telegram (account stays on the website)\n"
-            . "/newtag — create a tag: /newtag 🍕 Fast Food > Food\n\n"
-            . "In a private chat these open live widgets that update with every transaction.\n\n"
-            . "Reply menu\n"
-            . "Add · Recent · Month · Budgets · Tags · Recurring (the Web UI opens from the button next to the message field)\n\n"
-            . "Quick-add\n"
-            . "-350 groceries\n"
-            . "+15000 salary\n"
-            . "20.08 -350 groceries\n\n"
-            . "Receipts\n"
-            . "Send a photo or PDF with a caption like \"-350 groceries\" for instant save. Without an amount, AI may draft a receipt (Confirm / Edit / Cancel).\n"
-            . "Albums: choose one transaction or separate.\n\n"
-            . "Budgets & goals\n"
-            . "/budgets shows each limit's current period: spent, left, days left. Ask in chat:\n"
-            . "\"limit 8000 a month on groceries\" (calendar months; \"from the 15th\" to start there)\n"
-            . "\"how much is left for food?\" · \"raise the groceries limit to 9000\" (applies to the current period)\n"
-            . "\"goal: save 50000 for a vacation by June, tag savings\" · \"how is my vacation goal?\"\n"
-            . "Alerts at 80% and 100% of a limit, once per period.\n\n"
-            . "Voice\n"
-            . "Send a voice note for the same actions as typing (quick-add, menu, tags, help, month summary). Uses the shared daily AI budget.\n\n"
-            . "Text AI\n"
-            . "Ask free-form questions about your finances (any language). Examples: show recent, budgets, menu, tags; rename tags; month summary; what do you think about my finances.\n"
-            . "Same views as the reply-menu buttons when you ask to show them.\n"
-            . "Reply to a bot message to ask about it. The assistant remembers the last hour of chat, shared with the web assistant; /reset clears it.\n\n"
-            . "AI limit\n"
-            . "Receipt AI, voice, and text AI share a daily limit. Settings in the Web UI shows used/limit and reset time; the bot tells you when you're out.",
-            $this->menuKeyboard(),
-        );
+        $this->client->sendMessage($chatId, $this->helpText(), $this->menuKeyboard(), self::PARSE_HTML);
     }
 
     public function sendMiniAppHint(int|string $chatId): void
@@ -221,16 +223,20 @@ class TelegramSupport
             ->implode(' · ');
     }
 
+    /**
+     * The one card layout for a transaction everywhere (saved, updated, confirm, deleted):
+     * headline, bold signed amount, 📅 date, 📝 note, 📎 files, 🏷 tags. The sign carries the
+     * direction, so there is no 📉/📈.
+     */
     public function formatTransactionCard(User $user, Transaction $transaction, string $headline = '✅ Saved'): string
     {
-        $emoji = $transaction->amount > 0 ? '📈' : '📉';
-        $money = $this->escapeHtml(UserFormatter::formatMoney($user, $transaction->amount));
+        $money = $this->escapeHtml($this->signedMoney($user, (float) $transaction->amount));
         $date = $this->escapeHtml(UserFormatter::formatDate($user, $transaction->at));
 
         $lines = [
             $this->escapeHtml($headline),
             '',
-            "<b>{$money}</b> {$emoji}",
+            "<b>{$money}</b>",
             "📅 {$date}",
         ];
 
@@ -299,13 +305,18 @@ class TelegramSupport
         Transaction $transaction,
         string $headline = '✅ Saved',
         bool $remember = true,
+        ?int $editMessageId = null,
+        bool $undo = false,
     ): void {
-        $this->client->sendMessage(
-            $chatId,
-            $this->formatTransactionCard($user, $transaction, $headline),
-            $this->postSaveKeyboard($transaction),
-            self::PARSE_HTML,
-        );
+        $text = $this->formatTransactionCard($user, $transaction, $headline);
+        $keyboard = $this->postSaveKeyboard($transaction, $chatId, $undo);
+
+        if ($editMessageId !== null) {
+            // A confirm card or the "Reading receipt…" line turns into the result in place.
+            $this->client->editMessageText($chatId, $editMessageId, $text, $keyboard, self::PARSE_HTML);
+        } else {
+            $this->client->sendMessage($chatId, $text, $keyboard, self::PARSE_HTML);
+        }
 
         if ($remember) {
             $label = trim(preg_replace('/^[^\p{L}]+/u', '', $headline) ?? $headline);
@@ -321,15 +332,143 @@ class TelegramSupport
     /**
      * @return array<string, mixed>
      */
-    public function postSaveKeyboard(Transaction $transaction): array
+    public function postSaveKeyboard(Transaction $transaction, int|string|null $chatId = null, bool $undo = false): array
     {
-        return [
-            'inline_keyboard' => [[
-                ['text' => '🏷 Tags', 'callback_data' => "retag:{$transaction->id}"],
-                ['text' => '✏️ Amount', 'callback_data' => "editamt:{$transaction->id}"],
-                ['text' => '🗑', 'callback_data' => "delask:{$transaction->id}"],
-            ]],
+        $id = $transaction->id;
+        $undo = $undo && $this->canUndo($transaction);
+        $undoButton = ['text' => '↩️ Undo', 'callback_data' => "undo:{$id}"];
+        $delete = ['text' => '🗑 Delete', 'callback_data' => "delask:{$id}"];
+
+        if ($chatId === null || self::isPrivateChat($chatId)) {
+            // Private chat: one ✏️ Edit opens the widget editor (amount, date, tags, note).
+            $row = [['text' => '✏️ Edit', 'callback_data' => "edit:{$id}"], $delete];
+
+            return ['inline_keyboard' => [$undo ? [$undoButton, ...$row] : $row]];
+        }
+
+        // Groups have no widgets: tag picker and a typed amount, as before.
+        $rows = [[
+            ['text' => '🏷 Tags', 'callback_data' => "retag:{$id}"],
+            ['text' => '✏️ Amount', 'callback_data' => "editamt:{$id}"],
+            $delete,
+        ]];
+
+        if ($undo) {
+            array_unshift($rows, [$undoButton]);
+        }
+
+        return ['inline_keyboard' => $rows];
+    }
+
+    /**
+     * Undo is for "I didn't mean that": a few minutes after the entry was created.
+     */
+    public function canUndo(Transaction $transaction): bool
+    {
+        return $transaction->created_at !== null
+            && $transaction->created_at->gt(now()->subSeconds(self::UNDO_SECONDS));
+    }
+
+    /**
+     * Headline of a card message, kept when its keyboard re-renders the card (tag picker, delete
+     * cancelled). Unknown first lines (a Monobank line) become "Transaction".
+     */
+    public static function cardHeadline(?string $messageText, string $fallback = 'Transaction'): string
+    {
+        $first = trim(strtok((string) $messageText, "\n") ?: '');
+
+        return preg_match('/^(✅ |🔁 |✏️ |Transaction$)/u', $first) ? $first : $fallback;
+    }
+
+    public static function isPrivateChat(int|string $chatId): bool
+    {
+        return (int) $chatId > 0;
+    }
+
+    public function signedMoney(User $user, float $amount): string
+    {
+        $formatted = UserFormatter::formatMoney($user, $amount);
+
+        return $amount > 0 && !str_starts_with($formatted, '+') ? '+' . $formatted : $formatted;
+    }
+
+    /**
+     * Two short lines and a ➕ Add button (free, no AI) when today's AI assists are used up.
+     */
+    public function sendQuotaExhausted(int|string $chatId, User $user, TelegramAiQuota $quota): void
+    {
+        $limit = $quota->dailyLimit($user);
+
+        if (!$quota->enabledGlobally() || $limit <= 0) {
+            $text = "AI is turned off right now\n➕ Add and the menu still work";
+        } else {
+            $text = "All {$limit} AI assists for today are used\nThey're back at midnight. ➕ Add works without AI";
+        }
+
+        $this->client->sendMessage($chatId, $text, $this->addButtonKeyboard());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function addButtonKeyboard(): array
+    {
+        return ['inline_keyboard' => [[['text' => '➕ Add', 'callback_data' => 'menu:add']]]];
+    }
+
+    /**
+     * Before → after for an agent's update, the card for a delete or a staged create.
+     * Changed fields show "<s>old</s> → new"; unchanged ones as on the saved card.
+     *
+     * @param array<string, mixed> $payload
+     */
+    public function formatAgentPreviewCard(User $user, string $action, array $payload, ?Transaction $before): string
+    {
+        if ($action === 'delete_transaction' && $before) {
+            return $this->formatTransactionCard($user, $before, '🗑 Delete this transaction?');
+        }
+
+        $amount = (float) ($payload['amount'] ?? 0);
+        $at = (string) ($payload['at'] ?? $user->todayDateString());
+        $note = isset($payload['note']) && is_string($payload['note']) && $payload['note'] !== '' ? $payload['note'] : null;
+        $tagIds = array_map('intval', is_array($payload['tag_ids'] ?? null) ? $payload['tag_ids'] : []);
+        $tagLabel = fn (array $ids): string => $ids === []
+            ? 'No tags'
+            : $user->tags()->whereIn('id', $ids)->orderBy('title')->get(['emoji', 'title'])
+                ->map(fn (Tag $tag) => $this->escapeHtml(trim($tag->emoji . ' ' . $tag->title)))->implode(' · ');
+        $money = fn (float $v): string => $this->escapeHtml($this->signedMoney($user, $v));
+        $date = fn (string $d): string => $this->escapeHtml(UserFormatter::formatDate($user, $d));
+        $diff = fn (string $old, string $new): string => $old === $new ? $new : "<s>{$old}</s> → {$new}";
+
+        if ($action !== 'update_transaction' || !$before) {
+            $lines = ['➕ Save this transaction?', '', '<b>' . $money($amount) . '</b>', '📅 ' . $date($at)];
+
+            if ($note !== null) {
+                $lines[] = '📝 ' . $this->escapeHtml($note);
+            }
+            $lines[] = '🏷 ' . $tagLabel($tagIds);
+
+            return implode("\n", $lines);
+        }
+
+        $oldTags = $before->tags->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+        $newTags = collect($tagIds)->sort()->values()->all();
+        $oldNote = $before->note ? $this->escapeHtml($before->note) : '—';
+        $newNote = $note !== null ? $this->escapeHtml($note) : '—';
+
+        $lines = [
+            '✏️ Change this transaction?',
+            '',
+            '<b>' . $diff($money((float) $before->amount), $money($amount)) . '</b>',
+            '📅 ' . $diff($date($before->at->toDateString()), $date($at)),
         ];
+
+        if ($oldNote !== '—' || $newNote !== '—') {
+            $lines[] = '📝 ' . $diff($oldNote, $newNote);
+        }
+        $lines[] = '🏷 ' . ($oldTags === $newTags ? $tagLabel($newTags) : $diff($tagLabel($oldTags), $tagLabel($newTags)));
+
+        return implode("\n", $lines);
     }
 
     /**
@@ -339,7 +478,7 @@ class TelegramSupport
     {
         return [
             'inline_keyboard' => [[
-                ['text' => '✅ Delete', 'callback_data' => "delyes:{$transactionId}"],
+                ['text' => '🗑 Delete', 'callback_data' => "delyes:{$transactionId}"],
                 ['text' => '↩️ Cancel', 'callback_data' => "delno:{$transactionId}"],
             ]],
         ];
@@ -355,7 +494,7 @@ class TelegramSupport
                 ['text' => '−100', 'callback_data' => 'mediaamt:-100'],
                 ['text' => '−500', 'callback_data' => 'mediaamt:-500'],
                 ['text' => 'Other', 'callback_data' => 'mediaamt:other'],
-                ['text' => 'Cancel', 'callback_data' => 'mediacancel'],
+                ['text' => '↩️ Cancel', 'callback_data' => 'mediacancel'],
             ]],
         ];
     }
@@ -363,13 +502,18 @@ class TelegramSupport
     /**
      * @return array<string, mixed>
      */
-    public function receiptDraftKeyboard(string $nonce): array
+    public function receiptDraftKeyboard(string $nonce, int|string|null $chatId = null): array
     {
+        // Private chat: ✏️ Edit opens the widget editor; groups type a new amount.
+        $private = $chatId === null || self::isPrivateChat($chatId);
+
         return [
             'inline_keyboard' => [[
                 ['text' => '✅ Confirm', 'callback_data' => "draft:ok:{$nonce}"],
-                ['text' => '✏️ Edit amount', 'callback_data' => "draft:edit:{$nonce}"],
-                ['text' => 'Cancel', 'callback_data' => "draft:cancel:{$nonce}"],
+                $private
+                    ? ['text' => '✏️ Edit', 'callback_data' => "draft:open:{$nonce}"]
+                    : ['text' => '✏️ Amount', 'callback_data' => "draft:edit:{$nonce}"],
+                ['text' => '↩️ Cancel', 'callback_data' => "draft:cancel:{$nonce}"],
             ]],
         ];
     }
@@ -401,7 +545,7 @@ class TelegramSupport
                 ['text' => '🆕 Create them', 'callback_data' => "imp:create:{$nonce}"],
                 ['text' => 'Without tags', 'callback_data' => "imp:none:{$nonce}"],
             ], [
-                ['text' => 'Cancel', 'callback_data' => "imp:cancel:{$nonce}"],
+                ['text' => '↩️ Cancel', 'callback_data' => "imp:cancel:{$nonce}"],
             ]],
         ];
     }
@@ -414,7 +558,7 @@ class TelegramSupport
         return [
             'inline_keyboard' => [[
                 ['text' => '✅ Confirm', 'callback_data' => "nl:tags:ok:{$nonce}"],
-                ['text' => 'Cancel', 'callback_data' => "nl:tags:cancel:{$nonce}"],
+                ['text' => '↩️ Cancel', 'callback_data' => "nl:tags:cancel:{$nonce}"],
             ]],
         ];
     }
@@ -427,7 +571,7 @@ class TelegramSupport
         return [
             'inline_keyboard' => [[
                 ['text' => '✅ Confirm', 'callback_data' => "nl:rename:ok:{$nonce}"],
-                ['text' => 'Cancel', 'callback_data' => "nl:rename:cancel:{$nonce}"],
+                ['text' => '↩️ Cancel', 'callback_data' => "nl:rename:cancel:{$nonce}"],
             ]],
         ];
     }
@@ -437,12 +581,14 @@ class TelegramSupport
      *
      * @return array<string, mixed>
      */
-    public function nlAgentConfirmKeyboard(string $nonce): array
+    public function nlAgentConfirmKeyboard(string $nonce, bool $delete = false): array
     {
         return [
             'inline_keyboard' => [[
-                ['text' => '✅ Confirm', 'callback_data' => "nl:agent:ok:{$nonce}"],
-                ['text' => 'Cancel', 'callback_data' => "nl:agent:cancel:{$nonce}"],
+                $delete
+                    ? ['text' => '🗑 Delete', 'callback_data' => "nl:agent:ok:{$nonce}"]
+                    : ['text' => '✅ Confirm', 'callback_data' => "nl:agent:ok:{$nonce}"],
+                ['text' => '↩️ Cancel', 'callback_data' => "nl:agent:cancel:{$nonce}"],
             ]],
         ];
     }
@@ -484,14 +630,21 @@ class TelegramSupport
     /**
      * @param array<string, mixed> $draft
      */
-    public function sendReceiptDraft(int|string $chatId, User $user, array $draft): void
+    public function sendReceiptDraft(int|string $chatId, User $user, array $draft, ?int $editMessageId = null): ?int
     {
-        $this->client->sendMessage(
-            $chatId,
-            $this->formatReceiptDraftCard($user, $draft),
-            $this->receiptDraftKeyboard((string) ($draft['nonce'] ?? '')),
-            self::PARSE_HTML,
-        );
+        $text = $this->formatReceiptDraftCard($user, $draft);
+        $keyboard = $this->receiptDraftKeyboard((string) ($draft['nonce'] ?? ''), $chatId);
+
+        if ($editMessageId !== null) {
+            $this->client->editMessageText($chatId, $editMessageId, $text, $keyboard, self::PARSE_HTML);
+
+            return $editMessageId;
+        }
+
+        $result = $this->client->sendMessageResult($chatId, $text, $keyboard, self::PARSE_HTML);
+        $id = $result['result']['message_id'] ?? null;
+
+        return is_int($id) ? $id : null;
     }
 
     /**
@@ -501,9 +654,8 @@ class TelegramSupport
     {
         $amount = $draft['amount'] ?? null;
         $amount = is_numeric($amount) ? (float) $amount : null;
-        $emoji = ($amount !== null && $amount > 0) ? '📈' : '📉';
         $money = $amount !== null
-            ? $this->escapeHtml(UserFormatter::formatMoney($user, $amount))
+            ? $this->escapeHtml($this->signedMoney($user, $amount))
             : '?';
         $at = (string) ($draft['at'] ?? $user->todayDateString());
         $date = $this->escapeHtml(UserFormatter::formatDate($user, $at));
@@ -511,7 +663,7 @@ class TelegramSupport
         $lines = [
             $this->escapeHtml('🧾 Receipt draft'),
             '',
-            "<b>{$money}</b> {$emoji}",
+            "<b>{$money}</b>",
             "📅 {$date}",
         ];
 
@@ -523,7 +675,11 @@ class TelegramSupport
 
         $titles = $draft['suggested_tag_titles'] ?? [];
 
-        if (is_array($titles) && $titles !== []) {
+        if (is_array($draft['tag_ids'] ?? null)) {
+            // Picked in the editor: exact ids win over the AI's title guesses.
+            $tags = $user->tags()->whereIn('id', $draft['tag_ids'])->orderBy('title')->get(['emoji', 'title']);
+            $lines[] = '🏷 ' . ($tags->isEmpty() ? 'No tags' : $tags->map(fn (Tag $tag) => $this->escapeHtml(trim($tag->emoji . ' ' . $tag->title)))->implode(' · '));
+        } elseif (is_array($titles) && $titles !== []) {
             $matched = $this->matchSuggestedTagTitles($user, $titles);
 
             if ($matched !== []) {
@@ -537,11 +693,8 @@ class TelegramSupport
                 $lines[] = '🏷 suggested: ' . $hint;
             }
         } else {
-            $lines[] = '🏷 —';
+            $lines[] = '🏷 No tags';
         }
-
-        $lines[] = '';
-        $lines[] = 'Confirm to save with receipt, or edit the amount.';
 
         return implode("\n", $lines);
     }
@@ -654,9 +807,12 @@ class TelegramSupport
     }
 
     /**
+     * Only for a reply to the bot's own "send the amount" question (a receipt waiting for its
+     * amount when AI can't read it). Free text never goes through this: it goes to the AI.
+     *
      * @return null|array{at: string, amount: float, note: ?string}|array{error: string}
      */
-    public function parseQuickAdd(string $text, ?User $user = null): ?array
+    public function parseAmountReply(string $text, ?User $user = null): ?array
     {
         return $this->quickAdd->parseQuickAdd($text, $user);
     }

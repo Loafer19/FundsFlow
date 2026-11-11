@@ -59,9 +59,8 @@ and [Jars as savings goals](/docs/help/monobank/#jars-as-savings-goals).
 ### The bot or the Assistant says I've used my AI requests for today.
 
 The [AI limit](/docs/telegram/ai-assistant/#daily-ai-limit) is shared by receipt reading, voice messages and the
-assistant in Telegram and on the web. It resets at midnight in your timezone. Until then, quick add
-(`-350 groceries`), receipts with the amount in the caption, commands and menu buttons still work in Telegram, and
-the **+** button and all tabs still work on the web.
+assistant in Telegram and on the web. It resets at midnight in your timezone. Until then, the ➕ Add keypad
+(`/add`), commands and menu buttons still work in Telegram, and the **+** button and all tabs still work on the web.
 
 ### The receipt was read wrong.
 

@@ -7,6 +7,7 @@ use App\Actions\Telegram\RunTelegramAgentAction;
 use App\Actions\Telegram\TranscribeTelegramAudioAction;
 use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
+use App\Channels\Telegram\TelegramEditor;
 use App\Channels\Telegram\TelegramHistory;
 use App\Channels\Telegram\TelegramSupport;
 use App\Models\User;
@@ -23,7 +24,7 @@ class MessageHandler
         private readonly TelegramSupport $support,
         private readonly AuthHandler $authHandler,
         private readonly MenuHandler $menuHandler,
-        private readonly QuickAddHandler $quickAddHandler,
+        private readonly EditAmountHandler $editAmountHandler,
         private readonly MediaHandler $mediaHandler,
         private readonly NaturalLanguageHandler $naturalLanguageHandler,
         private readonly TelegramChatSession $session,
@@ -31,6 +32,7 @@ class MessageHandler
         private readonly AgentHistory $history,
         private readonly TelegramHistory $notes,
         private readonly SupportHandler $supportHandler,
+        private readonly TelegramEditor $editor,
     ) {}
 
     /**
@@ -79,13 +81,7 @@ class MessageHandler
         }
 
         if (!$this->transcribeAudio->hasQuota($user)) {
-            $this->client->sendMessage(
-                $chatId,
-                $this->transcribeAudio->quota()->exhaustedMessage(
-                    $user,
-                    'Until then, type your message instead — quick-add like -350 groceries and the menu buttons still work.',
-                ),
-            );
+            $this->support->sendQuotaExhausted($chatId, $user, $this->transcribeAudio->quota());
 
             return;
         }
@@ -333,18 +329,16 @@ class MessageHandler
             return;
         }
 
-        if (Cache::has("telegram_edit_amount:{$chatId}")) {
+        if ($this->editor->awaitingNote($chatId)) {
             $this->notes->input($chatId, $user, $text);
-            $this->quickAddHandler->handleEditAmountReply($user, $chatId, $text);
+            $this->editor->handleNoteReply($user, $chatId, $text);
 
             return;
         }
 
-        $parsed = $this->support->parseQuickAdd($text, $user);
-
-        if ($parsed !== null) {
+        if (Cache::has("telegram_edit_amount:{$chatId}")) {
             $this->notes->input($chatId, $user, $text);
-            $this->quickAddHandler->handleQuickAdd($user, $chatId, $text);
+            $this->editAmountHandler->handleEditAmountReply($user, $chatId, $text);
 
             return;
         }
@@ -353,12 +347,8 @@ class MessageHandler
             return;
         }
 
-        $this->client->sendMessage(
-            $chatId,
-            "Didn't recognize that. Format: -350 groceries (minus is an expense, plus is income). "
-                . 'Prefix a date like "20.08 -350 groceries" to log a past day. '
-                . 'Or try: create tags groceries, coffee',
-        );
+        // Only when AI isn't configured on this server.
+        $this->client->sendMessage($chatId, "AI isn't available here. Tap ➕ Add (or send /add) to log a transaction");
     }
 
     /**

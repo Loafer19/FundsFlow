@@ -13,7 +13,7 @@ A personal finance tracker with an AI assistant on the web and in Telegram: log 
 - **Budgets** with per-tag limits, limit history and savings goals with a deadline and pace
 - **Analytics** across Analytics, Flow, Trend, Calendar, Tags and List tabs, with forecasts and period comparison
 - **Recurring transactions**: daily, weekly, monthly or yearly, ending on a date or after N times
-- **Telegram bot + Mini App**: quick-add, receipts, charts, budget alerts and weekly digests
+- **Telegram bot + Mini App**: add in plain words or by voice, receipts, charts, budget alerts and weekly digests
 - **MCP server** so your own AI client (Claude, Cursor, Grok, …) can read and edit your finances
 - **Themed PDF reports** with real charts, downloaded or sent to Telegram, in 30+ themes
 

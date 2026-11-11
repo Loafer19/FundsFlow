@@ -3,8 +3,8 @@ title: AI assistant
 description: Ask the FundsFlow bot about your finances in plain language, draw charts, and make changes with confirmation.
 ---
 
-Anything you send that isn't a command or a [quick add](/docs/telegram/quick-add/) and contains words is handled by the
-AI assistant. Write in any language. While it works the chat shows *typing…*, and in your private chat the answer
+Anything you send that isn't a command is handled by the AI assistant, including transactions like `350 groceries`
+(see [Adding transactions](/docs/telegram/quick-add/)). Write in any language. While it works the chat shows *typing…*, and in your private chat the answer
 appears as it's being written; then the finished answer arrives (in a group chat it comes in one go). Answers reply
 to your message and can use simple formatting (bold, italic, code, bullet lists, links). A very long answer comes as
 several messages.
@@ -35,7 +35,7 @@ If something is ambiguous it asks a clarifying question, sometimes with suggeste
 - To ask about a specific bot message, **reply** to it: the assistant gets that message as context.
 - `/reset` (or `/new`) starts a new conversation: it forgets the earlier messages (here and in the web assistant) and
   any question or preview still waiting in this chat. The web app's **New chat** clears the shared memory too.
-- Quick add, menu views and receipts are noted in the memory as one line each (for example *Saved: -350.00 ₴
+- Saved transactions, menu views and receipts are noted in the memory as one line each (for example *Saved: -350.00 ₴
   groceries (Food)*), so you can ask “change the tag of the one I just added” here or in the web app.
 - In a group chat the assistant doesn't use the shared memory; `/reset` there clears only that chat.
 
@@ -118,14 +118,14 @@ AI features share one daily budget of **AI assists**:
 - transcribing a voice message,
 - each message handled by the AI assistant (in Telegram or in the web app's [Assistant](/docs/web/assistant/) panel).
 
-The default limit is **5 assists per day** (configurable by the operator). The counter resets at **midnight in your
+The default limit is **10 assists per day** (configurable by the operator). The counter resets at **midnight in your
 timezone**. When only a couple are left the bot warns you, and when you run out it tells you that the limit resets at
 midnight and what still works without AI.
 
 You can always see *AI assists today* (used / limit and reset time) in **Settings → Accounts** in the web app.
 
-Quick add, commands, menu buttons, and receipts with an amount in the caption **don't** use AI and keep working when
-the limit is reached.
+The **➕ Add** keypad (`/add`), commands, menu buttons and widgets **don't** use AI and keep working when the limit is
+reached. Typed and spoken messages, including plain transactions like `350 groceries`, and receipt photos do.
 
 Savings goals are budgets too: ask “how is my emergency fund?” or “when will I reach my Japan trip goal?” and the
 assistant answers from `budget_status`; “create a goal of 60 000 for 🗾 Japan trip by December, I started saving on

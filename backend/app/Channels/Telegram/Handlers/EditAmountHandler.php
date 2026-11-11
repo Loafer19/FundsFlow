@@ -2,51 +2,22 @@
 
 namespace App\Channels\Telegram\Handlers;
 
-use App\Actions\Transactions\CreateTransactionAction;
 use App\Actions\Transactions\UpdateTransactionAction;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
-use App\Enums\TransactionSource;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 
-class QuickAddHandler
+/**
+ * Reply to "Edit amount" on a saved transaction card: a bare number keeps the direction.
+ */
+class EditAmountHandler
 {
     public function __construct(
         private readonly TelegramClient $client,
         private readonly TelegramSupport $support,
-        private readonly CreateTransactionAction $createTransaction,
         private readonly UpdateTransactionAction $updateTransaction,
     ) {}
-
-    public function handleQuickAdd(User $user, int|string $chatId, string $text): void
-    {
-        $parsed = $this->support->parseQuickAdd($text, $user);
-
-        if ($parsed === null) {
-            $this->client->sendMessage(
-                $chatId,
-                "Didn't recognize that. Format: -350 groceries (minus is an expense, plus is income). "
-                    . 'Prefix a date like "20.08 -350 groceries" to log a past day.',
-            );
-
-            return;
-        }
-
-        if (isset($parsed['error'])) {
-            $this->client->sendMessage($chatId, $parsed['error']);
-
-            return;
-        }
-
-        $transaction = $this->createTransaction->execute($user, [
-            'at' => $parsed['at'],
-            'amount' => $parsed['amount'],
-            'note' => $parsed['note'],
-        ], TransactionSource::Telegram);
-
-        $this->support->sendSavedTransaction($chatId, $user, $transaction, '✅ Saved');
-    }
 
     public function handleEditAmountReply(User $user, int|string $chatId, string $text): void
     {

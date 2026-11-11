@@ -186,7 +186,7 @@ midnight (Europe/Kyiv), in 4h 12m*. The badge turns yellow when you're running l
 message box and the 📎 button are disabled and the box shows *AI assists reset in 4h 12m*. If you were already out when you sent a message, the
 assistant replies:
 
-> You've used all 5 AI assists for today. They reset at midnight (Europe/Kyiv). Until then, you can still add
+> You've used all 10 AI assists for today. They reset at midnight (Europe/Kyiv). Until then, you can still add
 > transactions with the + button and explore your tabs and analytics.
 
 The number and timezone are yours. Everything else in the web app keeps working without AI. Your usage is also in

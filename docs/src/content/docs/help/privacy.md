@@ -36,8 +36,7 @@ in Telegram, the content needed for that request is sent to xAI for processing:
 
 Some things never go to an AI provider:
 
-- Quick add, commands, menu buttons, and the web app's tabs and forms.
-- Receipts and PDFs with the amount in the caption (`-350 groceries`).
+- The ➕ Add keypad, commands, menu buttons and widgets, and the web app's tabs and forms.
 - OFX / QFX, QIF, and FundsFlow JSON files, and CSV, Excel (`.xlsx`), OpenDocument (`.ods`), and HTML tables whose
   columns are recognised — these are read on the FundsFlow server. Common import instructions (*only expenses*,
   *tag everything Travel*) are also applied without AI.
@@ -48,7 +47,7 @@ xAI processes this data under its own terms; see the
 features: everything else in FundsFlow works without them.
 
 The server administrator can turn all AI features off, or set your daily AI limit to zero, in the admin panel. When AI
-is off, AI requests are refused and nothing is sent to xAI; manual entry, quick add, and the menus keep working.
+is off, AI requests are refused and nothing is sent to xAI; manual entry, the ➕ Add keypad, and the menus keep working.
 
 When **you** connect an AI client over [MCP](/docs/ai/mcp/), that client (Claude, ChatGPT, Cursor, etc.) receives the
 data its tools request, under that provider's own terms.

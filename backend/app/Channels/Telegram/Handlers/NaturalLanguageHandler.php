@@ -56,10 +56,7 @@ class NaturalLanguageHandler
         }
 
         if (!$this->quota->hasQuota($user)) {
-            $this->client->sendMessage(
-                $chatId,
-                $this->agent->quotaExhaustedMessage($user, $chatId, $identity),
-            );
+            $this->support->sendQuotaExhausted($chatId, $user, $this->quota);
             $this->session->setSummary($identity, $chatId, 'AI quota exhausted.');
 
             return true;
@@ -71,7 +68,7 @@ class NaturalLanguageHandler
         if (!$result['ok'] && ($result['status'] ?? '') === 'unavailable') {
             $this->client->sendMessage(
                 $chatId,
-                'AI is temporarily unavailable. Try /help, menu buttons, or -350 groceries.',
+                'AI is temporarily unavailable. Tap ➕ Add (or send /add) to log a transaction, or use the menu buttons',
             );
             $this->session->setSummary($identity, $chatId, 'AI temporarily unavailable.');
 
@@ -81,7 +78,7 @@ class NaturalLanguageHandler
         if (!$result['ok']) {
             $this->client->sendMessage(
                 $chatId,
-                "Didn't catch an action there. Try show recent, budgets, month summary, menu, -350 groceries, or /help.",
+                "Didn't catch that. Try 350 groceries, show recent, my budgets, or /help",
             );
             $this->session->setSummary($identity, $chatId, "Didn't catch an action.");
 
@@ -121,10 +118,7 @@ class NaturalLanguageHandler
         }
 
         if (!$this->quota->hasQuota($user)) {
-            $this->client->sendMessage(
-                $chatId,
-                $this->agent->quotaExhaustedMessage($user, $chatId, $identity),
-            );
+            $this->support->sendQuotaExhausted($chatId, $user, $this->quota);
 
             return true;
         }
@@ -136,7 +130,7 @@ class NaturalLanguageHandler
         if (!$result['ok'] && ($result['status'] ?? '') === 'unavailable') {
             $this->client->sendMessage(
                 $chatId,
-                'AI is temporarily unavailable. Try /help, menu buttons, or -350 groceries.',
+                'AI is temporarily unavailable. Tap ➕ Add (or send /add) to log a transaction, or use the menu buttons',
             );
 
             return true;
@@ -220,7 +214,7 @@ class NaturalLanguageHandler
         }
 
         $this->session->setSummary($identity, $chatId, 'Tag creation cancelled.');
-        $this->client->sendMessage($chatId, 'Cancelled');
+        $this->client->sendMessage($chatId, '↩️ Cancelled');
         $this->markProposal($user, $chatId, $identity, $nonce, 'cancelled');
     }
 
@@ -282,7 +276,7 @@ class NaturalLanguageHandler
         }
 
         $this->session->setSummary($identity, $chatId, 'Tag rename cancelled.');
-        $this->client->sendMessage($chatId, 'Cancelled');
+        $this->client->sendMessage($chatId, '↩️ Cancelled');
         $this->markProposal($user, $chatId, $identity, $nonce, 'cancelled');
     }
 
@@ -291,6 +285,7 @@ class NaturalLanguageHandler
         int|string $chatId,
         string $nonce,
         int|string|null $telegramUserId = null,
+        ?int $messageId = null,
     ): void {
         $identity = $telegramUserId ?? $chatId;
         $pending = $this->takePending($identity, $chatId, 'agent_mutation', $nonce);
@@ -301,7 +296,9 @@ class NaturalLanguageHandler
             return;
         }
 
-        $applied = $this->toolExecutor->applyAgentMutation($user, $chatId, $identity, $pending);
+        // A transaction confirm card turns into the result card in place.
+        $inPlace = in_array($pending['action'] ?? '', TelegramAgentToolExecutor::TRANSACTION_ACTIONS, true) ? $messageId : null;
+        $applied = $this->toolExecutor->applyAgentMutation($user, $chatId, $identity, $pending, $inPlace);
         $this->markProposal($user, $chatId, $identity, $nonce, $applied ? 'confirmed' : 'failed');
     }
 
@@ -324,17 +321,37 @@ class NaturalLanguageHandler
         string $nonce,
         int|string|null $telegramUserId = null,
         ?User $user = null,
+        ?int $messageId = null,
     ): void {
         $identity = $telegramUserId ?? $chatId;
+        $pending = $this->takePending($identity, $chatId, 'agent_mutation', $nonce);
 
-        if ($this->takePending($identity, $chatId, 'agent_mutation', $nonce) === null) {
+        if ($pending === null) {
             $this->client->sendMessage($chatId, self::OUTDATED_PREVIEW);
 
             return;
         }
 
         $this->session->setSummary($identity, $chatId, 'Agent mutation cancelled.');
-        $this->client->sendMessage($chatId, 'Cancelled');
+        $action = (string) ($pending['action'] ?? '');
+        $transaction = $user && in_array($action, ['update_transaction', 'delete_transaction'], true)
+            ? $this->support->findOwnTransaction($user, (int) ($pending['payload']['id'] ?? 0))
+            : null;
+
+        if ($messageId !== null && $transaction) {
+            // The card stays, showing the transaction as it still is.
+            $this->client->editMessageText(
+                $chatId,
+                $messageId,
+                $this->support->formatTransactionCard($user, $transaction, '↩️ Cancelled, nothing changed'),
+                null,
+                TelegramSupport::PARSE_HTML,
+            );
+        } elseif ($messageId !== null && $action === 'create_transaction') {
+            $this->client->editMessageText($chatId, $messageId, '↩️ Cancelled, nothing saved');
+        } else {
+            $this->client->sendMessage($chatId, '↩️ Cancelled');
+        }
         $this->markProposal($user, $chatId, $identity, $nonce, 'cancelled');
     }
 
@@ -363,22 +380,14 @@ class NaturalLanguageHandler
     }
 
     /**
-     * Heuristic: skip AI for obvious quick-add-shaped leftovers and tiny noise.
+     * Every non-command text goes to the agent (there is no regex quick-add any more).
      */
     private function looksLikeNaturalLanguage(string $text): bool
     {
         $trimmed = trim($text);
 
-        if ($trimmed === '' || mb_strlen($trimmed) < 3) {
-            return false;
-        }
-
-        if (str_starts_with($trimmed, '/')) {
-            return false;
-        }
-
-        // Pure amounts already handled by quick-add; anything with letters may be intent.
-        return (bool) preg_match('/\p{L}/u', $trimmed);
+        // Every non-command text goes to the agent, a bare "350" too (it logs an expense).
+        return $trimmed !== '' && !str_starts_with($trimmed, '/');
     }
 
     /**

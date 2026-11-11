@@ -5,7 +5,9 @@ namespace App\Channels\Telegram\Handlers;
 use App\Actions\RecurringTransactions\UpdateRecurringTransactionAction;
 use App\Actions\Transactions\CreateTransactionAction;
 use App\Actions\Transactions\DeleteTransactionAction;
+use App\Channels\Telegram\PinnedMonthSummary;
 use App\Channels\Telegram\TelegramClient;
+use App\Channels\Telegram\TelegramEditor;
 use App\Channels\Telegram\TelegramHistory;
 use App\Channels\Telegram\TelegramSupport;
 use App\Channels\Telegram\Widgets\TelegramWidgetData;
@@ -30,6 +32,8 @@ class WidgetQueryHandler
         private readonly TelegramHistory $history,
         private readonly UpdateRecurringTransactionAction $updateRecurring,
         private readonly TelegramWidgetSync $sync,
+        private readonly TelegramEditor $editor,
+        private readonly PinnedMonthSummary $pinned,
     ) {}
 
     /**
@@ -63,6 +67,15 @@ class WidgetQueryHandler
         }
 
         try {
+            $messageId = isset($query['message_id']) ? (int) $query['message_id'] : null;
+            $edited = $this->editor->handleQuery($user, $chatId, $messageId, $data);
+
+            if ($edited !== null) {
+                $this->answer($queryId, $edited);
+
+                return;
+            }
+
             if (preg_match('/^a:([+-]?\d{1,10}(?:[.,]\d{1,2})?)(?::(\d{1,10}))?$/', $data, $matches)) {
                 $this->handleAdd($user, $chatId, $queryId, $matches);
 
@@ -105,8 +118,9 @@ class WidgetQueryHandler
                 return;
             }
 
-            if (preg_match('/^n:([01])$/', $data, $matches)) {
-                $this->handleNotifications($user, $chatId, $queryId, $matches[1] === '1');
+            // n:0 / n:1 from notifications widgets sent before the per-switch layout.
+            if (preg_match('/^n:(?:([mrp]):)?([01])$/', $data, $matches)) {
+                $this->handleNotifications($user, $chatId, $queryId, $matches[1] ?: 'm', $matches[2] === '1');
 
                 return;
             }
@@ -193,6 +207,7 @@ class WidgetQueryHandler
         $remembered = TelegramHistory::transactionLine($user, $transaction);
         $this->deleteTransaction->execute($user, $transaction);
         $this->history->outcome($chatId, $user, 'Deleted: ' . $remembered);
+        $this->editor->closeFor($chatId, $transactionId);
         $this->answer($queryId, ['ok' => 1]);
     }
 
@@ -253,7 +268,10 @@ class WidgetQueryHandler
         $this->sync->refreshRecurring($user);
     }
 
-    private function handleNotifications(User $user, int|string $chatId, string $queryId, bool $muted): void
+    /**
+     * m: mute everything (1 = muted), r: recurring reminders, p: pinned month summary.
+     */
+    private function handleNotifications(User $user, int|string $chatId, string $queryId, string $switch, bool $on): void
     {
         $identity = $this->sender->identityFor($user, $chatId);
 
@@ -263,8 +281,14 @@ class WidgetQueryHandler
             return;
         }
 
-        $identity->update(['meta' => [...($identity->meta ?? []), 'muted' => $muted]]);
-        $this->answer($queryId, ['ok' => 1, 'm' => $muted ? 1 : 0]);
+        match ($switch) {
+            'm' => $identity->update(['meta' => [...($identity->meta ?? []), 'muted' => $on]]),
+            'r' => $identity->update(['meta' => [...($identity->meta ?? []), 'remind_off' => !$on]]),
+            'p' => $on ? $this->pinned->enable($user, $identity) : $this->pinned->disable($identity),
+        };
+
+        $state = json_decode($this->data->notifications($identity->fresh() ?? $identity)['chat_data'], true);
+        $this->answer($queryId, ['ok' => 1] + (is_array($state) ? $state : []));
         $this->sync->refreshNotifications($user);
     }
 

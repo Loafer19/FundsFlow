@@ -20,7 +20,7 @@ use App\Support\TelegramAiQuota;
 final class TelegramAgentChannel implements AgentChannel
 {
     /** What still works in the bot without AI (quota exhausted). */
-    public const WITHOUT_AI = 'Until then, quick-add like -350 groceries and the menu buttons still work.';
+    public const WITHOUT_AI = 'Until then, tap ➕ Add (or send /add) to log transactions without AI; the menu buttons still work.';
 
     public function __construct(
         private readonly TelegramAiQuota $quota,
@@ -72,6 +72,13 @@ final class TelegramAgentChannel implements AgentChannel
         $lastList = $session['last_list'] ?? [];
         $lastListJson = json_encode(array_slice(is_array($lastList) ? $lastList : [], 0, 30), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $lastListJson = is_string($lastListJson) ? $lastListJson : '[]';
+        // Tag titles up front, so logging "350 groceries" needs no list_tags round trip.
+        $tagTitles = mb_strimwidth(
+            $user->tags()->orderBy('title')->limit(120)->pluck('title')->implode(', '),
+            0,
+            1500,
+            '…',
+        );
 
         return <<<PROMPT
 You are the FundsFlow personal finance assistant inside Telegram.
@@ -79,6 +86,7 @@ Today (user timezone {$tz}) is {$today}.
 Session domain: {$domain}
 Last bot summary: {$summary}
 last_list (ids are authoritative; never invent ids): {$lastListJson}
+Existing tag titles: {$tagTitles}
 
 Rules:
 - Use tools for ANY numbers, balances, lists, budgets, or ids. Never invent amounts, tag ids, transaction ids, or budget figures.
@@ -96,7 +104,7 @@ Rules:
 - For "send me a report / PDF / звіт" call send_report with the period (and tag_ids if they named tags); it sends the PDF itself; then stop.
 - Mutations (create/update/delete money objects or tags) MUST go through create_*/update_*/delete_*/rename_tags tools which only stage a Confirm UI. Never claim a write succeeded before confirmation.
 - If you need a missing detail, call ask_user (optional English suggestions). Then stop.
-- Quick-add like "-350 groceries" is handled outside you; focus on questions, analysis, lists, and proposed mutations.
+- Logging money: every plain message like "350 groceries", "кава 80 вчора", "+15000 salary" or "20.08 -350 groceries" (also from voice notes) comes to you. Call log_transaction once (no Confirm; the saved card has Edit and Delete). No sign = expense; "+" or income words = income; a leading DD.MM[.YYYY] or "yesterday"/"вчора" sets the date (this year if no year, never a future date). Pass tag_titles only for tags you know exist (list_tags if unsure is optional; unknown titles are ignored). Then stop without extra text.
 - Cap: tools already limit list sizes. Do not dump huge raw JSON to the user; summarize.
 - Formatting: light Markdown is rendered — **bold**, *italic*, `code`, short "- " bullet lists, [links](https://…). No tables, no # headings, no HTML. Keep answers short; never write more than ~3000 characters.
 - Earlier turns tagged [via web] happened in the FundsFlow web assistant; the user may continue them here. A "Proposed change … via web" can only be confirmed in the web chat: to do it here, propose it again with the tool.

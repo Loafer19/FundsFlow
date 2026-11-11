@@ -6,8 +6,8 @@ description: Send voice notes to the FundsFlow bot instead of typing.
 Send a **voice note** (or an audio file) to the bot. It is transcribed with speech-to-text, and the transcript is
 handled exactly like a typed message:
 
-- a quick add such as “minus three hundred fifty groceries” → transcribed and saved if it matches the
-  [quick add](/docs/telegram/quick-add/) format, otherwise passed to the [AI assistant](/docs/telegram/ai-assistant/);
+- a transaction such as “three hundred fifty for groceries yesterday” → the [AI assistant](/docs/telegram/ai-assistant/)
+  saves it (see [Adding transactions](/docs/telegram/quick-add/));
 - commands and questions (“show my budgets”, “month summary”).
 
 What you'll see:

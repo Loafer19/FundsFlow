@@ -6,6 +6,7 @@ use App\Actions\Budgets\CalculateGoalProgressAction;
 use App\Actions\Budgets\CalculateLimitStatusAction;
 use App\Actions\Budgets\ListBudgetsAction;
 use App\Channels\Telegram\TelegramClient;
+use App\Channels\Telegram\Widgets\TelegramWidgetSender;
 use App\Models\BudgetPeriod;
 use App\Models\Transaction;
 use App\Models\User;
@@ -21,6 +22,7 @@ class SendWeeklyDigestAction
         private readonly ListBudgetsAction $listBudgets,
         private readonly CalculateLimitStatusAction $limitStatus,
         private readonly CalculateGoalProgressAction $goalProgress,
+        private readonly TelegramWidgetSender $widgets,
     ) {}
 
     public function execute(): void
@@ -48,12 +50,23 @@ class SendWeeklyDigestAction
 
             $previous = $this->summarize($user, $previousStart, $previousEnd);
 
+            $keyboard = ['inline_keyboard' => [[
+                ['text' => '📊 Month', 'callback_data' => 'menu:month'],
+                ['text' => '💰 Budgets', 'callback_data' => 'menu:budgets'],
+            ]]];
+
+            // Widget with stat cards and budget bars; the text digest if the widget can't be sent.
+            if ($this->widgets->sendReport($identity->external_id, $this->report($user, $start, $end, $current, $previous), $keyboard)) {
+                continue;
+            }
+
             $message = $this->formatMessage($user, $start, $end, $current, $previous);
             $budgets = $this->budgetLines($user);
 
             $this->client->sendMessage(
                 $identity->external_id,
                 $budgets === [] ? $message : $message . "\n\n" . implode("\n", $budgets),
+                $keyboard,
             );
         }
     }
@@ -114,6 +127,94 @@ class SendWeeklyDigestAction
         }
 
         return $lines;
+    }
+
+    /**
+     * report.html state: income / expenses / net cards, top tag and change vs the week before,
+     * then limits and goals as bars.
+     *
+     * @param array{count: int, income: float, expenses: float, top: ?array{tag: object, amount: float}} $current
+     * @param array{count: int, income: float, expenses: float, top: ?array{tag: object, amount: float}} $previous
+     * @return array<string, mixed>
+     */
+    public function report(User $user, Carbon $start, Carbon $end, array $current, array $previous): array
+    {
+        $money = fn (float $v): string => UserFormatter::formatMoney($user, $v);
+        $net = $current['income'] - $current['expenses'];
+        $lines = [];
+
+        if ($current['top']) {
+            $tag = $current['top']['tag'];
+            $lines[] = 'Top: ' . trim($tag->emoji . ' ' . $tag->title) . ' ' . $money(-$current['top']['amount']);
+        }
+
+        $countLine = $current['count'] . ' transaction' . ($current['count'] === 1 ? '' : 's');
+
+        if ($previous['count'] > 0) {
+            $delta = $current['expenses'] - $previous['expenses'];
+
+            if (abs($delta) >= 0.01) {
+                $countLine .= ' · spent ' . $money(abs($delta)) . ($delta > 0 ? ' more' : ' less') . ' than the week before';
+            }
+        }
+        $lines[] = $countLine;
+
+        $limits = [];
+        $goals = [];
+
+        foreach ($this->listBudgets->execute($user) as $budget) {
+            $period = $budget->periods->first(fn (BudgetPeriod $p) => $p->ends_at === null);
+
+            if (!$period) {
+                continue;
+            }
+
+            $label = $budget->label($period);
+
+            if ($budget->isGoal()) {
+                $g = $this->goalProgress->execute($budget, $user);
+                $goals[] = [$label, (int) $g['percent'], $money($g['saved']) . ' / ' . $money($g['target']), '', GoalSummary::statusLabel($g['status'])];
+
+                continue;
+            }
+
+            $st = $this->limitStatus->execute($period, $user);
+            $limits[] = [
+                $label,
+                (int) $st['percent'],
+                $money($st['spent']) . ' / ' . $money($st['limit']),
+                match ($st['status']) {
+                    'over' => 'ov',
+                    'at_risk' => 'ar',
+                    default => '',
+                },
+                $st['status'] === 'over'
+                    ? ($st['left'] < 0 ? 'over by ' . $money(-$st['left']) : 'limit reached')
+                    : ($st['days_left'] === 1 ? 'last day' : $st['days_left'] . ' days left'),
+            ];
+        }
+
+        $groups = [];
+
+        if ($limits !== []) {
+            $groups[] = ['💰 Limits', $limits];
+        }
+
+        if ($goals !== []) {
+            $groups[] = ['🎯 Goals', $goals];
+        }
+
+        return [
+            'h' => '📬 Weekly digest',
+            's' => $start->format('d.m') . ' – ' . UserFormatter::formatDate($user, $end),
+            'k' => [
+                ['Income', '+' . $money($current['income']), 'pos'],
+                ['Expenses', $money(-$current['expenses']), 'neg'],
+                ['Net', ($net > 0 ? '+' : '') . $money($net), $net < 0 ? 'neg' : ($net > 0 ? 'pos' : '')],
+            ],
+            'l' => $lines,
+            'g' => $groups,
+        ];
     }
 
     /**

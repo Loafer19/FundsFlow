@@ -27,7 +27,7 @@ class AuthHandler
         $payload = trim(substr(trim($message['text']), strlen('/start')));
 
         if ($this->support->resolveUser($chatId)) {
-            $this->support->sendWelcome($chatId, "You're already linked to your FundsFlow account");
+            $this->support->sendWelcome($chatId, "👋 You're all set, this chat is linked to your FundsFlow account");
 
             return;
         }
@@ -128,7 +128,7 @@ class AuthHandler
             'meta' => $meta,
         ]);
 
-        $this->support->sendWelcome($chatId, '✅ Account created');
+        $this->support->sendWelcome($chatId, '👋 Welcome to FundsFlow, your account is ready', newAccount: true);
     }
 
     public function sendWebsiteLoginCode(User $user, int|string $chatId): void

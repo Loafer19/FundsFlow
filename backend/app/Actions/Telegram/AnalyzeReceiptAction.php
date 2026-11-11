@@ -46,7 +46,7 @@ class AnalyzeReceiptAction
         $dataUrl = 'data:' . $mime . ';base64,' . base64_encode($imageBytes);
         $today = $user->todayDateString();
         $hint = $captionHint !== null && trim($captionHint) !== ''
-            ? "\nUser caption hint (may lack amount): " . trim($captionHint)
+            ? "\nUser caption (authoritative where it says something): " . trim($captionHint)
             : '';
 
         $system = <<<'PROMPT'
@@ -70,6 +70,10 @@ Rules:
 - note: short merchant/place or description, max ~80 chars, no currency symbols required.
 - suggested_tag_titles: 0–3 short English tag names that fit (e.g. "Food", "Transport", "Groceries").
 - category: coarse label like food, groceries, transport, utilities, health, shopping, entertainment, other — or null.
+- User caption: when the user's caption gives an amount ("350 groceries", "-350", "+500 refund", "кава 80"), use it as
+  the amount (no sign = expense, negative; "+" or income words = positive) even if the image shows a different total,
+  and set needs_price false. A leading DD.MM or DD.MM.YYYY (this year if no year) or "yesterday"/"вчора" in the caption
+  sets at. Words in the caption describe the purchase: prefer them for note and suggested_tag_titles.
 - needs_price: true when amount is null OR the image is food/unclear and the user must type the price. Never invent a total.
 - confidence: 0–1 how sure you are about the amount (null if needs_price).
 - is_transaction_list: true when the image is NOT one receipt but a list of several operations (a banking app's

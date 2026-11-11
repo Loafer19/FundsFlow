@@ -9,6 +9,7 @@ use App\Actions\Agent\Documents\ImportTransactionsAction;
 use App\Actions\Charts\BuildUserChartAction;
 use App\Actions\Charts\ScreenshotHtmlViaGotenbergAction;
 use App\Actions\Report\RenderReportPdfAction;
+use App\Actions\Tags\MatchTagTitlesAction;
 use App\Channels\Telegram\Handlers\MenuHandler;
 use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
@@ -33,6 +34,9 @@ class TelegramAgentToolExecutor
 
     public const MAX_TRANSACTIONS_PAGE = AgentToolExecutor::MAX_TRANSACTIONS_PAGE;
 
+    /** Agent actions whose confirm card uses the transaction card layout. */
+    public const TRANSACTION_ACTIONS = ['create_transaction', 'update_transaction', 'delete_transaction'];
+
     public function __construct(
         private readonly TelegramClient $client,
         private readonly TelegramSupport $support,
@@ -42,6 +46,7 @@ class TelegramAgentToolExecutor
         private readonly BuildUserChartAction $buildChart,
         private readonly ScreenshotHtmlViaGotenbergAction $screenshot,
         private readonly RenderReportPdfAction $renderReport,
+        private readonly MatchTagTitlesAction $matchTags,
     ) {}
 
     /**
@@ -104,6 +109,16 @@ class TelegramAgentToolExecutor
             $this->tools->definition('ask_user'),
             $this->tools->definition('create_tags'),
             $this->tools->definition('rename_tags'),
+            $fn('log_transaction', 'Save ONE transaction the user is plainly logging right now and send the saved card (it has Edit and Delete buttons, so no Confirm step). Use it for messages like "350 groceries", "кава 80", "-40 taxi yesterday", "+15000 salary", "20.08 -350 groceries". A bare number or no sign is an expense; "+", "salary", "income", "отримав", "refund" etc. make it income. A leading DD.MM or DD.MM.YYYY, or words like yesterday/вчора, set the date. If the amount or direction is unclear, call ask_user instead; for several transactions at once, or edits/deletes, use the Confirm tools.', [
+                'type' => 'object',
+                'properties' => [
+                    'amount' => ['type' => 'number', 'description' => 'Signed: negative = expense, positive = income'],
+                    'at' => ['type' => 'string', 'description' => 'YYYY-MM-DD; default today; not in the future'],
+                    'note' => ['type' => 'string', 'description' => "Short note in the user's words, without the amount and date"],
+                    'tag_titles' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Existing tag titles that fit (matched case-insensitively; unknown titles are ignored, nothing is created). Omit if unsure'],
+                ],
+                'required' => ['amount'],
+            ]),
             $this->tools->definition('create_transaction'),
             $this->tools->definition('update_transaction'),
             $this->tools->definition('delete_transaction'),
@@ -194,9 +209,10 @@ class TelegramAgentToolExecutor
                 'ask_user' => AgentToolExecutor::askStop($this->doAskUser($chatId, $session, $arguments)),
                 'create_tags' => AgentToolExecutor::confirmStop($this->stageCreateTags($user, $chatId, $identity, $arguments)),
                 'rename_tags' => AgentToolExecutor::confirmStop($this->stageRenameTags($user, $chatId, $identity, $session, $arguments)),
-                'create_transaction' => AgentToolExecutor::confirmStop($this->stageMutation($identity, $chatId, 'create_transaction', $this->tools->prepareCreateTransaction($user, $arguments))),
-                'update_transaction' => AgentToolExecutor::confirmStop($this->stageMutation($identity, $chatId, 'update_transaction', $this->tools->prepareUpdateTransaction($user, $arguments))),
-                'delete_transaction' => AgentToolExecutor::confirmStop($this->stageMutation($identity, $chatId, 'delete_transaction', $this->tools->prepareDeleteTransaction($user, $arguments))),
+                'log_transaction' => AgentToolExecutor::uiStop($this->doLogTransaction($user, $chatId, $identity, $arguments)),
+                'create_transaction' => AgentToolExecutor::confirmStop($this->stageMutation($identity, $chatId, 'create_transaction', user: $user, prepared: $this->tools->prepareCreateTransaction($user, $arguments))),
+                'update_transaction' => AgentToolExecutor::confirmStop($this->stageMutation($identity, $chatId, 'update_transaction', user: $user, prepared: $this->tools->prepareUpdateTransaction($user, $arguments))),
+                'delete_transaction' => AgentToolExecutor::confirmStop($this->stageMutation($identity, $chatId, 'delete_transaction', user: $user, prepared: $this->tools->prepareDeleteTransaction($user, $arguments))),
                 'create_budget' => AgentToolExecutor::confirmStop($this->stageMutation($identity, $chatId, 'create_budget', $this->tools->prepareCreateBudget($user, $arguments))),
                 'get_import_preview', 'list_import_categories', 'set_import_category', 'apply_import_rules', 'update_import_row', 'commit_import', 'undo_import' => $this->runImportTool($user, $name, $arguments),
                 default => AgentToolExecutor::fail("Unknown tool: {$name}"),
@@ -231,16 +247,16 @@ class TelegramAgentToolExecutor
      *
      * @param array<string, mixed> $pending
      */
-    public function applyAgentMutation(User $user, int|string $chatId, int|string $identity, array $pending): bool
+    public function applyAgentMutation(User $user, int|string $chatId, int|string $identity, array $pending, ?int $messageId = null): bool
     {
         $action = (string) ($pending['action'] ?? '');
         $payload = is_array($pending['payload'] ?? null) ? $pending['payload'] : [];
 
         try {
             match ($action) {
-                'create_transaction' => $this->applyCreateTransaction($user, $chatId, $identity, $payload),
-                'update_transaction' => $this->applyUpdateTransaction($user, $chatId, $identity, $payload),
-                'delete_transaction' => $this->applyDeleteTransaction($user, $chatId, $identity, $payload),
+                'create_transaction' => $this->applyCreateTransaction($user, $chatId, $identity, $payload, $messageId),
+                'update_transaction' => $this->applyUpdateTransaction($user, $chatId, $identity, $payload, $messageId),
+                'delete_transaction' => $this->applyDeleteTransaction($user, $chatId, $identity, $payload, $messageId),
                 'create_budget' => $this->applyCreateBudget($user, $chatId, $identity, $payload),
                 'import_transactions' => $this->applyImport($user, $chatId, $identity, $payload),
                 default => AgentPlanningTools::isStaging($action)
@@ -488,7 +504,7 @@ class TelegramAgentToolExecutor
      * @param array{payload: array<string, mixed>, preview: string} $prepared
      * @return array<string, mixed>
      */
-    private function stageMutation(int|string $identity, int|string $chatId, string $action, array $prepared): array
+    private function stageMutation(int|string $identity, int|string $chatId, string $action, array $prepared, ?User $user = null): array
     {
         // One slot per chat: a newer preview replaces this one, and the nonce
         // makes the older preview's buttons answer "outdated" instead of
@@ -501,11 +517,25 @@ class TelegramAgentToolExecutor
             'preview' => $prepared['preview'],
             'nonce' => $nonce,
         ]);
-        $this->client->sendMessage(
-            $chatId,
-            $prepared['preview'] . "\n\nApply this change?",
-            $this->support->nlAgentConfirmKeyboard($nonce),
-        );
+
+        if ($user && in_array($action, self::TRANSACTION_ACTIONS, true)) {
+            // Same card as ✅ Saved; an update shows what changes (old struck out → new).
+            $before = isset($prepared['payload']['id'])
+                ? $this->support->findOwnTransaction($user, (int) $prepared['payload']['id'])
+                : null;
+            $this->client->sendMessage(
+                $chatId,
+                $this->support->formatAgentPreviewCard($user, $action, $prepared['payload'], $before),
+                $this->support->nlAgentConfirmKeyboard($nonce, delete: $action === 'delete_transaction'),
+                TelegramSupport::PARSE_HTML,
+            );
+        } else {
+            $this->client->sendMessage(
+                $chatId,
+                $prepared['preview'] . "\n\nApply this change?",
+                $this->support->nlAgentConfirmKeyboard($nonce),
+            );
+        }
         $this->session->setSummary($identity, $chatId, 'Agent mutation preview shown.');
 
         return ['staged' => true, 'payload' => $prepared['payload']];
@@ -528,18 +558,45 @@ class TelegramAgentToolExecutor
     /**
      * @param array<string, mixed> $payload
      */
-    private function applyCreateTransaction(User $user, int|string $chatId, int|string $identity, array $payload): void
+    /**
+     * Instant save for a plainly logged transaction (what the old "-350 groceries" quick-add did),
+     * with tags matched by title. The saved card carries Edit and Delete.
+     *
+     * @param array<string, mixed> $args
+     * @return array<string, mixed>
+     */
+    private function doLogTransaction(User $user, int|string $chatId, int|string $identity, array $args): array
+    {
+        $titles = is_array($args['tag_titles'] ?? null) ? $args['tag_titles'] : [];
+        $args['tag_ids'] = array_values(array_unique([
+            ...(is_array($args['tag_ids'] ?? null) ? $args['tag_ids'] : []),
+            ...$this->matchTags->ids($user, $titles),
+        ]));
+
+        if (isset($args['at']) && is_string($args['at']) && $args['at'] > $user->todayDateString()) {
+            throw new \InvalidArgumentException('date is in the future');
+        }
+
+        $prepared = $this->tools->prepareCreateTransaction($user, $args);
+        $tx = $this->tools->applyCreateTransaction($user, $prepared['payload'], TransactionSource::Telegram);
+        $this->session->setSummary($identity, $chatId, 'Transaction saved: ' . str_replace("\n", ' · ', $prepared['preview']));
+        $this->support->sendSavedTransaction($chatId, $user, $tx, '✅ Saved', undo: true);
+
+        return ['ui' => 'transaction_saved', 'sent' => true, 'id' => (int) $tx->id];
+    }
+
+    private function applyCreateTransaction(User $user, int|string $chatId, int|string $identity, array $payload, ?int $messageId = null): void
     {
         $tx = $this->tools->applyCreateTransaction($user, $payload, TransactionSource::Telegram);
 
         $this->session->setSummary($identity, $chatId, 'Transaction created via agent confirm.');
-        $this->support->sendSavedTransaction($chatId, $user, $tx, '✅ Saved');
+        $this->support->sendSavedTransaction($chatId, $user, $tx, '✅ Saved', editMessageId: $messageId, undo: true);
     }
 
     /**
      * @param array<string, mixed> $payload
      */
-    private function applyUpdateTransaction(User $user, int|string $chatId, int|string $identity, array $payload): void
+    private function applyUpdateTransaction(User $user, int|string $chatId, int|string $identity, array $payload, ?int $messageId = null): void
     {
         $tx = $this->tools->applyUpdateTransaction($user, $payload);
         if (!$tx) {
@@ -549,22 +606,30 @@ class TelegramAgentToolExecutor
         }
 
         $this->session->setSummary($identity, $chatId, 'Transaction updated via agent confirm.');
-        $this->support->sendSavedTransaction($chatId, $user, $tx, '✅ Updated');
+        $this->support->sendSavedTransaction($chatId, $user, $tx->load(['tags', 'attachments']), '✅ Updated', editMessageId: $messageId);
     }
 
     /**
      * @param array<string, mixed> $payload
      */
-    private function applyDeleteTransaction(User $user, int|string $chatId, int|string $identity, array $payload): void
+    private function applyDeleteTransaction(User $user, int|string $chatId, int|string $identity, array $payload, ?int $messageId = null): void
     {
+        $before = $this->support->findOwnTransaction($user, (int) ($payload['id'] ?? 0));
+
         if (!$this->tools->applyDeleteTransaction($user, $payload)) {
-            $this->client->sendMessage($chatId, 'That transaction no longer exists.');
+            $this->client->sendMessage($chatId, 'That transaction no longer exists');
 
             return;
         }
 
         $this->session->setSummary($identity, $chatId, 'Transaction deleted via agent confirm.');
-        $this->client->sendMessage($chatId, '✅ Transaction deleted.');
+        $text = $before ? $this->support->formatTransactionCard($user, $before, '🗑 Deleted') : '🗑 Deleted';
+
+        if ($messageId !== null) {
+            $this->client->editMessageText($chatId, $messageId, $text, null, TelegramSupport::PARSE_HTML);
+        } else {
+            $this->client->sendMessage($chatId, $text, null, TelegramSupport::PARSE_HTML);
+        }
     }
 
     /**

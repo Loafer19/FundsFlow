@@ -402,7 +402,7 @@ class MenuHandler
         $this->client->sendMessage(
             $chatId,
             'Quick add works as an interactive widget in a private chat with the bot. '
-            . 'Here, send a message like -350 groceries or +15000 salary.',
+            . 'Here, just write it, like 350 groceries or +15000 salary.',
         );
     }
 

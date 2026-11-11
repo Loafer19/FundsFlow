@@ -248,6 +248,21 @@ class TelegramClient
         return is_array($json) ? $json : ['ok' => false, 'error_code' => $response->status()];
     }
 
+    public function pinChatMessage(int|string $chatId, int $messageId): bool
+    {
+        return $this->postOk('pinChatMessage', ['chat_id' => $chatId, 'message_id' => $messageId, 'disable_notification' => true]);
+    }
+
+    public function unpinChatMessage(int|string $chatId, int $messageId): bool
+    {
+        return $this->postOk('unpinChatMessage', ['chat_id' => $chatId, 'message_id' => $messageId]);
+    }
+
+    public function deleteMessage(int|string $chatId, int $messageId): bool
+    {
+        return $this->postOk('deleteMessage', ['chat_id' => $chatId, 'message_id' => $messageId]);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -324,6 +339,18 @@ class TelegramClient
             'chat_id' => $chatId,
             'menu_button' => json_encode($menuButton),
         ], static fn ($value) => $value !== null))->json();
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function postOk(string $method, array $payload): bool
+    {
+        try {
+            return (bool) (Http::post($this->baseUrl . $method, $payload)->json('ok') ?? false);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**

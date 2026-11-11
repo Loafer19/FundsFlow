@@ -2,6 +2,7 @@
 
 namespace App\Channels\Telegram\Widgets;
 
+use App\Channels\Telegram\PinnedMonthSummary;
 use App\Models\Identity;
 use App\Models\User;
 use Throwable;
@@ -19,6 +20,7 @@ class TelegramWidgetSync
     public function refresh(User $user): void
     {
         $this->refreshKind($user, TelegramWidgetData::KIND_SUMMARY, fn () => $this->data->summary($user)['chat_data']);
+        $this->refreshPinned($user);
         $this->refreshKind($user, TelegramWidgetData::KIND_BUDGETS, fn () => $this->data->budgets($user)['chat_data']);
         $this->refreshKind($user, TelegramWidgetData::KIND_ADD, function () use ($user): string {
             $refs = $this->sender->stored($user, TelegramWidgetData::KIND_ADD);
@@ -29,6 +31,27 @@ class TelegramWidgetSync
         $this->refreshKind($user, TelegramWidgetData::KIND_RECENT, fn () => $this->data->recent($user)['chat_data']);
         $this->refreshTags($user);
         $this->refreshRecurring($user);
+    }
+
+    /**
+     * The pinned month summary, only while it still shows the current month (rollover re-pins).
+     */
+    public function refreshPinned(User $user): void
+    {
+        $refs = array_values(array_filter(
+            $this->sender->stored($user, TelegramWidgetData::KIND_SUMMARY_PIN),
+            fn (array $ref): bool => app(PinnedMonthSummary::class)->isCurrent($ref['identity']->setRelation('user', $user)),
+        ));
+
+        if ($refs === []) {
+            return;
+        }
+
+        $payload = $this->data->summary($user)['chat_data'];
+
+        foreach ($refs as $ref) {
+            $this->editRef($ref, TelegramWidgetData::KIND_SUMMARY_PIN, $payload);
+        }
     }
 
     public function refreshTags(User $user): void

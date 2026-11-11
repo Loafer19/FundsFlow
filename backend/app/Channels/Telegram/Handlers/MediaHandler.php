@@ -9,6 +9,7 @@ use App\Actions\Transactions\CreateTransactionAction;
 use App\Actions\Transactions\StoreTransactionAttachmentAction;
 use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
+use App\Channels\Telegram\TelegramEditor;
 use App\Channels\Telegram\TelegramHistory;
 use App\Channels\Telegram\TelegramSupport;
 use App\Enums\TransactionSource;
@@ -26,6 +27,9 @@ class MediaHandler
     /** Whose pending slot the current message uses (see identity()). */
     private int|string|null $currentIdentity = null;
 
+    /** "Reading receipt…" of the photo being read; the draft (or the error) replaces it. */
+    private ?int $statusMessageId = null;
+
     public function __construct(
         private readonly TelegramClient $client,
         private readonly TelegramSupport $support,
@@ -35,6 +39,7 @@ class MediaHandler
         private readonly TelegramHistory $history,
         private readonly DocumentImport $documents,
         private readonly TelegramChatSession $session,
+        private readonly TelegramEditor $editor,
     ) {}
 
     /**
@@ -92,37 +97,13 @@ class MediaHandler
         }
 
         // "statement" / "виписка" with a screenshot: a transaction list, not a receipt.
-        if (!isset($message['document']) && DocumentImport::isListCaption($caption) && !$this->quickAddWorks($caption, $user)) {
+        if (!isset($message['document']) && DocumentImport::isListCaption($caption)) {
             $this->readScreenshots($user, $chatId, $this->identity($message, $chatId), [$file], $caption);
 
             return;
         }
 
-        // Caption with parseable amount → instant create (no AI).
-        if ($caption !== '') {
-            $parsed = $this->support->parseQuickAdd($caption, $user);
-
-            if ($parsed !== null && !isset($parsed['error'])) {
-                $this->createTransactionWithAttachments(
-                    $user,
-                    $chatId,
-                    $parsed['at'],
-                    $parsed['amount'],
-                    $parsed['note'],
-                    [$file],
-                );
-
-                return;
-            }
-
-            if ($parsed !== null && isset($parsed['error'])) {
-                $this->client->sendMessage($chatId, $parsed['error']);
-
-                return;
-            }
-            // Caption without amount → continue to AI / fallback below.
-        }
-
+        // The caption (amount, date, words) goes to the receipt AI with the image; no text parsing here.
         $this->handleReceiptWithoutAmount($user, $chatId, $file, $caption !== '' ? $caption : null);
     }
 
@@ -149,7 +130,6 @@ class MediaHandler
                 'chat_id' => $chatId,
                 'user_id' => $user->id,
                 'files' => [],
-                'caption_parsed' => null,
                 'caption_hint' => null,
             ];
         }
@@ -169,13 +149,6 @@ class MediaHandler
             if ($buffer['caption_hint'] === null) {
                 $buffer['caption_hint'] = $caption;
             }
-
-            if ($buffer['caption_parsed'] === null) {
-                $parsed = $this->support->parseQuickAdd($caption, $user);
-                if ($parsed !== null && !isset($parsed['error'])) {
-                    $buffer['caption_parsed'] = $parsed;
-                }
-            }
         }
 
         Cache::put($bufferKey, $buffer, now()->addSeconds((int) config('telegram.album.collect_ttl_seconds')));
@@ -188,13 +161,6 @@ class MediaHandler
         sleep((int) config('telegram.album.debounce_seconds'));
 
         $this->promptAlbumChoice($user, $chatId, $groupId, $this->identity($message, $chatId));
-    }
-
-    private function quickAddWorks(string $caption, User $user): bool
-    {
-        $parsed = $caption !== '' ? $this->support->parseQuickAdd($caption, $user) : null;
-
-        return is_array($parsed) && !isset($parsed['error']);
     }
 
     private function promptAlbumChoice(User $user, int|string $chatId, string $groupId, int|string|null $identity = null): void
@@ -223,27 +189,13 @@ class MediaHandler
                 ? $buffer['caption_hint']
                 : null;
 
-            if (isset($buffer['caption_parsed']) && is_array($buffer['caption_parsed'])) {
-                $parsed = $buffer['caption_parsed'];
-                $this->createTransactionWithAttachments(
-                    $user,
-                    $chatId,
-                    $parsed['at'],
-                    $parsed['amount'],
-                    $parsed['note'],
-                    [$file],
-                );
-
-                return;
-            }
-
             $this->handleReceiptWithoutAmount($user, $chatId, $file, $hint);
 
             return;
         }
 
         // "statement" / "виписка" in the caption: screenshots of a transaction list, no question.
-        if (!is_array($buffer['caption_parsed'] ?? null) && DocumentImport::isListCaption($caption)) {
+        if (DocumentImport::isListCaption($caption)) {
             Cache::forget($bufferKey);
             $this->readScreenshots($user, $chatId, $identity ?? $chatId, $files, $caption);
 
@@ -335,21 +287,6 @@ class MediaHandler
         }
 
         $files = array_slice($files, 0, TransactionAttachmentRules::MAX_PER_TRANSACTION);
-
-        // Caption amount on album + One → skip AI, create with all attachments.
-        if (isset($buffer['caption_parsed']) && is_array($buffer['caption_parsed'])) {
-            $parsed = $buffer['caption_parsed'];
-            $this->createTransactionWithAttachments(
-                $user,
-                $chatId,
-                $parsed['at'],
-                $parsed['amount'],
-                $parsed['note'],
-                $files,
-            );
-
-            return;
-        }
 
         $primary = $this->pickBestAlbumFile($files);
         $hint = isset($buffer['caption_hint']) && is_string($buffer['caption_hint'])
@@ -468,14 +405,32 @@ class MediaHandler
             return;
         }
 
-        $this->client->sendMessage($chatId, 'Reading receipt…');
+        $status = $this->client->sendMessageResult($chatId, 'Reading receipt…');
+        $this->statusMessageId = is_int($status['result']['message_id'] ?? null) ? $status['result']['message_id'] : null;
 
+        try {
+            $this->readReceipt($user, $chatId, $file, $captionHint, $attachmentFiles, $albumPhoto);
+        } finally {
+            // Whatever came out (an import preview, a download error) is its own message.
+            if ($this->statusMessageId !== null) {
+                $this->client->deleteMessage($chatId, $this->statusMessageId);
+                $this->statusMessageId = null;
+            }
+        }
+    }
+
+    /**
+     * @param array{file_id: string, name: string, mime: string, file_size: int} $file
+     * @param list<array{file_id: string, name: string, mime: string, file_size?: int}> $attachmentFiles
+     */
+    private function readReceipt(User $user, int|string $chatId, array $file, ?string $captionHint, array $attachmentFiles, ?int $albumPhoto): void
+    {
         $downloaded = $this->downloadTelegramFile($chatId, $file, notify: $albumPhoto === null);
 
         if ($downloaded === null) {
             if ($albumPhoto !== null) {
                 // Otherwise the rest of the album would wait for a Confirm that never comes.
-                $this->client->sendMessage($chatId, "Photo {$albumPhoto} couldn't be read and was skipped. Send it again with the amount, like -350 groceries.");
+                $this->client->sendMessage($chatId, "Photo {$albumPhoto} couldn't be read and was skipped. Send it again, or tap ➕ Add");
                 $this->history->outcome($chatId, $user, "Receipt photo {$albumPhoto} skipped (couldn't be read).");
                 $this->continueAlbumQueue($user, $chatId);
             }
@@ -526,9 +481,9 @@ class MediaHandler
             Cache::forget($this->pendingKey($chatId));
             Cache::forget($this->awaitTextKey($chatId));
 
-            $this->client->sendMessage(
+            $this->replaceStatus(
                 $chatId,
-                "Couldn't read a clear total (e.g. food photo). Send the amount like -350, or pick a button.",
+                "Couldn't read a clear total (e.g. food photo). Send the amount, like 350, or pick a button",
                 $this->support->mediaAmountKeyboard(),
             );
 
@@ -588,7 +543,7 @@ class MediaHandler
                 $chatId,
                 $this->analyzeReceipt->quota()->exhaustedMessage(
                     $user,
-                    'Until then, pick an amount below or send it like -350 groceries.',
+                    'Until then, pick an amount below or send it, like 350',
                 ),
                 $this->support->mediaAmountKeyboard(),
             );
@@ -597,9 +552,9 @@ class MediaHandler
         }
 
         if ($aiFailed) {
-            $this->client->sendMessage(
+            $this->replaceStatus(
                 $chatId,
-                "Couldn't read that receipt automatically. Pick an amount or send like -350 groceries",
+                "Couldn't read that receipt automatically. Pick an amount or send it, like 350",
                 $this->support->mediaAmountKeyboard(),
             );
 
@@ -608,7 +563,7 @@ class MediaHandler
 
         $this->client->sendMessage(
             $chatId,
-            'Receipt received. Pick an amount or send like -350 groceries',
+            'Receipt received. Pick an amount or send it, like 350',
             $this->support->mediaAmountKeyboard(),
         );
     }
@@ -624,12 +579,12 @@ class MediaHandler
             return;
         }
 
-        $parsed = $this->support->parseQuickAdd($text, $user);
+        $parsed = $this->support->parseAmountReply($text, $user);
 
         if ($parsed === null) {
             $this->client->sendMessage(
                 $chatId,
-                'Send an amount like -350 groceries, or tap a button.',
+                'Send the amount, like 350 or 350 groceries, or tap a button',
                 $this->support->mediaAmountKeyboard(),
             );
 
@@ -724,12 +679,12 @@ class MediaHandler
             return;
         }
 
-        $parsed = $this->support->parseQuickAdd($text, $user);
+        $parsed = $this->support->parseAmountReply($text, $user);
 
         if ($parsed === null) {
             $this->client->sendMessage(
                 $chatId,
-                'Send an amount like -350 or -350 groceries',
+                'Send the amount, like 350 or 350 groceries',
                 $this->support->mediaAmountKeyboard(),
             );
 
@@ -755,7 +710,7 @@ class MediaHandler
         $this->showDraft($user, $chatId, $draft);
     }
 
-    public function confirmDraft(User $user, int|string $chatId, string $nonce): void
+    public function confirmDraft(User $user, int|string $chatId, string $nonce, ?int $messageId = null): void
     {
         $draft = $this->draftForCard($chatId, $nonce);
 
@@ -768,7 +723,7 @@ class MediaHandler
         if (($draft['awaiting_price'] ?? false) || ($draft['awaiting_edit_amount'] ?? false) || !isset($draft['amount']) || $draft['amount'] === null) {
             $this->client->sendMessage(
                 $chatId,
-                'Set an amount first (send like -350 or tap a button).',
+                'Set an amount first: send it, like 350, or tap a button',
                 $this->support->mediaAmountKeyboard(),
             );
 
@@ -783,7 +738,7 @@ class MediaHandler
             $this->putDraft($chatId, $draft);
             $this->client->sendMessage(
                 $chatId,
-                "Amount can't be zero. Send the amount like -350.",
+                "Amount can't be zero. Send the amount, like 350",
                 $this->support->mediaAmountKeyboard(),
             );
 
@@ -794,8 +749,12 @@ class MediaHandler
             return;
         }
 
-        $tagIds = $this->support->matchSuggestedTagIds($user, $draft['suggested_tag_titles'] ?? []);
+        // Tags picked in the editor win over the AI's suggested titles.
+        $tagIds = is_array($draft['tag_ids'] ?? null)
+            ? array_map('intval', $draft['tag_ids'])
+            : $this->support->matchSuggestedTagIds($user, $draft['suggested_tag_titles'] ?? []);
         $files = $this->filesFromPendingOrDraft($draft);
+        $this->editor->closeDraft($chatId, 'Receipt saved');
 
         $this->createTransactionWithAttachments(
             $user,
@@ -806,9 +765,43 @@ class MediaHandler
             $files,
             forgetPending: true,
             tags: $tagIds,
+            cardMessageId: $messageId,
         );
 
         $this->continueAlbumQueue($user, $chatId);
+    }
+
+    /**
+     * ✏️ Edit on a draft card in a private chat: the widget editor for the draft.
+     */
+    public function openDraftEditor(User $user, int|string $chatId, string $nonce, ?int $cardMessageId): void
+    {
+        $draft = $this->draftForCard($chatId, $nonce);
+
+        if ($draft === null) {
+            $this->client->sendMessage($chatId, self::OUTDATED_DRAFT);
+
+            return;
+        }
+
+        if (!$this->editor->openForDraft($user, $chatId, $draft, $cardMessageId)) {
+            $this->beginDraftAmountEdit($user, $chatId, $nonce);
+        }
+    }
+
+    public static function storedDraft(int|string $chatId): ?array
+    {
+        $draft = Cache::get("telegram_receipt_draft:{$chatId}");
+
+        return is_array($draft) ? $draft : null;
+    }
+
+    /**
+     * @param array<string, mixed> $draft
+     */
+    public static function storeDraft(int|string $chatId, array $draft): void
+    {
+        Cache::put("telegram_receipt_draft:{$chatId}", $draft, now()->addMinutes((int) config('telegram.pending_ttl_minutes')));
     }
 
     public function beginDraftAmountEdit(User $user, int|string $chatId, string $nonce): void
@@ -845,6 +838,7 @@ class MediaHandler
         }
 
         $this->cancelPendingMedia($chatId);
+        $this->editor->closeDraft($chatId, 'Receipt cancelled');
 
         return true;
     }
@@ -878,6 +872,7 @@ class MediaHandler
         array $files,
         bool $forgetPending = false,
         array $tags = [],
+        ?int $cardMessageId = null,
     ): void {
         $files = array_slice(array_values($files), 0, TransactionAttachmentRules::MAX_PER_TRANSACTION);
 
@@ -925,13 +920,13 @@ class MediaHandler
 
         if ($files === []) {
             // Read from a document that is not an attachment type (Word).
-            $this->support->sendSavedTransaction($chatId, $user, $transaction, '✅ Saved');
+            $this->support->sendSavedTransaction($chatId, $user, $transaction, '✅ Saved', editMessageId: $cardMessageId, undo: true);
 
             return;
         }
 
         if ($attached === 0) {
-            $this->support->sendSavedTransaction($chatId, $user, $transaction, '✅ Saved without file');
+            $this->support->sendSavedTransaction($chatId, $user, $transaction, '✅ Saved without file', editMessageId: $cardMessageId, undo: true);
             if ($lastError !== null) {
                 $this->client->sendMessage($chatId, $lastError);
             }
@@ -942,7 +937,8 @@ class MediaHandler
         $headline = $attached > 1
             ? "✅ Saved with {$attached} receipts"
             : '✅ Saved with receipt';
-        $this->support->sendSavedTransaction($chatId, $user, $transaction, $headline);
+        // The draft card turns into the saved card (no second message).
+        $this->support->sendSavedTransaction($chatId, $user, $transaction, $headline, editMessageId: $cardMessageId, undo: true);
 
         if ($lastError !== null) {
             $this->client->sendMessage($chatId, $lastError);
@@ -1077,7 +1073,26 @@ class MediaHandler
     {
         $draft['nonce'] = $this->support->newNonce();
         $this->putDraft($chatId, $draft);
-        $this->support->sendReceiptDraft($chatId, $user, $draft);
+        // A new card (new nonce) leaves an open editor pointing at nothing.
+        $this->editor->closeDraft($chatId, 'This draft changed. Tap ✏️ Edit on the new card');
+        // "Reading receipt…" becomes the draft card.
+        $this->support->sendReceiptDraft($chatId, $user, $draft, $this->statusMessageId);
+        $this->statusMessageId = null;
+    }
+
+    /**
+     * @param null|array<string, mixed> $keyboard
+     */
+    private function replaceStatus(int|string $chatId, string $text, ?array $keyboard = null): void
+    {
+        if ($this->statusMessageId !== null) {
+            $this->client->editMessageText($chatId, $this->statusMessageId, $text, $keyboard);
+            $this->statusMessageId = null;
+
+            return;
+        }
+
+        $this->client->sendMessage($chatId, $text, $keyboard);
     }
 
     /**
@@ -1177,15 +1192,6 @@ class MediaHandler
         $name = TransactionAttachmentRules::sanitizeOriginalName((string) ($document['file_name'] ?? 'document'));
         $this->history->input($chatId, $user, "Sent a file {$name}" . ($caption !== '' ? ": {$caption}" : ''));
 
-        $isPdf = ($document['mime_type'] ?? null) === 'application/pdf' || DocumentFile::extension($name) === 'pdf';
-
-        // A PDF receipt with the amount in the caption: saved at once with the file, no AI (as before).
-        if ($isPdf && $caption !== '' && $this->quickAddWorks($caption, $user) && $this->extractTelegramFile($message) !== null) {
-            $this->handleSingleMedia($user, $chatId, $message);
-
-            return;
-        }
-
         $loaded = $this->loadDocument($chatId, $document, true);
         if (is_string($loaded)) {
             if ($loaded !== '') {
@@ -1203,8 +1209,8 @@ class MediaHandler
             [['name' => $name, 'kind' => $kind, 'bytes' => $contents]],
             $caption !== '' ? $caption : null,
             $kind === DocumentFile::PDF
-                ? 'Until then, pick an amount below or send it like -350 groceries.'
-                : 'Until then, send the amount like -350 groceries, or a CSV with date and amount columns.',
+                ? 'Until then, pick an amount below or send it, like 350'
+                : 'Until then, tap ➕ Add to log it by hand, or send a CSV with date and amount columns',
         );
 
         if (in_array($result['type'], ['confirm', 'ask'], true)) {

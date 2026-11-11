@@ -2,7 +2,8 @@
 *{box-sizing:border-box}
 body{margin:0;padding:10px 12px 12px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color)}
 h3{margin:0 0 8px;font-size:1.05em;font-weight:650}
-.card{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px;border:0;border-radius:10px;background:var(--tg-theme-secondary-bg-color);color:inherit;font:inherit}
+.card{display:flex;align-items:center;gap:10px;width:100%;text-align:left;margin:0 0 6px;padding:10px;border:0;border-radius:10px;background:var(--tg-theme-secondary-bg-color);color:inherit;font:inherit}
+.card[disabled]{opacity:.5}
 .t{flex:1;min-width:0}
 .t b{display:block;font-weight:650}
 .t span{display:block;color:var(--tg-theme-hint-color);font-size:.8em;margin:2px 0 0}
@@ -10,35 +11,43 @@ h3{margin:0 0 8px;font-size:1.05em;font-weight:650}
 .sw:after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
 .on .sw{background:var(--tg-theme-button-color)}
 .on .sw:after{left:21px}
-ul{margin:10px 0 0;padding:0 0 0 18px;color:var(--tg-theme-hint-color);font-size:.85em}
-li{margin:2px 0}
 .err{color:var(--tg-theme-destructive-text-color);font-size:.85em;margin:8px 0 0}
 </style>
 <h3>Notifications</h3>
-<button type="button" class="card" id="c"><div class="t"><b id="s">—</b><span>In this chat</span></div><div class="sw"></div></button>
-<ul><li>Limit alerts at 80% and 100%</li><li>Savings goal updates</li><li>Weekly digest</li><li>Recurring and bank sync entries</li></ul>
+<div id="l"></div>
 <p class="err" id="e" hidden></p>
 <script>
 const W=window.TelegramWidget;
-let muted=false,busy=false;
+const R=[['m','Alerts and digest','Limits at 80% and 100%, goals, weekly digest, auto-added entries'],['r','Recurring reminders','A day before each payment, with Skip and Pause'],['p','Pinned month summary','Live /month pinned at the top of this chat']];
+let S={},busy='';
 function parse(s){try{return s?JSON.parse(s):null}catch(e){return null}}
+function on(k){return k==='m'?!S.m:!!S[k]}
 function show(err){
-  const c=document.getElementById('c');
-  c.className='card'+(muted?'':' on');
-  document.getElementById('s').textContent=busy?'Saving…':(muted?'Muted':'On');
+  const l=document.getElementById('l');l.innerHTML='';
+  R.forEach(function(r){
+    const b=document.createElement('button');b.type='button';b.className='card'+(on(r[0])?' on':'');
+    if(r[0]==='r'&&S.m)b.disabled=true;
+    const t=document.createElement('div');t.className='t';
+    const n=document.createElement('b');n.textContent=busy===r[0]?'Saving…':r[1];
+    const d=document.createElement('span');d.textContent=r[0]==='r'&&S.m?'Off while alerts are muted':r[2];
+    t.appendChild(n);t.appendChild(d);b.appendChild(t);
+    const sw=document.createElement('div');sw.className='sw';b.appendChild(sw);
+    b.addEventListener('click',function(){tap(r[0])});
+    l.appendChild(b);
+  });
   const e=document.getElementById('e');e.hidden=!err;e.textContent=err||'';
 }
-document.getElementById('c').addEventListener('click',function(){
+function tap(k){
   if(busy)return;
   if(!W||!W.request){show('Open this in Telegram');return}
-  const next=!muted;busy=true;show('');
-  W.request('n:'+(next?1:0)).then(function(a){
-    busy=false;const r=parse(a&&a.result);
-    if(r&&r.ok){muted=!!r.m;show('');return}
+  const next=k==='m'?(S.m?0:1):(S[k]?0:1);busy=k;show('');
+  W.request('n:'+k+':'+next).then(function(a){
+    busy='';const r=parse(a&&a.result);
+    if(r&&r.ok){S={m:r.m,r:r.r,p:r.p};show('');return}
     show((r&&r.e)||'Could not update');
-  },function(e){busy=false;show((e&&e.code)||'Could not update')});
-});
-function render(){const d=parse(W&&W.chatData)||{};muted=!!d.m;show('')}
+  },function(e){busy='';show((e&&e.code)||'Could not update')});
+}
+function render(){S=parse(W&&W.chatData)||{m:0,r:1,p:0};show('')}
 if(W&&W.onEvent)W.onEvent('chatDataChanged',render);
 if(W&&W.ready)W.ready();
 render();

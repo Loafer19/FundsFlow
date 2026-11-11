@@ -9,7 +9,7 @@ Open **Settings** (⚙️) from the header. It has seven tabs.
 
 - **Date** format, e.g. `YYYY/MM/DD`, `MM/DD/YYYY`, `DD/MM/YYYY`, `DD.MM.YYYY`, `DD.MM`, or long/short month names.
 - **Money** format: `1.234,56`, `1 234,56`, `1,234.56`, `1'234.56`, or `12,34,567.89`, and **Show decimals**.
-- **Timezone** — used for “today”, quick-add dates in Telegram, and the daily AI limit reset.
+- **Timezone** — used for “today”, dates of transactions you log in Telegram, and the daily AI limit reset.
 
 Click **Save** to apply.
 

@@ -38,6 +38,14 @@ class TelegramWidgetData
 
     public const KIND_NOTIFICATIONS = 'notifications';
 
+    /** The pinned month summary (summary.html, its own ref). */
+    public const KIND_SUMMARY_PIN = 'summary_pin';
+
+    public const KIND_EDIT = 'edit';
+
+    /** Budget alert and weekly digest (one template). */
+    public const KIND_REPORT = 'report';
+
     public const RECENT_PAGE = 8;
 
     public function __construct(
@@ -435,7 +443,84 @@ class TelegramWidgetData
      */
     public function notifications(Identity $identity): array
     {
-        return ['chat_data' => $this->json(['m' => ($identity->meta['muted'] ?? false) ? 1 : 0])];
+        $meta = $identity->meta ?? [];
+
+        return ['chat_data' => $this->json([
+            'm' => ($meta['muted'] ?? false) ? 1 : 0,
+            'r' => ($meta['remind_off'] ?? false) ? 0 : 1,
+            'p' => ($meta['pin'] ?? false) ? 1 : 0,
+        ])];
+    }
+
+    /**
+     * State of the transaction / receipt-draft editor (edit.html). k: t (transaction) or d
+     * (draft), a: signed amount, d / td: date and today as Ymd, n: note, s: selected tag ids,
+     * e / i: expense and income chips [id, label] (selected ones first), x: closed message.
+     *
+     * @param list<int> $tagIds
+     * @return array{chat_data: string}
+     */
+    public function editor(User $user, string $kind, float $amount, string $at, ?string $note, array $tagIds, ?string $closed = null): array
+    {
+        if ($closed !== null) {
+            return ['chat_data' => $this->json(['k' => $kind, 'x' => $closed])];
+        }
+
+        $tagIds = array_values(array_unique(array_map('intval', $tagIds)));
+        $selected = [];
+
+        if ($tagIds !== []) {
+            foreach ($user->tags()->whereIn('id', $tagIds)->orderBy('title')->get(['id', 'emoji', 'title']) as $tag) {
+                $selected[(int) $tag->id] = [(int) $tag->id, $this->clip(trim($tag->emoji . ' ' . $tag->title), 22)];
+            }
+        }
+
+        $chips = function (?int $sign) use ($user, $selected): array {
+            $list = $this->frequentTags($user, 8, $sign);
+
+            if ($sign !== null && count($list) < 4) {
+                $list = [...$list, ...$this->frequentTags($user, 8, null)];
+            }
+            $out = array_values($selected);
+            $seen = array_keys($selected);
+
+            foreach ($list as $tag) {
+                $id = (int) $tag['id'];
+
+                if (!in_array($id, $seen, true) && count($out) < 10) {
+                    $out[] = [$id, (string) $tag['n']];
+                    $seen[] = $id;
+                }
+            }
+
+            return $out;
+        };
+
+        $amount = round($amount, 2);
+        $payload = [
+            'k' => $kind,
+            'a' => ($amount < 0 ? '-' : '') . rtrim(rtrim(number_format(abs($amount), 2, '.', ''), '0'), '.'),
+            'd' => str_replace('-', '', substr($at, 0, 10)),
+            'td' => str_replace('-', '', $user->todayDateString()),
+            'n' => $note !== null && $note !== '' ? $this->clip($note, 48) : '',
+            's' => array_keys($selected),
+            'e' => $chips(-1),
+            'i' => $chips(1),
+        ];
+
+        // 1 KB: drop unselected chips from the end, the bigger list first.
+        while (strlen($this->json($payload)) > 1000) {
+            $side = count($payload['e']) >= count($payload['i']) ? 'e' : 'i';
+
+            if (count($payload[$side]) <= count($selected)) {
+                $payload['n'] = $this->clip($payload['n'], 16);
+
+                break;
+            }
+            array_pop($payload[$side]);
+        }
+
+        return ['chat_data' => $this->json($payload)];
     }
 
     /**

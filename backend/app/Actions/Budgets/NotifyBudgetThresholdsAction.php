@@ -3,6 +3,7 @@
 namespace App\Actions\Budgets;
 
 use App\Channels\Telegram\TelegramClient;
+use App\Channels\Telegram\Widgets\TelegramWidgetSender;
 use App\Enums\BudgetType;
 use App\Models\Budget;
 use App\Models\BudgetPeriod;
@@ -19,6 +20,7 @@ class NotifyBudgetThresholdsAction
         private readonly TelegramClient $client,
         private readonly CalculateLimitStatusAction $limitStatus,
         private readonly CalculateGoalProgressAction $goalProgress,
+        private readonly TelegramWidgetSender $widgets,
     ) {}
 
     public function execute(): void
@@ -30,6 +32,9 @@ class NotifyBudgetThresholdsAction
 
         $messagesByChat = [];
         $goalsByChat = [];
+
+        /** @var array<int|string, list<array<int, mixed>>> $itemsByChat widget rows, same order as the text */
+        $itemsByChat = [];
 
         foreach ($budgets as $budget) {
             // Goals are not spending caps: no 80%/100% alerts, one note when reached.
@@ -70,6 +75,15 @@ class NotifyBudgetThresholdsAction
                 continue;
             }
 
+            $itemsByChat[$identity->external_id][] = [
+                $budget->label($period),
+                (int) $status['percent'],
+                UserFormatter::formatMoney($user, $status['spent']) . ' / ' . UserFormatter::formatMoney($user, $status['limit']),
+                $threshold >= 100 ? 'ov' : 'ar',
+                $status['left'] < 0
+                    ? 'over by ' . UserFormatter::formatMoney($user, -$status['left'])
+                    : self::daysLeft((int) $status['days_left']),
+            ];
             $messagesByChat[$identity->external_id][] = sprintf(
                 "%s %s: %s / %s (%d%%)\n%s – %s",
                 $threshold >= 100 ? '🚨' : '⚠️',
@@ -83,12 +97,37 @@ class NotifyBudgetThresholdsAction
         }
 
         foreach ($messagesByChat as $chatId => $lines) {
-            $this->client->sendMessage($chatId, "💰 Budget alert\n" . implode("\n", $lines));
+            // A widget with bars in the private chat; the same text as before if it can't be sent.
+            $sent = $this->widgets->sendReport($chatId, [
+                'h' => '💰 Budget alert',
+                'g' => [['', $itemsByChat[$chatId] ?? []]],
+            ], self::budgetsKeyboard());
+
+            if (!$sent) {
+                $this->client->sendMessage($chatId, "💰 Budget alert\n" . implode("\n", $lines), self::budgetsKeyboard());
+            }
         }
 
         foreach ($goalsByChat as $chatId => $lines) {
-            $this->client->sendMessage($chatId, "🎯 Savings goal reached\n" . implode("\n", $lines));
+            $this->client->sendMessage($chatId, "🎯 Savings goal reached\n" . implode("\n", $lines), self::budgetsKeyboard());
         }
+    }
+
+    public static function daysLeft(int $days): string
+    {
+        return match (true) {
+            $days <= 0 => 'period ends today',
+            $days === 1 => 'last day',
+            default => $days . ' days left',
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function budgetsKeyboard(): array
+    {
+        return ['inline_keyboard' => [[['text' => '💰 Budgets', 'callback_data' => 'menu:budgets']]]];
     }
 
     /**

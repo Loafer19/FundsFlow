@@ -26,7 +26,7 @@ widget that updates by itself after every transaction; in a group they reply wit
 | Command | What it does |
 | --- | --- |
 | `/start` | Create an account for this chat, or link it with a code from the website |
-| `/add` | Quick-add keypad: amount, expense or income, one of your frequent tags |
+| `/add` | Keypad widget: amount, expense or income, one of your frequent tags (no AI) |
 | `/recent` | Recent transactions; tap one to open it, edit its tags, or delete it |
 | `/month` | This month's income, expenses, net, a daily chart, and top tags (a parent tag includes its child tags) |
 | `/budgets` | Spending limits for the current period (spent / limit, left or over, period dates, days left) and savings goals (saved vs target, deadline, pace) |
@@ -36,7 +36,7 @@ widget that updates by itself after every transaction; in a group they reply wit
 | `/website` | One-time code to [log in on the website](/docs/getting-started/sign-in/#telegram-code) |
 | `/reset` | Start a new AI conversation (alias `/new`); see [AI assistant](/docs/telegram/ai-assistant/) |
 | `/support` | Report a problem or send feedback: `/support The PDF report doesn't open`; see [FAQ](/docs/help/faq/#how-do-i-report-a-problem-or-send-feedback) |
-| `/help` | List commands and the quick-add format |
+| `/help` | All commands and tips |
 | `/unlink` | Unlink this chat; the account stays on the website |
 
 These still work but are not in the menu: `/newtag` (below), `/mute` and `/unmute` (same as the

@@ -4,7 +4,9 @@ namespace App\Channels\Telegram\Handlers;
 
 use App\Actions\Transactions\DeleteTransactionAction;
 use App\Actions\Transactions\UpdateTransactionAction;
+use App\Channels\Telegram\RecurringReminders;
 use App\Channels\Telegram\TelegramClient;
+use App\Channels\Telegram\TelegramEditor;
 use App\Channels\Telegram\TelegramHistory;
 use App\Channels\Telegram\TelegramSupport;
 use App\Models\Transaction;
@@ -13,6 +15,9 @@ use Illuminate\Support\Facades\Cache;
 
 class CallbackHandler
 {
+    /** Text of the message whose button was tapped (its headline is kept on re-render). */
+    private ?string $messageText = null;
+
     public function __construct(
         private readonly TelegramClient $client,
         private readonly TelegramSupport $support,
@@ -22,6 +27,8 @@ class CallbackHandler
         private readonly MediaHandler $mediaHandler,
         private readonly NaturalLanguageHandler $naturalLanguageHandler,
         private readonly TelegramHistory $history,
+        private readonly TelegramEditor $editor,
+        private readonly RecurringReminders $reminders,
     ) {}
 
     /**
@@ -33,6 +40,7 @@ class CallbackHandler
         $chatId = $callbackQuery['message']['chat']['id'] ?? null;
         $messageId = $callbackQuery['message']['message_id'] ?? null;
         $data = $callbackQuery['data'] ?? '';
+        $this->messageText = isset($callbackQuery['message']['text']) ? (string) $callbackQuery['message']['text'] : null;
         $telegramUserId = isset($callbackQuery['from']['id']) ? (int) $callbackQuery['from']['id'] : $chatId;
 
         if ($data === 'noop') {
@@ -109,6 +117,47 @@ class CallbackHandler
             return;
         }
 
+        if (preg_match('/^undo:(\d+)$/', $data, $matches)) {
+            $this->handleUndo($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
+
+            return;
+        }
+
+        if (preg_match('/^edit:(\d+)$/', $data, $matches)) {
+            $this->handleOpenEditor($user, $chatId, $messageId, $callbackId, (int) $matches[1]);
+
+            return;
+        }
+
+        if (preg_match('/^menu:(add|month|budgets|recurring)$/', $data, $matches)) {
+            $this->client->answerCallbackQuery($callbackId);
+            match ($matches[1]) {
+                'add' => $this->menuHandler->sendAddWidget($user, $chatId),
+                'month' => $this->menuHandler->sendMonthSummary($user, $chatId),
+                'budgets' => $this->menuHandler->sendBudgets($user, $chatId),
+                'recurring' => $this->menuHandler->sendRecurring($user, $chatId),
+            };
+
+            return;
+        }
+
+        if (preg_match('/^rec:(skip|pause|resume):(\d+)(?::(\d{8}))?$/', $data, $matches)) {
+            $this->client->answerCallbackQuery(
+                $callbackId,
+                $this->reminders->handleButton($user, $chatId, $messageId, $matches[1], (int) $matches[2], $matches[3] ?? null),
+            );
+
+            return;
+        }
+
+        if (preg_match('/^draft:open:(' . TelegramSupport::NONCE_PATTERN . ')$/', $data, $matches)) {
+            // The draft card keeps its buttons: Confirm still works next to the editor.
+            $this->client->answerCallbackQuery($callbackId);
+            $this->mediaHandler->openDraftEditor($user, $chatId, $matches[1], $messageId);
+
+            return;
+        }
+
         if (preg_match('/^editamt:(\d+)$/', $data, $matches)) {
             $this->handleEditAmountPrompt($user, $chatId, $callbackId, (int) $matches[1]);
 
@@ -119,7 +168,7 @@ class CallbackHandler
         // with. Each one is single-use, so its keyboard is removed once tapped.
         if (preg_match('/^draft:(ok|edit|cancel)(?::(' . TelegramSupport::NONCE_PATTERN . '))?$/', $data, $matches)) {
             $this->removeKeyboard($chatId, $messageId);
-            $this->handleDraftButton($user, $chatId, $callbackId, $matches[1], $matches[2] ?? '');
+            $this->handleDraftButton($user, $chatId, $callbackId, $matches[1], $matches[2] ?? '', $messageId);
 
             return;
         }
@@ -154,7 +203,7 @@ class CallbackHandler
 
         if (preg_match('/^nl:(tags|rename|agent):(ok|cancel)(?::(' . TelegramSupport::NONCE_PATTERN . '))?$/', $data, $matches)) {
             $this->removeKeyboard($chatId, $messageId);
-            $this->handleNlConfirmButton($user, $chatId, $callbackId, $telegramUserId, $matches[1], $matches[2], $matches[3] ?? '');
+            $this->handleNlConfirmButton($user, $chatId, $callbackId, $telegramUserId, $matches[1], $matches[2], $matches[3] ?? '', $messageId);
 
             return;
         }
@@ -182,7 +231,7 @@ class CallbackHandler
         if ($data === 'mediaamt:other') {
             Cache::put("telegram_pending_media_await_text:{$chatId}", true, now()->addMinutes((int) config('telegram.pending_ttl_minutes')));
             $this->client->answerCallbackQuery($callbackId);
-            $this->client->sendMessage($chatId, 'Send amount like -350 groceries');
+            $this->client->sendMessage($chatId, 'Send the amount, like 350 or 350 groceries');
 
             return;
         }
@@ -190,7 +239,7 @@ class CallbackHandler
         if ($data === 'mediacancel') {
             $this->mediaHandler->cancelPendingMedia($chatId);
             $this->client->answerCallbackQuery($callbackId, 'Cancelled');
-            $this->client->sendMessage($chatId, 'Cancelled');
+            $this->client->sendMessage($chatId, '↩️ Cancelled');
             $this->mediaHandler->continueAlbumQueue($user, $chatId);
 
             return;
@@ -199,7 +248,7 @@ class CallbackHandler
         $this->client->answerCallbackQuery($callbackId);
     }
 
-    private function handleDraftButton(User $user, int|string $chatId, string $callbackId, string $action, string $nonce): void
+    private function handleDraftButton(User $user, int|string $chatId, string $callbackId, string $action, string $nonce, ?int $messageId = null): void
     {
         if ($nonce === '') {
             // Card sent before buttons carried a nonce.
@@ -210,7 +259,7 @@ class CallbackHandler
 
         if ($action === 'ok') {
             $this->client->answerCallbackQuery($callbackId, 'Saving…');
-            $this->mediaHandler->confirmDraft($user, $chatId, $nonce);
+            $this->mediaHandler->confirmDraft($user, $chatId, $nonce, $messageId);
 
             return;
         }
@@ -224,7 +273,11 @@ class CallbackHandler
         }
 
         if ($this->mediaHandler->cancelDraft($chatId, $nonce)) {
-            $this->client->sendMessage($chatId, 'Cancelled');
+            if ($messageId) {
+                $this->client->editMessageText($chatId, $messageId, '↩️ Cancelled, nothing saved');
+            } else {
+                $this->client->sendMessage($chatId, '↩️ Cancelled, nothing saved');
+            }
             $this->history->outcome($chatId, $user, 'Receipt draft cancelled (nothing saved).');
             $this->mediaHandler->continueAlbumQueue($user, $chatId);
         }
@@ -238,6 +291,7 @@ class CallbackHandler
         string $kind,
         string $action,
         string $nonce,
+        ?int $messageId = null,
     ): void {
         if ($nonce === '') {
             // Preview sent before buttons carried a nonce.
@@ -254,7 +308,7 @@ class CallbackHandler
             match ($kind) {
                 'tags' => $nl->cancelCreateTags($chatId, $nonce, $telegramUserId, $user),
                 'rename' => $nl->cancelRenameTags($chatId, $nonce, $telegramUserId, $user),
-                'agent' => $nl->cancelAgentMutation($chatId, $nonce, $telegramUserId, $user),
+                'agent' => $nl->cancelAgentMutation($chatId, $nonce, $telegramUserId, $user, $messageId),
             };
 
             return;
@@ -269,7 +323,7 @@ class CallbackHandler
         match ($kind) {
             'tags' => $nl->confirmCreateTags($user, $chatId, $nonce, $telegramUserId),
             'rename' => $nl->confirmRenameTags($user, $chatId, $nonce, $telegramUserId),
-            'agent' => $nl->confirmAgentMutation($user, $chatId, $nonce, $telegramUserId),
+            'agent' => $nl->confirmAgentMutation($user, $chatId, $nonce, $telegramUserId, $messageId),
         };
     }
 
@@ -348,18 +402,9 @@ class CallbackHandler
             return;
         }
 
-        $this->client->answerCallbackQuery($callbackId, 'Saved ✅');
+        $this->client->answerCallbackQuery($callbackId, 'Tags saved!');
         $this->history->outcome($chatId, $user, 'Tags set: ' . TelegramHistory::transactionLine($user, $transaction->load('tags')));
-
-        if ($messageId) {
-            $this->client->editMessageText(
-                $chatId,
-                $messageId,
-                $this->support->formatTransactionCard($user, $transaction, '✅ Saved'),
-                $this->support->postSaveKeyboard($transaction),
-                TelegramSupport::PARSE_HTML,
-            );
-        }
+        $this->renderCard($user, $chatId, $messageId, $transaction, TelegramSupport::cardHeadline($this->messageText));
     }
 
     private function handleOpen(User $user, int|string $chatId, string $callbackId, int $transactionId): void
@@ -392,13 +437,13 @@ class CallbackHandler
             return;
         }
 
-        $card = $this->support->formatTransactionCard($user, $transaction, 'Transaction');
-        $text = $card . "\n\nDelete this transaction?";
+        // ↩️ Cancel puts the card back with its own headline (✅ Saved, ✅ Updated, …).
+        Cache::put($this->headlineKey($chatId, $messageId), TelegramSupport::cardHeadline($this->messageText), now()->addDay());
 
         $this->client->editMessageText(
             $chatId,
             $messageId,
-            $text,
+            $this->support->formatTransactionCard($user, $transaction, '🗑 Delete this transaction?'),
             $this->support->deleteConfirmKeyboard($transactionId),
             TelegramSupport::PARSE_HTML,
         );
@@ -414,16 +459,17 @@ class CallbackHandler
             return;
         }
 
-        $line = $this->support->formatTransactionLine($user, $transaction);
+        $card = $this->support->formatTransactionCard($user, $transaction, '🗑 Deleted');
         $remembered = TelegramHistory::transactionLine($user, $transaction);
 
         $this->deleteTransaction->execute($user, $transaction);
         $this->history->outcome($chatId, $user, 'Deleted: ' . $remembered);
+        $this->editor->closeFor($chatId, $transactionId);
 
-        $this->client->answerCallbackQuery($callbackId, 'Deleted 🗑');
+        $this->client->answerCallbackQuery($callbackId, 'Transaction deleted!');
 
         if ($messageId) {
-            $this->client->editMessageText($chatId, $messageId, "🗑 Deleted\n{$line}", ['inline_keyboard' => []]);
+            $this->client->editMessageText($chatId, $messageId, $card, ['inline_keyboard' => []], TelegramSupport::PARSE_HTML);
         }
     }
 
@@ -440,14 +486,91 @@ class CallbackHandler
         $this->client->answerCallbackQuery($callbackId);
 
         if ($messageId) {
-            $this->client->editMessageText(
-                $chatId,
-                $messageId,
-                $this->support->formatTransactionCard($user, $transaction, '✅ Saved'),
-                $this->support->postSaveKeyboard($transaction),
-                TelegramSupport::PARSE_HTML,
-            );
+            $headline = Cache::pull($this->headlineKey($chatId, $messageId)) ?: 'Transaction';
+            $this->renderCard($user, $chatId, $messageId, $transaction, (string) $headline);
         }
+    }
+
+    /**
+     * ↩️ Undo on a fresh card: deletes the entry (TransactionsChanged fires). After the window
+     * the button goes away and the tap says so.
+     */
+    private function handleUndo(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
+    {
+        $transaction = $this->support->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction) {
+            $this->client->answerCallbackQuery($callbackId, 'Already deleted');
+            $this->removeKeyboard($chatId, $messageId);
+
+            return;
+        }
+
+        if (!$this->support->canUndo($transaction)) {
+            $this->client->answerCallbackQuery($callbackId, 'Too late to undo. Use 🗑 Delete');
+            $this->renderCard($user, $chatId, $messageId, $transaction, TelegramSupport::cardHeadline($this->messageText));
+
+            return;
+        }
+
+        $card = $this->support->formatTransactionCard($user, $transaction, '↩️ Undone, not saved');
+        $remembered = TelegramHistory::transactionLine($user, $transaction);
+        $this->deleteTransaction->execute($user, $transaction);
+        $this->history->outcome($chatId, $user, 'Undone (deleted): ' . $remembered);
+        $this->editor->closeFor($chatId, $transactionId);
+        $this->client->answerCallbackQuery($callbackId, 'Transaction undone!');
+
+        if ($messageId) {
+            $this->client->editMessageText($chatId, $messageId, $card, ['inline_keyboard' => []], TelegramSupport::PARSE_HTML);
+        }
+    }
+
+    private function handleOpenEditor(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
+    {
+        $transaction = $this->support->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction) {
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found');
+
+            return;
+        }
+
+        if (!TelegramSupport::isPrivateChat($chatId)) {
+            // Old private-chat card forwarded or a stale keyboard: fall back to the tag picker.
+            $this->client->answerCallbackQuery($callbackId);
+            $this->renderTagPicker($user, $chatId, $messageId, $transaction, 0);
+
+            return;
+        }
+
+        $this->client->answerCallbackQuery($callbackId);
+
+        if (!$this->editor->openForTransaction($user, $chatId, $transaction, $messageId, TelegramSupport::cardHeadline($this->messageText))) {
+            $this->client->sendMessage($chatId, "Couldn't open the editor. Try again in a moment");
+        }
+    }
+
+    /**
+     * Card text and its keyboard with the given headline; ↩️ Undo stays while the entry is fresh.
+     */
+    private function renderCard(User $user, int|string $chatId, ?int $messageId, Transaction $transaction, string $headline): void
+    {
+        if (!$messageId) {
+            return;
+        }
+
+        $this->client->editMessageText(
+            $chatId,
+            $messageId,
+            $this->support->formatTransactionCard($user, $transaction, $headline),
+            $this->support->postSaveKeyboard($transaction, $chatId, str_starts_with($headline, '✅ Saved')),
+            TelegramSupport::PARSE_HTML,
+        );
+    }
+
+    private function headlineKey(int|string $chatId, int $messageId): string
+    {
+        return "telegram_card_headline:{$chatId}:{$messageId}";
     }
 
     private function handleRetag(User $user, int|string $chatId, ?int $messageId, string $callbackId, int $transactionId): void
@@ -489,7 +612,7 @@ class CallbackHandler
         $this->client->editMessageText(
             $chatId,
             $messageId,
-            $this->support->formatTransactionCard($user, $transaction, '✅ Saved'),
+            $this->support->formatTransactionCard($user, $transaction, TelegramSupport::cardHeadline($this->messageText)),
             $this->support->tagKeyboard($user, $transaction, $page),
             TelegramSupport::PARSE_HTML,
         );

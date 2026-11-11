@@ -5,7 +5,7 @@ description: Use the FundsFlow Telegram bot to log transactions, scan receipts, 
 
 The FundsFlow bot is [@funds_flow_bot](https://t.me/funds_flow_bot). It lets you:
 
-- log transactions with a short message — [quick add](/docs/telegram/quick-add/);
+- log transactions by writing them in plain words, or with the ➕ Add keypad — [adding transactions](/docs/telegram/quick-add/);
 - attach [receipt photos and PDFs](/docs/telegram/receipts/), with AI reading the total when you don't type one;
 - send [voice messages](/docs/telegram/voice/) instead of typing;
 - ask questions and request changes in plain language — the [AI assistant](/docs/telegram/ai-assistant/);
