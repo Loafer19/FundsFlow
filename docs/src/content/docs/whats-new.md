@@ -7,6 +7,45 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
 **1.13** update that put an AI assistant in the Telegram bot. Self-hosting and technical changes are listed in the
 [GitHub releases](https://github.com/Loafer19/FundsFlow/releases).
 
+## 2.3.0
+
+### Web app
+
+- **Grouped tabs.** Tabs are now grouped into **Overview** (Analytics, Calendar, List), **Plan** (Budgets, Tags) and
+  **Charts** (Flow, Trend), and each group remembers your last tab. On a phone they sit in a dock at the bottom, with
+  **Add** and **More** next to them. [Learn more](/docs/web/tabs/)
+- **Settings in a side panel** with five sections: Appearance, Account, Connections (Telegram, MCP, monobank),
+  Data & reports, and Support. [Learn more](/docs/web/settings/)
+- **An Import page.** **Import** on the List tab (or **More → Import** on a phone) opens a page with your past imports;
+  pick a file there to preview it. [Learn more](/docs/web/import/)
+- **Forecast on the Trend chart.** A dashed line shows where your balance is heading for the rest of the period.
+- **Design polish:** a close button on every dialog, clearer toggles, tag pickers in popovers, dates as DD.MM.YYYY in
+  forms, friendlier empty screens and consistent messages.
+- **No more “This view failed to load” after an update.** If the app was open during an update, it now reloads
+  itself once to load the new version.
+
+### Telegram bot
+
+- **Live widgets.** `/month`, `/budgets`, `/tags`, `/recent`, `/recurring` and `/notifications` open small widgets
+  in a private chat that update by themselves after every transaction. ➕ **Add** is a keypad that never uses AI.
+  [Learn more](/docs/telegram/commands/)
+- **Just write it.** Every text or voice message goes to the assistant, so `кава 80`, `+15000 salary` or
+  `40 taxi yesterday` work in any language. [Learn more](/docs/telegram/quick-add/)
+- **A simpler menu.** Six buttons below the message field (Add, Recent, Month, Budgets, Tags, Recurring), 12
+  commands, and a shorter `/start` and `/help`.
+- **Edit and Undo on every new card.** **✏️ Edit** opens an editor with a keypad, expense or income, date arrows,
+  tag chips and a note; **↩️ Undo** removes a new entry within 5 minutes. Receipt drafts use the same editor.
+  [Learn more](/docs/telegram/quick-add/#after-saving)
+- **Clearer confirmations.** When the assistant wants to change something, the card shows only what changes
+  (old value crossed out) and turns into the result after you tap **✅ Confirm** or **↩️ Cancel**.
+- **Alerts with progress bars.** Budget alerts, reached savings goals and the weekly digest come as widgets with
+  bars and buttons to open your budgets or the month. [Learn more](/docs/telegram/notifications/)
+- **Reminders before recurring payments.** The evening before a payment the bot reminds you, with **Skip** and
+  **Pause**. [Learn more](/docs/telegram/notifications/#recurring-reminders)
+- **Pinned month summary.** Turn it on in `/notifications` to keep a live `/month` pinned at the top of the chat; a
+  new one is pinned when the month changes. [Learn more](/docs/telegram/notifications/#pinned-month-summary)
+- **10 AI assists a day** by default, up from 5.
+
 ## 2.2.0
 
 - **Monobank sync.** Connect a personal token in Settings → Bank: cards sync automatically, including the last 31

@@ -106,8 +106,10 @@ and, optionally, some tags (“PDF report for groceries and coffee this year”)
 | `delete_recurring` | Delete a recurring rule (transactions it already created stay) |
 
 :::caution[Changes need Confirm]
-The assistant never changes your data silently. Every write shows a preview with **✅ Confirm** and **Cancel**;
-nothing is saved until you press **Confirm**. Old previews stop working once handled or replaced.
+The assistant never changes your data silently. Every write shows a preview with **✅ Confirm** and **↩️ Cancel**
+(**🗑 Delete** and **↩️ Cancel** for a deletion); nothing is saved until you confirm. A change to a transaction shows
+only what changes, with the old value crossed out (`-80.00 → -95.00`). The preview card itself turns into the result
+(**✅ Updated**, **🗑 Deleted** or *Cancelled, nothing changed*). Old previews stop working once handled or replaced.
 :::
 
 ## Daily AI limit
@@ -119,10 +121,10 @@ AI features share one daily budget of **AI assists**:
 - each message handled by the AI assistant (in Telegram or in the web app's [Assistant](/docs/web/assistant/) panel).
 
 The default limit is **10 assists per day** (configurable by the operator). The counter resets at **midnight in your
-timezone**. When only a couple are left the bot warns you, and when you run out it tells you that the limit resets at
-midnight and what still works without AI.
+timezone**. When only a couple are left the bot warns you, and when you run out it says the assists are back at
+midnight, with a **➕ Add** button for the keypad, which works without AI.
 
-You can always see *AI assists today* (used / limit and reset time) in **Settings → Accounts** in the web app.
+You can always see *AI assists today* (used / limit and reset time) in **Settings → Account** in the web app.
 
 The **➕ Add** keypad (`/add`), commands, menu buttons and widgets **don't** use AI and keep working when the limit is
 reached. Typed and spoken messages, including plain transactions like `350 groceries`, and receipt photos do.
@@ -134,5 +136,5 @@ assistant answers from `budget_status`; “create a goal of 60 000 for 🗾 Japa
 ## PDF reports in Telegram
 
 Ask the assistant: “send me a PDF report for last month” (or any period, optionally for some tags) and it sends the
-PDF to the chat. The web app can send its own report too: **Settings → Report → Send to Telegram**. See
+PDF to the chat. The web app can send its own report too: **Settings → Data & reports → Send to Telegram**. See
 [Reports](/docs/web/reports/).

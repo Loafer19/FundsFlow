@@ -15,6 +15,9 @@ return [
     'telegram' => [
         'bot_token' => env('TELEGRAM_BOT_TOKEN'),
         'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+        // Where system alerts go (failed queue jobs, worker down), comma-separated chat ids.
+        // Empty: every admin (users.is_admin) with a linked Telegram.
+        'admin_chat_id' => env('TELEGRAM_ADMIN_CHAT_ID'),
     ],
 
     'gotenberg' => [

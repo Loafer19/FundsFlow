@@ -33,13 +33,16 @@ class NotifyBudgetThresholdsAction
         $messagesByChat = [];
         $goalsByChat = [];
 
+        /** @var array<int|string, list<array<int, mixed>>> $goalItemsByChat */
+        $goalItemsByChat = [];
+
         /** @var array<int|string, list<array<int, mixed>>> $itemsByChat widget rows, same order as the text */
         $itemsByChat = [];
 
         foreach ($budgets as $budget) {
             // Goals are not spending caps: no 80%/100% alerts, one note when reached.
             if ($budget->type === BudgetType::Goal) {
-                $this->collectReachedGoal($budget, $goalsByChat);
+                $this->collectReachedGoal($budget, $goalsByChat, $goalItemsByChat);
 
                 continue;
             }
@@ -109,7 +112,14 @@ class NotifyBudgetThresholdsAction
         }
 
         foreach ($goalsByChat as $chatId => $lines) {
-            $this->client->sendMessage($chatId, "🎯 Savings goal reached\n" . implode("\n", $lines), self::budgetsKeyboard());
+            $sent = $this->widgets->sendReport($chatId, [
+                'h' => '🎯 Savings goal reached',
+                'g' => [['', $goalItemsByChat[$chatId] ?? []]],
+            ], self::budgetsKeyboard());
+
+            if (!$sent) {
+                $this->client->sendMessage($chatId, "🎯 Savings goal reached\n" . implode("\n", $lines), self::budgetsKeyboard());
+            }
         }
     }
 
@@ -144,8 +154,9 @@ class NotifyBudgetThresholdsAction
      * Once per goal and target amount (raising the target can notify again).
      *
      * @param array<int|string, list<string>> $goalsByChat
+     * @param array<int|string, list<array<int, mixed>>> $goalItemsByChat widget rows, same order as the text
      */
-    private function collectReachedGoal(Budget $budget, array &$goalsByChat): void
+    private function collectReachedGoal(Budget $budget, array &$goalsByChat, array &$goalItemsByChat): void
     {
         $user = $budget->user;
         $period = $budget->currentPeriod;
@@ -175,6 +186,14 @@ class NotifyBudgetThresholdsAction
         }
 
         $label = $budget->label($period);
+
+        $goalItemsByChat[$identity->external_id][] = [
+            $label,
+            (int) $progress['percent'],
+            UserFormatter::formatMoney($user, $progress['saved']) . ' / ' . UserFormatter::formatMoney($user, $progress['target']),
+            'ok',
+            'reached 🎉',
+        ];
 
         $goalsByChat[$identity->external_id][] = sprintf(
             '🎉 %s: %s / %s (%d%%)',

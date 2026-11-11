@@ -261,6 +261,7 @@ import {
     takeStashedInitData,
     ready as telegramReady,
 } from './services/telegramWebApp.js'
+import { lazyImport } from './services/staleChunk.js'
 import { useTransactionsStore } from './services/transactions.js'
 import { hasUnseenWhatsNew, markWhatsNewSeen } from './services/whatsNew.js'
 import Analytics from './tabs/Analytics.vue'
@@ -272,7 +273,7 @@ import TabLoading from './tabs/TabLoading.vue'
 const lazyTab = (loader) =>
     markRaw(
         defineAsyncComponent({
-            loader,
+            loader: lazyImport(loader),
             loadingComponent: TabLoading,
             errorComponent: TabLoadError,
             delay: 120,

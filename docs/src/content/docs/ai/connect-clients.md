@@ -23,11 +23,11 @@ FundsFlow doesn't support dynamic client registration, so if your client asks fo
 | Token auth method | none (public client, PKCE S256) |
 
 When you connect, a FundsFlow sign-in page opens. Log in with your FundsFlow **email and password** (set them in
-**Settings → Accounts → Login credentials** if you signed up another way).
+**Settings → Account → Login credentials** if you signed up another way).
 
 ## Personal token
 
-1. In the web app open **Settings → Accounts → MCP**.
+1. In the web app open **Settings → Connections → MCP**.
 2. Click **Generate token**. FundsFlow shows a connection URL with the token in it
    (`https://mcp.fundsflow.fun/mcp?token=…`) and a **Copy connection URL** button. It's shown **only once**, so copy it
    now.

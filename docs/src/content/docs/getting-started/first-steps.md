@@ -10,7 +10,7 @@ The first time you sign in to an account with no transactions, FundsFlow shows a
 1. **Welcome to FundsFlow** — a preview of the starter tags created for every new account, plus three choices:
    **Add first transaction**, **Manage tags**, or **Skip**.
 2. **Add from Telegram** — an optional step to link the Telegram bot (**Open Telegram to link**) so you can log
-   expenses from chat. You can skip it and link later in **Settings → Accounts**.
+   expenses from chat. You can skip it and link later in **Settings → Connections**.
 
 After that, the action you picked (adding a transaction or managing tags) opens. The welcome is shown once per browser.
 

@@ -40,6 +40,12 @@ web app. New requests and user replies are sent to every admin with a linked Tel
 `SUPPORT_ADMIN_TELEGRAM_CHAT_ID` (comma-separated, e.g. a group). A user can open up to `SUPPORT_MAX_PER_HOUR`
 (default 5) requests an hour.
 
+## Failed jobs
+
+**Failed jobs** lists queued jobs that used up their tries, with **Details**, **Retry** and **Delete** (also for
+several at once). Failures and a stopped worker are also sent to Telegram; see
+[Queue worker and alerts](/docs/self-hosting/queue-worker/).
+
 ## Environment (backend)
 
 - `SESSION_DRIVER=redis`

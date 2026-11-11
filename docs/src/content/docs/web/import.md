@@ -3,7 +3,7 @@ title: Files and bulk import
 description: Send statements, spreadsheets, OFX / QIF / JSON exports, bank-app screenshots, or a receipt to the assistant — or upload them on the Import page — then review a preview before anything is saved.
 ---
 
-If you use monobank, [connect it in Settings → Bank](/docs/help/monobank/) instead of uploading statements: new purchases arrive on their own.
+If you use monobank, [connect it in Settings → Connections → Monobank](/docs/help/monobank/) instead of uploading statements: new purchases arrive on their own.
 
 The assistant reads files as well as receipt photos, in the [web Assistant panel](/docs/web/assistant/) and in the
 [Telegram bot](/docs/telegram/receipts/). You can also upload a file on the dedicated **Import** page (`/import`).

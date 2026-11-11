@@ -16,7 +16,7 @@ connected: add those transactions yourself in the web app or Telegram, with recu
 
 ### How do I connect monobank?
 
-Open **Settings → Bank**, get a personal token at [api.monobank.ua](https://api.monobank.ua/), and paste
+Open **Settings → Connections → Monobank**, get a personal token at [api.monobank.ua](https://api.monobank.ua/), and paste
 it. FundsFlow imports the last 31 days, then new items arrive on their own. Only UAH cards are synced
 (foreign-currency cards are listed but left off). Transfers between your own cards and jars are not
 counted. Pending (hold) purchases appear immediately and the amount updates when they settle.
@@ -34,7 +34,7 @@ directly. After import you can **Undo** the whole batch.
 ### Which currency does it use?
 
 FundsFlow tracks plain amounts and doesn't convert currencies. Choose how numbers look in
-**Settings → Formatting**.
+**Settings → Appearance**.
 
 ### I signed up in Telegram. How do I use the website?
 
@@ -60,16 +60,17 @@ and [Jars as savings goals](/docs/help/monobank/#jars-as-savings-goals).
 
 The [AI limit](/docs/telegram/ai-assistant/#daily-ai-limit) is shared by receipt reading, voice messages and the
 assistant in Telegram and on the web. It resets at midnight in your timezone. Until then, the ➕ Add keypad
-(`/add`), commands and menu buttons still work in Telegram, and the **+** button and all tabs still work on the web.
+(`/add`), commands and menu buttons still work in Telegram, and adding transactions and all tabs still work on the web.
 
 ### The receipt was read wrong.
 
-Tap **✏️ Edit amount** before confirming, or **Cancel** and type the amount in the photo caption: a caption with an
-amount is saved without AI. After saving, use the transaction card's buttons to fix the tags or the amount.
+Tap **✏️ Edit** on the draft before confirming to fix the amount, date, tags or note, or **↩️ Cancel** and type the
+amount in the photo caption: a caption with an amount is saved without AI. After saving, **✏️ Edit** on the
+transaction card does the same, and **↩️ Undo** removes it within 5 minutes.
 
 ### Can I export my data?
 
-Yes. **Settings → Data → Download JSON** downloads everything: tags, transactions, budgets and recurring rules.
+Yes. **Settings → Data & reports → Download JSON** downloads everything: tags, transactions, budgets and recurring rules.
 
 ### How do I stop notifications?
 

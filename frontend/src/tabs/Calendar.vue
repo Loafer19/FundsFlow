@@ -173,6 +173,8 @@ const props = defineProps({
     },
 })
 
+// App passes the same props and listeners to every tab; this one renders a fragment and uses only some
+defineOptions({ inheritAttrs: false })
 const emit = defineEmits(['jump-to-month'])
 
 const weekdayLabels = [

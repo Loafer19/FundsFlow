@@ -17,7 +17,7 @@ groceries last month?”, “add yesterday's receipts”, “create a monthly bu
 
 - **OAuth** (recommended where the client supports it) — the client opens a FundsFlow sign-in page, you log in with your
   FundsFlow **email and password**, and the client gets an access token valid for 30 days.
-- **Personal token** — generate one in **Settings → Accounts → MCP** and paste it into the client.
+- **Personal token** — generate one in **Settings → Connections → MCP** and paste it into the client.
 
 See [Connect AI clients](/docs/ai/connect-clients/) for step-by-step setup.
 
@@ -28,7 +28,7 @@ when you want to work with FundsFlow from Claude, ChatGPT, Cursor, or another as
 :::
 
 :::note[Signed up with Telegram, Google, or GitHub?]
-OAuth sign-in uses email and password. Set them first in **Settings → Accounts → Login credentials**, or use a
+OAuth sign-in uses email and password. Set them first in **Settings → Account → Login credentials**, or use a
 personal token instead.
 :::
 

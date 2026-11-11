@@ -54,7 +54,7 @@ class TelegramSupport
         ['command' => 'budgets', 'description' => 'Spending limits and savings goals'],
         ['command' => 'tags', 'description' => "Your tags with this month's expenses and income"],
         ['command' => 'recurring', 'description' => 'Recurring payments: next dates, pause or resume'],
-        ['command' => 'notifications', 'description' => 'Turn alerts and the weekly digest on or off'],
+        ['command' => 'notifications', 'description' => 'Alerts, digest, reminders and pinned month'],
         ['command' => 'website', 'description' => 'One-time code to log in on the website'],
         ['command' => 'reset', 'description' => 'Start a new AI conversation'],
         ['command' => 'support', 'description' => 'Report a problem or send feedback'],
@@ -125,7 +125,7 @@ class TelegramSupport
             . "/budgets — limits and savings goals\n"
             . "/recurring — repeating payments\n\n"
             . "<b>Settings &amp; account</b>\n"
-            . "/notifications — alerts on or off\n"
+            . "/notifications — alerts, reminders, pinned month\n"
             . "/website — code to log in on the web\n"
             . "/reset — new AI conversation\n"
             . "/support — report a problem or idea\n"
@@ -135,11 +135,12 @@ class TelegramSupport
             . "Send a receipt photo or PDF, a caption helps\n"
             . "Ask anything: <i>where did my money go this week?</i>\n"
             . "Reply to a bot message to ask about it\n"
+            . "Fix a new entry with ✏️ Edit, or ↩️ Undo within 5 minutes\n"
             . '<blockquote expandable>Text, voice notes and receipts share a daily AI limit; Settings in the Web UI shows what is left. '
             . '➕ Add and the menu buttons never use it. '
             . 'The assistant remembers the last hour, shared with the web chat; /reset clears it. '
             . 'Live widgets work in a private chat with the bot; in groups, commands answer with text. '
-            . 'Limit alerts come at 80% and 100%; /notifications turns them off</blockquote>';
+            . 'Limit alerts come at 80% and 100%, payment reminders the evening before; /notifications has the switches</blockquote>';
     }
 
     public function sendHelp(int|string $chatId): void

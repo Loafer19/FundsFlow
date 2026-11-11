@@ -19,8 +19,12 @@ note and tags. A hint like `dinner with friends` works too.
 
 1. The bot replies *Reading receipt…* and AI vision extracts the **total**, the **date** if clearly visible, a short
    **note** (merchant or place), and up to three **suggested tags**, which are matched to your existing tags.
-2. You get a draft card with **✅ Confirm**, **✏️ Edit amount**, and **Cancel**.
-3. On **Confirm** the transaction is saved with the photo attached.
+2. The *Reading receipt…* message turns into a **🧾 Receipt draft** card with **✅ Confirm**, **✏️ Edit**, and
+   **↩️ Cancel**. **✏️ Edit** opens the same [editor](/docs/telegram/quick-add/#edit-a-transaction) as for saved
+   transactions (amount, expense or income, date, tags, note); **Save** there updates the draft and **Discard** drops
+   it. In a group the button is **✏️ Amount** instead.
+3. On **Confirm** the transaction is saved with the photo attached, and the card shows **✅ Saved with receipt**
+   with **↩️ Undo** for 5 minutes.
 
 If the AI can't find a clear total (for example a photo of food), it asks you to send the amount, like `350`, or
 choose **−100**, **−500**, **Other**, or **Cancel**.

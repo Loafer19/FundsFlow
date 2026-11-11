@@ -59,8 +59,8 @@ create or link your account.
 
 ## Your control
 
-- **Export**: **Settings → Data → Download JSON** (or `export_account` over MCP).
+- **Export**: **Settings → Data & reports → Download JSON** (or `export_account` over MCP).
 - **Delete data**: delete transactions, tags, budgets, recurring rules, and attachments at any time.
 - **Telegram**: `/mute` stops proactive messages; `/unlink` disconnects the chat.
-- **MCP**: revoke your personal token in **Settings → Accounts → MCP**.
+- **MCP**: revoke your personal token in **Settings → Connections → MCP**.
 - **Account deletion**: there's no self-service option yet. [Send a request](/docs/help/faq/#how-do-i-report-a-problem-or-send-feedback) (or contact [@Loafer19](https://t.me/Loafer19)).

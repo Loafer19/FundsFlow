@@ -32,7 +32,7 @@ widget that updates by itself after every transaction; in a group they reply wit
 | `/budgets` | Spending limits for the current period (spent / limit, left or over, period dates, days left) and savings goals (saved vs target, deadline, pace) |
 | `/tags` | Your top-level tags with this month's expenses (−) and income (+); tap a tag to split it by subtags. Tags with no transactions this month are folded |
 | `/recurring` | Recurring payments with their next dates; tap one to pause or resume it |
-| `/notifications` | One switch for limit alerts, goal messages, the weekly digest, and recurring and bank sync notifications in this chat |
+| `/notifications` | Alerts, digest, reminders and pinned month: three switches for **Alerts and digest** (limit alerts, goal messages, the weekly digest, recurring and bank sync notifications), **Recurring reminders** (a day before each payment) and **Pinned month summary** (a live `/month` pinned at the top of the chat). See [Notifications](/docs/telegram/notifications/) |
 | `/website` | One-time code to [log in on the website](/docs/getting-started/sign-in/#telegram-code) |
 | `/reset` | Start a new AI conversation (alias `/new`); see [AI assistant](/docs/telegram/ai-assistant/) |
 | `/support` | Report a problem or send feedback: `/support The PDF report doesn't open`; see [FAQ](/docs/help/faq/#how-do-i-report-a-problem-or-send-feedback) |
@@ -40,7 +40,7 @@ widget that updates by itself after every transaction; in a group they reply wit
 | `/unlink` | Unlink this chat; the account stays on the website |
 
 These still work but are not in the menu: `/newtag` (below), `/mute` and `/unmute` (same as the
-`/notifications` switch), and `/app` (how to open the Web UI). Any other command gets "Unknown command, see /help".
+**Alerts and digest** switch), and `/app` (how to open the Web UI). Any other command gets "Unknown command, see /help".
 
 ### `/newtag`
 
@@ -52,8 +52,11 @@ These still work but are not in the menu: `/newtag` (below), `/mute` and `/unmut
 - `/newtag 🍕 Fast Food > Food` creates *Fast Food* under the existing tag *Food* (parent matched by title,
   case-insensitive).
 
-## Deleting transactions
+## Editing and deleting transactions
 
-Open a transaction card — right after saving it, by tapping it in the `/recent` widget, or with **Open N** under `/recent` in a group — and tap **🗑**. The bot asks
-**✅ Delete** or **↩️ Cancel**; nothing is deleted until you confirm. You can also ask the
-[AI assistant](/docs/telegram/ai-assistant/) to delete a transaction; it also asks for confirmation.
+Open a transaction card — right after saving it, by tapping it in the `/recent` widget, or with **Open N** under
+`/recent` in a group. **✏️ Edit** opens the [editor](/docs/telegram/quick-add/#edit-a-transaction); **🗑 Delete**
+turns the card into *Delete this transaction?* with **🗑 Delete** and **↩️ Cancel**, and nothing is deleted until you
+confirm. A card you just added also has **↩️ Undo** for 5 minutes. You can also ask the
+[AI assistant](/docs/telegram/ai-assistant/) to change or delete a transaction; it shows what will change and asks
+for confirmation.

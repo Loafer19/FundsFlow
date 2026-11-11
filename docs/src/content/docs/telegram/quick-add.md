@@ -17,7 +17,7 @@ There is no special syntax: write the transaction the way you'd say it, and the
 - A number without a sign, or with a minus, is an **expense**. A plus, or words like *salary*, *income* or *refund*,
   make it **income**.
 - A date at the start (`DD.MM` or `DD.MM.YYYY`) or words like *yesterday* set the day; otherwise it's **today in your
-  timezone** (set in [Settings → Formatting](/docs/web/settings/)). Dates can't be in the future.
+  timezone** (set in [Settings → Appearance](/docs/web/settings/)). Dates can't be in the future.
 - Matching tags are added when the words fit one of your existing tags; nothing new is created.
 - If the amount or direction is unclear, the assistant asks first.
 
@@ -31,11 +31,49 @@ one of your frequent tags, then **Add**. It never uses the AI limit, so it keeps
 
 ## After saving
 
-The bot answers **✅ Saved** with a transaction card and three buttons:
+The bot answers **✅ Saved** with a transaction card:
+
+```text
+✅ Saved
+
+-80.00
+📅 11.11.2026
+📝 кава
+🏷 ☕ Cafes
+```
+
+Under it are three buttons:
+
+- **↩️ Undo** — removes the transaction you just added. It works for **5 minutes**; after that the bot says
+  *Too late to undo. Use 🗑 Delete* and the button goes away.
+- **✏️ Edit** — opens the editor below the card (see next section).
+- **🗑 Delete** — the card asks *Delete this transaction?* with **🗑 Delete** and **↩️ Cancel**; nothing is
+  deleted until you confirm.
+
+You can open the same card later by tapping a transaction in the `/recent` widget (without **Undo**).
+
+## Edit a transaction
+
+**✏️ Edit** opens an editor widget in the chat:
+
+- **Amount** — tap it to show a keypad and type the new amount.
+- **Expense / Income** — switch the direction; the tag chips follow it.
+- **Date** — step back with **‹** and forward with **›** (*Today* and *Yesterday* are labelled). Dates can't be in
+  the future.
+- **Tags** — tap chips to select or clear them (✓ marks selected ones). **All tags…** opens the full list on the
+  card for tags that aren't shown.
+- **📝 Note** — the bot asks for the new note; reply with the text, or `-` to remove it.
+- **Save** applies the changes and updates the card above (**✅ Updated**). **Delete** removes the transaction.
+
+Only one editor per transaction is open at a time: tapping **✏️ Edit** again replaces the old one.
+
+### In a group
+
+Widgets work only in a private chat with the bot. In a group the card keeps text buttons instead:
 
 - **🏷 Tags** — pick tags for the transaction (paged list; tap to toggle, then finish).
 - **✏️ Amount** — reply with the new amount, e.g. `+120` or `-50.5`. A number without a sign keeps the direction
   (an expense stays an expense).
-- **🗑** — delete. The bot asks for confirmation: **✅ Delete** or **↩️ Cancel**.
+- **🗑 Delete** — delete after confirmation.
 
-You can open the same card later by tapping a transaction in the `/recent` widget.
+**↩️ Undo** is shown on its own row above them for the first 5 minutes.

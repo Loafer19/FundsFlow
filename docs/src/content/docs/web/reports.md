@@ -3,7 +3,7 @@ title: Reports
 description: Export FundsFlow tabs as a PDF report or send it to Telegram.
 ---
 
-**Settings → Report** turns the tabs you choose into a report, using the **current period type, dates, and tag filter**
+**Settings → Data & reports** turns the tabs you choose into a report, using the **current period type, dates, and tag filter**
 from the header.
 
 1. Choose sections: Analytics, Calendar, Budgets, Tags, Flow, Trend, List.

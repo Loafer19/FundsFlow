@@ -190,4 +190,4 @@ assistant replies:
 > transactions with the + button and explore your tabs and analytics.
 
 The number and timezone are yours. Everything else in the web app keeps working without AI. Your usage is also in
-**Settings → Accounts → AI assists today**.
+**Settings → Account → AI assists today**.

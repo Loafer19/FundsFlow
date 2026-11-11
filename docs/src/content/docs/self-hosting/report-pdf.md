@@ -3,7 +3,7 @@ title: Report PDF (Gotenberg)
 description: How FundsFlow renders themed report PDFs with Gotenberg, and how to set it up locally or on Dokploy.
 ---
 
-One renderer for every report PDF: **Settings → Report** (download / Send to Telegram), the assistant report card and the
+One renderer for every report PDF: **Settings → Data & reports** (download / Send to Telegram), the assistant report card and the
 Telegram `send_report` tool all call the API (`POST /api/report`, `POST /api/agent/report`).
 
 The API mints a one-time, read-only token (120 s, ability `report:print`) and asks [Gotenberg](https://gotenberg.dev)

@@ -338,13 +338,14 @@ import {
 } from '../services/receiptImages.js'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 import settings from '../services/settings.js'
+import { lazyImport } from '../services/staleChunk.js'
 import toasts from '../services/toasts.js'
 import { useTransactionsStore } from '../services/transactions.js'
 import AgentShowCard from './AgentShowCard.vue'
 
 // Chart.js stays out of the main bundle: it loads with the first chart in the chat.
 const AgentChart = defineAsyncComponent({
-    loader: () => import('./AgentChart.vue'),
+    loader: lazyImport(() => import('./AgentChart.vue')),
     loadingComponent: { render: () => h('div', { class: 'skeleton h-56 w-full' }) },
     delay: 0,
 })

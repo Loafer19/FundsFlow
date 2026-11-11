@@ -8,7 +8,7 @@ FundsFlow can import transactions from your monobank cards. You paste a personal
 
 ## How to connect
 
-1. In the web app, open **Settings → Bank**.
+1. In the web app, open **Settings → Connections → Monobank**.
 2. Open [api.monobank.ua](https://api.monobank.ua/) and sign in with the monobank app or Diia.
 3. Copy the personal token and paste it in FundsFlow, then click **Connect**.
 
@@ -46,7 +46,7 @@ the same way.
 
 ## Jars as savings goals
 
-Jars are not imported as accounts or as transactions. Instead, each UAH jar in **Settings → Bank** has a
+Jars are not imported as accounts or as transactions. Instead, each UAH jar in **Settings → Connections → Monobank** has a
 **Track as goal** toggle (off until you turn it on). Turning it on creates a savings goal with the jar's
 title and, if monobank has one, the jar's target. Progress is the jar's current balance from monobank,
 not tagged contributions. You can still set a deadline on the goal; required-per-week or per-month and
@@ -62,7 +62,7 @@ once an hour (monobank allows one client-info request per minute).
 ## Telegram
 
 When a new purchase is imported, the bot can send a short message with the merchant, the amount and the
-tag, and buttons to change the tag or delete it. Turn **Notify in Telegram** off in **Settings → Bank**
+tag, and buttons to change the tag or delete it. Turn **Notify in Telegram** off in **Settings → Connections → Monobank**
 to keep the sync and hide those messages. `/mute` also silences them, along with the other bot
 notifications.
 

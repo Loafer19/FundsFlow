@@ -3,6 +3,10 @@ title: Tabs
 description: Analytics, Calendar, Budgets, Tags, Flow, Trend, and List tabs in the FundsFlow web app.
 ---
 
+Tabs are grouped: **Overview** (Analytics, Calendar, List), **Plan** (Budgets, Tags) and **Charts** (Flow, Trend).
+Pick a group, then a tab inside it; each group remembers the tab you used last. On a phone the groups sit in a dock
+at the bottom, next to **Add** and **More** (assistant, import, recurring payments, tags, settings, docs and feedback).
+
 All tabs use the period and tag filter selected at the top of the page.
 
 ## Analytics

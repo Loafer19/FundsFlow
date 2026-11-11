@@ -10,7 +10,9 @@ The FundsFlow bot is [@funds_flow_bot](https://t.me/funds_flow_bot). It lets you
 - send [voice messages](/docs/telegram/voice/) instead of typing;
 - ask questions and request changes in plain language — the [AI assistant](/docs/telegram/ai-assistant/);
 - browse this month, recent transactions, tags, budgets, and recurring rules from the [reply menu and commands](/docs/telegram/commands/);
-- receive [notifications](/docs/telegram/notifications/) about budgets, recurring payments, and a weekly digest.
+- fix a new entry with **✏️ Edit** or **↩️ Undo** right on its card — [after saving](/docs/telegram/quick-add/#after-saving);
+- receive [notifications](/docs/telegram/notifications/): budget alerts, a weekly digest, reminders the day before
+  recurring payments, and an optional pinned month summary.
 
 ## Start the bot
 
@@ -26,11 +28,11 @@ Either way you get a short usage guide and the reply menu.
 
 If you already have a FundsFlow account on the website (email, Google, or GitHub):
 
-1. On [fundsflow.fun](https://fundsflow.fun/) open **Settings → Accounts**.
+1. On [fundsflow.fun](https://fundsflow.fun/) open **Settings → Connections**.
 2. Next to **Telegram**, click **Open Bot**. Telegram opens the bot with a one-time link code.
 3. Press **Start**. The bot replies **✅ Linked to your FundsFlow account**.
 
-Link codes are valid for **10 minutes**. If a link expired, generate a new one from **Settings → Accounts**.
+Link codes are valid for **10 minutes**. If a link expired, generate a new one from **Settings → Connections**.
 You can also type `/start K7QM-2XPA` with the code by hand.
 
 ## Unlink
@@ -40,5 +42,5 @@ Send `/unlink`. This disconnects the chat; the FundsFlow account and its data st
 
 ## Open the web app inside Telegram
 
-Use the **Web UI** menu button next to the message field (or the **🌐 Web UI** reply button / `/app`). See
+Use the **Web UI** menu button next to the message field (or send `/app`). See
 [Mini App](/docs/mini-app/).

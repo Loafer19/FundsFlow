@@ -4,6 +4,7 @@ use App\Console\Commands\CheckBudgetThresholdsCommand;
 use App\Console\Commands\RefreshMonobankJarsCommand;
 use App\Console\Commands\GenerateRecurringTransactionsCommand;
 use App\Console\Commands\PruneAgentUploadsCommand;
+use App\Console\Commands\QueueHeartbeatCommand;
 use App\Console\Commands\SendRecurringRemindersCommand;
 use App\Console\Commands\SendWeeklyDigestCommand;
 use App\Console\Commands\TelegramPinnedMonthCommand;
@@ -22,3 +23,6 @@ Schedule::command(TelegramPinnedMonthCommand::class)->hourlyAt(2);
 Schedule::command('sanctum:prune-expired --hours=24')->daily();
 // Receipt photos sent to the web assistant whose Confirm card was never resolved.
 Schedule::command(PruneAgentUploadsCommand::class)->hourly();
+// Queue worker heartbeat (only when a worker is expected, see config/queue_monitor.php).
+Schedule::command(QueueHeartbeatCommand::class)->everyMinute()->when(fn (): bool => (bool) config('queue_monitor.enabled'));
+Schedule::command(QueueHeartbeatCommand::class, ['--check'])->everyFiveMinutes()->when(fn (): bool => (bool) config('queue_monitor.enabled'));

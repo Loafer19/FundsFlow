@@ -37,11 +37,11 @@ used the bot — see [Telegram bot overview](/docs/telegram/overview/).
 
 Sending `/start` to the bot **without** a link creates a new FundsFlow account tied to that chat. Use `/website` to get
 into the web app. To use email and password later (for example for [MCP OAuth](/docs/ai/connect-clients/)), set them
-in **Settings → Accounts → Login credentials**.
+in **Settings → Account → Login credentials**.
 
 ## Linking more sign-in methods
 
-Linked methods are listed in **Settings → Accounts**. To link Telegram from the website, use
-**Settings → Accounts → Telegram → Open Bot** (see [Linking Telegram](/docs/telegram/overview/#link-telegram-to-an-existing-account)).
+Linked methods are listed in **Settings → Account** (Google, GitHub) and **Settings → Connections** (Telegram). To link Telegram from the website, use
+**Settings → Connections → Telegram → Open Bot** (see [Linking Telegram](/docs/telegram/overview/#link-telegram-to-an-existing-account)).
 If you open the [Mini App](/docs/mini-app/) from a Telegram account that is not linked yet, signing in there links that
 Telegram account to the FundsFlow account you sign in to.

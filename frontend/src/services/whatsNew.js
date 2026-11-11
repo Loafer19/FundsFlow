@@ -10,6 +10,20 @@ import { useAuthStore } from './auth.js'
  */
 export const RELEASES = [
     {
+        version: '2.3.0',
+        items: [
+            'A cleaner layout: tabs grouped into Overview, Plan and Charts, with a bottom dock on phones.',
+            'Settings in a side panel with fewer sections, and a new Import page with your past imports.',
+            'The Trend chart shows where your balance is heading this period.',
+            'The Telegram bot got live widgets: this month, budgets, tags, recent and recurring payments.',
+            'Just write or say a transaction in Telegram, any language: the assistant saves it.',
+            'Fix a new entry right on its card: ✏️ Edit opens an editor, ↩️ Undo works for 5 minutes.',
+            'Budget alerts, reached goals and the weekly digest come with progress bars.',
+            'Get a reminder the evening before a recurring payment, and pin a live month summary in the chat.',
+            'After an update the app reloads by itself instead of showing a loading error.',
+        ],
+    },
+    {
         version: '2.2.0',
         items: [
             'Connect monobank with a personal token: cards sync automatically, including the last 31 days.',

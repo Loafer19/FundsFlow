@@ -8,7 +8,7 @@ The Mini App is the full FundsFlow web app running inside Telegram.
 ## Open it
 
 - Tap the **Web UI** menu button next to the message field in the bot chat, or
-- tap **🌐 Web UI** in the reply menu (or send `/app`) for a reminder of where the button is.
+- send `/app` for a reminder of where the button is.
 
 ## Sign-in
 
@@ -28,5 +28,5 @@ The Mini App uses Telegram's native controls:
 
 A few things that need a regular browser are hidden in the Mini App:
 
-- **Settings → Data → Download JSON** (export) and **Settings → Report → Download PDF**. Use **Send to Telegram** in
+- **Settings → Data & reports → Download JSON** (export) and **Settings → Data & reports → Download PDF**. Use **Send to Telegram** in
   the Report tab instead, or open [fundsflow.fun](https://fundsflow.fun/) in a browser.

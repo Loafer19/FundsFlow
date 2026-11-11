@@ -57,6 +57,8 @@ import { useTransactionsStore } from '../services/transactions.js'
 const budgetsStore = useBudgetsStore()
 const transactionsStore = useTransactionsStore()
 
+// App passes the same props and listeners to every tab; this one renders a fragment and uses only some
+defineOptions({ inheritAttrs: false })
 const emit = defineEmits(['jump-to-list'])
 
 const limits = computed(() => budgetsStore.budgets.filter((budget) => !isGoal(budget)))
