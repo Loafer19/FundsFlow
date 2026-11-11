@@ -102,6 +102,16 @@ final class TagTree
         return trim($meta['emoji'] . ' ' . $meta['title']);
     }
 
+    /**
+     * Direct child ids of a tag (deleted tags included, like the rest of the map).
+     *
+     * @return list<int>
+     */
+    public function childrenOf(int $id): array
+    {
+        return $this->children[$id] ?? [];
+    }
+
     public function parentOf(int $id): ?int
     {
         return $this->parents[$id] ?? null;

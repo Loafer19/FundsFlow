@@ -109,6 +109,12 @@ class MenuHandler
             $tree,
         ));
 
+        if ($tags->isNotEmpty() && $this->isPrivateChat($chatId) && $this->widgets->sendTags($user, $chatId)) {
+            $this->session->setSummary($identity, $chatId, 'Tags with this month\'s expenses shown.');
+
+            return;
+        }
+
         if ($tags->isEmpty()) {
             $this->session->setSummary($identity, $chatId, 'No tags yet.');
             $this->client->sendMessage($chatId, 'No tags yet');
@@ -280,6 +286,10 @@ class MenuHandler
     {
         $rules = $this->listRecurring->execute($user);
 
+        if ($rules->isNotEmpty() && $this->isPrivateChat($chatId) && $this->widgets->sendRecurring($user, $chatId)) {
+            return;
+        }
+
         if ($rules->isEmpty()) {
             $this->client->sendMessage($chatId, 'No recurring rules');
 
@@ -362,6 +372,25 @@ class MenuHandler
         ]);
 
         $this->client->sendMessage($chatId, "✅ Tag created: {$tag->emoji} {$tag->title}");
+    }
+
+    /**
+     * One switch for limit alerts, goal messages, the weekly digest, and recurring / bank sync
+     * notifications (muted per chat). /mute and /unmute still work as shortcuts.
+     */
+    public function sendNotifications(User $user, int|string $chatId): void
+    {
+        if ($this->isPrivateChat($chatId) && $this->widgets->sendNotifications($user, $chatId)) {
+            return;
+        }
+
+        $muted = (bool) ($this->support->resolveIdentity($chatId)?->meta['muted'] ?? false);
+        $this->client->sendMessage(
+            $chatId,
+            $muted
+                ? '🔕 Notifications are muted in this chat. Send /unmute to turn them back on'
+                : '🔔 Notifications are on in this chat. Send /mute to turn them off',
+        );
     }
 
     public function sendAddWidget(User $user, int|string $chatId): void

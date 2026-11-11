@@ -5,6 +5,7 @@ namespace App\Channels\Telegram\Handlers;
 use App\Actions\Identities\GenerateTelegramLinkCodeAction;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
+use App\Channels\Telegram\Widgets\TelegramWidgetSync;
 use App\Models\User;
 use App\Support\AppSettings;
 use App\Support\TelegramCode;
@@ -14,6 +15,7 @@ class AuthHandler
     public function __construct(
         private readonly TelegramClient $client,
         private readonly TelegramSupport $support,
+        private readonly TelegramWidgetSync $widgetSync,
     ) {}
 
     /**
@@ -174,6 +176,10 @@ class AuthHandler
         $identity = $this->support->resolveIdentity($chatId);
 
         $identity->update(['meta' => [...($identity->meta ?? []), 'muted' => $muted]]);
+
+        if ($identity->user) {
+            $this->widgetSync->refreshNotifications($identity->user);
+        }
 
         $this->client->sendMessage($chatId, $muted
             ? '🔕 Notifications muted. Use /unmute to turn budget alerts, weekly digest, recurring auto-add, and bank sync notifications back on'

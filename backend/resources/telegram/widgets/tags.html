@@ -1,0 +1,104 @@
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:10px 12px 12px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color);--g:#2ea44f}
+.h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0}
+h3{margin:0;font-size:1.05em;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.d{color:var(--tg-theme-hint-color);font-size:.8em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tot{margin:2px 0 8px;font-size:.85em;font-weight:600;font-variant-numeric:tabular-nums}
+.row{display:block;width:100%;text-align:left;margin:0 0 6px;padding:7px 10px;border:0;border-radius:10px;background:var(--tg-theme-secondary-bg-color);color:inherit;font:inherit}
+.top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.a{font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.neg{color:var(--tg-theme-destructive-text-color)}
+.pos{color:var(--g)}
+.sep{color:var(--tg-theme-hint-color);font-weight:400}
+.z .n,.z .a{color:var(--tg-theme-hint-color);font-weight:400}
+.bar{height:4px;margin:6px 0 0;background:var(--tg-theme-section-separator-color);border-radius:99px;overflow:hidden}
+.fill{height:100%;background:var(--tg-theme-button-color);border-radius:99px}
+.fill.in{background:var(--g)}
+.k{color:var(--tg-theme-hint-color);margin-left:4px}
+.empty,.err,.hint{font-size:.85em;margin:8px 0 0}
+.empty,.hint{color:var(--tg-theme-hint-color)}
+.err{color:var(--tg-theme-destructive-text-color)}
+button.back{margin:0 0 10px}
+button.more{margin:4px 0 0}
+</style>
+<div id="root"></div>
+<script>
+const W=window.TelegramWidget;
+let d={},sel=null,kids=null,err='',busy=false,all=false;
+function parse(s){try{return s?JSON.parse(s):null}catch(e){return null}}
+function el(t,c,x){const n=document.createElement(t);if(c)n.className=c;if(x!=null)n.textContent=x;return n}
+function root(){const n=document.getElementById('root');n.innerHTML='';return n}
+function sums(box,e,i){
+  if(e)box.appendChild(el('span','neg',e));
+  if(e&&i)box.appendChild(el('span','sep',' · '));
+  if(i)box.appendChild(el('span','pos',i));
+  if(!e&&!i)box.textContent='—';
+  return box;
+}
+function head(r,title,src){
+  const h=el('div','h');h.appendChild(el('h3','',title));h.appendChild(el('span','d',d.p||''));r.appendChild(h);
+  r.appendChild(sums(el('div','tot'),src.e,src.in));
+}
+// c: [label, expenses, income, expense %, income %, has children]
+function line(c,more){
+  const act=c[1]||c[2];
+  const b=el(more?'button':'div','row'+(act?'':' z'));if(more)b.type='button';
+  const t=el('div','top');const n=el('span','n',c[0]);
+  if(more)n.appendChild(el('span','k','›'));
+  t.appendChild(n);t.appendChild(sums(el('span','a'),c[1],c[2]));b.appendChild(t);
+  if(act){
+    const w=el('div','bar');const f=el('div',c[1]?'fill':'fill in');
+    f.style.width=Math.max(2,Math.min(100,(c[1]?c[3]:c[4])||0))+'%';w.appendChild(f);b.appendChild(w);
+  }
+  return b;
+}
+function showList(){
+  const r=root();head(r,'Tags',d);
+  if(err)r.appendChild(el('p','err',err));
+  const it=d.i||[];
+  if(!it.length){r.appendChild(el('p','empty','No tags yet'));return}
+  const idle=it.filter(function(x){return !x[2]&&!x[3]});
+  const fold=idle.length&&idle.length<it.length;
+  it.forEach(function(x){
+    if(!x[2]&&!x[3]&&fold&&!all)return;
+    const b=line(x.slice(1),!!x[6]);
+    if(x[6])b.addEventListener('click',function(){open(x)});
+    r.appendChild(b);
+  });
+  if(fold){
+    const t=el('button','more',all?'Hide tags with no transactions':(idle.length+' more with no transactions'));t.type='button';
+    t.addEventListener('click',function(){all=!all;showList()});r.appendChild(t);
+  }
+  if(d.more)r.appendChild(el('p','hint','+'+d.more+' more in the Web UI'));
+}
+function showKids(x){
+  const r=root();
+  const back=el('button','back','Back');back.type='button';
+  back.addEventListener('click',function(){sel=null;kids=null;err='';showList()});
+  r.appendChild(back);
+  head(r,(kids&&kids.n)||x[1],kids||{e:x[2],in:x[3]});
+  if(err)r.appendChild(el('p','err',err));
+  if(!kids){if(!err)r.appendChild(el('p','empty','Loading…'));return}
+  (kids.i||[]).forEach(function(k){r.appendChild(line(k,false))});
+}
+function open(x){
+  if(busy)return;sel=x;kids=null;err='';showKids(x);
+  if(!W||!W.request){err='Open this in Telegram';showKids(x);return}
+  busy=true;
+  W.request('t:'+x[0]).then(function(a){
+    busy=false;const r=parse(a&&a.result);
+    if(r&&r.ok){kids=r;showKids(x);return}
+    err=(r&&r.e)||'Could not load subtags';showKids(x);
+  },function(e){busy=false;err=(e&&e.code)||'Could not load subtags';showKids(x)});
+}
+function render(){
+  d=parse(W&&W.chatData)||{};
+  if(sel){const f=(d.i||[]).filter(function(x){return x[0]===sel[0]})[0];if(f){open(f);return}sel=null}
+  showList();
+}
+if(W&&W.onEvent)W.onEvent('chatDataChanged',render);
+if(W&&W.ready)W.ready();
+render();
+</script>

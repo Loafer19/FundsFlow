@@ -226,6 +226,7 @@ class TelegramClient
         bool $allowQueries = false,
         ?int $height = null,
         ?string $parseMode = null,
+        ?array $replyMarkup = null,
     ): array {
         try {
             $response = Http::post($this->baseUrl . 'sendWidget', array_filter([
@@ -236,6 +237,7 @@ class TelegramClient
                 'parse_mode' => $parseMode,
                 'allow_queries' => $allowQueries ?: null,
                 'height' => $height,
+                'reply_markup' => $replyMarkup ? json_encode($replyMarkup) : null,
             ], static fn ($value) => $value !== null && $value !== ''));
         } catch (\Throwable $e) {
             return ['ok' => false, 'description' => $e->getMessage()];

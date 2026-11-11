@@ -1,0 +1,45 @@
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:10px 12px 12px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color)}
+h3{margin:0 0 8px;font-size:1.05em;font-weight:650}
+.card{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px;border:0;border-radius:10px;background:var(--tg-theme-secondary-bg-color);color:inherit;font:inherit}
+.t{flex:1;min-width:0}
+.t b{display:block;font-weight:650}
+.t span{display:block;color:var(--tg-theme-hint-color);font-size:.8em;margin:2px 0 0}
+.sw{flex:none;width:42px;height:24px;border-radius:99px;background:var(--tg-theme-hint-color);position:relative;transition:background .15s}
+.sw:after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.on .sw{background:var(--tg-theme-button-color)}
+.on .sw:after{left:21px}
+ul{margin:10px 0 0;padding:0 0 0 18px;color:var(--tg-theme-hint-color);font-size:.85em}
+li{margin:2px 0}
+.err{color:var(--tg-theme-destructive-text-color);font-size:.85em;margin:8px 0 0}
+</style>
+<h3>Notifications</h3>
+<button type="button" class="card" id="c"><div class="t"><b id="s">—</b><span>In this chat</span></div><div class="sw"></div></button>
+<ul><li>Limit alerts at 80% and 100%</li><li>Savings goal updates</li><li>Weekly digest</li><li>Recurring and bank sync entries</li></ul>
+<p class="err" id="e" hidden></p>
+<script>
+const W=window.TelegramWidget;
+let muted=false,busy=false;
+function parse(s){try{return s?JSON.parse(s):null}catch(e){return null}}
+function show(err){
+  const c=document.getElementById('c');
+  c.className='card'+(muted?'':' on');
+  document.getElementById('s').textContent=busy?'Saving…':(muted?'Muted':'On');
+  const e=document.getElementById('e');e.hidden=!err;e.textContent=err||'';
+}
+document.getElementById('c').addEventListener('click',function(){
+  if(busy)return;
+  if(!W||!W.request){show('Open this in Telegram');return}
+  const next=!muted;busy=true;show('');
+  W.request('n:'+(next?1:0)).then(function(a){
+    busy=false;const r=parse(a&&a.result);
+    if(r&&r.ok){muted=!!r.m;show('');return}
+    show((r&&r.e)||'Could not update');
+  },function(e){busy=false;show((e&&e.code)||'Could not update')});
+});
+function render(){const d=parse(W&&W.chatData)||{};muted=!!d.m;show('')}
+if(W&&W.onEvent)W.onEvent('chatDataChanged',render);
+if(W&&W.ready)W.ready();
+render();
+</script>

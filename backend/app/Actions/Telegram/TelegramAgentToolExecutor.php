@@ -67,7 +67,7 @@ class TelegramAgentToolExecutor
             $this->tools->definition('list_recurring'),
             $this->tools->definition('period_summary'),
             ...$this->planningDefinitions(read: true),
-            $fn('show_menu', 'Send the standard reply-keyboard menu (Month, Recent, Tags, Budgets, Recurring, Web UI).', [
+            $fn('show_menu', 'Send the standard reply-keyboard menu (Add, Recent, Month, Budgets, Tags, Recurring).', [
                 'type' => 'object',
                 'properties' => (object) [],
             ]),

@@ -5,9 +5,11 @@ namespace App\Channels\Telegram\Widgets;
 use App\Actions\Budgets\CalculateGoalProgressAction;
 use App\Actions\Budgets\CalculateLimitStatusAction;
 use App\Actions\Budgets\ListBudgetsAction;
+use App\Actions\RecurringTransactions\ListRecurringTransactionsAction;
 use App\Models\Budget;
 use App\Models\BudgetPeriod;
 use App\Models\Identity;
+use App\Models\RecurringTransaction;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
@@ -15,6 +17,7 @@ use App\Support\TagTree;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
 
 /**
  * chat_data payloads for Telegram HTML widgets (each at most 1024 UTF-8 bytes).
@@ -29,16 +32,23 @@ class TelegramWidgetData
 
     public const KIND_RECENT = 'recent';
 
+    public const KIND_TAGS = 'tags';
+
+    public const KIND_RECURRING = 'recurring';
+
+    public const KIND_NOTIFICATIONS = 'notifications';
+
     public const RECENT_PAGE = 8;
 
     public function __construct(
         private readonly ListBudgetsAction $listBudgets,
         private readonly CalculateLimitStatusAction $limitStatus,
         private readonly CalculateGoalProgressAction $goalProgress,
+        private readonly ListRecurringTransactionsAction $listRecurring,
     ) {}
 
     /**
-     * @return array{chat_data: string, caption: string}
+     * @return array{chat_data: string}
      */
     public function summary(User $user): array
     {
@@ -112,11 +122,11 @@ class TelegramWidgetData
             $payload['t'] = array_slice($payload['t'], 0, 2);
         }
 
-        return ['chat_data' => $this->json($payload), 'caption' => 'Month summary'];
+        return ['chat_data' => $this->json($payload)];
     }
 
     /**
-     * @return array{chat_data: string, caption: string}
+     * @return array{chat_data: string}
      */
     public function budgets(User $user): array
     {
@@ -132,7 +142,7 @@ class TelegramWidgetData
 
         $payload = $this->packBudgetItems($items);
 
-        return ['chat_data' => $this->json($payload), 'caption' => 'Limits and savings goals'];
+        return ['chat_data' => $this->json($payload)];
     }
 
     /**
@@ -152,7 +162,7 @@ class TelegramWidgetData
     }
 
     /**
-     * @return array{chat_data: string, caption: string}
+     * @return array{chat_data: string}
      */
     public function add(User $user, ?Identity $identity = null): array
     {
@@ -196,15 +206,15 @@ class TelegramWidgetData
             array_pop($payload['tags']);
         }
 
-        return ['chat_data' => $this->json($payload), 'caption' => 'Quick add a transaction'];
+        return ['chat_data' => $this->json($payload)];
     }
 
     /**
-     * @return array{chat_data: string, caption: string}
+     * @return array{chat_data: string}
      */
     public function recent(User $user, int $offset = 0): array
     {
-        return ['chat_data' => $this->json($this->recentPage($user, $offset)), 'caption' => 'Recent transactions'];
+        return ['chat_data' => $this->json($this->recentPage($user, $offset))];
     }
 
     /**
@@ -228,6 +238,207 @@ class TelegramWidgetData
     }
 
     /**
+     * This month's expenses and income per top-level tag (a parent includes its children), every
+     * top-level tag listed so the widget doubles as the tag list.
+     * Rows: [id, label, expenses "-X" or "", income "+Y" or "", expense share %, income share %, has children].
+     *
+     * @return array{chat_data: string}
+     */
+    public function tags(User $user): array
+    {
+        [$from, $to] = $this->monthRange($user);
+        $tree = TagTree::for($user);
+        $sums = [];
+        $untagged = [0.0, 0.0];
+        $totals = [0.0, 0.0];
+
+        foreach ($this->monthTransactions($user, $from, $to) as $transaction) {
+            $amount = (float) $transaction->amount;
+            $side = $amount < 0 ? 0 : 1;
+            $totals[$side] += abs($amount);
+            $ids = $transaction->tags->pluck('id');
+
+            if ($ids->isEmpty()) {
+                $untagged[$side] += abs($amount);
+
+                continue;
+            }
+
+            foreach ($tree->rootsOf($ids) as $root) {
+                $sums[$root] ??= [0.0, 0.0];
+                $sums[$root][$side] += abs($amount);
+            }
+        }
+
+        $rows = [];
+
+        foreach ($user->tags()->whereNull('parent_id')->orderBy('title')->get(['id', 'emoji', 'title']) as $tag) {
+            $id = (int) $tag->id;
+            $rows[] = [$id, $this->clip(trim($tag->emoji . ' ' . $tag->title), 24), $sums[$id] ?? [0.0, 0.0], $tree->childrenOf($id) !== []];
+        }
+
+        if ($untagged[0] > 0 || $untagged[1] > 0) {
+            $rows[] = [0, 'Untagged', $untagged, false];
+        }
+
+        $payload = [
+            'p' => $from->format('m.Y'),
+            'e' => $totals[0] > 0 ? $this->money($user, -$totals[0]) : '',
+            'in' => $totals[1] > 0 ? $this->signedMoney($user, $totals[1]) : '',
+            'i' => array_map(
+                fn (array $row): array => [$row[0], $row[1], ...$this->flowCells($user, $row[2], $totals), $row[3] ? 1 : 0],
+                $this->sortByFlow($rows, 2),
+            ),
+        ];
+        $hidden = 0;
+
+        while (strlen($this->json($payload)) > 1000 && $payload['i'] !== []) {
+            array_pop($payload['i']);
+            $payload['more'] = ++$hidden;
+        }
+
+        return ['chat_data' => $this->json($payload)];
+    }
+
+    /**
+     * One top-level tag split by its direct children for this month (query answer).
+     * Rows: [label, expenses, income, expense share %, income share %].
+     *
+     * @return null|array<string, mixed>
+     */
+    public function tagDetail(User $user, int $tagId): ?array
+    {
+        $tag = $user->tags()->whereKey($tagId)->first(['id', 'emoji', 'title', 'parent_id']);
+
+        if (!$tag instanceof Tag) {
+            return null;
+        }
+
+        [$from, $to] = $this->monthRange($user);
+        $tree = TagTree::for($user);
+        $children = $user->tags()->where('parent_id', $tagId)->get(['id', 'emoji', 'title']);
+        $subtrees = [];
+
+        foreach ($children as $child) {
+            $subtrees[(int) $child->id] = array_flip($tree->expand([(int) $child->id]));
+        }
+
+        $own = array_flip($tree->expand([$tagId]));
+        $sums = array_fill_keys(array_keys($subtrees), [0.0, 0.0]);
+        $direct = [0.0, 0.0];
+        $totals = [0.0, 0.0];
+
+        foreach ($this->monthTransactions($user, $from, $to) as $transaction) {
+            $ids = $transaction->tags->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+            if (!array_filter($ids, fn (int $id) => isset($own[$id]))) {
+                continue;
+            }
+
+            $amount = (float) $transaction->amount;
+            $side = $amount < 0 ? 0 : 1;
+            $totals[$side] += abs($amount);
+            $matched = false;
+
+            foreach ($subtrees as $childId => $subtree) {
+                if (array_filter($ids, fn (int $id) => isset($subtree[$id]))) {
+                    $sums[$childId][$side] += abs($amount);
+                    $matched = true;
+                }
+            }
+
+            if (!$matched) {
+                $direct[$side] += abs($amount);
+            }
+        }
+
+        $rows = [];
+
+        foreach ($children as $child) {
+            $rows[] = [$this->clip(trim($child->emoji . ' ' . $child->title), 24), $sums[(int) $child->id]];
+        }
+
+        if ($direct[0] > 0 || $direct[1] > 0) {
+            $rows[] = ['Without a subtag', $direct];
+        }
+
+        $payload = [
+            'n' => $this->clip(trim($tag->emoji . ' ' . $tag->title), 28),
+            'e' => $totals[0] > 0 ? $this->money($user, -$totals[0]) : '',
+            'in' => $totals[1] > 0 ? $this->signedMoney($user, $totals[1]) : '',
+            'i' => array_map(
+                fn (array $row): array => [$row[0], ...$this->flowCells($user, $row[1], $totals)],
+                $this->sortByFlow($rows, 1),
+            ),
+        ];
+
+        while (strlen($this->json($payload)) > 1000 && $payload['i'] !== []) {
+            array_pop($payload['i']);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Recurring rules, active first and then by next date.
+     *
+     * @return array{chat_data: string}
+     */
+    public function recurring(User $user): array
+    {
+        $rules = $this->listRecurring->execute($user)
+            ->sortBy(fn (RecurringTransaction $rule) => [$rule->active ? 0 : 1, $rule->next_run_at->toDateString()])
+            ->values();
+        $items = $rules->map(fn (RecurringTransaction $rule) => $this->recurringItem($user, $rule))->all();
+        $payload = ['i' => $items];
+        $hidden = 0;
+
+        while (strlen($this->json($payload)) > 1000 && $payload['i'] !== []) {
+            array_pop($payload['i']);
+            $payload['more'] = ++$hidden;
+        }
+
+        return ['chat_data' => $this->json($payload)];
+    }
+
+    /**
+     * @return array{id: int, a: string, n: string, fq: string, nx: string, on: int, g?: string}
+     */
+    public function recurringItem(User $user, RecurringTransaction $rule): array
+    {
+        $note = trim((string) ($rule->note ?? ''));
+        $tags = $rule->relationLoaded('tags') ? $rule->tags : $rule->tags()->get();
+        $tag = $tags->first();
+        $tagLabel = $tag ? $this->clip(trim($tag->emoji . ' ' . $tag->title), 22) : '';
+        $item = [
+            'id' => (int) $rule->id,
+            'a' => $this->signedMoney($user, (float) $rule->amount),
+            'n' => $this->clip($note !== '' ? $note : ($tagLabel !== '' ? $tagLabel : 'No note'), 26),
+            'fq' => ucfirst($rule->frequency->value),
+            'nx' => $this->date($rule->next_run_at),
+            'on' => $rule->active ? 1 : 0,
+        ];
+
+        if ($note !== '' && $tagLabel !== '') {
+            $item['g'] = $tagLabel;
+        }
+
+        if ($rule->ends_at !== null) {
+            $item['end'] = $this->date($rule->ends_at);
+        }
+
+        return $item;
+    }
+
+    /**
+     * @return array{chat_data: string}
+     */
+    public function notifications(Identity $identity): array
+    {
+        return ['chat_data' => $this->json(['m' => ($identity->meta['muted'] ?? false) ? 1 : 0])];
+    }
+
+    /**
      * @param array{a: string, n: string} $last
      */
     public function storeAddLast(Identity $identity, array $last): void
@@ -236,6 +447,63 @@ class TelegramWidgetData
         $meta['widgets']['add_last'] = $last;
         $identity->meta = $meta;
         $identity->save();
+    }
+
+    /**
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function monthRange(User $user): array
+    {
+        $now = $user->nowInTimezone();
+
+        return [$now->copy()->startOfMonth()->startOfDay(), $now->copy()->endOfMonth()->startOfDay()];
+    }
+
+    /**
+     * @return Collection<int, Transaction>
+     */
+    private function monthTransactions(User $user, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        return $user->transactions()
+            ->with('tags')
+            ->onDays($from, $to)
+            ->get();
+    }
+
+    /**
+     * Signed amount labels and shares for one tag row: [expenses, income, expense %, income %].
+     *
+     * @param array{0: float, 1: float} $sums [expenses, income], both positive
+     * @param array{0: float, 1: float} $totals
+     * @return array{0: string, 1: string, 2: int, 3: int}
+     */
+    private function flowCells(User $user, array $sums, array $totals): array
+    {
+        return [
+            $sums[0] > 0 ? $this->money($user, -$sums[0]) : '',
+            $sums[1] > 0 ? $this->signedMoney($user, $sums[1]) : '',
+            $totals[0] > 0 ? (int) round($sums[0] / $totals[0] * 100) : 0,
+            $totals[1] > 0 ? (int) round($sums[1] / $totals[1] * 100) : 0,
+        ];
+    }
+
+    /**
+     * Expense rows first (largest first), then income-only rows (largest first), then rows
+     * with no transactions this month in their original (alphabetical) order.
+     *
+     * @param list<array<int, mixed>> $rows
+     * @return list<array<int, mixed>>
+     */
+    private function sortByFlow(array $rows, int $sumsAt): array
+    {
+        $rank = static fn (array $row): array => [
+            $row[$sumsAt][0] > 0 ? 0 : ($row[$sumsAt][1] > 0 ? 1 : 2),
+            -($row[$sumsAt][0] > 0 ? $row[$sumsAt][0] : $row[$sumsAt][1]),
+        ];
+        $indexed = array_map(null, array_keys($rows), $rows);
+        usort($indexed, static fn (array $a, array $b): int => [$rank($a[1]), $a[0]] <=> [$rank($b[1]), $b[0]]);
+
+        return array_column($indexed, 1);
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Channels\Telegram\Widgets;
 
 use App\Channels\Telegram\TelegramClient;
+use App\Channels\Telegram\TelegramSupport;
 use App\Models\Identity;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
@@ -15,6 +16,7 @@ class TelegramWidgetSender
     public function __construct(
         private readonly TelegramClient $client,
         private readonly TelegramWidgetData $data,
+        private readonly TelegramSupport $support,
     ) {}
 
     public function html(string $kind): string
@@ -44,6 +46,27 @@ class TelegramWidgetSender
     public function sendRecent(User $user, int|string $chatId): bool
     {
         return $this->send($user, $chatId, TelegramWidgetData::KIND_RECENT, $this->data->recent($user), allowQueries: true);
+    }
+
+    public function sendTags(User $user, int|string $chatId): bool
+    {
+        return $this->send($user, $chatId, TelegramWidgetData::KIND_TAGS, $this->data->tags($user), allowQueries: true);
+    }
+
+    public function sendRecurring(User $user, int|string $chatId): bool
+    {
+        return $this->send($user, $chatId, TelegramWidgetData::KIND_RECURRING, $this->data->recurring($user), allowQueries: true);
+    }
+
+    public function sendNotifications(User $user, int|string $chatId): bool
+    {
+        $identity = $this->identityFor($user, $chatId);
+
+        if (!$identity) {
+            return false;
+        }
+
+        return $this->send($user, $chatId, TelegramWidgetData::KIND_NOTIFICATIONS, $this->data->notifications($identity), allowQueries: true);
     }
 
     /**
@@ -106,7 +129,10 @@ class TelegramWidgetSender
     }
 
     /**
-     * @param array{chat_data: string, caption: string} $payload
+     * No caption: the widget carries its own title, and Telegram shows a caption
+     * as an extra text line under the bubble.
+     *
+     * @param array{chat_data: string} $payload
      */
     private function send(
         User $user,
@@ -130,15 +156,24 @@ class TelegramWidgetSender
             return false;
         }
 
+        $identity = $this->identityFor($user, $chatId);
+        $upgradeMenu = $identity && (int) ($identity->meta['menu_v'] ?? 1) < TelegramSupport::MENU_VERSION;
         $result = $this->client->sendWidget(
             $chatId,
             $html,
             $payload['chat_data'],
-            $payload['caption'],
+            null,
             $allowQueries,
             $height,
             null,
+            $upgradeMenu ? $this->support->menuKeyboard() : null,
         );
+
+        if ($upgradeMenu && !($result['ok'] ?? false)) {
+            // Never lose the widget over the keyboard: retry without it.
+            $upgradeMenu = false;
+            $result = $this->client->sendWidget($chatId, $html, $payload['chat_data'], null, $allowQueries, $height);
+        }
 
         if (!($result['ok'] ?? false)) {
             Log::warning('Telegram sendWidget failed', [
@@ -151,10 +186,15 @@ class TelegramWidgetSender
         }
 
         $messageId = $result['result']['message_id'] ?? null;
-        $identity = $this->identityFor($user, $chatId);
+
+        if ($identity && $upgradeMenu) {
+            $identity->meta = [...($identity->meta ?? []), 'menu_v' => TelegramSupport::MENU_VERSION];
+        }
 
         if (is_int($messageId) && $identity) {
             $this->remember($identity, $kind, $chatId, $messageId);
+        } elseif ($identity && $upgradeMenu) {
+            $identity->save();
         }
 
         return true;

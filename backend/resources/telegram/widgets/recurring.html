@@ -1,0 +1,78 @@
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:10px 12px 12px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color)}
+h3{margin:0 0 8px;font-size:1.05em;font-weight:650}
+.item{display:block;width:100%;text-align:left;margin:0 0 6px;padding:8px 10px;border:0;border-radius:10px;background:var(--tg-theme-secondary-bg-color);color:inherit;font:inherit}
+.off{opacity:.55}
+.top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.amt{font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pos{color:var(--tg-theme-accent-text-color)}
+.neg{color:var(--tg-theme-destructive-text-color)}
+.meta{color:var(--tg-theme-hint-color);font-size:.8em;margin:4px 0 0}
+.lines p{margin:4px 0;font-size:.95em}
+.empty,.err,.hint{font-size:.85em;margin:8px 0 0}
+.empty,.hint{color:var(--tg-theme-hint-color)}
+.err{color:var(--tg-theme-destructive-text-color)}
+button.back{margin:0 0 10px}
+button.act{display:block;width:100%;margin:10px 0 0}
+</style>
+<div id="root"></div>
+<script>
+const W=window.TelegramWidget;
+let list=[],more=0,sel=null,err='',busy=false;
+function parse(s){try{return s?JSON.parse(s):null}catch(e){return null}}
+function el(t,c,x){const n=document.createElement(t);if(c)n.className=c;if(x!=null)n.textContent=x;return n}
+function root(){const n=document.getElementById('root');n.innerHTML='';return n}
+function cls(a){return 'amt'+((a&&a.charAt(0)==='+')?' pos':' neg')}
+function when(it){return it.on?('next '+it.nx):'Paused'}
+function showList(){
+  const r=root();r.appendChild(el('h3','','Recurring'));
+  if(err)r.appendChild(el('p','err',err));
+  if(!list.length){r.appendChild(el('p','empty','No recurring payments'));return}
+  list.forEach(function(it){
+    const b=el('button','item'+(it.on?'':' off'));b.type='button';
+    const t=el('div','top');t.appendChild(el('span',cls(it.a),it.a));t.appendChild(el('span','n',it.n));b.appendChild(t);
+    b.appendChild(el('div','meta',it.fq+' · '+when(it)));
+    b.addEventListener('click',function(){sel=it;err='';showDetail()});
+    r.appendChild(b);
+  });
+  if(more)r.appendChild(el('p','hint','+'+more+' more in the Web UI'));
+}
+function showDetail(){
+  const it=sel,r=root();
+  const back=el('button','back','Back');back.type='button';
+  back.addEventListener('click',function(){sel=null;err='';showList()});
+  r.appendChild(back);
+  r.appendChild(el('h3',cls(it.a),it.a));
+  const box=el('div','lines');
+  box.appendChild(el('p','',it.n));
+  if(it.g)box.appendChild(el('p','',it.g));
+  box.appendChild(el('p','',it.fq+(it.end?' until '+it.end:'')));
+  box.appendChild(el('p','',it.on?'Next payment '+it.nx:'Paused'));
+  if(err)box.appendChild(el('p','err',err));
+  r.appendChild(box);
+  const b=el('button','act',busy?'Saving…':(it.on?'Pause':'Resume'));b.type='button';
+  b.addEventListener('click',toggle);r.appendChild(b);
+}
+function toggle(){
+  if(busy||!sel)return;
+  if(!W||!W.request){err='Open this in Telegram';showDetail();return}
+  busy=true;err='';showDetail();
+  W.request('r:'+sel.id+':'+(sel.on?0:1)).then(function(a){
+    busy=false;const r=parse(a&&a.result);
+    if(r&&r.ok){delete r.ok;sel=r;list=list.map(function(x){return x.id===r.id?r:x});showDetail();
+      if(W.HapticFeedback&&W.HapticFeedback.notificationOccurred)W.HapticFeedback.notificationOccurred('success');return}
+    err=(r&&r.e)||'Could not update';showDetail();
+  },function(e){busy=false;err=(e&&e.code)||'Could not update';showDetail()});
+}
+function render(){
+  const d=parse(W&&W.chatData)||{};
+  list=d.i||[];more=d.more||0;
+  if(sel){const f=list.filter(function(x){return x.id===sel.id})[0];if(f){sel=f;showDetail();return}sel=null}
+  showList();
+}
+if(W&&W.onEvent)W.onEvent('chatDataChanged',render);
+if(W&&W.ready)W.ready();
+render();
+</script>

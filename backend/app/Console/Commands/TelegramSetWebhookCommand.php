@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Channels\Telegram\TelegramClient;
+use App\Channels\Telegram\TelegramSupport;
 use Illuminate\Console\Command;
 
 class TelegramSetWebhookCommand extends Command
@@ -34,25 +35,7 @@ class TelegramSetWebhookCommand extends Command
 
         $this->info("Webhook set to {$url}");
 
-        $client->setMyCommands([
-            ['command' => 'month', 'description' => "This month's income, expenses, net, and top tags"],
-            ['command' => 'analytics', 'description' => 'Same as /month'],
-            ['command' => 'summary', 'description' => 'Same as /month (live widget in a private chat)'],
-            ['command' => 'recent', 'description' => 'Last transactions (live widget in a private chat)'],
-            ['command' => 'tags', 'description' => 'List your tags'],
-            ['command' => 'newtag', 'description' => 'Create a tag: /newtag 🍕 Fast Food > Food'],
-            ['command' => 'budgets', 'description' => 'Active budgets and savings goals'],
-            ['command' => 'add', 'description' => 'Quick-add a transaction with the keypad widget'],
-            ['command' => 'recurring', 'description' => 'List recurring transaction rules'],
-            ['command' => 'app', 'description' => 'Open the Web UI from the menu button'],
-            ['command' => 'website', 'description' => 'Get a one-time code to log in on the website'],
-            ['command' => 'mute', 'description' => 'Mute budget alerts, weekly digest, and recurring notifications'],
-            ['command' => 'unmute', 'description' => 'Turn budget alerts, weekly digest, and recurring notifications back on'],
-            ['command' => 'unlink', 'description' => 'Unlink Telegram; account stays on the website'],
-            ['command' => 'reset', 'description' => 'Start a new AI conversation (forget earlier messages)'],
-            ['command' => 'support', 'description' => 'Report a problem or send feedback: /support your message'],
-            ['command' => 'help', 'description' => 'List commands and quick-add format'],
-        ]);
+        $client->setMyCommands(TelegramSupport::BOT_COMMANDS);
 
         $this->info('Bot command menu registered.');
 

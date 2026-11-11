@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Cache;
 
 class TelegramSupport
 {
+    public const MENU_ADD = '➕ Add';
+
     public const MENU_MONTH = '📊 Month';
 
     public const MENU_RECENT = '🕘 Recent';
@@ -25,9 +27,39 @@ class TelegramSupport
 
     public const MENU_RECURRING = '🔁 Recurring';
 
+    /**
+     * Legacy button from the v1 keyboard (the Telegram menu button next to the input opens the
+     * Web UI). Still handled for chats that have the old keyboard: the reply carries the new one.
+     */
     public const MENU_WEB = '🌐 Web UI';
 
+    /**
+     * Bump when menuKeyboard() changes: the next widget sent to a private chat whose identity has
+     * an older menu_v attaches the new keyboard once.
+     */
+    public const MENU_VERSION = 2;
+
     public const PARSE_HTML = 'HTML';
+
+    /**
+     * The bot command menu (setMyCommands), most used first. Shortcuts that still work but are
+     * not listed: /mute, /unmute (→ /notifications),
+     * /newtag, /app, /new (→ /reset).
+     */
+    public const BOT_COMMANDS = [
+        ['command' => 'add', 'description' => 'Quick add a transaction with the keypad'],
+        ['command' => 'recent', 'description' => 'Recent transactions: open, edit tags, delete'],
+        ['command' => 'month', 'description' => 'This month: income, expenses, net, top tags'],
+        ['command' => 'budgets', 'description' => 'Spending limits and savings goals'],
+        ['command' => 'tags', 'description' => "Your tags with this month's expenses and income"],
+        ['command' => 'recurring', 'description' => 'Recurring payments: next dates, pause or resume'],
+        ['command' => 'notifications', 'description' => 'Turn alerts and the weekly digest on or off'],
+        ['command' => 'website', 'description' => 'One-time code to log in on the website'],
+        ['command' => 'reset', 'description' => 'Start a new AI conversation'],
+        ['command' => 'support', 'description' => 'Report a problem or send feedback'],
+        ['command' => 'help', 'description' => 'All commands and the quick-add format'],
+        ['command' => 'unlink', 'description' => 'Unlink Telegram; the account stays on the website'],
+    ];
 
     /** Callback-data suffix tying a confirm button to the preview it was sent with. */
     public const NONCE_PATTERN = '[a-f0-9]{8}';
@@ -72,25 +104,22 @@ class TelegramSupport
         $this->client->sendMessage(
             $chatId,
             "Commands\n"
-            . "/month — this month's income, expenses, net, top tags (live widget in a private chat)\n"
-            . "/analytics — same as /month\n"
-            . "/summary — same as /month\n"
-            . '/recent — last transactions (live widget in a private chat)\n'
-            . "/tags — list your tags\n"
-            . "/newtag — create a tag: /newtag 🍕 Fast Food > Food\n"
-            . "/budgets — spending limits and savings goals (live widget in a private chat)\n"
-            . "/add — quick-add keypad widget (private chat)\n"
-            . "/recurring — recurring rules\n"
-            . "/app — open the Web UI from the menu button\n"
+            . "/add — quick-add keypad (private chat)\n"
+            . "/recent — recent transactions: open, edit tags, delete\n"
+            . "/month — this month's income, expenses, net, top tags\n"
+            . "/budgets — spending limits and savings goals\n"
+            . "/tags — your tags with this month's expenses and income; tap a tag for its subtags\n"
+            . "/recurring — recurring payments: next dates, pause or resume\n"
+            . "/notifications — turn alerts, the weekly digest and recurring notifications on or off (/mute, /unmute also work)\n"
             . "/website — one-time web login code\n"
-            . "/mute — mute limit alerts, weekly digest, recurring notifications\n"
-            . "/unmute — turn notifications back on\n"
-            . "/unlink — unlink Telegram (account stays on the website)\n"
             . "/reset — start a new AI conversation (alias /new)\n"
             . "/support — report a problem or send feedback: /support The report doesn't open\n"
-            . "/help — this list\n\n"
+            . "/help — this list\n"
+            . "/unlink — unlink Telegram (account stays on the website)\n"
+            . "/newtag — create a tag: /newtag 🍕 Fast Food > Food\n\n"
+            . "In a private chat these open live widgets that update with every transaction.\n\n"
             . "Reply menu\n"
-            . "Month · Recent · Tags · Budgets · Recurring · Web UI\n\n"
+            . "Add · Recent · Month · Budgets · Tags · Recurring (the Web UI opens from the button next to the message field)\n\n"
             . "Quick-add\n"
             . "-350 groceries\n"
             . "+15000 salary\n"
@@ -132,9 +161,9 @@ class TelegramSupport
     {
         return [
             'keyboard' => [
-                [self::MENU_MONTH, self::MENU_RECENT],
-                [self::MENU_TAGS, self::MENU_BUDGETS],
-                [self::MENU_RECURRING, self::MENU_WEB],
+                [self::MENU_ADD, self::MENU_RECENT],
+                [self::MENU_MONTH, self::MENU_BUDGETS],
+                [self::MENU_TAGS, self::MENU_RECURRING],
             ],
             'resize_keyboard' => true,
         ];

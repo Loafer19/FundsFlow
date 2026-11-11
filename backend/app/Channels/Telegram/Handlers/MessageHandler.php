@@ -237,12 +237,13 @@ class MessageHandler
 
         // Menu views: one line each in the assistant memory shared with the web chat.
         $view = match (true) {
-            $text === '/month' || $text === '/analytics' || $text === '/summary' || $text === TelegramSupport::MENU_MONTH => 'Month summary',
+            $text === '/month' || $text === TelegramSupport::MENU_MONTH => 'Month summary',
             $text === '/recent' || $text === TelegramSupport::MENU_RECENT => 'Recent transactions',
             $text === '/tags' || $text === TelegramSupport::MENU_TAGS => 'Tags',
             $text === '/budgets' || $text === TelegramSupport::MENU_BUDGETS => 'Budgets',
             $text === '/recurring' || $text === TelegramSupport::MENU_RECURRING => 'Recurring rules',
-            $text === '/add' => 'Quick add',
+            $text === '/add' || $text === TelegramSupport::MENU_ADD => 'Quick add',
+            $text === '/notifications' => 'Notification settings',
             default => null,
         };
 
@@ -251,22 +252,36 @@ class MessageHandler
         }
 
         match (true) {
-            $text === '/month' || $text === '/analytics' || $text === '/summary' || $text === TelegramSupport::MENU_MONTH => $this->menuHandler->sendMonthSummary($user, $chatId, $telegramUserId),
+            $text === '/month' || $text === TelegramSupport::MENU_MONTH => $this->menuHandler->sendMonthSummary($user, $chatId, $telegramUserId),
             $text === '/recent' || $text === TelegramSupport::MENU_RECENT => $this->menuHandler->sendRecent($user, $chatId, $telegramUserId),
             $text === '/tags' || $text === TelegramSupport::MENU_TAGS => $this->menuHandler->sendTags($user, $chatId, $telegramUserId),
             $text === '/budgets' || $text === TelegramSupport::MENU_BUDGETS => $this->menuHandler->sendBudgets($user, $chatId, $telegramUserId),
-            $text === '/add' => $this->menuHandler->sendAddWidget($user, $chatId),
+            $text === '/add' || $text === TelegramSupport::MENU_ADD => $this->menuHandler->sendAddWidget($user, $chatId),
             $text === '/recurring' || $text === TelegramSupport::MENU_RECURRING => $this->menuHandler->sendRecurring($user, $chatId),
             $text === TelegramSupport::MENU_WEB => $this->support->sendMiniAppHint($chatId),
             $text === '/website' => $this->authHandler->sendWebsiteLoginCode($user, $chatId),
+            $text === '/notifications' => $this->menuHandler->sendNotifications($user, $chatId),
             $text === '/mute' => $this->authHandler->handleMute($chatId, true),
             $text === '/unmute' => $this->authHandler->handleMute($chatId, false),
             $text === '/unlink' => $this->authHandler->handleUnlink($chatId),
             (bool) preg_match('/^\/(reset|new)(@\w+)?$/', $text) => $this->resetConversation($user, $chatId, $telegramUserId),
             SupportHandler::matches($text) => $this->supportHandler->handle($user, $chatId, $text),
             str_starts_with($text, '/newtag') => $this->menuHandler->handleNewTag($user, $chatId, $text),
+            (bool) preg_match('/^\/[A-Za-z0-9_]+(@\w+)?$/', $text) => $this->handleUnknownCommand($chatId),
             default => $this->handleDefaultText($user, $chatId, $text, $telegramUserId, $replyTo, $quoted),
         };
+    }
+
+    /**
+     * A bare slash command the bot doesn't know (e.g. the removed /summary): a short pointer to
+     * /help instead of the AI path, so it costs no AI quota. In groups it stays silent, since the
+     * command may be meant for another bot.
+     */
+    private function handleUnknownCommand(int|string $chatId): void
+    {
+        if ((int) $chatId > 0) {
+            $this->client->sendMessage($chatId, 'Unknown command, see /help');
+        }
     }
 
     /**

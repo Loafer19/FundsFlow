@@ -2,6 +2,7 @@
 
 namespace App\Channels\Telegram\Handlers;
 
+use App\Actions\RecurringTransactions\UpdateRecurringTransactionAction;
 use App\Actions\Transactions\CreateTransactionAction;
 use App\Actions\Transactions\DeleteTransactionAction;
 use App\Channels\Telegram\TelegramClient;
@@ -9,7 +10,9 @@ use App\Channels\Telegram\TelegramHistory;
 use App\Channels\Telegram\TelegramSupport;
 use App\Channels\Telegram\Widgets\TelegramWidgetData;
 use App\Channels\Telegram\Widgets\TelegramWidgetSender;
+use App\Channels\Telegram\Widgets\TelegramWidgetSync;
 use App\Enums\TransactionSource;
+use App\Models\RecurringTransaction;
 use App\Models\Tag;
 use App\Models\User;
 use App\Support\UserFormatter;
@@ -25,6 +28,8 @@ class WidgetQueryHandler
         private readonly TelegramWidgetData $data,
         private readonly TelegramWidgetSender $sender,
         private readonly TelegramHistory $history,
+        private readonly UpdateRecurringTransactionAction $updateRecurring,
+        private readonly TelegramWidgetSync $sync,
     ) {}
 
     /**
@@ -84,6 +89,24 @@ class WidgetQueryHandler
 
             if (preg_match('/^m:(\d{1,10})$/', $data, $matches)) {
                 $this->handleRecentMore($user, $queryId, (int) $matches[1]);
+
+                return;
+            }
+
+            if (preg_match('/^t:(\d{1,10})$/', $data, $matches)) {
+                $this->handleTagDetail($user, $queryId, (int) $matches[1]);
+
+                return;
+            }
+
+            if (preg_match('/^r:(\d{1,10}):([01])$/', $data, $matches)) {
+                $this->handleRecurringToggle($user, $chatId, $queryId, (int) $matches[1], $matches[2] === '1');
+
+                return;
+            }
+
+            if (preg_match('/^n:([01])$/', $data, $matches)) {
+                $this->handleNotifications($user, $chatId, $queryId, $matches[1] === '1');
 
                 return;
             }
@@ -191,6 +214,58 @@ class WidgetQueryHandler
     {
         $page = $this->data->recentPage($user, max(0, $offset));
         $this->answer($queryId, ['ok' => 1] + $page);
+    }
+
+    private function handleTagDetail(User $user, string $queryId, int $tagId): void
+    {
+        $detail = $this->data->tagDetail($user, $tagId);
+
+        if ($detail === null) {
+            $this->answer($queryId, ['ok' => 0, 'e' => 'Tag not found']);
+
+            return;
+        }
+
+        $this->answer($queryId, ['ok' => 1] + $detail);
+    }
+
+    private function handleRecurringToggle(User $user, int|string $chatId, string $queryId, int $ruleId, bool $active): void
+    {
+        $rule = $user->recurringTransactions()->with('tags')->whereKey($ruleId)->first();
+
+        if (!$rule instanceof RecurringTransaction) {
+            $this->answer($queryId, ['ok' => 0, 'e' => 'Recurring rule not found']);
+
+            return;
+        }
+
+        if ($rule->active !== $active) {
+            $rule = $this->updateRecurring->execute($user, $rule, ['active' => $active]);
+            $this->history->outcome(
+                $chatId,
+                $user,
+                ($active ? 'Resumed' : 'Paused') . ' recurring rule: ' . UserFormatter::formatMoney($user, (float) $rule->amount)
+                    . ($rule->note ? ' ' . $rule->note : ''),
+            );
+        }
+
+        $this->answer($queryId, ['ok' => 1] + $this->data->recurringItem($user, $rule));
+        $this->sync->refreshRecurring($user);
+    }
+
+    private function handleNotifications(User $user, int|string $chatId, string $queryId, bool $muted): void
+    {
+        $identity = $this->sender->identityFor($user, $chatId);
+
+        if (!$identity) {
+            $this->answer($queryId, ['ok' => 0, 'e' => 'Chat is not linked']);
+
+            return;
+        }
+
+        $identity->update(['meta' => [...($identity->meta ?? []), 'muted' => $muted]]);
+        $this->answer($queryId, ['ok' => 1, 'm' => $muted ? 1 : 0]);
+        $this->sync->refreshNotifications($user);
     }
 
     /**
