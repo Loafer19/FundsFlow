@@ -10,12 +10,13 @@
     --agent-ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
-/* --- Drawer: a slightly quicker, snappier slide than daisyUI's 300ms ease-out --- */
+/* --- Drawer: 200ms like every modal and backdrop (styles/motion.css), with a snappier curve --- */
 
-.agent-drawer-side > .agent-panel {
+.agent-drawer-side > .agent-panel,
+.settings-drawer-side > .settings-panel {
     transition:
-        translate 240ms var(--agent-ease-out),
-        width 200ms ease-out;
+        translate var(--ui-motion, 200ms) var(--agent-ease-out),
+        width var(--ui-motion, 200ms) ease-out;
 }
 
 /* --- Message / row enter: fade + small slide up --- */
@@ -415,7 +416,8 @@
 /* --- Reduced motion: no movement; only the typing dots keep a gentle opacity pulse --- */
 
 @media (prefers-reduced-motion: reduce) {
-    .agent-drawer-side > .agent-panel {
+    .agent-drawer-side > .agent-panel,
+    .settings-drawer-side > .settings-panel {
         transition: none;
     }
 

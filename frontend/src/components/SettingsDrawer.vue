@@ -1,9 +1,14 @@
 <template>
-    <div v-if="settingsOpen" class="fixed inset-0 z-[70]" role="presentation">
-        <button type="button" class="absolute inset-0 bg-base-content/30" aria-label="Close settings"
-            @click="closeSettings"></button>
-        <aside class="absolute inset-y-0 right-0 w-full max-w-3xl bg-base-100 shadow-2xl border-l border-base-300 flex flex-col"
+    <!-- Same daisyUI drawer as the assistant (AgentDrawer.vue): its 40% black overlay fade and the
+         panel slide in from the right, instead of a custom backdrop that popped in and out. -->
+    <div class="drawer drawer-end settings-drawer-root" :class="{ 'settings-drawer-expanded': settingsOpen }">
+        <input id="settings_drawer" type="checkbox" class="drawer-toggle" tabindex="-1" aria-hidden="true"
+            :checked="settingsOpen" @change="(event) => { if (!event.target.checked) closeSettings() }" />
+        <div class="drawer-side settings-drawer-side z-[70]">
+        <label for="settings_drawer" aria-label="Close settings" class="drawer-overlay" />
+        <aside class="settings-panel relative h-dvh w-full max-w-3xl bg-base-100 shadow-xl flex flex-col"
             role="dialog" aria-modal="true" aria-labelledby="settings_drawer_title">
+            <template v-if="rendered">
             <div class="flex items-center gap-2 px-4 py-3 border-b border-base-300 shrink-0 bg-base-100 z-10">
                 <button v-if="compact && tab" type="button" class="btn btn-ghost btn-sm btn-square" aria-label="Back"
                     @click="tab = ''">
@@ -324,7 +329,9 @@ recurring_transactions</pre>
                     Save
                 </button>
             </div>
+            </template>
         </aside>
+        </div>
     </div>
 </template>
 
@@ -646,13 +653,25 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+    clearTimeout(unmountTimer)
     window.removeEventListener('resize', syncCompact)
     document.removeEventListener('keydown', onKeydown)
 })
 
+// The panel content stays mounted while the drawer slides out (200ms, styles/motion.css), then
+// unmounts (as v-if did before).
+const rendered = ref(settingsOpen.value)
+let unmountTimer = null
+
 watch(settingsOpen, (open) => {
-    if (open) openDrawer()
-    else onModalClose()
+    clearTimeout(unmountTimer)
+    if (open) {
+        rendered.value = true
+        openDrawer()
+    } else {
+        onModalClose()
+        unmountTimer = setTimeout(() => { rendered.value = false }, 260)
+    }
 })
 
 const openImportPreview = () => {
@@ -851,6 +870,23 @@ const saveSettings = async () => {
 </script>
 
 <style scoped>
+/* Like .agent-drawer-root: off the layout while closed; the fixed .drawer-side still animates out. */
+.settings-drawer-root {
+    position: fixed;
+    inset: auto 0 0 auto;
+    z-index: 70;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+.settings-drawer-root.settings-drawer-expanded {
+    inset: 0;
+    width: 100%;
+    height: 100dvh;
+    pointer-events: auto;
+}
+
 .theme-chips {
     border-radius: 0.35rem;
     overflow: hidden;

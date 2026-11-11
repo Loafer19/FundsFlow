@@ -1,0 +1,74 @@
+/*
+ * One motion speed for overlays: modals, drawers and their backdrops all move in 200ms, together.
+ * Overrides daisyUI 5's timings (modal 300ms, drawer overlay 200ms after a 100ms delay + 300ms
+ * visibility, drawer slide 300ms). These rules are unlayered, so they win over daisyUI's
+ * @layer rules without editing node_modules; that is also why the open state of .modal needs its
+ * own rule here (an unlayered .modal rule would otherwise override daisyUI's open-state transition).
+ * The assistant and settings panels slide with --agent-ease-out (styles/agent-motion.css).
+ */
+
+:root {
+    --ui-motion: 200ms;
+}
+
+/* --- Modals (<dialog class="modal">) --- */
+
+.modal {
+    transition:
+        overlay var(--ui-motion) allow-discrete,
+        visibility var(--ui-motion) allow-discrete,
+        background-color var(--ui-motion) ease-out,
+        opacity var(--ui-motion) ease-out;
+}
+
+.modal.modal-open,
+.modal[open],
+.modal:popover-open,
+.modal:target,
+.modal-toggle:checked + .modal {
+    transition:
+        visibility 0s allow-discrete,
+        background-color var(--ui-motion) ease-out,
+        opacity var(--ui-motion) ease-out;
+}
+
+.modal[popover]::backdrop {
+    transition: background-color var(--ui-motion) ease-out;
+}
+
+.modal-box {
+    transition:
+        translate var(--ui-motion) ease-out,
+        scale var(--ui-motion) ease-out,
+        opacity var(--ui-motion) ease-out,
+        box-shadow var(--ui-motion) ease-out;
+}
+
+/* --- Drawers: the overlay fades while the panel slides, no 100ms head start --- */
+
+.drawer-side {
+    transition:
+        opacity var(--ui-motion) ease-out allow-discrete,
+        visibility var(--ui-motion) ease-out allow-discrete;
+}
+
+.drawer-side > :not(.drawer-overlay) {
+    transition:
+        translate var(--ui-motion) ease-out,
+        width var(--ui-motion) ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .modal,
+    .modal.modal-open,
+    .modal[open],
+    .modal:popover-open,
+    .modal:target,
+    .modal-toggle:checked + .modal,
+    .modal[popover]::backdrop,
+    .modal-box,
+    .drawer-side,
+    .drawer-side > :not(.drawer-overlay) {
+        transition: none;
+    }
+}

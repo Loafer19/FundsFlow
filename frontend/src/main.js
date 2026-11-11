@@ -1,6 +1,7 @@
 import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 import './assets/css/main.css'
+import './styles/motion.css'
 import './styles/agent-motion.css'
 import App from './App.vue'
 import { formatDate, formatMoney, formatPercentage } from './services/formatters'
