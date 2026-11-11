@@ -59,7 +59,7 @@ final class AgentHistory
     }
 
     /**
-     * A staged change, as text: "Proposed change (pending via Telegram): …". A newer proposal in
+     * A staged change, as text: "[via Telegram] [Confirm card shown earlier, status pending] …" (worded so the model does not copy it as a reply). A newer proposal in
      * the same channel replaces the old one there, so older pending ones turn "outdated".
      */
     public function addProposal(User|int $user, string $channel, string $preview, string $ref, ?string $turnId = null): void
@@ -132,7 +132,7 @@ final class AgentHistory
             $via = ($item['channel'] ?? null) === self::TELEGRAM ? 'Telegram' : 'web';
             $text = (string) ($item['text'] ?? '');
             $content = ($item['kind'] ?? null) === 'proposal'
-                ? 'Proposed change (' . ($item['status'] ?? 'pending') . " via {$via}): " . $text
+                ? "[via {$via}] [Confirm card shown earlier, status " . ($item['status'] ?? 'pending') . '] ' . $text
                 : "[via {$via}] " . $text;
             $out[] = [
                 'role' => ($item['role'] ?? 'assistant') === 'user' ? 'user' : 'assistant',

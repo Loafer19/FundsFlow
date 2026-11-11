@@ -71,6 +71,7 @@ class TelegramAgentToolExecutor
             $this->tools->definition('list_budgets'),
             $this->tools->definition('list_recurring'),
             $this->tools->definition('period_summary'),
+            $this->tools->definition('convert_currency'),
             ...$this->planningDefinitions(read: true),
             $fn('show_menu', 'Send the standard reply-keyboard menu (Add, Recent, Month, Budgets, Tags, Recurring).', [
                 'type' => 'object',
@@ -196,6 +197,7 @@ class TelegramAgentToolExecutor
                 'list_budgets' => AgentToolExecutor::ok($this->tools->listBudgets($user, $session)),
                 'list_recurring' => AgentToolExecutor::ok($this->tools->listRecurring($user)),
                 'period_summary' => AgentToolExecutor::ok($this->tools->periodSummary($user, $arguments)),
+                'convert_currency' => AgentToolExecutor::ok($this->tools->convertCurrency($user, $arguments)),
                 'show_menu' => AgentToolExecutor::uiStop($this->doShowMenu($chatId, $identity)),
                 'show_help' => AgentToolExecutor::uiStop($this->doShowHelp($chatId, $identity)),
                 'show_recent' => AgentToolExecutor::uiStop($this->doShowRecent($user, $chatId, $identity)),

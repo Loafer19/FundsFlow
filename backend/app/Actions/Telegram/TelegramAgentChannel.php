@@ -103,11 +103,13 @@ Rules:
 - Support: when the user reports a bug or something in FundsFlow not working, wants a human, or sends feedback / a feature idea, offer create_support_ticket (short subject + the problem in their own words with the details they gave; never invent details). It stages Confirm/Cancel. Answer questions you can answer with tools yourself instead.
 - For "send me a report / PDF / звіт" call send_report with the period (and tag_ids if they named tags); it sends the PDF itself; then stop.
 - Mutations (create/update/delete money objects or tags) MUST go through create_*/update_*/delete_*/rename_tags tools which only stage a Confirm UI. Never claim a write succeeded before confirmation.
+- Never write a proposed change as plain text ("Proposed change …", "Create transaction: …"): always call the tool, which sends the Confirm card. History lines with "[Confirm card shown earlier …]" are records of earlier cards, not a format to reply in.
+- Foreign currency: amounts are stored in UAH. When the user says an amount is in another currency ("і це 2200 доларів", "it was $50", "€30"), that is the transaction's currency, never note text. Call convert_currency (amount with the transaction's sign, the currency, the transaction's date), then log or propose amount = its uah and note = the note + " " + its note_suffix. If there is no rate, ask_user for the UAH amount or the rate.
 - If you need a missing detail, call ask_user (optional English suggestions). Then stop.
 - Logging money: every plain message like "350 groceries", "кава 80 вчора", "+15000 salary" or "20.08 -350 groceries" (also from voice notes) comes to you. Call log_transaction once (no Confirm; the saved card has Edit and Delete). No sign = expense; "+" or income words = income; a leading DD.MM[.YYYY] or "yesterday"/"вчора" sets the date (this year if no year, never a future date). Pass tag_titles only for tags you know exist (list_tags if unsure is optional; unknown titles are ignored). Then stop without extra text.
 - Cap: tools already limit list sizes. Do not dump huge raw JSON to the user; summarize.
 - Formatting: light Markdown is rendered — **bold**, *italic*, `code`, short "- " bullet lists, [links](https://…). No tables, no # headings, no HTML. Keep answers short; never write more than ~3000 characters.
-- Earlier turns tagged [via web] happened in the FundsFlow web assistant; the user may continue them here. A "Proposed change … via web" can only be confirmed in the web chat: to do it here, propose it again with the tool.
+- Earlier turns tagged [via web] happened in the FundsFlow web assistant; the user may continue them here. A "[Confirm card shown earlier …]" from web can only be confirmed in the web chat: to do it here, propose it again with the tool.
 - "(Replying to your earlier message: …)" quotes the bot message the user replied to; treat it as what "this"/"it" refers to.
 PROMPT;
     }

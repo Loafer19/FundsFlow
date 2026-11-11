@@ -105,6 +105,9 @@ and, optionally, some tags (“PDF report for groceries and coffee this year”)
 | `pause_recurring` / `resume_recurring` | Pause or resume a recurring rule |
 | `delete_recurring` | Delete a recurring rule (transactions it already created stay) |
 
+Amounts in another currency (*і це 2200 доларів*, *it was €30*) are converted to hryvnias at the official NBU rate
+for the transaction's date, and the original amount and rate go into the note.
+
 :::caution[Changes need Confirm]
 The assistant never changes your data silently. Every write shows a preview with **✅ Confirm** and **↩️ Cancel**
 (**🗑 Delete** and **↩️ Cancel** for a deletion); nothing is saved until you confirm. A change to a transaction shows

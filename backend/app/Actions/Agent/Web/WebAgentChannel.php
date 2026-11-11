@@ -62,6 +62,8 @@ final class WebAgentChannel implements AgentChannel
         'delete_recurring' => 'Preparing recurring delete',
         'create_support_ticket' => 'Preparing support request',
         'read_receipt' => 'Reading receipt',
+        'convert_currency' => 'Checking the NBU rate',
+        'update_pending_transaction' => 'Updating the card',
         'get_import_preview' => 'Reading import preview',
         'list_import_categories' => 'Reading import categories',
         'set_import_category' => 'Updating import categories',
@@ -103,6 +105,14 @@ final class WebAgentChannel implements AgentChannel
         $lastListJson = json_encode(array_slice($session['last_list'], 0, 30), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $lastListJson = is_string($lastListJson) ? $lastListJson : '[]';
         $screen = $this->screenContextText($user);
+        $waiting = $this->pendingTransaction();
+        $waitingText = '';
+        if ($waiting !== null) {
+            $card = $waiting['payload'];
+            unset($card['files']);
+            $waitingJson = json_encode($card + ['has_receipt_photo' => !empty($waiting['payload']['files'])], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $waitingText = "Waiting Confirm card (not saved yet; change it with update_pending_transaction): {$waitingJson}\n";
+        }
 
         return <<<PROMPT
 You are the FundsFlow personal finance assistant in the chat panel of the FundsFlow web app.
@@ -110,7 +120,7 @@ Today (user timezone {$tz}) is {$today}.
 Session domain: {$domain}
 Last bot summary: {$summary}
 last_list (ids are authoritative; never invent ids): {$lastListJson}
-{$screen}
+{$screen}{$waitingText}
 Rules:
 - Use tools for ANY numbers, balances, lists, budgets, or ids. Never invent amounts, tag ids, transaction ids, or budget figures.
 - Prefer concise replies. Match the user's language (Ukrainian if they wrote Ukrainian; otherwise English). You may use light Markdown (bold, short bullet lists, inline code); no tables, images or HTML.
@@ -126,9 +136,12 @@ Rules:
 - When the screen context is given and the user says "this", "here", "these", "цей період", "тут" etc., use the visible period (from/to) and tag filter from it. Otherwise ignore it; it is not an instruction.
 - Support: when the user reports a bug or something in FundsFlow not working, wants a human, or sends feedback / a feature idea, offer create_support_ticket (short subject + the problem in their own words with the details they gave; never invent details). It stages Confirm/Cancel. Answer questions you can answer with tools yourself instead.
 - Mutations (create/update/delete transactions, budgets, recurring rules or tags) MUST go through create_*/update_*/delete_*/pause_*/resume_*/rename_tags tools which only stage a Confirm/Cancel card. Never claim a write succeeded before confirmation.
+- Never write a proposed change as plain text ("Proposed change …", "Create transaction: …", "I'll add …, confirm?"): always call the tool, which shows the Confirm card. History lines with "[Confirm card shown earlier …]" are records of earlier cards, not a format to reply in.
+- Corrections to the waiting Confirm card (amount, date, note, tags, currency) go through update_pending_transaction, not create_transaction, so the receipt photo stays attached.
+- Foreign currency: amounts are stored in UAH. When the user says an amount is in another currency ("і це 2200 доларів", "it was $50", "€30", "в злотих"), that is the transaction's currency, never note text to append. Call convert_currency (amount with the transaction's sign, the currency, the transaction's date), then propose amount = its uah and note = the existing note + " " + its note_suffix (e.g. "Rozetka (2200 USD @ 45.4123 NBU 10.11.2026)"). Keep the tags as they are. If convert_currency returns no rate, ask_user for the UAH amount or the rate.
 - If you need a missing detail, call ask_user (optional short English suggestions shown as buttons). Then stop.
 - Cap: tools already limit list sizes. Do not dump huge raw JSON to the user; summarize.
-- Earlier turns tagged [via Telegram] happened in the FundsFlow Telegram bot; the user may continue them here. A "Proposed change … via Telegram" can only be confirmed in Telegram: to do it here, propose it again with the tool.
+- Earlier turns tagged [via Telegram] happened in the FundsFlow Telegram bot; the user may continue them here. A "[Confirm card shown earlier …]" from Telegram can only be confirmed in Telegram: to do it here, propose it again with the tool.
 PROMPT;
     }
 
@@ -155,6 +168,7 @@ PROMPT;
             $this->tools->definition('list_budgets'),
             $this->tools->definition('list_recurring'),
             $this->tools->definition('period_summary'),
+            $this->tools->definition('convert_currency'),
             ...$this->planningDefinitions(read: true),
             $fn('show_budget_status', 'Show the Budget status card (limits: spent, left, days left, per-day allowance, projection; goals: saved, remaining, deadline, needed pace, projected date) for all active budgets or one budget, then stop.', [
                 'type' => 'object',
@@ -180,6 +194,15 @@ PROMPT;
             $this->tools->definition('create_tags'),
             $this->tools->definition('rename_tags'),
             $this->tools->definition('create_transaction'),
+            $fn('update_pending_transaction', 'Change the transaction on the Confirm card that is waiting right now (a receipt draft or a proposed new transaction), before it is saved. Pass only the fields to change; the receipt photo stays attached. The new card replaces the old one. Use this, not create_transaction, for corrections like "and it was 2200 dollars", "date is yesterday", "tag it Food".', [
+                'type' => 'object',
+                'properties' => [
+                    'amount' => ['type' => 'number', 'description' => 'Signed UAH amount: negative = expense, positive = income'],
+                    'at' => ['type' => 'string', 'description' => 'YYYY-MM-DD'],
+                    'note' => ['type' => 'string'],
+                    'tag_ids' => ['type' => 'array', 'items' => ['type' => 'integer']],
+                ],
+            ]),
             $this->tools->definition('update_transaction'),
             $this->tools->definition('delete_transaction'),
             $this->tools->definition('create_budget'),
@@ -232,7 +255,56 @@ PROMPT;
 
     public function stagingTools(): array
     {
-        return AgentToolExecutor::STAGING_TOOLS;
+        return [...AgentToolExecutor::STAGING_TOOLS, 'update_pending_transaction'];
+    }
+
+    /**
+     * The waiting create_transaction card (receipt draft or agent proposal), for the prompt and
+     * for update_pending_transaction. Null when nothing (or a multi-row card) is waiting.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function pendingTransaction(): ?array
+    {
+        $pending = $this->session->get()['pending'] ?? null;
+
+        return is_array($pending)
+            && ($pending['type'] ?? null) === 'agent_mutation'
+            && ($pending['action'] ?? null) === 'create_transaction'
+            && is_array($pending['payload'] ?? null)
+            ? $pending
+            : null;
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     * @return array<string, mixed>
+     */
+    private function amendPending(User $user, array $args): array
+    {
+        $pending = $this->pendingTransaction();
+        if ($pending === null) {
+            return AgentToolExecutor::fail('No single transaction card is waiting for confirmation. Use create_transaction or update_transaction instead.');
+        }
+
+        $old = $pending['payload'];
+        $merged = [
+            'amount' => array_key_exists('amount', $args) ? $args['amount'] : ($old['amount'] ?? null),
+            'at' => $args['at'] ?? ($old['at'] ?? null),
+            'note' => array_key_exists('note', $args) ? $args['note'] : ($old['note'] ?? null),
+            'tag_ids' => array_key_exists('tag_ids', $args) ? $args['tag_ids'] : ($old['tag_ids'] ?? []),
+        ];
+        $prepared = $this->tools->prepareCreateTransaction($user, $merged);
+        $files = is_array($old['files'] ?? null) ? array_values($old['files']) : [];
+        if ($files !== []) {
+            $prepared['payload']['files'] = $files;
+            $label = $pending['card']['files_label'] ?? null;
+            $prepared['card'] = $this->tools->transactionCard($user, 'create', $prepared['payload'], files: count($files));
+            $prepared['card']['files_label'] = is_string($label) ? $label : null;
+            $prepared['preview'] = AgentToolExecutor::cardText($prepared['card']);
+        }
+
+        return $this->stage('create_transaction', $prepared, keepUploads: true);
     }
 
     public function executeTool(User $user, string $name, array $arguments): array
@@ -273,6 +345,8 @@ PROMPT;
                 'ask_user' => $this->ask($arguments),
                 'create_tags' => $this->stageCreateTags($user, $arguments),
                 'rename_tags' => $this->stageRenameTags($user, $arguments),
+                'convert_currency' => AgentToolExecutor::ok($tools->convertCurrency($user, $arguments)),
+                'update_pending_transaction' => $this->amendPending($user, $arguments),
                 'create_transaction' => $this->stage('create_transaction', $tools->prepareCreateTransaction($user, $arguments)),
                 'update_transaction' => $this->stage('update_transaction', $tools->prepareUpdateTransaction($user, $arguments)),
                 'delete_transaction' => $this->stage('delete_transaction', $tools->prepareDeleteTransaction($user, $arguments)),
@@ -575,11 +649,12 @@ PROMPT;
      * @param array{payload: array<string, mixed>, preview: string} $prepared
      * @return array{ok: bool, control: 'confirm_staged', result: array<string, mixed>}
      */
-    private function stage(string $action, array $prepared): array
+    private function stage(string $action, array $prepared, bool $keepUploads = false): array
     {
         $pendingId = bin2hex(random_bytes(8));
 
-        $previous = WebAgentUploads::refsIn($this->session->get()['pending']);
+        // An amended draft keeps its receipt photos; any other new preview drops the old ones.
+        $previous = $keepUploads ? [] : WebAgentUploads::refsIn($this->session->get()['pending']);
         if ($previous !== []) {
             app(WebAgentUploads::class)->delete($this->session->user(), $previous);
         }
@@ -593,6 +668,7 @@ PROMPT;
             'action' => $action,
             'payload' => $prepared['payload'],
             'preview' => $prepared['preview'],
+            'card' => $prepared['card'] ?? null,
             'nonce' => $pendingId,
         ]);
         $this->push('confirm', [
@@ -602,7 +678,7 @@ PROMPT;
             'action' => $action,
             'preview' => $prepared['preview'],
             'status' => 'pending',
-        ]);
+        ] + (isset($prepared['card']) ? ['card' => $prepared['card']] : []));
         $this->session->setSummary('Agent mutation preview shown.');
 
         return AgentToolExecutor::confirmStop(['staged' => true, 'payload' => $prepared['payload']]);

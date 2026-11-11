@@ -581,13 +581,16 @@ final class RunWebReceiptAction
         }
 
         $lines = [];
+        $cards = [];
         foreach ($rows as $n => $row) {
             $lines[] = $this->previewLine($user, $row, "Photo {$n}");
+            $cards[] = ['label' => "Photo {$n}"] + $this->tools->transactionCard($user, 'create', $row, files: count($row['files']));
         }
 
         $channel->stageConfirm('create_transactions', [
             'payload' => ['transactions' => array_values($rows)],
-            'preview' => '🧾 ' . count($rows) . " receipts:\n" . implode("\n", $lines),
+            'preview' => count($rows) . " receipts\n" . implode("\n", $lines),
+            'card' => ['type' => 'transactions', 'title' => count($rows) . ' receipts', 'rows' => $cards],
         ]);
 
         return 'confirm_staged';
@@ -633,9 +636,10 @@ final class RunWebReceiptAction
             'tag_ids' => $tagIds,
         ]);
         $prepared['payload']['files'] = array_values($files);
-        $prepared['preview'] = '🧾 Receipt' . "\n"
-            . preg_replace('/^Create transaction:\n/', '', $prepared['preview'])
-            . ($files !== [] ? "\n📎 " . $this->photoCount($files) : '');
+        // Title "Receipt" only when the photo is attached to the transaction.
+        $prepared['card'] = $this->tools->transactionCard($user, 'create', $prepared['payload'], files: count($files));
+        $prepared['card']['files_label'] = $files !== [] ? $this->photoCount($files) : null;
+        $prepared['preview'] = AgentToolExecutor::cardText($prepared['card']);
 
         $channel->stageConfirm('create_transaction', $prepared);
 
@@ -650,7 +654,7 @@ final class RunWebReceiptAction
         $tags = $row['tag_ids'] !== [] ? ' · ' . $this->tools->tagLabels($user, $row['tag_ids']) : '';
         $note = is_string($row['note'] ?? null) && $row['note'] !== '' ? ' · ' . $row['note'] : '';
 
-        return '• ' . $label . ': ' . UserFormatter::formatMoney($user, (float) $row['amount']) . ' on ' . $row['at'] . $note . $tags;
+        return '• ' . $label . ': ' . AgentToolExecutor::signedMoney($user, (float) $row['amount']) . ' · ' . UserFormatter::formatDate($user, (string) $row['at']) . $note . $tags;
     }
 
     /**

@@ -61,6 +61,7 @@ class RunAgentAction
         $stagingTools = $channel->stagingTools();
         $quotaConsumed = false;
 
+        $nudged = false;
         $maxRounds = (int) config('telegram.agent_max_rounds');
         for ($round = 0; $round < $maxRounds; $round++) {
             $payload = [
@@ -101,6 +102,19 @@ class RunAgentAction
             $messages[] = $assistantMessage;
 
             if (!is_array($toolCalls) || $toolCalls === []) {
+                // The model sometimes imitates the history line "Proposed change (pending via web): …"
+                // instead of calling the tool, which leaves a text bubble without Confirm/Cancel.
+                // Ask once for the tool call instead.
+                if (!$nudged && $round < $maxRounds - 1 && self::looksLikeTextProposal($assistantContent)) {
+                    $nudged = true;
+                    $messages[] = [
+                        'role' => 'user',
+                        'content' => '(System) That reply wrote a proposed change as text, so the user has no Confirm button. Call the matching tool now (update_pending_transaction, create_transaction, update_transaction, delete_transaction, …) instead of text.',
+                    ];
+
+                    continue;
+                }
+
                 if ($assistantContent !== '') {
                     $channel->onAnswer($assistantContent);
 
@@ -184,6 +198,15 @@ class RunAgentAction
         $channel->onMaxRounds();
 
         return ['ok' => true, 'status' => 'answered', 'summary' => 'Max rounds reached.'];
+    }
+
+    /**
+     * "Proposed change (pending via web): …", "Create transaction: …" and the like, written as
+     * plain text instead of a tool call.
+     */
+    public static function looksLikeTextProposal(string $text): bool
+    {
+        return preg_match('/^[\s*_]*(proposed change|(\[via (web|telegram)\] )?\[confirm card|create transaction:|update transaction|delete transaction|запропонована зміна|пропонована зміна)/iu', trim($text)) === 1;
     }
 
     /**

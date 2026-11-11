@@ -1,5 +1,5 @@
 <template>
-    <div class="drawer drawer-end agent-drawer-root" :class="{ 'drawer-open': agent.isOpen }">
+    <div class="drawer drawer-end agent-drawer-root" :class="{ 'agent-drawer-expanded': agent.isOpen }">
         <input id="agent_drawer" type="checkbox" class="drawer-toggle" :checked="agent.isOpen"
             @change="(event) => (event.target.checked ? agent.open() : agent.close())" />
         <div class="drawer-side agent-drawer-side z-[60]">
@@ -151,7 +151,7 @@
                                 <div class="flex items-center gap-2">
                                     <ShieldQuestion :size="16" class="text-warning" />
                                     <span class="text-xs uppercase tracking-wide text-base-content/60">
-                                        {{ actionLabel(item.action) }}
+                                        {{ item.card?.title || actionLabel(item.action) }}
                                     </span>
                                     <span v-if="item.status !== 'pending'" class="badge badge-xs ml-auto agent-pop"
                                         :class="statusClass(item.status)">
@@ -159,7 +159,44 @@
                                         {{ item.status }}
                                     </span>
                                 </div>
-                                <p class="text-sm whitespace-pre-wrap break-words">{{ item.preview }}</p>
+                                <!-- Transaction cards: the Telegram card layout (signed amount, 📅, 📝, 📎, 🏷). -->
+                                <div v-if="item.card?.type === 'transaction'" class="flex flex-col gap-1 text-sm">
+                                    <p class="flex flex-wrap items-center gap-1.5">
+                                        <template v-if="item.card.before?.amount_formatted">
+                                            <s class="text-base-content/50">{{ item.card.before.amount_formatted }}</s>
+                                            <span class="text-base-content/50" aria-hidden="true">→</span>
+                                        </template>
+                                        <span class="badge font-semibold tabular-nums"
+                                            :class="item.card.amount > 0 ? 'badge-success' : 'badge-error'">
+                                            {{ item.card.amount_formatted }}
+                                        </span>
+                                    </p>
+                                    <p v-for="row in cardRows(item.card)" :key="row.key" class="break-words">
+                                        <span aria-hidden="true">{{ row.icon }}</span>
+                                        <template v-if="row.before !== undefined">
+                                            <s class="text-base-content/50">{{ row.before }}</s>
+                                            <span class="text-base-content/50"> → </span>
+                                        </template>
+                                        {{ row.value }}
+                                    </p>
+                                </div>
+                                <ul v-else-if="item.card?.type === 'transactions'" class="flex flex-col gap-2 text-sm">
+                                    <li v-for="(row, i) in item.card.rows" :key="i" class="flex flex-col gap-0.5">
+                                        <p class="flex flex-wrap items-center gap-1.5">
+                                            <span class="text-base-content/60">{{ row.label }}</span>
+                                            <span class="badge badge-sm font-semibold tabular-nums"
+                                                :class="row.amount > 0 ? 'badge-success' : 'badge-error'">
+                                                {{ row.amount_formatted }}
+                                            </span>
+                                            <span class="text-base-content/60">📅 {{ row.date }}</span>
+                                        </p>
+                                        <p v-if="row.note || row.tags?.length" class="text-base-content/80 break-words">
+                                            <template v-if="row.note">📝 {{ row.note }} </template>
+                                            <template v-if="row.tags?.length">🏷 {{ row.tags.join(' · ') }}</template>
+                                        </p>
+                                    </li>
+                                </ul>
+                                <p v-else class="text-sm whitespace-pre-wrap break-words">{{ item.preview }}</p>
                                 <div v-if="item.status === 'pending'" class="card-actions justify-end">
                                     <button type="button" class="btn btn-sm btn-ghost agent-press"
                                         :disabled="agent.busyPendingId !== null" @click="resolvePending(item, 'cancel')">
@@ -406,6 +443,17 @@ const ACTION_LABELS = {
 }
 
 const actionLabel = (action) => ACTION_LABELS[action] ?? 'Confirm change'
+
+// 📅 / 📝 / 📎 / 🏷 lines of a transaction card; `before` is the old value of a changed field.
+const cardRows = (card) => {
+    const before = card.before ?? {}
+    const tags = (list) => (list?.length ? list.join(' · ') : 'No tags')
+    const rows = [{ key: 'date', icon: '📅 ', value: card.date, before: before.date }]
+    if (card.note || before.note !== undefined) rows.push({ key: 'note', icon: '📝 ', value: card.note || '—', before: before.note })
+    if (card.files > 0) rows.push({ key: 'files', icon: '📎 ', value: card.files_label || `${card.files} photo${card.files === 1 ? '' : 's'}` })
+    rows.push({ key: 'tags', icon: '🏷 ', value: tags(card.tags), before: before.tags === undefined ? undefined : tags(before.tags) })
+    return rows
+}
 
 const statusClass = (status) =>
     ({
@@ -798,12 +846,22 @@ const onContentResize = () => {
     }
 }
 
-// The user just sent something or opened the drawer: always go to the latest.
+// The user just sent something or opened the drawer: always go to the latest. Scroll again on the
+// next frames too: the open slide, enter animations and lazy cards (charts) settle the height later.
+let settleFrame = 0
 const stickToBottom = () => {
     stick = true
+    jumping = false
     showJump.value = false
     hasNew.value = false
-    nextTick(() => scrollToBottom())
+    nextTick(() => {
+        scrollToBottom()
+        cancelAnimationFrame(settleFrame)
+        settleFrame = requestAnimationFrame(() => {
+            if (stick) scrollToBottom()
+            settleFrame = requestAnimationFrame(() => stick && scrollToBottom())
+        })
+    })
 }
 
 const jumpToLatest = () => {
@@ -812,6 +870,10 @@ const jumpToLatest = () => {
     showJump.value = false
     hasNew.value = false
     scrollToBottom(true)
+    // If the smooth scroll is interrupted (the user grabs the list), stop forcing "follow".
+    setTimeout(() => {
+        jumping = false
+    }, 1000)
     nextTick(() => textarea.value?.focus({ preventScroll: true }))
 }
 
@@ -824,13 +886,17 @@ watch(
     },
 )
 
-// Fallback where ResizeObserver is missing: the old "on every change" behaviour, gated by stick.
+// Every new item, streamed chunk or status line: follow it while stuck to the bottom (ResizeObserver
+// covers late growth such as photos and charts; this also covers browsers without it).
 watch(
-    () => [agent.items.length, agent.draft, agent.status],
-    () => {
-        if (!resizeObserver) nextTick(onContentResize)
-    },
+    () => [agent.items.length, agent.draft, agent.status, agent.isStreaming],
+    () => nextTick(onContentResize),
 )
+
+// Mobile keyboard / browser bars resize the visual viewport: keep the latest message in view.
+const onViewportResize = () => {
+    if (agent.isOpen && stick) scrollToBottom()
+}
 
 // Import chips prefill the composer and open the file picker; the rest send their text right away.
 const useChip = (chip) => {
@@ -1073,6 +1139,7 @@ watch(
 
 onMounted(() => {
     document.addEventListener('keydown', onGlobalKeydown)
+    window.visualViewport?.addEventListener('resize', onViewportResize)
     if (typeof ResizeObserver !== 'undefined' && content.value) {
         resizeObserver = new ResizeObserver(onContentResize)
         resizeObserver.observe(content.value)
@@ -1083,6 +1150,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     document.removeEventListener('keydown', onGlobalKeydown)
+    window.visualViewport?.removeEventListener('resize', onViewportResize)
+    cancelAnimationFrame(settleFrame)
     resizeObserver?.disconnect()
     clearTimeout(focusTimer)
     stopTicker()
@@ -1127,7 +1196,10 @@ onBeforeUnmount(() => {
 }
 
 /* The drawer is a sibling of the page, not a Daisy drawer-content wrapper.
-   Keep the closed panel off the layout so it cannot inflate mobile scrollWidth. */
+   Keep the closed panel off the layout so it cannot inflate mobile scrollWidth.
+   Not Daisy's `drawer-open`: that modifier is the always-visible sidebar layout, which hides the
+   overlay (transparent, 0x0, so outside clicks did nothing) and, when removed on close, brought the
+   40% overlay back for the fade-out (the "shadow gets stronger, then disappears" flash). */
 .agent-drawer-root {
     position: fixed;
     inset: auto 0 0 auto;
@@ -1137,7 +1209,7 @@ onBeforeUnmount(() => {
     overflow: hidden;
     pointer-events: none;
 }
-.agent-drawer-root.drawer-open {
+.agent-drawer-root.agent-drawer-expanded {
     inset: 0;
     width: 100%;
     height: 100dvh;

@@ -19,6 +19,7 @@ use App\Models\BudgetPeriod;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\Currency\NbuRates;
 use App\Support\TagTree;
 use App\Support\UserFormatter;
 use Illuminate\Support\Facades\DB;
@@ -101,6 +102,15 @@ class AgentToolExecutor
                 'properties' => [
                     'month' => ['type' => 'string', 'description' => 'YYYY-MM; default current month in user timezone'],
                 ],
+            ]),
+            'convert_currency' => self::fn('convert_currency', 'Convert a foreign-currency amount to UAH at the official NBU (National Bank of Ukraine) rate for a date. Use whenever the user says an amount is in another currency ("і це 2200 доларів", "it was $50", "€30"). Returns uah (sign kept), rate, rate_date and note_suffix to append to the note.', [
+                'type' => 'object',
+                'properties' => [
+                    'amount' => ['type' => 'number', 'description' => 'Amount in the foreign currency; keep the sign (negative = expense)'],
+                    'currency' => ['type' => 'string', 'description' => 'ISO code (USD, EUR, PLN…) or the word/symbol the user used'],
+                    'date' => ['type' => 'string', 'description' => 'YYYY-MM-DD of the transaction; default today'],
+                ],
+                'required' => ['amount', 'currency'],
             ]),
             'ask_user' => self::fn('ask_user', 'Ask the user a clarifying question and stop. Optional English suggested replies as inline buttons. Button labels must be English.', [
                 'type' => 'object',
@@ -433,6 +443,43 @@ class AgentToolExecutor
      * @param array<string, mixed> $args
      * @return array<string, mixed>
      */
+    public function convertCurrency(User $user, array $args): array
+    {
+        if (!isset($args['amount']) || !is_numeric($args['amount'])) {
+            throw new \InvalidArgumentException('amount is required');
+        }
+        $amount = (float) $args['amount'];
+        $currency = (string) ($args['currency'] ?? '');
+        $date = $this->optionalDate($args['date'] ?? null) ?? $user->todayDateString();
+        if (NbuRates::normalize($currency) === null) {
+            return ['ok' => false, 'error' => "Unknown currency: {$currency}. Ask the user which currency it is."];
+        }
+
+        $converted = app(NbuRates::class)->toUah($amount, $currency, $date);
+        if ($converted === null) {
+            return ['ok' => false, 'error' => 'No NBU rate is available for ' . strtoupper($currency) . " on {$date}. Ask the user for the UAH amount or the rate."];
+        }
+
+        $original = self::plainNumber(abs($amount)) . ' ' . $converted['currency'];
+        $rate = rtrim(rtrim(number_format($converted['rate'], 4, '.', ''), '0'), '.');
+
+        return $converted + [
+            'ok' => true,
+            'date' => $date,
+            'uah_formatted' => UserFormatter::formatMoney($user, $converted['uah']),
+            'note_suffix' => '(' . $original . ' @ ' . $rate . ' NBU ' . UserFormatter::formatDate($user, $converted['rate_date']) . ')',
+        ];
+    }
+
+    private static function plainNumber(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     * @return array<string, mixed>
+     */
     public function periodSummary(User $user, array $args): array
     {
         $month = is_string($args['month'] ?? null) && preg_match('/^\d{4}-\d{2}$/', $args['month'])
@@ -577,12 +624,9 @@ class AgentToolExecutor
             'tag_ids' => $tagIds,
         ];
 
-        $preview = 'Create transaction:' . "\n"
-            . UserFormatter::formatMoney($user, $amount) . ' on ' . $at
-            . ($note ? "\nNote: {$note}" : '')
-            . ($tagIds !== [] ? "\nTags: " . $this->tagLabels($user, $tagIds) : '');
+        $card = $this->transactionCard($user, 'create', $payload);
 
-        return ['payload' => $payload, 'preview' => $preview];
+        return ['payload' => $payload, 'preview' => self::cardText($card), 'card' => $card];
     }
 
     /**
@@ -616,12 +660,9 @@ class AgentToolExecutor
             'tag_ids' => $tagIds,
         ];
 
-        $preview = "Update transaction #{$id}:\n"
-            . UserFormatter::formatMoney($user, $amount) . ' on ' . $at
-            . ($note ? "\nNote: {$note}" : '')
-            . ($tagIds !== [] ? "\nTags: " . $this->tagLabels($user, $tagIds) : '');
+        $card = $this->transactionCard($user, 'update', $payload, $tx);
 
-        return ['payload' => $payload, 'preview' => $preview];
+        return ['payload' => $payload, 'preview' => self::cardText($card), 'card' => $card];
     }
 
     /**
@@ -637,12 +678,117 @@ class AgentToolExecutor
         }
 
         $payload = ['id' => $id];
-        $preview = "Delete transaction #{$id}:\n"
-            . UserFormatter::formatMoney($user, (float) $tx->amount)
-            . ' on ' . $tx->at->format('Y-m-d')
-            . ($tx->note ? "\nNote: {$tx->note}" : '');
+        $card = $this->transactionCard($user, 'delete', [
+            'amount' => (float) $tx->amount,
+            'at' => $tx->at->format('Y-m-d'),
+            'note' => $tx->note,
+            'tag_ids' => $tx->tags->pluck('id')->map(fn ($tagId) => (int) $tagId)->all(),
+        ], $tx);
 
-        return ['payload' => $payload, 'preview' => $preview];
+        return ['payload' => $payload, 'preview' => self::cardText($card), 'card' => $card];
+    }
+
+    /**
+     * The confirm card for one transaction, in the Telegram card layout (091e6ff): title by kind
+     * (Income / Expense; Receipt only when photos are attached), the signed amount as in the List
+     * view, 📅 DD.MM.YYYY (user date format), 📝 note, 📎 files, 🏷 tags. Updates carry the old
+     * value of each changed field in `before`.
+     *
+     * @param 'create'|'update'|'delete' $mode
+     * @param array{amount?: mixed, at?: mixed, note?: mixed, tag_ids?: mixed} $payload
+     * @return array<string, mixed>
+     */
+    public function transactionCard(User $user, string $mode, array $payload, ?Transaction $before = null, int $files = 0): array
+    {
+        $amount = (float) ($payload['amount'] ?? 0);
+        $at = (string) ($payload['at'] ?? $user->todayDateString());
+        $note = is_string($payload['note'] ?? null) && $payload['note'] !== '' ? $payload['note'] : null;
+        $tagIds = array_map('intval', is_array($payload['tag_ids'] ?? null) ? $payload['tag_ids'] : []);
+        $kind = $files > 0 ? 'Receipt' : ($amount > 0 ? 'Income' : 'Expense');
+
+        $card = [
+            'type' => 'transaction',
+            'mode' => $mode,
+            'kind' => strtolower($kind),
+            'title' => match ($mode) {
+                'update' => 'Edit ' . strtolower($kind),
+                'delete' => 'Delete ' . strtolower($kind),
+                default => $kind,
+            },
+            'amount' => $amount,
+            'amount_formatted' => self::signedMoney($user, $amount),
+            'date' => UserFormatter::formatDate($user, $at),
+            'note' => $note,
+            'tags' => $this->tagLabelList($user, $tagIds),
+            'files' => $files,
+        ];
+
+        if ($mode === 'update' && $before) {
+            $oldTags = $before->tags->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+            $changed = [];
+            if (round((float) $before->amount, 2) !== round($amount, 2)) {
+                $changed['amount_formatted'] = self::signedMoney($user, (float) $before->amount);
+            }
+            if ($before->at->format('Y-m-d') !== $at) {
+                $changed['date'] = UserFormatter::formatDate($user, $before->at->format('Y-m-d'));
+            }
+            if (($before->note ?: null) !== $note) {
+                $changed['note'] = $before->note ?: '—';
+            }
+            if ($oldTags !== collect($tagIds)->sort()->values()->all()) {
+                $changed['tags'] = $this->tagLabelList($user, $oldTags);
+            }
+            $card['before'] = (object) $changed;
+        }
+
+        return $card;
+    }
+
+    /**
+     * Plain-text twin of a transaction card (transcript, shared history, non-card clients).
+     *
+     * @param array<string, mixed> $card
+     */
+    public static function cardText(array $card): string
+    {
+        $before = (array) ($card['before'] ?? []);
+        $diff = static fn (string $key, string $value): string => isset($before[$key])
+            ? (is_array($before[$key]) ? (implode(' · ', $before[$key]) ?: 'No tags') : (string) $before[$key]) . ' → ' . $value
+            : $value;
+        $tags = $card['tags'] === [] ? 'No tags' : implode(' · ', $card['tags']);
+
+        $lines = [$card['title'], $diff('amount_formatted', (string) $card['amount_formatted']), '📅 ' . $diff('date', (string) $card['date'])];
+        if ($card['note'] !== null || isset($before['note'])) {
+            $lines[] = '📝 ' . $diff('note', (string) ($card['note'] ?? '—'));
+        }
+        if (($card['files'] ?? 0) > 0) {
+            $lines[] = '📎 ' . ($card['files_label'] ?? ($card['files'] . ' photo' . ($card['files'] === 1 ? '' : 's')));
+        }
+        $lines[] = '🏷 ' . $diff('tags', $tags);
+
+        return implode("\n", $lines);
+    }
+
+    /** "+1 234,5" for income, "-350" for expenses: the List view convention. */
+    public static function signedMoney(User $user, float $amount): string
+    {
+        $formatted = UserFormatter::formatMoney($user, $amount);
+
+        return $amount > 0 && !str_starts_with($formatted, '+') ? '+' . $formatted : $formatted;
+    }
+
+    /**
+     * @param list<int> $tagIds
+     * @return list<string>
+     */
+    private function tagLabelList(User $user, array $tagIds): array
+    {
+        if ($tagIds === []) {
+            return [];
+        }
+
+        return $user->tags()->whereIn('id', $tagIds)->orderBy('title')->get(['emoji', 'title'])
+            ->map(fn (Tag $tag): string => trim($tag->emoji . ' ' . $tag->title))->values()->all();
     }
 
     /**

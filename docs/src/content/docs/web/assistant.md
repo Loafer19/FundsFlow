@@ -108,9 +108,14 @@ Send a photo of a receipt and the assistant reads it into a transaction, like
     assist used.
   - **Without an amount** (`lunch with Anna`), the AI reads the photo and uses your text as a hint.
 - The AI reads the total, the date, and the shop, and suggests tags matched to your existing ones. A **Confirm** card
-  shows the result, for example *🧾 Receipt · -350.00 on 2026-10-25 · Note: Silpo · Tags: 🛒 Groceries · 📎 1 photo*.
+  shows the result, for example *Receipt · -350.00 · 📅 25.10.2026 · 📝 Silpo · 📎 1 photo · 🏷 🛒 Groceries*.
   Nothing is saved until you press **Confirm**. The transaction is then saved with the photos attached, so they show
   in the transaction's attachments.
+- To correct the card, just say so (*the date is yesterday*, *tag it Food*). A new card replaces the old one and the
+  photo stays attached. If the receipt is in another currency (*і це 2200 доларів*, *it was €30*), the assistant
+  converts it to hryvnias at the official NBU rate for the transaction's date and keeps the original in the note,
+  for example *Rozetka (2200 USD @ 45.4123 NBU 10.11.2026)*. If NBU has no rate for it, the assistant asks for the
+  amount in hryvnias.
 - **Several photos** get a question first: **One transaction** (one long receipt, or a receipt plus its card slip) or
   **Separate** (a transaction per photo).
   - **One transaction**: the clearest photo is read (JPEG first, then the largest) and every photo is attached.
@@ -146,6 +151,9 @@ contents.
 The assistant never changes your data on its own. A proposed change appears as a card with a preview and
 **Confirm** / **Cancel**:
 
+- Transaction cards use the same layout as in Telegram: the kind (**Income**, **Expense**, or **Receipt** when a
+  photo is attached), the signed amount as in the List, 📅 the date, 📝 the note, 📎 files, and 🏷 tags. An edit shows
+  the old value crossed out next to the new one.
 - Nothing is saved until you press **Confirm**. The card then shows the result (for example
   *✅ Saved: -350.00 · 2026-10-25 · 🛒 Groceries*). The open tab updates right away, without a page reload: the
   table and list, analytics, budgets, tags, and the calendar's upcoming charges.
