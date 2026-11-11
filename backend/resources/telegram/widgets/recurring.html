@@ -7,15 +7,16 @@ h3{margin:0 0 8px;font-size:1.05em;font-weight:650}
 .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
 .amt{font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
-.pos{color:var(--tg-theme-accent-text-color)}
+.pos{color:#2e9a4c}
 .neg{color:var(--tg-theme-destructive-text-color)}
 .meta{color:var(--tg-theme-hint-color);font-size:.8em;margin:4px 0 0}
 .lines p{margin:4px 0;font-size:.95em}
 .empty,.err,.hint{font-size:.85em;margin:8px 0 0}
 .empty,.hint{color:var(--tg-theme-hint-color)}
 .err{color:var(--tg-theme-destructive-text-color)}
-button.back{margin:0 0 10px}
+button.back{margin:0 0 10px;background:transparent;color:var(--tg-theme-hint-color);box-shadow:inset 0 0 0 1px var(--tg-theme-section-separator-color,var(--tg-theme-hint-color))}
 button.act{display:block;width:100%;margin:10px 0 0}
+button.act.o{background:transparent;color:var(--tg-theme-hint-color);box-shadow:inset 0 0 0 1px var(--tg-theme-section-separator-color,var(--tg-theme-hint-color))}
 </style>
 <div id="root"></div>
 <script>
@@ -49,10 +50,10 @@ function showDetail(){
   box.appendChild(el('p','',it.n));
   if(it.g)box.appendChild(el('p','',it.g));
   box.appendChild(el('p','',it.fq+(it.end?' until '+it.end:'')));
-  box.appendChild(el('p','',it.on?'Next payment '+it.nx:'Paused'));
+  box.appendChild(el('p','',it.on?'Next payment '+it.nx:'⏸ Paused'));
   if(err)box.appendChild(el('p','err',err));
   r.appendChild(box);
-  const b=el('button','act',busy?'Saving…':(it.on?'Pause':'Resume'));b.type='button';
+  const b=el('button','act'+(it.on?' o':''),busy?'Saving…':(it.on?'Pause':'Resume'));b.type='button';
   b.addEventListener('click',toggle);r.appendChild(b);
 }
 function toggle(){

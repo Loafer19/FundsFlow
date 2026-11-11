@@ -6,12 +6,13 @@ h3{margin:0 0 8px;font-size:1.05em}
 .item .n{display:flex;justify-content:space-between;gap:8px;font-weight:650;margin:0 0 6px}
 .bar{height:6px;background:var(--tg-theme-section-separator-color);border-radius:99px;overflow:hidden}
 .fill{height:100%;width:0;background:var(--tg-theme-button-color);border-radius:99px}
-.fill.ar{background:var(--tg-theme-accent-text-color)}
+.fill.ar{background:#f0a020}
+.fill.ok{background:#2e9a4c}
 .fill.ov{background:var(--tg-theme-destructive-text-color)}
 .meta{color:var(--tg-theme-hint-color);font-size:.8em;margin:6px 0 0}
 .empty{color:var(--tg-theme-hint-color)}
 .err{color:var(--tg-theme-destructive-text-color);font-size:.85em;margin:6px 0 0}
-button.back{margin:0 0 10px}
+button.back{margin:0 0 10px;background:transparent;color:var(--tg-theme-hint-color);box-shadow:inset 0 0 0 1px var(--tg-theme-section-separator-color,var(--tg-theme-hint-color))}
 .lines p{margin:4px 0;font-size:.95em}
 </style>
 <div id="root"></div>
@@ -20,7 +21,7 @@ const W=window.TelegramWidget;
 let list=[],sel=null,extra=null,err='';
 function parse(s){try{return s?JSON.parse(s):null}catch(e){return null}}
 function esc(){return document.createElement('div')}
-function fillClass(s){return s==='ov'?'fill ov':s==='ar'?'fill ar':'fill'}
+function fillClass(s){return 'fill'+(s==='ov'||s==='ar'||s==='ok'?' '+s:'')}
 function bar(p,s){
   const wrap=document.createElement('div');wrap.className='bar';
   const f=document.createElement('div');f.className=fillClass(s);

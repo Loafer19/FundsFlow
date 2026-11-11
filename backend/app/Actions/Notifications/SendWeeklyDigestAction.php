@@ -173,7 +173,14 @@ class SendWeeklyDigestAction
 
             if ($budget->isGoal()) {
                 $g = $this->goalProgress->execute($budget, $user);
-                $goals[] = [$label, (int) $g['percent'], $money($g['saved']) . ' / ' . $money($g['target']), '', GoalSummary::statusLabel($g['status'])];
+                // Bar colour as in /budgets: reached = green, behind its deadline = red; on track, no
+                // deadline (in_progress) or paused = blue.
+                $goalBar = match ((string) $g['status']) {
+                    'completed' => 'ok',
+                    'behind', 'overdue' => 'ov',
+                    default => '',
+                };
+                $goals[] = [$label, (int) $g['percent'], $money($g['saved']) . ' / ' . $money($g['target']), $goalBar, GoalSummary::statusLabel($g['status'])];
 
                 continue;
             }

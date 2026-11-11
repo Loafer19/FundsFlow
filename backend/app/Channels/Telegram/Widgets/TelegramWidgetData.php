@@ -607,9 +607,11 @@ class TelegramWidgetData
         if ($budget->isGoal()) {
             $progress = $this->goalProgress->execute($budget, $user);
             $status = match ((string) $progress['status']) {
+                // Reached = green, behind its deadline = red; on track, no deadline (in_progress)
+                // or paused = blue. Same colours as the weekly digest.
+                'completed' => 'ok',
                 'behind', 'overdue' => 'ov',
-                'on_track', 'completed' => 'ot',
-                default => 'ar',
+                default => 'ot',
             };
             $item = [
                 'id' => (int) $budget->id,
