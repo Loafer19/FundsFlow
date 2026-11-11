@@ -225,6 +225,29 @@ class TelegramSupport
     }
 
     /**
+     * "🏷 Food" for a tag without its own emoji; "💼 Salary · 🅱️ PUMB" as is, so the line doesn't
+     * start with two emoji in a row.
+     */
+    public static function tagLine(string $label): string
+    {
+        return self::startsWithEmoji(strip_tags($label)) ? $label : '🏷 ' . $label;
+    }
+
+    public static function startsWithEmoji(string $text): bool
+    {
+        return preg_match('/^[\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{2300}-\x{23FF}\x{2190}-\x{21FF}\x{3030}\x{303D}\x{3297}\x{3299}\x{00A9}\x{00AE}\x{203C}\x{2049}\x{2122}\x{2139}]/u', ltrim($text)) === 1;
+    }
+
+    /**
+     * Cards use DD.MM.YYYY everywhere in Telegram (widgets, editor, text cards), whatever the web
+     * app's date display setting: a year-less "11 Nov" is ambiguous for older entries.
+     */
+    public static function cardDate(\Carbon\CarbonInterface|string $date): string
+    {
+        return ($date instanceof \Carbon\CarbonInterface ? $date : \Illuminate\Support\Carbon::parse($date))->format('d.m.Y');
+    }
+
+    /**
      * The one card layout for a transaction everywhere (saved, updated, confirm, deleted):
      * headline, bold signed amount, 📅 date, 📝 note, 📎 files, 🏷 tags. The sign carries the
      * direction, so there is no 📉/📈.
@@ -232,7 +255,7 @@ class TelegramSupport
     public function formatTransactionCard(User $user, Transaction $transaction, string $headline = '✅ Saved'): string
     {
         $money = $this->escapeHtml($this->signedMoney($user, (float) $transaction->amount));
-        $date = $this->escapeHtml(UserFormatter::formatDate($user, $transaction->at));
+        $date = $this->escapeHtml(self::cardDate($transaction->at));
 
         $lines = [
             $this->escapeHtml($headline),
@@ -250,7 +273,7 @@ class TelegramSupport
             $lines[] = '📎 ' . $count . ' file' . ($count === 1 ? '' : 's');
         }
 
-        $lines[] = '🏷 ' . $this->formatTagListHtml($transaction);
+        $lines[] = self::tagLine($this->formatTagListHtml($transaction));
 
         return implode("\n", $lines);
     }
@@ -261,13 +284,14 @@ class TelegramSupport
         $note = $transaction->note
             ? $this->escapeHtml($this->truncateNote($transaction->note))
             : '—';
-        $date = $this->escapeHtml(UserFormatter::formatDate($user, $transaction->at));
-        $firstTag = $transaction->tags->first();
-        $tagLabel = $firstTag
-            ? $this->escapeHtml(trim($firstTag->emoji . ' ' . $firstTag->title))
-            : 'Untagged';
+        $date = $this->escapeHtml(self::cardDate($transaction->at));
+        // All tags, like the card ("💼 Salary · 🅱️ PUMB"); past three it says "+N".
+        $labels = $transaction->tags->map(fn ($tag) => $this->escapeHtml(trim($tag->emoji . ' ' . $tag->title)))->values();
+        $tagLabel = $labels->isEmpty()
+            ? 'Untagged'
+            : $labels->take(3)->implode(' · ') . ($labels->count() > 3 ? ' +' . ($labels->count() - 3) : '');
 
-        $meta = "📅 {$date} · 🏷 {$tagLabel}";
+        $meta = "📅 {$date} · " . self::tagLine($tagLabel);
 
         if ($transaction->relationLoaded('attachments') && $transaction->attachments->isNotEmpty()) {
             $meta .= ' · 📎';
@@ -292,7 +316,7 @@ class TelegramSupport
             UserFormatter::formatMoney($user, $transaction->amount),
             $note,
             $files,
-            UserFormatter::formatDate($user, $transaction->at),
+            self::cardDate($transaction->at),
         );
     }
 
@@ -438,7 +462,7 @@ class TelegramSupport
             : $user->tags()->whereIn('id', $ids)->orderBy('title')->get(['emoji', 'title'])
                 ->map(fn (Tag $tag) => $this->escapeHtml(trim($tag->emoji . ' ' . $tag->title)))->implode(' · ');
         $money = fn (float $v): string => $this->escapeHtml($this->signedMoney($user, $v));
-        $date = fn (string $d): string => $this->escapeHtml(UserFormatter::formatDate($user, $d));
+        $date = fn (string $d): string => $this->escapeHtml(self::cardDate($d));
         $diff = fn (string $old, string $new): string => $old === $new ? $new : "<s>{$old}</s> → {$new}";
 
         if ($action !== 'update_transaction' || !$before) {
@@ -447,7 +471,7 @@ class TelegramSupport
             if ($note !== null) {
                 $lines[] = '📝 ' . $this->escapeHtml($note);
             }
-            $lines[] = '🏷 ' . $tagLabel($tagIds);
+            $lines[] = self::tagLine($tagLabel($tagIds));
 
             return implode("\n", $lines);
         }
@@ -467,7 +491,7 @@ class TelegramSupport
         if ($oldNote !== '—' || $newNote !== '—') {
             $lines[] = '📝 ' . $diff($oldNote, $newNote);
         }
-        $lines[] = '🏷 ' . ($oldTags === $newTags ? $tagLabel($newTags) : $diff($tagLabel($oldTags), $tagLabel($newTags)));
+        $lines[] = self::tagLine($oldTags === $newTags ? $tagLabel($newTags) : $diff($tagLabel($oldTags), $tagLabel($newTags)));
 
         return implode("\n", $lines);
     }
@@ -659,7 +683,7 @@ class TelegramSupport
             ? $this->escapeHtml($this->signedMoney($user, $amount))
             : '?';
         $at = (string) ($draft['at'] ?? $user->todayDateString());
-        $date = $this->escapeHtml(UserFormatter::formatDate($user, $at));
+        $date = $this->escapeHtml(self::cardDate($at));
 
         $lines = [
             $this->escapeHtml('🧾 Receipt draft'),
@@ -679,7 +703,7 @@ class TelegramSupport
         if (is_array($draft['tag_ids'] ?? null)) {
             // Picked in the editor: exact ids win over the AI's title guesses.
             $tags = $user->tags()->whereIn('id', $draft['tag_ids'])->orderBy('title')->get(['emoji', 'title']);
-            $lines[] = '🏷 ' . ($tags->isEmpty() ? 'No tags' : $tags->map(fn (Tag $tag) => $this->escapeHtml(trim($tag->emoji . ' ' . $tag->title)))->implode(' · '));
+            $lines[] = self::tagLine($tags->isEmpty() ? 'No tags' : $tags->map(fn (Tag $tag) => $this->escapeHtml(trim($tag->emoji . ' ' . $tag->title)))->implode(' · '));
         } elseif (is_array($titles) && $titles !== []) {
             $matched = $this->matchSuggestedTagTitles($user, $titles);
 
@@ -688,7 +712,7 @@ class TelegramSupport
                     fn (Tag $tag) => $this->escapeHtml(trim($tag->emoji . ' ' . $tag->title)),
                     $matched,
                 ));
-                $lines[] = '🏷 ' . $label;
+                $lines[] = self::tagLine($label);
             } else {
                 $hint = implode(', ', array_map(fn ($t) => $this->escapeHtml((string) $t), $titles));
                 $lines[] = '🏷 suggested: ' . $hint;

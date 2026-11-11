@@ -451,7 +451,9 @@ const cardRows = (card) => {
     const rows = [{ key: 'date', icon: '📅 ', value: card.date, before: before.date }]
     if (card.note || before.note !== undefined) rows.push({ key: 'note', icon: '📝 ', value: card.note || '—', before: before.note })
     if (card.files > 0) rows.push({ key: 'files', icon: '📎 ', value: card.files_label || `${card.files} photo${card.files === 1 ? '' : 's'}` })
-    rows.push({ key: 'tags', icon: '🏷 ', value: tags(card.tags), before: before.tags === undefined ? undefined : tags(before.tags) })
+    // No 🏷 in front of a tag that has its own emoji ("💼 Salary · 🅱️ PUMB"), as in Telegram.
+    const tagIcon = /^\p{Extended_Pictographic}/u.test(card.tags?.[0] ?? '') ? '' : '🏷 '
+    rows.push({ key: 'tags', icon: tagIcon, value: tags(card.tags), before: before.tags === undefined ? undefined : tags(before.tags) })
     return rows
 }
 

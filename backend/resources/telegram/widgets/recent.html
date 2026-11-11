@@ -21,12 +21,13 @@ button.back,button.more{margin:0 0 10px}
 <div id="root"></div>
 <script>
 const W=window.TelegramWidget;
-let list=[],sel=null,ask=false,err='',busy=false,more=0;
+let list=[],sel=null,ask=false,err='',okMsg='',busy=false,more=0;
 function parse(s){try{return s?JSON.parse(s):null}catch(e){return null}}
 function cls(a){return 'amt'+((a&&a.charAt(0)==='+')?' pos':' neg')}
 function sd(df){return df?String(df).slice(0,5):''}
 function note(it){return it.fn||it.n||'—'}
-function tags(it){return (it.gs&&it.gs.length)?it.gs.join(' · '):(it.g||'Untagged')}
+function more1(it){return it.gx?(' +'+it.gx):''}
+function tags(it){return (it.gs&&it.gs.length)?it.gs.join(' · '):((it.g||'Untagged')+more1(it))}
 function clip(it){return it.f?' · 📎':''}
 function el(tag,clsName,text){const n=document.createElement(tag);if(clsName)n.className=clsName;if(text!=null)n.textContent=text;return n}
 function root(){const n=document.getElementById('root');n.innerHTML='';return n}
@@ -40,8 +41,8 @@ function showList(){
     top.appendChild(el('span',cls(it.a),it.a||''));
     top.appendChild(el('span','n',it.n||'—'));
     b.appendChild(top);
-    b.appendChild(el('div','meta',sd(it.df)+(it.g?(' · '+it.g):'')+clip(it)));
-    b.addEventListener('click',function(){sel=it;ask=false;err='';showDetail(it)});
+    b.appendChild(el('div','meta',sd(it.df)+(it.g?(' · '+it.g+more1(it)):'')+clip(it)));
+    b.addEventListener('click',function(){sel=it;ask=false;err='';okMsg='';showDetail(it)});
     r.appendChild(b);
   });
   if(more){const m=el('button','more','Load more');m.type='button';m.addEventListener('click',loadMore);r.appendChild(m)}
@@ -49,7 +50,7 @@ function showList(){
 function showDetail(it){
   const r=root();
   const back=el('button','back','Back');back.type='button';
-  back.addEventListener('click',function(){sel=null;ask=false;err='';showList()});
+  back.addEventListener('click',function(){sel=null;ask=false;err='';okMsg='';showList()});
   r.appendChild(back);
   r.appendChild(el('h3',cls(it.a),it.a||''));
   const box=el('div','lines');
@@ -57,15 +58,14 @@ function showDetail(it){
   box.appendChild(el('p','',tags(it)));
   box.appendChild(el('p','',(it.df||'')+clip(it)));
   if(err)box.appendChild(el('p','err',err));
+  if(okMsg)box.appendChild(el('p','meta',okMsg));
   r.appendChild(box);
   const act=el('div','actions');
+  const edit=el('button','','Edit');edit.type='button';
+  edit.addEventListener('click',function(){ask1(it,'e:','Editor opened below','Could not open the editor')});
   const del=el('button','','Delete');del.type='button';
-  del.addEventListener('click',function(){ask=true;err='';showConfirm(it)});
-  const edit=el('button','','Edit tags');edit.type='button';
-  edit.addEventListener('click',function(){openCard(it)});
-  const open=el('button','','Open');open.type='button';
-  open.addEventListener('click',function(){openCard(it)});
-  act.appendChild(del);act.appendChild(edit);act.appendChild(open);r.appendChild(act);
+  del.addEventListener('click',function(){ask=true;err='';okMsg='';showConfirm(it)});
+  act.appendChild(edit);act.appendChild(del);r.appendChild(act);
 }
 function showConfirm(it){
   const r=root();
@@ -86,13 +86,13 @@ function askBot(q){
   if(!W||!W.request)return Promise.reject({code:'Send this in Telegram'});
   return W.request(q).then(function(a){return parse(a&&a.result)||{}})
 }
-function openCard(it){
-  if(busy)return;busy=true;err='';showDetail(it);
-  askBot('o:'+it.id).then(function(r){
+function ask1(it,p,done,fail){
+  if(busy)return;busy=true;err='';okMsg='';showDetail(it);
+  askBot(p+it.id).then(function(r){
     busy=false;
-    if(r&&r.ok){err='';showDetail(it);if(W.HapticFeedback&&W.HapticFeedback.notificationOccurred)W.HapticFeedback.notificationOccurred('success');return}
-    err=(r&&r.e)||'Could not open';showDetail(it);
-  },function(e){busy=false;err=(e&&e.code)||'Could not open';showDetail(it)});
+    if(r&&r.ok){okMsg=done;showDetail(it);if(W.HapticFeedback&&W.HapticFeedback.notificationOccurred)W.HapticFeedback.notificationOccurred('success');return}
+    err=(r&&r.e)||fail;showDetail(it);
+  },function(e){busy=false;err=(e&&e.code)||fail;showDetail(it)});
 }
 function doDelete(it){
   if(busy)return;busy=true;err='';showConfirm(it);

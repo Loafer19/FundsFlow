@@ -764,7 +764,7 @@ class AgentToolExecutor
         if (($card['files'] ?? 0) > 0) {
             $lines[] = '📎 ' . ($card['files_label'] ?? ($card['files'] . ' photo' . ($card['files'] === 1 ? '' : 's')));
         }
-        $lines[] = '🏷 ' . $diff('tags', $tags);
+        $lines[] = \App\Channels\Telegram\TelegramSupport::tagLine($diff('tags', $tags));
 
         return implode("\n", $lines);
     }

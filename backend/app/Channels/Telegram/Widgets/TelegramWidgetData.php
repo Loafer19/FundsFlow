@@ -712,20 +712,34 @@ class TelegramWidgetData
             return $payload;
         }
 
-        $compact = array_map(static function (array $item): array {
-            unset($item['fn'], $item['gs']);
+        // Over the limit: drop long notes first, then show fewer items (down to 5, the rest come with
+        // "More"), and only then the full tag lists (gx still says "+N" more tags), so a transaction's
+        // detail shows all its tags whenever it can.
+        $strip = static fn (array $list, array $keys): array => array_map(static function (array $item) use ($keys): array {
+            foreach ($keys as $key) {
+                unset($item[$key]);
+            }
 
             return $item;
-        }, $items);
-        $payload = ['i' => $compact];
+        }, $list);
+        $pack = static fn (array $list, bool $more): array => $more ? ['i' => $list, 'more' => 1] : ['i' => $list];
+        $compact = $strip($items, ['fn']);
+        $payload = $pack($compact, $hasMore);
+        $keep = min(5, count($compact));
 
-        if ($hasMore) {
-            $payload['more'] = 1;
+        while (strlen($this->json($payload)) > $max && count($compact) > $keep) {
+            array_pop($compact);
+            $payload = $pack($compact, true);
+        }
+
+        if (strlen($this->json($payload)) > $max) {
+            $compact = $strip($compact, ['gs']);
+            $payload = $pack($compact, $hasMore || count($compact) < count($items));
         }
 
         while (strlen($this->json($payload)) > $max && $compact !== []) {
             array_pop($compact);
-            $payload = ['i' => $compact, 'more' => 1];
+            $payload = $pack($compact, true);
         }
 
         return $payload;
@@ -755,6 +769,8 @@ class TelegramWidgetData
         }
 
         if (count($tags) > 1) {
+            // gx: how many more tags than `g` shows ("💼 Salary +1"); gs: all of them for the detail.
+            $item['gx'] = count($tags) - 1;
             $item['gs'] = array_slice($tags, 0, 6);
         }
 

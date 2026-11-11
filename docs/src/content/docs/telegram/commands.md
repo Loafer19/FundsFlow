@@ -27,7 +27,7 @@ widget that updates by itself after every transaction; in a group they reply wit
 | --- | --- |
 | `/start` | Create an account for this chat, or link it with a code from the website |
 | `/add` | Keypad widget: amount, expense or income, one of your frequent tags (no AI) |
-| `/recent` | Recent transactions; tap one to open it, edit its tags, or delete it |
+| `/recent` | Recent transactions with all their tags; tap one for **✏️ Edit** (opens the editor) or **🗑 Delete** |
 | `/month` | This month's income, expenses, net, a daily chart, and top tags (a parent tag includes its child tags) |
 | `/budgets` | Spending limits for the current period (spent / limit, left or over, period dates, days left) and savings goals (saved vs target, deadline, pace) |
 | `/tags` | Your top-level tags with this month's expenses (−) and income (+); tap a tag to split it by subtags. Tags with no transactions this month are folded |
@@ -54,9 +54,11 @@ These still work but are not in the menu: `/newtag` (below), `/mute` and `/unmut
 
 ## Editing and deleting transactions
 
-Open a transaction card — right after saving it, by tapping it in the `/recent` widget, or with **Open N** under
-`/recent` in a group. **✏️ Edit** opens the [editor](/docs/telegram/quick-add/#edit-a-transaction); **🗑 Delete**
+In a private chat, tap a transaction in the `/recent` widget: **✏️ Edit** opens the
+[editor](/docs/telegram/quick-add/#edit-a-transaction) as a new message below the list, and **🗑 Delete** asks
+*Delete this transaction?* first. A card you just saved has the same **✏️ Edit** and **🗑 Delete** buttons; **🗑 Delete**
 turns the card into *Delete this transaction?* with **🗑 Delete** and **↩️ Cancel**, and nothing is deleted until you
-confirm. A card you just added also has **↩️ Undo** for 5 minutes. You can also ask the
+confirm. Groups have no widgets, so there **Open N** under `/recent` sends the transaction as a text card (date as
+DD.MM.YYYY) with **🏷 Tags**, **✏️ Amount** and **🗑 Delete**. A card you just added also has **↩️ Undo** for 5 minutes. You can also ask the
 [AI assistant](/docs/telegram/ai-assistant/) to change or delete a transaction; it shows what will change and asks
 for confirmation.

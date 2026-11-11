@@ -94,8 +94,10 @@ class WidgetQueryHandler
                 return;
             }
 
-            if (preg_match('/^o:(\d{1,10})$/', $data, $matches)) {
-                $this->handleRecentOpen($user, $chatId, $queryId, (int) $matches[1]);
+            // e: is ✏️ Edit; o: is the old Open button on Recent widgets already in chats,
+            // which now opens the editor too instead of a separate text card.
+            if (preg_match('/^[eo]:(\d{1,10})$/', $data, $matches)) {
+                $this->handleRecentEdit($user, $chatId, $queryId, (int) $matches[1]);
 
                 return;
             }
@@ -211,7 +213,10 @@ class WidgetQueryHandler
         $this->answer($queryId, ['ok' => 1]);
     }
 
-    private function handleRecentOpen(User $user, int|string $chatId, string $queryId, int $transactionId): void
+    /**
+     * ✏️ Edit in the Recent widget: the same edit.html editor as a saved card's ✏️ Edit.
+     */
+    private function handleRecentEdit(User $user, int|string $chatId, string $queryId, int $transactionId): void
     {
         $transaction = $this->support->findOwnTransaction($user, $transactionId);
 
@@ -221,8 +226,9 @@ class WidgetQueryHandler
             return;
         }
 
-        $this->answer($queryId, ['ok' => 1]);
-        $this->support->sendSavedTransaction($chatId, $user, $transaction, 'Transaction', remember: false);
+        $transaction->loadMissing('tags');
+        $opened = $this->editor->openForTransaction($user, $chatId, $transaction, null, 'Transaction');
+        $this->answer($queryId, $opened ? ['ok' => 1] : ['ok' => 0, 'e' => "Couldn't open the editor"]);
     }
 
     private function handleRecentMore(User $user, string $queryId, int $offset): void

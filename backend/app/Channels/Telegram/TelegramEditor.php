@@ -130,7 +130,7 @@ class TelegramEditor
         return match ($data) {
             'ed' => $this->delete($user, $chatId, $editorId, $ref),
             'en' => $this->askNote($user, $chatId, $editorId, $ref),
-            'et' => $this->tagPicker($user, $chatId, $ref),
+            'et' => $this->tagPicker($user, $chatId, $editorId, $ref),
             default => ['ok' => 0, 'e' => 'Unknown request'],
         };
     }
@@ -311,12 +311,29 @@ class TelegramEditor
      * @param array<string, mixed> $ref
      * @return array<string, mixed>
      */
-    private function tagPicker(User $user, int|string $chatId, array $ref): array
+    private function tagPicker(User $user, int|string $chatId, int $editorId, array $ref): array
     {
         $transaction = $ref['t'] === 'tx' ? $this->support->findOwnTransaction($user, (int) $ref['id']) : null;
 
-        if (!$transaction || !($ref['card'] ?? null)) {
+        if (!$transaction) {
             return ['ok' => 0, 'e' => 'All tags work for saved transactions'];
+        }
+
+        if (!($ref['card'] ?? null)) {
+            // Opened from the Recent widget: there is no card yet, so send one with the tag picker.
+            $sent = $this->client->sendMessageResult(
+                $chatId,
+                $this->support->formatTransactionCard($user, $transaction, (string) ($ref['h'] ?? 'Transaction')),
+                $this->support->tagKeyboard($user, $transaction),
+                TelegramSupport::PARSE_HTML,
+            );
+            $cardId = $sent['result']['message_id'] ?? null;
+
+            if (is_int($cardId)) {
+                Cache::put($this->editorKey($chatId, $editorId), array_merge($ref, ['card' => $cardId]), now()->addDays(self::TTL_DAYS));
+            }
+
+            return ['ok' => 1, 'm' => 'Pick tags on the card below'];
         }
 
         $this->client->editMessageText(

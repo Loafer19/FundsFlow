@@ -131,7 +131,7 @@ class RecurringReminders
             }
             $rule->save();
             $this->history->outcome($chatId, $user, 'Skipped recurring payment on ' . $skipped->toDateString() . ': ' . $this->line($user, $rule));
-            $this->render($user, $chatId, $messageId, $rule, '⏭ Skipped ' . UserFormatter::formatDate($user, $skipped));
+            $this->render($user, $chatId, $messageId, $rule, '⏭ Skipped ' . TelegramSupport::cardDate($skipped));
             $this->sync->refreshRecurring($user);
 
             return 'Payment skipped!';
@@ -160,11 +160,11 @@ class RecurringReminders
         ];
 
         $lines[] = $rule->active
-            ? '📅 ' . $esc(UserFormatter::formatDate($user, $rule->next_run_at)) . ' · ' . $rule->frequency->value
+            ? '📅 ' . $esc(TelegramSupport::cardDate($rule->next_run_at)) . ' · ' . $rule->frequency->value
             : '📅 Paused · ' . $rule->frequency->value;
 
         if ($rule->tags->isNotEmpty()) {
-            $lines[] = '🏷 ' . $rule->tags->map(fn ($tag) => $esc(trim($tag->emoji . ' ' . $tag->title)))->implode(' · ');
+            $lines[] = TelegramSupport::tagLine($rule->tags->map(fn ($tag) => $esc(trim($tag->emoji . ' ' . $tag->title)))->implode(' · '));
         }
 
         return implode("\n", $lines);

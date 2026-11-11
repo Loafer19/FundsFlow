@@ -300,7 +300,7 @@ class MenuHandler
             $status = $rule->active ? '✅' : '⏸';
             $money = $this->support->escapeHtml(UserFormatter::formatMoney($user, $rule->amount));
             $freq = $this->support->escapeHtml($rule->frequency->value);
-            $next = $this->support->escapeHtml(UserFormatter::formatDate($user, $rule->next_run_at));
+            $next = $this->support->escapeHtml(TelegramSupport::cardDate($rule->next_run_at));
 
             $lines = [
                 "{$status} <b>{$money}</b> · {$freq}",
@@ -423,7 +423,7 @@ class MenuHandler
         return '<b>' . $esc($label) . "</b>\n"
             . $this->support->progressBar($st['limit'] > 0 ? $st['spent'] / $st['limit'] : 0.0) . ' ' . $st['percent'] . "%\n"
             . $money($st['spent']) . ' / ' . $money($st['limit']) . ' · ' . $balance . "\n"
-            . $esc(UserFormatter::formatDate($user, $st['start']) . ' – ' . UserFormatter::formatDate($user, $st['end'])) . ' · ' . $days;
+            . $esc(TelegramSupport::cardDate($st['start']) . ' – ' . TelegramSupport::cardDate($st['end'])) . ' · ' . $days;
     }
 
     public function goalBlock(User $user, Budget $budget, string $label): string
