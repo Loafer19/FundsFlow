@@ -47,15 +47,15 @@
 </template>
 
 <script setup>
-import { LifeBuoy, Send } from 'lucide-vue-next'
+import { LifeBuoy, Send } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import { version } from '../../package.json'
+import ModalHeader from '../components/ModalHeader.vue'
 import { useAuthStore } from '../services/auth.js'
 import { apiErrorMessage } from '../services/formatters.js'
 import { openSettingsTab } from '../services/modal.js'
 import { createSupportTicket, FAQ_URL } from '../services/support.js'
 import toasts from '../services/toasts.js'
-import ModalHeader from '../components/ModalHeader.vue'
 
 const authStore = useAuthStore()
 

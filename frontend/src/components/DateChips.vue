@@ -16,7 +16,7 @@
 </template>
 
 <script setup>
-import { CalendarDays } from 'lucide-vue-next'
+import { CalendarDays } from '@lucide/vue'
 import { computed } from 'vue'
 import { today } from '../services/clock.js'
 import { formatDate, parseLocalDate, toLocalDateStr } from '../services/formatters.js'

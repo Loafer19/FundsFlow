@@ -43,7 +43,7 @@
 </template>
 
 <script setup>
-import { Plus, PiggyBank } from 'lucide-vue-next'
+import { PiggyBank, Plus } from '@lucide/vue'
 import { computed } from 'vue'
 import GoalCard from '../components/budgets/GoalCard.vue'
 import LimitCard from '../components/budgets/LimitCard.vue'

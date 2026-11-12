@@ -25,15 +25,15 @@
 </template>
 
 <script setup>
-import { PiggyBank, Save, Target } from 'lucide-vue-next'
+import { PiggyBank, Save, Target } from '@lucide/vue'
 import { ref, watch } from 'vue'
 import BudgetFormFields from '../components/budgets/BudgetFormFields.vue'
+import ModalHeader from '../components/ModalHeader.vue'
 import { budgetPayload } from '../services/budgetPayload.js'
 import { useBudgetsStore } from '../services/budgets.js'
 import { nowDateStr } from '../services/formatters.js'
 import { chainStart } from '../services/limits.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
-import ModalHeader from '../components/ModalHeader.vue'
 
 const budgetsStore = useBudgetsStore()
 

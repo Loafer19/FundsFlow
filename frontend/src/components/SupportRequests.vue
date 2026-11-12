@@ -79,7 +79,7 @@
 </template>
 
 <script setup>
-import { ChevronLeft, Plus, Send, LifeBuoy } from 'lucide-vue-next'
+import { ChevronLeft, LifeBuoy, Plus, Send } from '@lucide/vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { apiErrorMessage, formatDate } from '../services/formatters.js'
 import { showModal } from '../services/modal.js'

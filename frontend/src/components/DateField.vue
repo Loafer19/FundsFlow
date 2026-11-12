@@ -19,7 +19,7 @@
 </template>
 
 <script setup>
-import { CalendarDays, X } from 'lucide-vue-next'
+import { CalendarDays, X } from '@lucide/vue'
 import { computed, ref, useAttrs } from 'vue'
 import { formatDate, parseLocalDate } from '../services/formatters.js'
 import { haptic } from '../services/telegramWebApp.js'

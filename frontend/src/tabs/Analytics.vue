@@ -171,7 +171,7 @@
 </template>
 
 <script setup>
-import { ChartPie, ChevronDown, ChevronRight, Flame, Info, Lightbulb, Presentation, Telescope } from 'lucide-vue-next'
+import { ChartPie, ChevronDown, ChevronRight, Flame, Info, Lightbulb, Presentation, Telescope } from '@lucide/vue'
 import { computed, inject, ref } from 'vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatCard from '../components/StatCard.vue'

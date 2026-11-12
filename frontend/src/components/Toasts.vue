@@ -21,7 +21,7 @@
 </template>
 
 <script setup>
-import { CircleCheck, CircleX, Info } from 'lucide-vue-next'
+import { CircleCheck, CircleX, Info } from '@lucide/vue'
 import { onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 import toasts from '../services/toasts'
 

@@ -113,7 +113,7 @@
 </template>
 
 <script setup>
-import { ChevronRight, X } from 'lucide-vue-next'
+import { ChevronRight, X } from '@lucide/vue'
 import { computed, inject, ref } from 'vue'
 import { tagChange } from '../services/comparison.js'
 import { toLocalDateStr } from '../services/formatters.js'

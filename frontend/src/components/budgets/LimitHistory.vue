@@ -34,7 +34,7 @@
 </template>
 
 <script setup>
-import { ChevronRight } from 'lucide-vue-next'
+import { ChevronRight } from '@lucide/vue'
 import { computed } from 'vue'
 import { formatMoney, parseLocalDate } from '../../services/formatters.js'
 

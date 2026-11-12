@@ -60,7 +60,7 @@
 </template>
 
 <script setup>
-import { CircleHelp, LifeBuoy, LogOut, Menu, Plus, Repeat, Settings, Sparkles, Tag, Upload } from 'lucide-vue-next'
+import { CircleHelp, LifeBuoy, LogOut, Menu, Plus, Repeat, Settings, Sparkles, Tag, Upload } from '@lucide/vue'
 
 defineProps({
     groups: { type: Array, required: true },

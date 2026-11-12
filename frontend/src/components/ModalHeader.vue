@@ -17,7 +17,7 @@
 </template>
 
 <script setup>
-import { X } from 'lucide-vue-next'
+import { X } from '@lucide/vue'
 
 const props = defineProps({
     titleId: { type: String, required: true },

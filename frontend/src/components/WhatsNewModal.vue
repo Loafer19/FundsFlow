@@ -34,11 +34,11 @@
 </template>
 
 <script setup>
-import { Check, PartyPopper } from 'lucide-vue-next'
+import { Check, PartyPopper } from '@lucide/vue'
 import { ref, watch } from 'vue'
+import ModalHeader from '../components/ModalHeader.vue'
 import { useDialogOpen } from '../services/dialogOpen.js'
 import { markWhatsNewSeen, WHATS_NEW_URL, whatsNewReleases } from '../services/whatsNew.js'
-import ModalHeader from '../components/ModalHeader.vue'
 
 // Frozen while open: marking as seen on close must not swap the list during the fade-out.
 const { isOpen } = useDialogOpen('whats_new_modal')

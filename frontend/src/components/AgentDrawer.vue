@@ -351,7 +351,7 @@ import {
     Sparkles,
     Square,
     X,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { computed, defineAsyncComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { lastTurnIndex, rewindBlocker, useAgentStore } from '../services/agent.js'
 import {

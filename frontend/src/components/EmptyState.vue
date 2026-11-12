@@ -17,7 +17,7 @@
 </template>
 
 <script setup>
-import { Plus } from 'lucide-vue-next'
+import { Plus } from '@lucide/vue'
 
 defineProps({
     // Lucide component. Rendered in the same tile language as StatCard.

@@ -56,12 +56,12 @@
     </dialog>
 </template>
 <script setup>
-import { Pencil, Plus, Tag } from 'lucide-vue-next'
+import { Pencil, Plus, Tag } from '@lucide/vue'
 import DeleteHold from './../components/buttons/DeleteHold.vue'
 import EmptyState from './../components/EmptyState.vue'
+import ModalHeader from '../components/ModalHeader.vue'
 import { showModal } from './../services/modal.js'
 import { useTagsStore } from './../services/tags.js'
-import ModalHeader from '../components/ModalHeader.vue'
 
 const tagsStore = useTagsStore()
 </script>

@@ -115,7 +115,7 @@
 </template>
 
 <script setup>
-import { CalendarClock, PartyPopper, Pause, Pencil, Play, Target, TrendingUp } from 'lucide-vue-next'
+import { CalendarClock, PartyPopper, Pause, Pencil, Play, Target, TrendingUp } from '@lucide/vue'
 import { computed, inject } from 'vue'
 import { useBudgetsStore } from '../../services/budgets.js'
 import { formatDate, formatMoney } from '../../services/formatters.js'

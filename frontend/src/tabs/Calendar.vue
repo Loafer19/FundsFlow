@@ -147,7 +147,7 @@
 </template>
 
 <script setup>
-import { CalendarDays, FileText, Image as ImageIcon, Inbox, Plus, Repeat } from 'lucide-vue-next'
+import { CalendarDays, FileText, Image as ImageIcon, Inbox, Plus, Repeat } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import CalendarYearMonths from '../components/CalendarYearMonths.vue'
 import EmptyState from '../components/EmptyState.vue'

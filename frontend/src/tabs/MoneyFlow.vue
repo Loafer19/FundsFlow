@@ -37,14 +37,14 @@
 </template>
 
 <script setup>
-import { ArrowLeftRight, Info } from 'lucide-vue-next'
+import { ArrowLeftRight, Info } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import BarChart from '../components/charts/BarChart.vue'
 import EmptyState from '../components/EmptyState.vue'
+import SegmentedControl from '../components/SegmentedControl.vue'
 import StatCard from '../components/StatCard.vue'
 import { nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { useTransactionsStore } from '../services/transactions.js'
-import SegmentedControl from '../components/SegmentedControl.vue'
 
 const transactionsStore = useTransactionsStore()
 

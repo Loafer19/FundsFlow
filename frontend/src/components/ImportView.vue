@@ -395,7 +395,7 @@ import {
     TrendingDown,
     TrendingUp,
     Upload,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAuthStore } from '../services/auth.js'
 import { apiErrorMessage, formatDate, formatMoney, parseLocalDate } from '../services/formatters.js'
@@ -403,11 +403,11 @@ import { applyImportRules, commitImport, fetchImport, fetchImports, goToImport, 
 import { showModal } from '../services/modal.js'
 import { useTagsStore } from '../services/tags.js'
 import toasts from '../services/toasts.js'
-import EmptyState from './EmptyState.vue'
-import TagPicker from './TagPicker.vue'
-import StatCard from './StatCard.vue'
-import SegmentedControl from './SegmentedControl.vue'
 import DateField from './DateField.vue'
+import EmptyState from './EmptyState.vue'
+import SegmentedControl from './SegmentedControl.vue'
+import StatCard from './StatCard.vue'
+import TagPicker from './TagPicker.vue'
 
 const props = defineProps({
     uuid: { type: String, default: '' },

@@ -68,16 +68,16 @@
 </template>
 
 <script setup>
-import { Save, Tag } from 'lucide-vue-next'
+import { Save, Tag } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import LazyEmojiPicker from '../components/LazyEmojiPicker.js'
+import ModalHeader from '../components/ModalHeader.vue'
+import PopoverMenu from '../components/PopoverMenu.vue'
+import TagPicker from '../components/TagPicker.vue'
 import { useDialogOpen } from '../services/dialogOpen.js'
 import { randomEmoji as pickRandomEmoji } from '../services/emojiDefaults.js'
 import { useTagsStore } from './../services/tags.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
-import ModalHeader from '../components/ModalHeader.vue'
-import PopoverMenu from '../components/PopoverMenu.vue'
-import TagPicker from '../components/TagPicker.vue'
 
 const randomEmoji = pickRandomEmoji()
 

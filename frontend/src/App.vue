@@ -213,14 +213,14 @@ import {
     Tags,
     TrendingUp,
     X,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { computed, defineAsyncComponent, markRaw, nextTick, onMounted, provide, ref, watch } from 'vue'
 import AgentDrawer from './components/AgentDrawer.vue'
 import AppFooter from './components/AppFooter.vue'
 import BootLoader from './components/BootLoader.vue'
 import GroupDock from './components/GroupDock.vue'
-import GroupSegments from './components/GroupSegments.vue'
 import GroupedTabs from './components/GroupedTabs.vue'
+import GroupSegments from './components/GroupSegments.vue'
 import ImportView from './components/ImportView.vue'
 import PopoverMenu from './components/PopoverMenu.vue'
 import SettingsDrawer from './components/SettingsDrawer.vue'
@@ -250,6 +250,7 @@ import { parseLocalDate } from './services/formatters.js'
 import { closeSettings, openSettingsTab, showModal } from './services/modal.js'
 import { shouldShowOnboarding } from './services/onboarding.js'
 import { useRecurringTransactionsStore } from './services/recurringTransactions.js'
+import { lazyImport } from './services/staleChunk.js'
 import { useTagsStore } from './services/tags.js'
 import { installTelegramChrome } from './services/telegramChrome.js'
 import {
@@ -261,7 +262,6 @@ import {
     takeStashedInitData,
     ready as telegramReady,
 } from './services/telegramWebApp.js'
-import { lazyImport } from './services/staleChunk.js'
 import { useTransactionsStore } from './services/transactions.js'
 import { hasUnseenWhatsNew, markWhatsNewSeen } from './services/whatsNew.js'
 import Analytics from './tabs/Analytics.vue'

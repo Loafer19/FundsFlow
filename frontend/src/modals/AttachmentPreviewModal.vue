@@ -55,7 +55,7 @@
 </template>
 
 <script setup>
-import { Download, Send, X } from 'lucide-vue-next'
+import { Download, Send, X } from '@lucide/vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { showModal } from '../services/modal.js'
 import { sendAttachmentToTelegram } from '../services/telegramSend.js'

@@ -14,12 +14,12 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.4
 
       - name: Run Biome Check
         run: |
           cd frontend
-          bun i
+          bun install --frozen-lockfile
           bun run check
 
   release:
@@ -36,7 +36,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.4
 
       - name: Get current version
         id: current_version

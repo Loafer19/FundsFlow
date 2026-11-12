@@ -218,7 +218,7 @@
 </template>
 
 <script setup>
-import { Bot, CalendarDays, FileText, Image as ImageIcon, Laptop, Paperclip, Pencil, Repeat, Search, Send, X, Landmark, FileUp, List } from 'lucide-vue-next'
+import { Bot, CalendarDays, FileText, FileUp, Image as ImageIcon, Landmark, Laptop, List, Paperclip, Pencil, Repeat, Search, Send, X } from '@lucide/vue'
 
 import { computed, inject, ref } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'

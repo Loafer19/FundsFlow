@@ -29,7 +29,7 @@
 </template>
 
 <script setup>
-import { TrendingUp } from 'lucide-vue-next'
+import { TrendingUp } from '@lucide/vue'
 import { computed, inject, ref } from 'vue'
 import TrendChart from '../components/charts/TrendChart.vue'
 import EmptyState from '../components/EmptyState.vue'

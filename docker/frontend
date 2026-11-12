@@ -1,4 +1,4 @@
-FROM oven/bun:latest AS builder
+FROM oven/bun:1.4.4 AS builder
 
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
@@ -9,9 +9,13 @@ ENV VITE_TELEGRAM_BOT_USERNAME=$VITE_TELEGRAM_BOT_USERNAME
 
 WORKDIR /app
 
-COPY frontend /app
+# Same Bun as CI (.github/workflows/ci.yml) and the committed lockfile, so a fresh upstream publish
+# can't change what gets built.
+COPY frontend/package.json frontend/bun.lock /app/
 
-RUN bun i
+RUN bun install --frozen-lockfile
+
+COPY frontend /app
 
 RUN bun run prod
 
@@ -19,7 +23,7 @@ RUN bun run prod
 COPY docker/csp-hashes.mjs docker/precompress.mjs /tmp/
 RUN bun /tmp/csp-hashes.mjs /app/dist /app/csp.env APP_SCRIPT_HASHES && bun /tmp/precompress.mjs /app/dist
 
-FROM oven/bun:latest AS docs
+FROM oven/bun:1.4.4 AS docs
 
 WORKDIR /docs
 
@@ -35,7 +39,7 @@ RUN bun run build
 COPY docker/csp-hashes.mjs docker/precompress.mjs /tmp/
 RUN bun /tmp/csp-hashes.mjs /docs/dist /docs/csp.env DOCS_SCRIPT_HASHES && bun /tmp/precompress.mjs /docs/dist
 
-FROM oven/bun:latest AS landing
+FROM oven/bun:1.4.4 AS landing
 
 # Served at https://fundsflow.fun/landing/ (landing/astro.config.mjs). LANDING_SITE / LANDING_BASE and
 # PUBLIC_APP_URL / PUBLIC_DOCS_URL are optional overrides; empty means the defaults in landing/src/config.ts.

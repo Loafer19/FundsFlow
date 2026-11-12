@@ -77,14 +77,14 @@
 </template>
 
 <script setup>
-import { Gauge, Info, Target } from 'lucide-vue-next'
+import { Gauge, Info, Target } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
 import { nowDateStr, parseLocalDate } from '../../services/formatters.js'
 import { bucketBounds } from '../../services/limits.js'
 import AmountField from '../AmountField.vue'
-import TagPicker from '../TagPicker.vue'
-import SegmentedControl from '../SegmentedControl.vue'
 import DateField from '../DateField.vue'
+import SegmentedControl from '../SegmentedControl.vue'
+import TagPicker from '../TagPicker.vue'
 
 defineProps({
     // Edit modal: a limit cannot turn into a goal or back (the API keeps the type).

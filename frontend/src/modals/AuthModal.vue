@@ -116,13 +116,13 @@
 </template>
 
 <script setup>
-import { LogIn, Send, User, UserPlus } from 'lucide-vue-next'
+import { LogIn, Send, User, UserPlus } from '@lucide/vue'
 import { ref } from 'vue'
+import ModalHeader from '../components/ModalHeader.vue'
 import { useAuthStore } from './../services/auth.js'
 import { formatTelegramCode, normalizeTelegramCode, TELEGRAM_CODE_LENGTH } from './../services/telegramCode.js'
 import { takeStashedInitData } from './../services/telegramWebApp.js'
 import toasts from './../services/toasts.js'
-import ModalHeader from '../components/ModalHeader.vue'
 
 const googleAuthUrl = import.meta.env.VITE_API_URL + '/auth/google'
 const githubAuthUrl = import.meta.env.VITE_API_URL + '/auth/github'

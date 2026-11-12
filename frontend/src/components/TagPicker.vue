@@ -35,7 +35,7 @@
 </template>
 
 <script setup>
-import { ChevronRight, Search } from 'lucide-vue-next'
+import { ChevronRight, Search } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import { useTagsStore } from '../services/tags.js'
 import { haptic } from '../services/telegramWebApp.js'

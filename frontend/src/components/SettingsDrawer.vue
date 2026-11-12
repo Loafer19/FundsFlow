@@ -336,10 +336,8 @@ recurring_transactions</pre>
 </template>
 
 <script setup>
-import { Bot, Cable, ChevronLeft, ChevronRight, Database, Download, FileUp, Info, KeyRound, LifeBuoy, Palette, Save, Send, Settings as SettingsIcon, UserRound, X } from 'lucide-vue-next'
+import { Bot, Cable, ChevronLeft, ChevronRight, Database, Download, FileUp, Info, KeyRound, LifeBuoy, Palette, Save, Send, Settings as SettingsIcon, UserRound, X } from '@lucide/vue'
 import { computed, inject, markRaw, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import BankSync from './BankSync.vue'
-import SupportRequests from './SupportRequests.vue'
 import {
     createMcpToken,
     downloadAccountExport,
@@ -360,8 +358,8 @@ import {
     toLocalDateStr,
 } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
-import { closeSettings, settingsOpen, settingsTabRequest } from '../services/modal'
 import { goToImport } from '../services/imports.js'
+import { closeSettings, settingsOpen, settingsTabRequest } from '../services/modal'
 import { reportErrorMessage, requestReport, saveBlob } from '../services/report.js'
 import settings, {
     updateDateFormat,
@@ -374,6 +372,8 @@ import { useTagsStore } from '../services/tags'
 import { isTelegramWebApp } from '../services/telegramWebApp.js'
 import toasts from '../services/toasts'
 import { useTransactionsStore } from '../services/transactions'
+import BankSync from './BankSync.vue'
+import SupportRequests from './SupportRequests.vue'
 
 const authStore = useAuthStore()
 

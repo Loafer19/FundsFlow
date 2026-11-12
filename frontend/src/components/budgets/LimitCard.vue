@@ -100,7 +100,7 @@
 </template>
 
 <script setup>
-import { CalendarClock, Gauge, Pause, Pencil, Play, TrendingUp } from 'lucide-vue-next'
+import { CalendarClock, Gauge, Pause, Pencil, Play, TrendingUp } from '@lucide/vue'
 import { computed, inject } from 'vue'
 import { useBudgetsStore } from '../../services/budgets.js'
 import { formatDate, formatMoney } from '../../services/formatters.js'

@@ -18,7 +18,7 @@
 </template>
 
 <script setup>
-import { Trash2 } from 'lucide-vue-next'
+import { Trash2 } from '@lucide/vue'
 import { ref } from 'vue'
 import { haptic } from '../../services/telegramWebApp.js'
 

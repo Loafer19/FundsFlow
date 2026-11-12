@@ -60,20 +60,19 @@
 </template>
 
 <script setup>
-import { Repeat, Save } from 'lucide-vue-next'
+import { Repeat, Save } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import AmountField from '../components/AmountField.vue'
 import DateChips from '../components/DateChips.vue'
+import DateField from '../components/DateField.vue'
+import ModalHeader from '../components/ModalHeader.vue'
+import SegmentedControl from '../components/SegmentedControl.vue'
 import TagPicker from '../components/TagPicker.vue'
 import { today } from '../services/clock.js'
 import { formatDate, nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
-
 import { advanceDateStr } from '../services/recurringSchedule.js'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
-import ModalHeader from '../components/ModalHeader.vue'
-import SegmentedControl from '../components/SegmentedControl.vue'
-import DateField from '../components/DateField.vue'
 
 const frequencyOptions = [
     { value: 'daily', label: 'Daily' },

@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { FileText, Image as ImageIcon, Paperclip, X } from 'lucide-vue-next'
+import { FileText, Image as ImageIcon, Paperclip, X } from '@lucide/vue'
 import { computed } from 'vue'
 import { ALLOWED_MIMES, MAX_BYTES, MAX_PER_TRANSACTION } from '../services/attachmentLimits.js'
 import toasts from '../services/toasts.js'

@@ -67,15 +67,15 @@
 </template>
 
 <script setup>
-import { Plus, Send, Tag } from 'lucide-vue-next'
+import { Plus, Send, Tag } from '@lucide/vue'
 import { computed, ref } from 'vue'
+import ModalHeader from '../components/ModalHeader.vue'
 import { apiErrorMessage } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
 import { showModal } from '../services/modal'
 import { isOnboardingDone, markOnboardingDone } from '../services/onboarding'
 import { useTagsStore } from '../services/tags'
 import toasts from '../services/toasts'
-import ModalHeader from '../components/ModalHeader.vue'
 
 const tagsStore = useTagsStore()
 

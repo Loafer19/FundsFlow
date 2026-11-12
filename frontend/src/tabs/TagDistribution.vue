@@ -97,16 +97,16 @@
 </template>
 
 <script setup>
-import { Tags, TrendingDown, TrendingUp } from 'lucide-vue-next'
+import { Tags, TrendingDown, TrendingUp } from '@lucide/vue'
 import { computed, inject, ref } from 'vue'
 import TagDonutChart from '../components/charts/TagDonutChart.vue'
 import EmptyState from '../components/EmptyState.vue'
+import SegmentedControl from '../components/SegmentedControl.vue'
+import StatCard from '../components/StatCard.vue'
 import TagDetailModal from '../components/TagDetailModal.vue'
 import { tagChange } from '../services/comparison.js'
 import { useTagsStore } from '../services/tags'
 import { useTransactionsStore } from '../services/transactions'
-import SegmentedControl from '../components/SegmentedControl.vue'
-import StatCard from '../components/StatCard.vue'
 
 const props = defineProps({
     dateRange: {

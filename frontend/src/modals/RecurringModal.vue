@@ -69,13 +69,13 @@
 </template>
 
 <script setup>
-import { Pause, Pencil, Play, Plus, Repeat } from 'lucide-vue-next'
+import { Pause, Pencil, Play, Plus, Repeat } from '@lucide/vue'
 import DeleteHold from './../components/buttons/DeleteHold.vue'
 import EmptyState from './../components/EmptyState.vue'
+import ModalHeader from '../components/ModalHeader.vue'
 import { formatDate, formatMoney } from './../services/formatters.js'
 import { showModal } from './../services/modal.js'
 import { useRecurringTransactionsStore } from './../services/recurringTransactions.js'
-import ModalHeader from '../components/ModalHeader.vue'
 
 const recurringStore = useRecurringTransactionsStore()
 

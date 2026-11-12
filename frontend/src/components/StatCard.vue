@@ -44,7 +44,7 @@ import {
     Telescope,
     TrendingDown,
     TrendingUp,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { computed } from 'vue'
 import { compareValues } from '../services/comparison.js'
 import { formatMoney, formatPercentage } from '../services/formatters.js'

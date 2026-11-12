@@ -37,17 +37,17 @@
 </template>
 
 <script setup>
-import { ArrowLeftRight, Save } from 'lucide-vue-next'
+import { ArrowLeftRight, Save } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import AmountField from '../components/AmountField.vue'
 import AttachmentField from '../components/AttachmentField.vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import DateChips from '../components/DateChips.vue'
+import ModalHeader from '../components/ModalHeader.vue'
 import TagPicker from '../components/TagPicker.vue'
 import { toLocalDateStr } from '../services/formatters.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
 import { useTransactionsStore } from '../services/transactions.js'
-import ModalHeader from '../components/ModalHeader.vue'
 
 const transactionsStore = useTransactionsStore()
 
