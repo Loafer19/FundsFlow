@@ -286,7 +286,10 @@
                     class="agent-chip-group border-t border-base-300 px-3 pt-3 flex flex-wrap gap-2"
                     role="list" aria-label="Photos to send">
                     <div v-for="(image, index) in attachments" :key="image.url" class="relative" role="listitem">
-                        <img :src="image.url" :alt="`Photo ${index + 1} to send`"
+                        <div v-if="image.heic" :title="image.name"
+                            class="size-16 rounded-lg border border-base-300 bg-base-200 grid place-items-center text-xs font-semibold text-base-content/60">
+                            HEIC</div>
+                        <img v-else :src="image.url" :alt="`Photo ${index + 1} to send`"
                             class="size-16 rounded-lg object-cover border border-base-300" />
                         <button type="button" class="btn btn-xs btn-circle btn-neutral absolute -top-2 -right-2"
                             :aria-label="`Remove photo ${index + 1}`" @click="removeAttachment(index)">
@@ -736,7 +739,7 @@ const addFiles = async (list) => {
             const heic = /hei[cf]$/i.test(file.type) || /\.hei[cf]$/i.test(name)
             toasts.error(
                 heic
-                    ? `This browser cannot open HEIC photos (${name}). Send it as JPEG or PNG.`
+                    ? `${name} is too large to send as HEIC. Send it as JPEG or PNG.`
                     : `Couldn't read ${name}`,
             )
         } finally {

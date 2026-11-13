@@ -21,7 +21,7 @@ class TransactionAttachmentStoreRequest extends FormRequest
         return [
             'file' => [
                 'required',
-                File::types(['jpg', 'jpeg', 'png', 'webp', 'pdf'])
+                File::types(TransactionAttachmentRules::EXTENSIONS)
                     ->max(TransactionAttachmentRules::MAX_BYTES / 1024),
             ],
         ];

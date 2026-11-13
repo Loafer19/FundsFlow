@@ -89,7 +89,7 @@ class AgentController extends Controller
             'images.*.file' => 'That photo could not be uploaded. Try again.',
             'images.*.uploaded' => 'Each photo must be ' . intdiv(WebAgentUploads::MAX_BYTES, 1024 * 1024) . ' MB or smaller.',
             'images.*.max' => 'Each photo must be ' . intdiv(WebAgentUploads::MAX_BYTES, 1024 * 1024) . ' MB or smaller.',
-            'images.*.mimetypes' => 'Only JPEG, PNG and WebP photos are supported.',
+            'images.*.mimetypes' => 'Only JPEG, PNG, WebP and HEIC photos are supported.',
             'document.file' => 'That file could not be uploaded. Try again.',
             'document.uploaded' => 'That file is too large.',
             'document.max' => 'That file is too large: PDF up to ' . DocumentFile::formatBytes(DocumentFile::maxBytes(DocumentFile::PDF))

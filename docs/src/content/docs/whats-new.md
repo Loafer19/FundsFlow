@@ -45,6 +45,14 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
 - **Pinned month summary.** Turn it on in `/notifications` to keep a live `/month` pinned at the top of the chat; a
   new one is pinned when the month changes. [Learn more](/docs/telegram/notifications/#pinned-month-summary)
 - **10 AI assists a day** by default, up from 5.
+- **Other currencies.** Tell the assistant *it was $50* or *і це 2200 доларів* and it converts the amount at the
+  official NBU rate for that day, keeping the original in the note. [Learn more](/docs/telegram/ai-assistant/)
+- **Files on existing transactions.** **📎 Files** in `/recent` lists a transaction's files with **Send** and 🗑 for each
+  and **+ Attach** to add a photo or PDF (a reply to a transaction's card works too) instead of starting a new receipt.
+  [Learn more](/docs/telegram/receipts/#attach-to-an-existing-transaction)
+- **iPhone photos and WebP.** HEIC photos can be attached everywhere (web, Telegram, MCP) and are saved as JPEG;
+  WebP and HEIC receipts are read by AI too instead of asking for the amount.
+- **`/summary` and `/analytics` are gone.** Use `/month`, or ask the assistant about any period.
 
 ## 2.2.0
 

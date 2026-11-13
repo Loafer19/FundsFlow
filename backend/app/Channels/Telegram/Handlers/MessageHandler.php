@@ -48,6 +48,9 @@ class MessageHandler
             return;
         }
 
+        // Text or a command instead of the file a 📎 Attach prompt asked for: drop the prompt, go on.
+        $this->support->cancelAttach($chatId, $telegramUserId);
+
         $this->handleIncomingText($chatId, $telegramUserId, $text, replyTo: $this->messageId($message), quoted: $this->quotedBotText($message));
     }
 
@@ -60,6 +63,7 @@ class MessageHandler
     {
         $chatId = $message['chat']['id'];
         $telegramUserId = isset($message['from']['id']) ? (int) $message['from']['id'] : $chatId;
+        $this->support->cancelAttach($chatId, $telegramUserId);
 
         $user = $this->support->resolveUser($chatId);
 

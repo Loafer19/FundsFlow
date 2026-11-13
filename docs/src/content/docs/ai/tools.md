@@ -40,7 +40,7 @@ Amounts are **signed**: negative for expenses, positive for income. Dates use `Y
 
 | Tool | Description |
 | --- | --- |
-| `attach_transaction_file` | Attach a JPEG, PNG, WebP, or PDF (max 8 MB, 5 per transaction) from base64 content or an `https` URL |
+| `attach_transaction_file` | Attach a JPEG, PNG, WebP, HEIC, or PDF (max 8 MB, 5 per transaction; HEIC is saved as JPEG) from base64 content or an `https` URL |
 | `list_transaction_attachments` | Attachment metadata for a transaction |
 | `get_transaction_attachment` | Download an attachment (images are returned as images) |
 | `delete_transaction_attachment` | Delete an attachment |

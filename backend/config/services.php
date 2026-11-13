@@ -30,6 +30,13 @@ return [
         'render_url' => env('REPORT_RENDER_URL'),
     ],
 
+    // ImageMagick CLI (docker/backend installs it with HEIC/WebP coders): HEIC/HEIF attachments are
+    // stored as JPEG, and WebP/HEIC photos are turned into JPEG before receipt vision.
+    'imagemagick' => [
+        'binary' => env('IMAGEMAGICK_BINARY', 'magick'),
+        'timeout' => (int) env('IMAGEMAGICK_TIMEOUT', 30),
+    ],
+
     'xai' => [
         'api_key' => env('XAI_API_KEY'),
         'base_url' => env('XAI_BASE_URL', 'https://api.x.ai/v1'),

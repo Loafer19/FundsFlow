@@ -11,6 +11,7 @@ use App\Http\Resources\RecurringTransactionResource;
 use App\Http\Resources\TagResource;
 use App\Http\Resources\TransactionResource;
 use App\Models\User;
+use App\Support\FileRules;
 
 class LoadBootstrapDataAction
 {
@@ -33,6 +34,8 @@ class LoadBootstrapDataAction
             'recurring_transactions' => RecurringTransactionResource::collection(
                 $this->listRecurring->execute($user),
             )->resolve(),
+            // Accepted formats and limits for pickers and client-side checks (one source: backend rules).
+            'file_rules' => FileRules::forClient(),
         ];
     }
 }

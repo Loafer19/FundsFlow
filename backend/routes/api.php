@@ -14,7 +14,6 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\Telegram\TelegramWebhookController;
-use App\Http\Controllers\TelegramSendController;
 use App\Http\Controllers\TransactionAttachmentController;
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
@@ -75,8 +74,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/transactions/{transaction}/attachments/{attachment}', [TransactionAttachmentController::class, 'destroy']);
     Route::post('/transactions/{transaction}/attachments/{attachment}/telegram', [TransactionAttachmentController::class, 'sendToTelegram'])
         ->middleware('throttle:30,1,attach-tg:');
-    Route::post('/telegram/send-file', [TelegramSendController::class, 'sendFile'])
-        ->middleware('throttle:20,1,tg-send-file:');
     // Report PDF (one renderer for Settings and the assistant card; see RenderReportPdfAction).
     // Every throttle has its own limiter key (3rd arg): unprefixed throttle:N,M counters are shared per user across routes,
     // and every render also calls print-data, so the report must not eat the app-wide budget.

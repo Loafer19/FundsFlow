@@ -2,12 +2,16 @@
 // Sent as-is (up to MAX_DOCUMENTS per message, one import); the server checks the real type and
 // reads it (see backend DocumentFile / DocumentImport).
 
-export const MAX_PDF_BYTES = 8 * 1024 * 1024
-export const MAX_FILE_BYTES = 5 * 1024 * 1024
-export const MAX_DOCUMENTS = 5
-export const MAX_DOCUMENTS_TOTAL_BYTES = 20 * 1024 * 1024
+import { DOCUMENT_EXTENSIONS, MAX_FILE_BYTES, MAX_PDF_BYTES } from './fileRules.js'
 
-const EXTENSIONS = /\.(pdf|docx|csv|tsv|txt|xlsx|ods|json|ofx|qfx|qif|html?)$/i
+export {
+    DOCUMENT_ACCEPT,
+    MAX_DOCUMENTS,
+    MAX_DOCUMENTS_TOTAL_BYTES,
+    MAX_FILE_BYTES,
+    MAX_PDF_BYTES,
+} from './fileRules.js'
+
 // Known formats the server refuses with a "save as" hint; caught here to save the upload.
 const LEGACY = {
     xls: 'Old Excel (.xls) files are not supported yet. Save it as .xlsx or .csv.',
@@ -19,12 +23,6 @@ const LEGACY = {
     numbers: 'Numbers files are not supported. Export it as .csv or .xlsx.',
 }
 
-export const DOCUMENT_ACCEPT =
-    '.pdf,.docx,.csv,.tsv,.txt,.xlsx,.ods,.json,.ofx,.qfx,.qif,.html,.htm,application/pdf,text/csv,application/json,' +
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document,' +
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,' +
-    'application/vnd.oasis.opendocument.spreadsheet'
-
 const extension = (name) =>
     String(name ?? '')
         .match(/\.([^.]+)$/)?.[1]
@@ -32,7 +30,8 @@ const extension = (name) =>
 
 export const isPdf = (file) => file?.type === 'application/pdf' || extension(file?.name) === 'pdf'
 
-export const isSupportedDocument = (file) => file instanceof Blob && (isPdf(file) || EXTENSIONS.test(file.name ?? ''))
+export const isSupportedDocument = (file) =>
+    file instanceof Blob && (isPdf(file) || DOCUMENT_EXTENSIONS.includes(extension(file.name)))
 
 // A "save it as…" hint for a known unsupported format, else null.
 export const legacyDocumentHint = (file) => LEGACY[extension(file?.name)] ?? null

@@ -777,7 +777,8 @@ class TelegramWidgetData
         }
 
         if ($transaction->relationLoaded('attachments') && $transaction->attachments->isNotEmpty()) {
-            $item['f'] = 1;
+            // f: number of attached files (📎 in the list, "📎 Files (n)" in the detail).
+            $item['f'] = $transaction->attachments->count();
         }
 
         return $item;

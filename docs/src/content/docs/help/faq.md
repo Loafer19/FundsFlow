@@ -33,8 +33,10 @@ directly. After import you can **Undo** the whole batch.
 
 ### Which currency does it use?
 
-FundsFlow tracks plain amounts and doesn't convert currencies. Choose how numbers look in
-**Settings → Appearance**.
+Amounts are kept in one currency (hryvnias for monobank and imports). Choose how numbers look in
+**Settings → Appearance**. If you tell the assistant an amount is in another currency (*it was $50*, *і це 2200
+доларів*), it converts it at the official NBU rate for that day and keeps the original amount and rate in the note.
+See [AI assistant](/docs/telegram/ai-assistant/).
 
 ### I signed up in Telegram. How do I use the website?
 

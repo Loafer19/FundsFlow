@@ -44,7 +44,7 @@
             :class="{ 'btn-disabled': busy }">
             <Paperclip :size="16" />
             Add files
-            <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp,application/pdf" multiple
+            <input type="file" class="hidden" :accept="ATTACHMENT_ACCEPT" multiple
                 :disabled="busy || totalCount >= MAX_PER_TRANSACTION" @change="onPick" />
         </label>
     </div>
@@ -53,7 +53,13 @@
 <script setup>
 import { FileText, Image as ImageIcon, Paperclip, X } from '@lucide/vue'
 import { computed } from 'vue'
-import { ALLOWED_MIMES, MAX_BYTES, MAX_PER_TRANSACTION } from '../services/attachmentLimits.js'
+import {
+    ATTACHMENT_ACCEPT,
+    ATTACHMENT_LABEL,
+    isAttachable,
+    ATTACHMENT_MAX_BYTES as MAX_BYTES,
+    ATTACHMENT_MAX_FILES as MAX_PER_TRANSACTION,
+} from '../services/fileRules.js'
 import toasts from '../services/toasts.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
@@ -89,12 +95,12 @@ const onPick = async (event) => {
     const accepted = []
 
     for (const file of picked.slice(0, room)) {
-        if (!ALLOWED_MIMES.has(file.type)) {
-            toasts.error(`Could not add ${file.name}: only JPEG, PNG, WebP, and PDF are allowed`)
+        if (!isAttachable(file)) {
+            toasts.error(`Could not add ${file.name}: only ${ATTACHMENT_LABEL} are allowed`)
             continue
         }
         if (file.size > MAX_BYTES) {
-            toasts.error(`Could not add ${file.name}: must be 8 MB or smaller`)
+            toasts.error(`Could not add ${file.name}: must be ${Math.round(MAX_BYTES / 1048576)} MB or smaller`)
             continue
         }
         accepted.push(file)

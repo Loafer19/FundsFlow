@@ -31,11 +31,7 @@ final class WebAgentUploads
     public const MAX_BYTES = TransactionAttachmentRules::MAX_BYTES;
 
     /** @var array<string, string> sniffed mime => extension */
-    public const MIMES = [
-        'image/jpeg' => 'jpg',
-        'image/png' => 'png',
-        'image/webp' => 'webp',
-    ];
+    public const MIMES = TransactionAttachmentRules::IMAGE_MIMES;
 
     /** @var array<string, string> canonical document mime => extension (see DocumentFile) */
     public const DOCUMENT_MIMES = [
@@ -64,9 +60,9 @@ final class WebAgentUploads
         }
 
         // Sniff the bytes; the client-declared type is ignored.
-        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($contents) ?: '';
+        $mime = TransactionAttachmentRules::detectMime($contents) ?? '';
         if (!isset(self::MIMES[$mime])) {
-            throw ValidationException::withMessages(['images' => 'Only JPEG, PNG and WebP photos are supported.']);
+            throw ValidationException::withMessages(['images' => 'Only JPEG, PNG, WebP and HEIC photos are supported.']);
         }
 
         $id = Str::uuid()->toString();

@@ -5,6 +5,7 @@ namespace App\Channels\Telegram\Handlers;
 use App\Actions\RecurringTransactions\UpdateRecurringTransactionAction;
 use App\Actions\Transactions\CreateTransactionAction;
 use App\Actions\Transactions\DeleteTransactionAction;
+use App\Actions\Transactions\DeleteTransactionAttachmentAction;
 use App\Channels\Telegram\PinnedMonthSummary;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramEditor;
@@ -14,6 +15,7 @@ use App\Channels\Telegram\Widgets\TelegramWidgetData;
 use App\Channels\Telegram\Widgets\TelegramWidgetSender;
 use App\Channels\Telegram\Widgets\TelegramWidgetSync;
 use App\Enums\TransactionSource;
+use App\Events\TransactionsChanged;
 use App\Models\RecurringTransaction;
 use App\Models\Tag;
 use App\Models\User;
@@ -34,6 +36,7 @@ class WidgetQueryHandler
         private readonly TelegramWidgetSync $sync,
         private readonly TelegramEditor $editor,
         private readonly PinnedMonthSummary $pinned,
+        private readonly DeleteTransactionAttachmentAction $deleteAttachment,
     ) {}
 
     /**
@@ -96,6 +99,84 @@ class WidgetQueryHandler
 
             // e: is ✏️ Edit; o: is the old Open button on Recent widgets already in chats,
             // which now opens the editor too instead of a separate text card.
+            if (preg_match('/^v:(\d{1,10})$/', $data, $matches)) {
+                // Detail opened (0 = back to the list): a photo sent as a reply to this widget attaches there.
+                if ($messageId !== null) {
+                    TelegramSupport::rememberRecentOpen($chatId, $messageId, (int) $matches[1]);
+                }
+                $this->answer($queryId, ['ok' => 1]);
+
+                return;
+            }
+
+            if (preg_match('/^p:(\d{1,10})$/', $data, $matches)) {
+                $transaction = $this->support->findOwnTransaction($user, (int) $matches[1]);
+                $error = $transaction
+                    ? $this->support->startAttach($user, $chatId, $query['from']['id'] ?? $chatId, $transaction)
+                    : 'Transaction not found';
+                $this->answer($queryId, $error === null ? ['ok' => 1] : ['ok' => 0, 'e' => $error]);
+
+                return;
+            }
+
+            if (preg_match('/^l:(\d{1,10})$/', $data, $matches)) {
+                // 📎 Files box: the transaction's files (own transactions only).
+                $transaction = $this->support->findOwnTransaction($user, (int) $matches[1]);
+                $this->answer($queryId, $transaction
+                    ? ['ok' => 1, 'l' => $this->support->attachmentList($transaction)]
+                    : ['ok' => 0, 'e' => 'Transaction not found']);
+
+                return;
+            }
+
+            if (preg_match('/^g:(\d{1,10}):(\d{1,10})$/', $data, $matches)) {
+                // Send in the 📎 Files box: g:<attachment id>:<transaction id>, just that file.
+                $transaction = $this->support->findOwnTransaction($user, (int) $matches[2]);
+                $exists = $transaction?->attachments->contains('id', (int) $matches[1]);
+
+                if (!$exists) {
+                    $this->answer($queryId, ['ok' => 0, 'e' => $transaction ? 'File not found' : 'Transaction not found']);
+
+                    return;
+                }
+
+                $this->answer($queryId, ['ok' => 1]);
+                $result = $this->support->sendAttachments($chatId, $transaction, (int) $matches[1]);
+
+                if ($result['failed'] > 0) {
+                    $this->client->sendMessage($chatId, "Couldn't send that file.");
+                }
+
+                return;
+            }
+
+            if (preg_match('/^k:(\d{1,10}):(\d{1,10})$/', $data, $matches)) {
+                // 🗑 → Yes in the 📎 Files box: k:<attachment id>:<transaction id>. Answers the new list.
+                $transaction = $this->support->findOwnTransaction($user, (int) $matches[2]);
+                $attachment = $transaction?->attachments->firstWhere('id', (int) $matches[1]);
+
+                if (!$attachment) {
+                    $this->answer($queryId, ['ok' => 0, 'e' => $transaction ? 'File not found' : 'Transaction not found']);
+
+                    return;
+                }
+
+                $this->deleteAttachment->execute($user, $transaction, $attachment);
+                $transaction->load('attachments');
+                $this->answer($queryId, ['ok' => 1, 'l' => $this->support->attachmentList($transaction)]);
+                // 📎 counts in /recent and the group cards.
+                TransactionsChanged::dispatch((int) $user->id, 'updated', [(int) $transaction->id]);
+
+                return;
+            }
+
+            // Send-all from widgets posted before the 📎 Files box (and the group cards' files: twin).
+            if (preg_match('/^f:(\d{1,10})$/', $data, $matches)) {
+                $this->handleRecentFiles($user, $chatId, $queryId, (int) $matches[1]);
+
+                return;
+            }
+
             if (preg_match('/^[eo]:(\d{1,10})$/', $data, $matches)) {
                 $this->handleRecentEdit($user, $chatId, $queryId, (int) $matches[1]);
 
@@ -211,6 +292,29 @@ class WidgetQueryHandler
         $this->history->outcome($chatId, $user, 'Deleted: ' . $remembered);
         $this->editor->closeFor($chatId, $transactionId);
         $this->answer($queryId, ['ok' => 1]);
+    }
+
+    /**
+     * 📎 Files in the Recent widget: the attachments as photos / documents below the widget.
+     */
+    private function handleRecentFiles(User $user, int|string $chatId, string $queryId, int $transactionId): void
+    {
+        $transaction = $this->support->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction || $transaction->attachments->isEmpty()) {
+            $this->answer($queryId, ['ok' => 0, 'e' => $transaction ? 'No files' : 'Transaction not found']);
+
+            return;
+        }
+
+        // Answer first: uploading several files can take longer than the widget waits.
+        $count = $transaction->attachments->count();
+        $this->answer($queryId, ['ok' => 1]);
+        $result = $this->support->sendAttachments($chatId, $transaction);
+
+        if ($result['failed'] > 0) {
+            $this->client->sendMessage($chatId, "Couldn't send {$result['failed']} of {$count} files.");
+        }
     }
 
     /**

@@ -12,7 +12,9 @@ const JSON_BODY_LIMIT = '12mb'
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
 const MAX_ATTACHMENT_BASE64_CHARS = Math.ceil((MAX_ATTACHMENT_BYTES * 4) / 3) + 4096
 const BULK_MAX_ITEMS = 50
-const ATTACHMENT_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] as const
+// Mirrors backend TransactionAttachmentRules (the API re-checks every file; HEIC/HEIF become JPEG there).
+const ATTACHMENT_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'] as const
+const ATTACHMENT_LABEL = 'JPEG, PNG, WebP, HEIC and PDF'
 type AttachmentMime = (typeof ATTACHMENT_MIMES)[number]
 
 const MCP_VERSION = '1.3.1'
@@ -455,7 +457,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         {
             title: 'Attach file to transaction',
             description:
-                'Attach a JPEG/PNG/WebP/PDF to a transaction (max 8 MB, max 5 files per transaction). Pass exactly one of content_base64 (raw base64, no data: URL prefix) or source_url (https URL; MCP downloads then uploads). Optional name/mime: derived from URL / Content-Type / magic bytes when omitted.',
+                'Attach a JPEG/PNG/WebP/HEIC/PDF to a transaction (max 8 MB, max 5 files per transaction; HEIC is stored as JPEG). Pass exactly one of content_base64 (raw base64, no data: URL prefix) or source_url (https URL; MCP downloads then uploads). Optional name/mime: derived from URL / Content-Type / magic bytes when omitted.',
             inputSchema: {
                 transaction_id: z.number().int(),
                 name: z.string().max(255).optional(),
@@ -911,6 +913,13 @@ function sniffAttachmentMime(buf: Buffer): AttachmentMime | null {
         return 'image/webp'
     }
     if (buf.length >= 5 && buf.toString('ascii', 0, 5) === '%PDF-') return 'application/pdf'
+    if (
+        buf.length >= 12
+        && buf.toString('ascii', 4, 8) === 'ftyp'
+        && ['heic', 'heix', 'heim', 'heis', 'hevc', 'hevx', 'mif1', 'msf1'].includes(buf.toString('ascii', 8, 12))
+    ) {
+        return 'image/heic'
+    }
     return null
 }
 
@@ -944,7 +953,7 @@ async function fetchAttachmentFromUrl(sourceUrl: string): Promise<{
             redirect: 'manual',
             signal: AbortSignal.timeout(60_000),
             headers: {
-                Accept: 'image/jpeg,image/png,image/webp,application/pdf,*/*',
+                Accept: `${ATTACHMENT_MIMES.join(',')},*/*`,
             },
         })
 
@@ -977,7 +986,7 @@ async function fetchAttachmentFromUrl(sourceUrl: string): Promise<{
         const sniffed = sniffAttachmentMime(buffer)
         const mime = sniffed || typeHint
         if (!mime) {
-            throw new Error('Could not detect file type. Only JPEG, PNG, WebP, and PDF are allowed.')
+            throw new Error(`Could not detect file type. Only ${ATTACHMENT_LABEL} are allowed.`)
         }
 
         const name = (nameHint || nameFromUrlPath(url)).slice(0, 255)

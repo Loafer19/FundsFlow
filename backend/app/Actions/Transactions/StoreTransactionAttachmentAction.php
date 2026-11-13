@@ -5,6 +5,7 @@ namespace App\Actions\Transactions;
 use App\Models\Transaction;
 use App\Models\TransactionAttachment;
 use App\Models\User;
+use App\Support\ImageConverter;
 use App\Support\TransactionAttachmentRules;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
@@ -55,11 +56,28 @@ class StoreTransactionAttachmentAction
         }
 
         $mime = TransactionAttachmentRules::detectMime($contents, $claimedMime);
+
+        if ($mime !== null && TransactionAttachmentRules::needsConversion($mime)) {
+            // HEIC/HEIF (iPhone photos) are stored as JPEG so every browser and Telegram can show them.
+            $jpeg = ImageConverter::toJpeg($contents, $mime);
+
+            if ($jpeg === null || strlen($jpeg) > TransactionAttachmentRules::MAX_BYTES) {
+                throw ValidationException::withMessages([
+                    'file' => 'Could not convert this HEIC photo. Send it as JPEG or PNG!',
+                ]);
+            }
+
+            $contents = $jpeg;
+            $size = strlen($jpeg);
+            $mime = 'image/jpeg';
+            $name = TransactionAttachmentRules::jpegName($name);
+        }
+
         $extension = $mime ? TransactionAttachmentRules::extensionForMime($mime) : null;
 
         if ($extension === null) {
             throw ValidationException::withMessages([
-                'file' => 'Only JPEG, PNG, WebP, and PDF files are allowed!',
+                'file' => 'Only ' . TransactionAttachmentRules::LABEL . ' files are allowed!',
             ]);
         }
 

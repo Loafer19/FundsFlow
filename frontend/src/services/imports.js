@@ -27,8 +27,8 @@ export const commitImport = (id) =>
 export const undoImport = (id) =>
     api.post(`/imports/${id}/undo`, {}, long).then((res) => res.data)
 
-// Matches DocumentFile::EXTENSIONS / ImportController file validation.
-export const IMPORT_FILE_ACCEPT = '.csv,.tsv,.txt,.xlsx,.ods,.ofx,.qfx,.qif,.json,.html,.htm,.pdf,.docx'
+// Accepted extensions come from the backend rules (fileRules.js ← DocumentFile::EXTENSIONS).
+export { DOCUMENT_ACCEPT_EXTENSIONS as IMPORT_FILE_ACCEPT } from './fileRules.js'
 
 export const IMPORT_FORMATS = [
     { label: 'CSV, TSV or text', extensions: '.csv, .tsv, .txt' },

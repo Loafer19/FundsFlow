@@ -13,7 +13,8 @@ Click **Add Transaction** (or the round **+** button):
   A leading `+` or `-` switches between income and expense.
 - **Tags** — pick any number of tags.
 - **Note** — optional, up to 255 characters.
-- **Attachments** — optional images (JPEG, PNG, WebP) or PDFs, up to **5 files** of up to **8 MB** each.
+- **Attachments** — optional images (JPEG, PNG, WebP, HEIC) or PDFs, up to **5 files** of up to **8 MB** each. HEIC (iPhone)
+  photos are saved as JPEG.
 
 ## Edit a transaction
 

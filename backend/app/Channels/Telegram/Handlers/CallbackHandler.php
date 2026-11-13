@@ -87,6 +87,27 @@ class CallbackHandler
             return;
         }
 
+        if (preg_match('/^attach:(\d+)$/', $data, $matches)) {
+            $this->handleAttach($user, $chatId, $telegramUserId, $callbackId, (int) $matches[1]);
+
+            return;
+        }
+
+        if (preg_match('/^attx:(\d+)$/', $data, $matches)) {
+            if (!$this->support->cancelAttach($chatId, $telegramUserId) && is_int($messageId)) {
+                $this->client->editMessageText($chatId, $messageId, 'Attach cancelled');
+            }
+            $this->client->answerCallbackQuery($callbackId, 'Attach cancelled');
+
+            return;
+        }
+
+        if (preg_match('/^files:(\d+)$/', $data, $matches)) {
+            $this->handleFiles($user, $chatId, $callbackId, (int) $matches[1]);
+
+            return;
+        }
+
         if (preg_match('/^open:(\d+)$/', $data, $matches)) {
             $this->handleOpen($user, $chatId, $callbackId, (int) $matches[1]);
 
@@ -405,6 +426,39 @@ class CallbackHandler
         $this->client->answerCallbackQuery($callbackId, 'Tags saved!');
         $this->history->outcome($chatId, $user, 'Tags set: ' . TelegramHistory::transactionLine($user, $transaction->load('tags')));
         $this->renderCard($user, $chatId, $messageId, $transaction, TelegramSupport::cardHeadline($this->messageText));
+    }
+
+    /** 📎 Attach on a group text card: the next photo or file from this member goes to the transaction. */
+    private function handleAttach(User $user, int|string $chatId, int|string $sender, string $callbackId, int $transactionId): void
+    {
+        $transaction = $this->support->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction) {
+            $this->client->answerCallbackQuery($callbackId, 'Transaction not found');
+
+            return;
+        }
+
+        $error = $this->support->startAttach($user, $chatId, $sender, $transaction);
+        $this->client->answerCallbackQuery($callbackId, $error ?? '');
+    }
+
+    private function handleFiles(User $user, int|string $chatId, string $callbackId, int $transactionId): void
+    {
+        $transaction = $this->support->findOwnTransaction($user, $transactionId);
+
+        if (!$transaction || $transaction->attachments->isEmpty()) {
+            $this->client->answerCallbackQuery($callbackId, $transaction ? 'No files' : 'Transaction not found');
+
+            return;
+        }
+
+        $this->client->answerCallbackQuery($callbackId, 'Sending files…');
+        $result = $this->support->sendAttachments($chatId, $transaction);
+
+        if ($result['failed'] > 0) {
+            $this->client->sendMessage($chatId, "Couldn't send {$result['failed']} of " . ($result['sent'] + $result['failed']) . ' files.');
+        }
     }
 
     private function handleOpen(User $user, int|string $chatId, string $callbackId, int $transactionId): void

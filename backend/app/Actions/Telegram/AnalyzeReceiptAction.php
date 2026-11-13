@@ -3,7 +3,9 @@
 namespace App\Actions\Telegram;
 
 use App\Models\User;
+use App\Support\ImageConverter;
 use App\Support\TelegramAiQuota;
+use App\Support\TransactionAttachmentRules;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -39,9 +41,13 @@ class AnalyzeReceiptAction
             return null;
         }
 
-        if (!$this->isVisionMime($mime)) {
+        // WebP / HEIC photos are converted to JPEG for the model (JPEG and PNG pass as they are).
+        $image = ImageConverter::forVision($imageBytes, $mime);
+
+        if ($image === null) {
             return null;
         }
+        [$imageBytes, $mime] = [$image['bytes'], $image['mime']];
 
         $dataUrl = 'data:' . $mime . ';base64,' . base64_encode($imageBytes);
         $today = $user->todayDateString();
@@ -162,7 +168,7 @@ PROMPT;
 
     public function isVisionMime(string $mime): bool
     {
-        return in_array($mime, ['image/jpeg', 'image/png'], true);
+        return in_array($mime, TransactionAttachmentRules::visionMimes(), true);
     }
 
     /**

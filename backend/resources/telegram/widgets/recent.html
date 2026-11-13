@@ -14,7 +14,19 @@ h3{margin:0 0 8px;font-size:1.05em}
 .err{color:var(--tg-theme-destructive-text-color)}
 .actions{display:flex;gap:6px;margin:10px 0 0;flex-wrap:wrap}
 .actions button{flex:1}
-button.back,button.more{margin:0 0 10px;background:transparent;color:var(--tg-theme-hint-color);box-shadow:inset 0 0 0 1px var(--tg-theme-section-separator-color,var(--tg-theme-hint-color))}
+.actions+.actions,.files+.actions{margin-top:6px}
+.hint{color:var(--tg-theme-hint-color);font-size:.85em;margin:6px 0 0}
+.files{margin:6px 0 0;padding:6px 10px 10px;border-radius:10px;box-shadow:inset 0 0 0 1px var(--tg-theme-section-separator-color,var(--tg-theme-hint-color))}
+.file{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:.92em}
+.file+.file{border-top:1px solid var(--tg-theme-section-separator-color,rgba(127,127,127,.2))}
+.fn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sz{color:var(--tg-theme-hint-color);font-size:.85em}
+button.sm{padding:4px 10px}
+button.ic{display:flex;align-items:center;padding:4px 8px}
+.files>button.o{width:100%;margin-top:8px}
+button.o.on{color:var(--tg-theme-text-color)}
+button.back,button.more{margin:0 0 10px}
+button.back,button.more,button.o{background:transparent;color:var(--tg-theme-hint-color);box-shadow:inset 0 0 0 1px var(--tg-theme-section-separator-color,var(--tg-theme-hint-color))}
 button.del{background:var(--tg-theme-secondary-bg-color);color:var(--tg-theme-destructive-text-color)}
 .lines p{margin:4px 0;font-size:.95em}
 .warn{margin:8px 0;font-size:.95em}
@@ -22,7 +34,7 @@ button.del{background:var(--tg-theme-secondary-bg-color);color:var(--tg-theme-de
 <div id="root"></div>
 <script>
 const W=window.TelegramWidget;
-let list=[],sel=null,ask=false,err='',okMsg='',busy=false,more=0;
+let list=[],sel=null,ask=false,err='',okMsg='',busy=false,more=0,fo=false,lf=0,fl={},cf=0;
 function parse(s){try{return s?JSON.parse(s):null}catch(e){return null}}
 function cls(a){return 'amt'+((a&&a.charAt(0)==='+')?' pos':' neg')}
 function sd(df){return df?String(df).slice(0,5):''}
@@ -43,7 +55,7 @@ function showList(){
     top.appendChild(el('span','n',it.n||'—'));
     b.appendChild(top);
     b.appendChild(el('div','meta',sd(it.df)+(it.g?(' · '+it.g+more1(it)):'')+clip(it)));
-    b.addEventListener('click',function(){sel=it;ask=false;err='';okMsg='';showDetail(it)});
+    b.addEventListener('click',function(){sel=it;ask=false;fo=false;cf=0;err='';okMsg='';seen(it.id);showDetail(it)});
     r.appendChild(b);
   });
   if(more){const m=el('button','more','Load more');m.type='button';m.addEventListener('click',loadMore);r.appendChild(m)}
@@ -51,7 +63,7 @@ function showList(){
 function showDetail(it){
   const r=root();
   const back=el('button','back','Back');back.type='button';
-  back.addEventListener('click',function(){sel=null;ask=false;err='';okMsg='';showList()});
+  back.addEventListener('click',function(){sel=null;ask=false;err='';okMsg='';seen(0);showList()});
   r.appendChild(back);
   r.appendChild(el('h3',cls(it.a),it.a||''));
   const box=el('div','lines');
@@ -66,7 +78,37 @@ function showDetail(it){
   edit.addEventListener('click',function(){ask1(it,'e:','Editor opened below','Could not open the editor')});
   const del=el('button','del','Delete');del.type='button';
   del.addEventListener('click',function(){ask=true;err='';okMsg='';showConfirm(it)});
-  act.appendChild(edit);act.appendChild(del);r.appendChild(act);
+  act.appendChild(edit);act.appendChild(del);
+  const n=it.f||0,fa=el('div','actions'),L=fl[it.id];
+  const fb=el('button','o'+(fo?' on':''),(n?'📎 Files ('+n+')':'📎 Files')+(fo?' ▴':' ▾'));fb.type='button';
+  fb.addEventListener('click',function(){fo=!fo;showDetail(it)});
+  fa.appendChild(fb);r.appendChild(fa);
+  if(fo){
+    if(n&&!L&&!lf)loadFiles(it);
+    const s=el('div','files');
+    if(!n)s.appendChild(el('p','hint','No files yet'));
+    else if(!L)s.appendChild(el('p','hint','Loading…'));
+    (L||[]).forEach(function(f){
+      const row=el('div','file');
+      row.appendChild(el('span','',f.m==='i'?'🖼':'📄'));
+      if(cf===f.i){
+        row.appendChild(el('span','fn','Delete?'));
+        row.appendChild(sm('del sm','Yes',function(){delFile(it,f)}));
+        row.appendChild(sm('o sm','No',function(){cf=0;showDetail(it)}));
+      }else{
+        row.appendChild(el('span','fn',f.n));
+        row.appendChild(el('span','sz',kb(f.s)));
+        row.appendChild(sm('o sm','Send',function(){ask1(it,'g:'+f.i+':','Sent below','Could not send the file')}));
+        const tb=sm('del sm ic',null,function(){cf=f.i;err='';okMsg='';showDetail(it)});tb.title='Delete';tb.setAttribute('aria-label','Delete');tb.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>';row.appendChild(tb);
+      }
+      s.appendChild(row);
+    });
+    if(n<5)s.appendChild(btn('+ Attach','p:','Send the file below','Could not start attaching'));
+    s.appendChild(el('p','hint',n<5?'Or reply to this message with a photo or file':'5 of 5 files'));
+    r.appendChild(s);
+  }
+  r.appendChild(act);
+  function btn(t,p,ok,no){const b=el('button','o',t);b.type='button';b.addEventListener('click',function(){ask1(it,p,ok,no)});return b}
 }
 function showConfirm(it){
   const r=root();
@@ -83,6 +125,18 @@ function showConfirm(it){
   no.addEventListener('click',function(){ask=false;err='';showDetail(it)});
   act.appendChild(yes);act.appendChild(no);r.appendChild(act);
 }
+function kb(b){return b>=1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'}
+function loadFiles(it){lf=1;askBot('l:'+it.id).then(function(r){lf=0;fl[it.id]=(r&&r.ok&&r.l)||[];if(!(r&&r.ok))err=(r&&r.e)||'Could not load files';showDetail(sel||it)},function(e){lf=0;fl[it.id]=[];err=(e&&e.code)||'Could not load files';showDetail(sel||it)})}
+function sm(c,t,fn){const b=el('button',c,t);b.type='button';b.addEventListener('click',fn);return b}
+function delFile(it,f){
+  if(busy)return;busy=true;err='';okMsg='';
+  askBot('k:'+f.i+':'+it.id).then(function(r){
+    busy=false;cf=0;
+    if(r&&r.ok){fl[it.id]=r.l||[];it.f=fl[it.id].length;list.forEach(function(x){if(x.id===it.id)x.f=it.f});okMsg='File deleted'}else err=(r&&r.e)||'Could not delete the file';
+    showDetail(it);
+  },function(e){busy=false;cf=0;err=(e&&e.code)||'Could not delete the file';showDetail(it)});
+}
+function seen(id){askBot('v:'+id).catch(function(){})}
 function askBot(q){
   if(!W||!W.request)return Promise.reject({code:'Send this in Telegram'});
   return W.request(q).then(function(a){return parse(a&&a.result)||{}})
@@ -122,7 +176,8 @@ function render(){
   if(sel){
     const fresh=list.filter(function(x){return x.id===sel.id})[0];
     if(!fresh){sel=null;ask=false;showList();return}
-    sel=Object.assign({},sel,fresh);
+    if((fresh.f||0)!==(sel.f||0))delete fl[sel.id];
+    sel=Object.assign({},sel,fresh,{f:fresh.f||0});
     if(ask)showConfirm(sel);else showDetail(sel);return;
   }
   showList();

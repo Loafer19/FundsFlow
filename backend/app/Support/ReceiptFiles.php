@@ -8,7 +8,7 @@ namespace App\Support;
 final class ReceiptFiles
 {
     /**
-     * Best photo of an album to send to vision: JPEG > PNG > WebP, then the largest.
+     * Best photo of an album to send to vision: JPEG > PNG > WebP > HEIC, then the largest.
      * Each file needs `mime` and (optionally) `file_size`; the winning element is returned as is.
      *
      * @template T of array<string, mixed>
@@ -27,6 +27,7 @@ final class ReceiptFiles
                 'image/jpeg' => 1_000_000_000,
                 'image/png' => 900_000_000,
                 'image/webp' => 800_000_000,
+                'image/heic', 'image/heif' => 700_000_000,
                 default => 0,
             };
             $score = $mimeBonus + $size;

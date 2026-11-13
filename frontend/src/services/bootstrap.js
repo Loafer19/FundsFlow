@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import api from './api.js'
 import { useBudgetsStore } from './budgets.js'
 import { currentUserId, noticeCachedData, persistCache, readCache } from './cache.js'
+import { applyFileRules } from './fileRules.js'
 import { apiErrorMessage } from './formatters.js'
 import { useRecurringTransactionsStore } from './recurringTransactions.js'
 import { useTagsStore } from './tags.js'
@@ -43,6 +44,7 @@ export const bootstrapStores = async () => {
     try {
         const { data } = await api.get('/bootstrap', { timeout: 60000 })
 
+        applyFileRules(data.file_rules)
         tagsStore.tags = data.tags ?? []
         transactionsStore.transactions = data.transactions ?? []
         budgetsStore.budgets = data.budgets ?? []
@@ -84,6 +86,7 @@ const runRefresh = async () => {
         const budgetsStore = useBudgetsStore()
         const recurringStore = useRecurringTransactionsStore()
 
+        applyFileRules(data.file_rules)
         tagsStore.tags = data.tags ?? []
         transactionsStore.transactions = data.transactions ?? []
         budgetsStore.budgets = data.budgets ?? []

@@ -3,6 +3,7 @@
 namespace App\Actions\Agent\Documents;
 
 use App\Models\User;
+use App\Support\ImageConverter;
 use DateTimeInterface;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -223,6 +224,11 @@ PROMPT;
 
         $content = [['type' => 'text', 'text' => 'Screenshots follow.' . ($caption !== null && trim($caption) !== '' ? ' User caption: ' . mb_substr(trim($caption), 0, 300) : '')]];
         foreach ($images as $image) {
+            // WebP / HEIC screenshots are converted to JPEG for the model.
+            $image = ImageConverter::forVision($image['bytes'], $image['mime']);
+            if ($image === null) {
+                continue;
+            }
             $content[] = ['type' => 'image_url', 'image_url' => ['url' => 'data:' . $image['mime'] . ';base64,' . base64_encode($image['bytes']), 'detail' => 'high']];
         }
 

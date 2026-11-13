@@ -455,6 +455,14 @@ class TelegramEditor
         return true;
     }
 
+    /** Transaction an open editor widget (by its message id) belongs to; null for drafts. */
+    public function transactionIdFor(int|string $chatId, int $messageId): ?int
+    {
+        $ref = Cache::get($this->editorKey($chatId, $messageId));
+
+        return is_array($ref) && ($ref['t'] ?? null) === 'tx' && isset($ref['id']) ? (int) $ref['id'] : null;
+    }
+
     private function editorKey(int|string $chatId, int $editorId): string
     {
         return "telegram_editor:{$chatId}:{$editorId}";

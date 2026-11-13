@@ -75,5 +75,8 @@ Widgets work only in a private chat with the bot. In a group the card keeps text
 - **✏️ Amount** — reply with the new amount, e.g. `+120` or `-50.5`. A number without a sign keeps the direction
   (an expense stays an expense).
 - **🗑 Delete** — delete after confirmation.
+- **📎 Attach** — the next photo or file you send goes to this transaction (see
+  [Attach to an existing transaction](/docs/telegram/receipts/#attach-to-an-existing-transaction)).
+- **📎 Files (N)** — next to Attach when the transaction has attachments; sends them to the group.
 
 **↩️ Undo** is shown on its own row above them for the first 5 minutes.

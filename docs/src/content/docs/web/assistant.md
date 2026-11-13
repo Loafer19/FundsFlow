@@ -100,8 +100,8 @@ Send a photo of a receipt and the assistant reads it into a transaction, like
 - **Attach** photos with the 📎 button next to the message box (inside the Telegram mini app it opens your gallery or
   camera), **drag and drop** them onto the panel, or **paste** an image with **Ctrl+V** (**⌘V**).
 - Up to **5 photos** per message, JPEG, PNG, WebP, or HEIC, up to 10 MB each. Before uploading, each photo is resized
-  to at most 1600 px on its long side and converted to JPEG. HEIC works only where the browser can open it (Safari,
-  for example). Otherwise, send that photo as JPEG.
+  to at most 1600 px on its long side and converted to JPEG. A HEIC photo the browser can't open (anything but
+  Safari) is sent as it is, up to 8 MB, and converted to JPEG on the server; its thumbnail just says *HEIC*.
 - Thumbnails appear above the message box. Remove one with its **✕** before sending.
 - The text you send with the photos works like a Telegram photo caption:
   - **With an amount** (`-350 groceries`, `12.10 -40 taxi`), the transaction is prepared from that, with no AI and no

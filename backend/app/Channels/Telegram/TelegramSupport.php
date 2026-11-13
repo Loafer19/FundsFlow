@@ -10,9 +10,12 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Support\QuickAddParser;
 use App\Support\TelegramAiQuota;
+use App\Support\TransactionAttachmentRules;
 use App\Support\UserFormatter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class TelegramSupport
 {
@@ -49,12 +52,12 @@ class TelegramSupport
      */
     public const BOT_COMMANDS = [
         ['command' => 'add', 'description' => 'Quick add a transaction with the keypad'],
-        ['command' => 'recent', 'description' => 'Recent transactions: open, edit tags, delete'],
+        ['command' => 'recent', 'description' => 'Recent transactions: edit, delete, files'],
         ['command' => 'month', 'description' => 'This month: income, expenses, net, top tags'],
         ['command' => 'budgets', 'description' => 'Spending limits and savings goals'],
         ['command' => 'tags', 'description' => "Your tags with this month's expenses and income"],
         ['command' => 'recurring', 'description' => 'Recurring payments: next dates, pause or resume'],
-        ['command' => 'notifications', 'description' => 'Alerts, digest, reminders and pinned month'],
+        ['command' => 'notifications', 'description' => 'Alerts and digest, recurring reminders, pinned month, mute'],
         ['command' => 'website', 'description' => 'One-time code to log in on the website'],
         ['command' => 'reset', 'description' => 'Start a new AI conversation'],
         ['command' => 'support', 'description' => 'Report a problem or send feedback'],
@@ -377,6 +380,18 @@ class TelegramSupport
             ['text' => '✏️ Amount', 'callback_data' => "editamt:{$id}"],
             $delete,
         ]];
+        $files = $transaction->relationLoaded('attachments') ? $transaction->attachments->count() : 0;
+        // Same as 📎 Attach and 📎 Files in the private-chat /recent widget.
+        $fileRow = [];
+
+        if ($files < TransactionAttachmentRules::MAX_PER_TRANSACTION) {
+            $fileRow[] = ['text' => '📎 Attach', 'callback_data' => "attach:{$id}"];
+        }
+
+        if ($files > 0) {
+            $fileRow[] = ['text' => self::filesLabel($files), 'callback_data' => "files:{$id}"];
+        }
+        $rows[] = $fileRow;
 
         if ($undo) {
             array_unshift($rows, [$undoButton]);
@@ -813,6 +828,208 @@ class TelegramSupport
         $mark = $selected ? '✅ ' : '';
 
         return $prefix . $mark . trim($tag->emoji . ' ' . $tag->title);
+    }
+
+    /**
+     * 📎 Files: send a transaction's attachments into the chat, images as photos (a document when
+     * Telegram refuses the photo), everything else as documents. Files missing from storage are
+     * skipped.
+     *
+     * @return array{sent: int, failed: int}
+     */
+    public function sendAttachments(int|string $chatId, Transaction $transaction, ?int $onlyId = null): array
+    {
+        $transaction->loadMissing('attachments');
+        $sent = 0;
+        $failed = 0;
+
+        foreach ($transaction->attachments as $attachment) {
+            if ($onlyId !== null && (int) $attachment->id !== $onlyId) {
+                continue;
+            }
+
+            $disk = Storage::disk($attachment->disk);
+
+            if ($disk->missing($attachment->path)) {
+                $failed++;
+
+                continue;
+            }
+
+            $contents = (string) $disk->get($attachment->path);
+            $name = (string) ($attachment->original_name ?: basename((string) $attachment->path));
+            $mime = (string) $attachment->mime;
+            $asPhoto = str_starts_with($mime, 'image/') && $mime !== 'image/svg+xml';
+
+            try {
+                if ($asPhoto) {
+                    try {
+                        $this->client->sendPhoto($chatId, $contents, $name);
+                    } catch (\RuntimeException) {
+                        // Too large or unusual dimensions for a photo: send the original file instead.
+                        $this->client->sendDocument($chatId, $contents, $name);
+                    }
+                } else {
+                    $this->client->sendDocument($chatId, $contents, $name);
+                }
+                $sent++;
+            } catch (\RuntimeException $e) {
+                $failed++;
+                Log::warning('Telegram attachment send failed', ['attachment' => $attachment->id, 'error' => $e->getMessage()]);
+            }
+        }
+
+        return ['sent' => $sent, 'failed' => $failed];
+    }
+
+    /**
+     * Files of a transaction for the /recent widget's 📎 Files box: id, name, m ("i" image /
+     * "d" document) and size. Names are shortened until the answer fits Telegram's 1024 chars.
+     *
+     * @return list<array{i: int, n: string, m: string, s: int}>
+     */
+    public function attachmentList(Transaction $transaction, int $budget = 900): array
+    {
+        $transaction->loadMissing('attachments');
+
+        foreach ([40, 28, 18, 10] as $max) {
+            $list = $transaction->attachments->sortBy('id')->values()->map(static fn ($a): array => [
+                'i' => (int) $a->id,
+                'n' => mb_strimwidth((string) ($a->original_name ?: basename((string) $a->path)), 0, $max, '…'),
+                'm' => str_starts_with((string) $a->mime, 'image/') ? 'i' : 'd',
+                's' => (int) $a->size,
+            ])->all();
+
+            if (strlen((string) json_encode(['ok' => 1, 'l' => $list], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) <= $budget) {
+                break;
+            }
+        }
+
+        return $list;
+    }
+
+    public static function filesLabel(int $count): string
+    {
+        return '📎 Files (' . $count . ')';
+    }
+
+    /** Minutes a 📎 Attach prompt waits for the file. */
+    public const ATTACH_TTL_MINUTES = 10;
+
+    /** Inline-button prefixes whose callback data carries a transaction id (cards, prompts). */
+    private const TX_CALLBACK = '/^(?:edit|delask|delyes|delno|retag|editamt|files|attach|attx|undo|open):(\d{1,10})$/';
+
+    /** "−350.00 · Silpo receipt · 13.11.2026": which transaction an attach prompt is for. */
+    public function attachSummary(User $user, Transaction $transaction): string
+    {
+        $note = trim((string) $transaction->note);
+
+        return UserFormatter::formatMoney($user, $transaction->amount)
+            . ($note !== '' ? ' · ' . mb_strimwidth($note, 0, 40, '…') : '')
+            . ' · ' . self::cardDate($transaction->at);
+    }
+
+    /**
+     * 📎 Attach: prompt for a photo or file and remember (per chat and sender, 10 minutes) which
+     * transaction it goes to. Returns an error for the user, or null when the prompt was sent.
+     */
+    public function startAttach(User $user, int|string $chatId, int|string $sender, Transaction $transaction): ?string
+    {
+        $free = TransactionAttachmentRules::MAX_PER_TRANSACTION - $transaction->attachments()->count();
+
+        if ($free <= 0) {
+            return 'Already has ' . TransactionAttachmentRules::MAX_PER_TRANSACTION . ' files';
+        }
+
+        $this->cancelAttach($chatId, $sender, null);
+        $text = '📎 Send a photo or file to attach to ' . $this->attachSummary($user, $transaction)
+            . "\n" . TransactionAttachmentRules::LABEL . ', up to 8 MB' . ($free < TransactionAttachmentRules::MAX_PER_TRANSACTION ? " · {$free} more" : '');
+        $sent = $this->client->sendMessageResult($chatId, $text, [
+            'inline_keyboard' => [[['text' => '↩️ Cancel', 'callback_data' => "attx:{$transaction->id}"]]],
+        ]);
+
+        if (!($sent['ok'] ?? false)) {
+            return 'Could not start attaching';
+        }
+
+        Cache::put(self::attachKey($chatId, $sender), [
+            'id' => (int) $transaction->id,
+            'prompt' => (int) ($sent['result']['message_id'] ?? 0),
+        ], now()->addMinutes(self::ATTACH_TTL_MINUTES));
+
+        return null;
+    }
+
+    /** @return array{id: int, prompt: int}|null */
+    public function pendingAttach(int|string $chatId, int|string $sender): ?array
+    {
+        $state = Cache::get(self::attachKey($chatId, $sender));
+
+        return is_array($state) && isset($state['id']) ? $state : null;
+    }
+
+    /**
+     * Forget a waiting 📎 Attach. With $notice the prompt turns into it (buttons removed).
+     */
+    public function cancelAttach(int|string $chatId, int|string $sender, ?string $notice = 'Attach cancelled'): bool
+    {
+        $state = Cache::pull(self::attachKey($chatId, $sender));
+
+        if (!is_array($state)) {
+            return false;
+        }
+
+        if ($notice !== null && ($state['prompt'] ?? 0) > 0) {
+            $this->client->editMessageText($chatId, (int) $state['prompt'], $notice);
+        }
+
+        return true;
+    }
+
+    /**
+     * Transaction id behind a message the user replied to: the id in its inline buttons (saved and
+     * text cards, confirm results, the attach prompt), an open editor widget, or the detail open
+     * in a /recent widget.
+     *
+     * @param array<string, mixed> $reply
+     */
+    public function transactionIdFromReply(int|string $chatId, array $reply): ?int
+    {
+        foreach (($reply['reply_markup']['inline_keyboard'] ?? []) as $row) {
+            foreach ((array) $row as $button) {
+                if (is_array($button) && preg_match(self::TX_CALLBACK, (string) ($button['callback_data'] ?? ''), $m)) {
+                    return (int) $m[1];
+                }
+            }
+        }
+
+        $messageId = (int) ($reply['message_id'] ?? 0);
+
+        if ($messageId <= 0) {
+            return null;
+        }
+
+        $id = app(TelegramEditor::class)->transactionIdFor($chatId, $messageId)
+            ?? Cache::get(self::recentOpenKey($chatId, $messageId));
+
+        return is_int($id) && $id > 0 ? $id : null;
+    }
+
+    /** The /recent widget reports which detail is open (0 = list), so a reply to it can attach. */
+    public static function rememberRecentOpen(int|string $chatId, int $widgetMessageId, int $transactionId): void
+    {
+        $key = self::recentOpenKey($chatId, $widgetMessageId);
+        $transactionId > 0 ? Cache::put($key, $transactionId, now()->addHours(2)) : Cache::forget($key);
+    }
+
+    public static function attachKey(int|string $chatId, int|string $sender): string
+    {
+        return "telegram_attach:{$chatId}:{$sender}";
+    }
+
+    private static function recentOpenKey(int|string $chatId, int $messageId): string
+    {
+        return "telegram_recent_open:{$chatId}:{$messageId}";
     }
 
     public function findOwnTransaction(User $user, int $transactionId): ?Transaction

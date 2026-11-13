@@ -1,6 +1,8 @@
 // Receipt photos for the assistant: pick/drop/paste -> validate -> downscale to JPEG before upload.
 
-export const MAX_IMAGES = 5
+import { ATTACHMENT_MAX_BYTES } from './fileRules.js'
+
+export { RECEIPT_MAX_IMAGES as MAX_IMAGES } from './fileRules.js'
 // Original file size we accept from the picker (the upload itself is the downscaled JPEG, far below the 8 MB server cap).
 export const MAX_INPUT_BYTES = 10 * 1024 * 1024
 export const MAX_SIDE = 1600
@@ -42,7 +44,18 @@ const decode = async (file) => {
  * Resolves to { file: File (image/jpeg), name, url (object URL for the preview) }.
  */
 export const prepareReceiptImage = async (file) => {
-    const { source, width, height, url } = await decode(file)
+    let decoded
+    try {
+        decoded = await decode(file)
+    } catch (error) {
+        // HEIC the browser can't open (anything but Safari): upload it as is, the server converts it to JPEG.
+        const heic = /hei[cf]$/i.test(file.type) || /\.hei[cf]$/i.test(file.name ?? '')
+        if (heic && file.size <= ATTACHMENT_MAX_BYTES) {
+            return { file, name: file.name || 'photo.heic', url: URL.createObjectURL(file), heic: true }
+        }
+        throw error
+    }
+    const { source, width, height, url } = decoded
 
     try {
         const scale = Math.min(1, MAX_SIDE / Math.max(width, height))

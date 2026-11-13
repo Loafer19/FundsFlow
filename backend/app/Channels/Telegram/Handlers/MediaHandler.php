@@ -13,6 +13,8 @@ use App\Channels\Telegram\TelegramEditor;
 use App\Channels\Telegram\TelegramHistory;
 use App\Channels\Telegram\TelegramSupport;
 use App\Enums\TransactionSource;
+use App\Events\TransactionsChanged;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Support\ReceiptFiles;
 use App\Support\TransactionAttachmentRules;
@@ -57,6 +59,18 @@ class MediaHandler
         }
         $this->currentIdentity = $this->identity($message, $chatId);
 
+        // 📎 Attach: a reply to a transaction's message, or the file asked for by an Attach prompt,
+        // goes to that existing transaction instead of starting a new receipt.
+        $target = $this->attachTarget($user, $chatId, $message);
+
+        if ($target !== null) {
+            if ($target instanceof Transaction) {
+                $this->attachToExisting($user, $chatId, $message, $target);
+            }
+
+            return;
+        }
+
         // Documents to read (PDF, Word, CSV, Excel, JSON, OFX, QIF, HTML). A group of them is
         // collected first and becomes ONE import.
         if ($this->isReadableDocument($message)) {
@@ -91,7 +105,7 @@ class MediaHandler
         $file = $this->extractTelegramFile($message);
 
         if ($file === null) {
-            $this->client->sendMessage($chatId, 'Send a receipt photo (JPEG, PNG, WebP) or a file: PDF, Word (.docx), CSV, Excel (.xlsx), .ods, JSON, OFX / QFX, QIF or HTML.');
+            $this->client->sendMessage($chatId, 'Send a receipt photo (JPEG, PNG, WebP, HEIC) or a file: PDF, Word (.docx), CSV, Excel (.xlsx), .ods, JSON, OFX / QFX, QIF or HTML.');
 
             return;
         }
@@ -946,6 +960,207 @@ class MediaHandler
     }
 
     /**
+     * Existing transaction this photo or file should be attached to: the rest of an album already
+     * going there, the transaction behind the replied-to message, or a waiting 📎 Attach prompt.
+     * false = handled (the prompt's transaction is gone), null = normal receipt flow.
+     *
+     * @param array<string, mixed> $message
+     */
+    private function attachTarget(User $user, int|string $chatId, array $message): Transaction|false|null
+    {
+        $sender = $this->currentIdentity ?? $chatId;
+        $group = $this->mediaGroupId($message);
+        $id = $group !== null ? Cache::get($this->attachAlbumKey($chatId, $group, 'tx')) : null;
+
+        if (!is_int($id) && is_array($message['reply_to_message'] ?? null)) {
+            $id = $this->support->transactionIdFromReply($chatId, $message['reply_to_message']);
+        }
+
+        $pending = false;
+
+        if (!is_int($id) && ($state = $this->support->pendingAttach($chatId, $sender)) !== null) {
+            $id = (int) $state['id'];
+            $pending = true;
+        }
+
+        if (!is_int($id)) {
+            return null;
+        }
+
+        // Only the account's own transactions (in a group: the group's linked account, as for Edit).
+        $transaction = $this->support->findOwnTransaction($user, $id);
+
+        if ($transaction === null && $pending) {
+            $this->support->cancelAttach($chatId, $sender, 'Transaction not found, nothing attached');
+
+            return false;
+        }
+
+        return $transaction;
+    }
+
+    /**
+     * Attach one photo or file (or each photo of an album) to an existing transaction. An album is
+     * confirmed once, by its first photo, after the others are stored.
+     *
+     * @param array<string, mixed> $message
+     */
+    private function attachToExisting(User $user, int|string $chatId, array $message, Transaction $transaction): void
+    {
+        $group = $this->mediaGroupId($message);
+        $file = $this->extractTelegramFile($message);
+        $error = null;
+
+        if ($file === null) {
+            $error = 'Only ' . TransactionAttachmentRules::LABEL . ' files can be attached';
+        }
+
+        if ($group === null) {
+            $error ??= $this->storeOnTransaction($user, $chatId, $transaction, $file);
+
+            if ($error !== null) {
+                $this->client->sendMessage($chatId, $error);
+
+                return;
+            }
+            $this->confirmAttached($user, $chatId, $transaction, 1, null);
+
+            return;
+        }
+
+        $ttl = now()->addSeconds((int) config('telegram.album.collect_ttl_seconds', 60));
+        Cache::put($this->attachAlbumKey($chatId, $group, 'tx'), (int) $transaction->id, $ttl);
+        Cache::add($this->attachAlbumKey($chatId, $group, 'seen'), 0, $ttl);
+        Cache::increment($this->attachAlbumKey($chatId, $group, 'seen'));
+        $first = Cache::add($this->attachAlbumKey($chatId, $group, 'lead'), true, $ttl);
+
+        $error ??= $this->storeOnTransaction($user, $chatId, $transaction, $file);
+        Cache::add($this->attachAlbumKey($chatId, $group, 'ok'), 0, $ttl);
+        Cache::add($this->attachAlbumKey($chatId, $group, 'done'), 0, $ttl);
+
+        if ($error === null) {
+            Cache::increment($this->attachAlbumKey($chatId, $group, 'ok'));
+        } else {
+            Cache::put($this->attachAlbumKey($chatId, $group, 'error'), $error, $ttl);
+        }
+        Cache::increment($this->attachAlbumKey($chatId, $group, 'done'));
+
+        if (!$first) {
+            // Arrived after the album was already confirmed (slow upload): confirm this one on its own.
+            if (Cache::get($this->attachAlbumKey($chatId, $group, 'confirmed'))) {
+                $error === null
+                    ? $this->confirmAttached($user, $chatId, $transaction, 1, null)
+                    : $this->client->sendMessage($chatId, $error);
+            }
+
+            return;
+        }
+
+        // Let the other photos of the album arrive and finish (each is its own webhook request).
+        sleep((int) config('telegram.album.debounce_seconds', 3));
+        for ($i = 0; $i < 15 && (int) Cache::get($this->attachAlbumKey($chatId, $group, 'done')) < (int) Cache::get($this->attachAlbumKey($chatId, $group, 'seen')); $i++) {
+            sleep(1);
+        }
+
+        Cache::put($this->attachAlbumKey($chatId, $group, 'confirmed'), true, $ttl);
+        $attached = (int) Cache::get($this->attachAlbumKey($chatId, $group, 'ok'));
+        $lastError = Cache::get($this->attachAlbumKey($chatId, $group, 'error'));
+
+        if ($attached > 0) {
+            $this->confirmAttached($user, $chatId, $transaction, $attached, is_string($lastError) ? $lastError : null);
+        } elseif (is_string($lastError)) {
+            $this->client->sendMessage($chatId, $lastError);
+        }
+    }
+
+    /**
+     * Download and store one file on the transaction (attachment rules: type, 8 MB, 5 per
+     * transaction). Returns an error for the user, or null when it was attached.
+     *
+     * @param array{file_id: string, name: string, mime: string, file_size?: int} $file
+     */
+    private function storeOnTransaction(User $user, int|string $chatId, Transaction $transaction, array $file): ?string
+    {
+        if (($file['file_size'] ?? 0) > TransactionAttachmentRules::MAX_BYTES) {
+            return 'Each attachment must be 8 MB or smaller';
+        }
+
+        $downloaded = $this->downloadTelegramFile($chatId, $file, notify: false);
+
+        if ($downloaded === null) {
+            return "Couldn't download that file from Telegram";
+        }
+
+        [$contents, $meta] = $downloaded;
+
+        try {
+            // Album photos arrive in parallel: one at a time per transaction keeps the 5-file limit.
+            return Cache::lock("telegram_attach_store:{$transaction->id}", 20)->block(15, function () use ($user, $transaction, $contents, $meta): ?string {
+                $this->storeAttachment->execute($user, $transaction, [
+                    'name' => $meta['name'],
+                    'mime' => $meta['mime'],
+                    'contents' => $contents,
+                ]);
+
+                return null;
+            });
+        } catch (ValidationException $exception) {
+            return rtrim((string) collect($exception->errors())->flatten()->first(), '!');
+        } catch (Throwable) {
+            return "Couldn't attach that file";
+        }
+    }
+
+    /**
+     * "✅ Attached N files to …" with 📎 Files (N); the Attach prompt turns into it when it was the
+     * one waiting for this transaction. Widgets refresh (📎 counts in /recent).
+     */
+    private function confirmAttached(User $user, int|string $chatId, Transaction $transaction, int $attached, ?string $lastError): void
+    {
+        $sender = $this->currentIdentity ?? $chatId;
+        $state = $this->support->pendingAttach($chatId, $sender);
+        $prompt = null;
+
+        if ($state !== null && $state['id'] === (int) $transaction->id) {
+            $this->support->cancelAttach($chatId, $sender, null);
+            $prompt = $state['prompt'] > 0 ? $state['prompt'] : null;
+        }
+
+        $transaction->load(['attachments', 'tags']);
+        $text = '✅ Attached ' . $attached . ' file' . ($attached === 1 ? '' : 's') . ' to ' . $this->support->attachSummary($user, $transaction);
+        $keyboard = ['inline_keyboard' => [[[
+            'text' => TelegramSupport::filesLabel($transaction->attachments->count()),
+            'callback_data' => "files:{$transaction->id}",
+        ]]]];
+
+        if ($prompt !== null) {
+            $this->client->editMessageText($chatId, $prompt, $text, $keyboard);
+        } else {
+            $this->client->sendMessage($chatId, $text, $keyboard);
+        }
+
+        if ($lastError !== null) {
+            $this->client->sendMessage($chatId, $lastError);
+        }
+
+        $this->history->outcome($chatId, $user, "Attached {$attached} file(s) to: " . TelegramHistory::transactionLine($user, $transaction));
+        TransactionsChanged::dispatch((int) $user->id, 'updated', [(int) $transaction->id]);
+    }
+
+    /** @param array<string, mixed> $message */
+    private function mediaGroupId(array $message): ?string
+    {
+        $group = $message['media_group_id'] ?? null;
+
+        return is_string($group) && $group !== '' ? $group : null;
+    }
+
+    private function attachAlbumKey(int|string $chatId, string $group, string $part): string
+    {
+        return "telegram_attach_album:{$chatId}:{$group}:{$part}";
+    }
+
+    /**
      * @param array{file_id: string, name: string, mime: string, file_size?: int} $file
      * @return array{0: string, 1: array{name: string, mime: string}}|null
      */
@@ -1560,13 +1775,18 @@ class MediaHandler
             $document = $message['document'];
             $mime = (string) ($document['mime_type'] ?? '');
 
-            if (!isset(TransactionAttachmentRules::ALLOWED_MIMES[$mime])) {
+            if (!TransactionAttachmentRules::isAccepted($mime)) {
+                // iPhone HEIC sent "as file" often arrives as application/octet-stream.
+                $mime = (string) TransactionAttachmentRules::mimeForExtension((string) ($document['file_name'] ?? ''));
+            }
+
+            if (!TransactionAttachmentRules::isAccepted($mime)) {
                 return null;
             }
 
             return [
                 'file_id' => (string) $document['file_id'],
-                'name' => (string) ($document['file_name'] ?? ('receipt.' . TransactionAttachmentRules::ALLOWED_MIMES[$mime])),
+                'name' => (string) ($document['file_name'] ?? ('receipt.' . (TransactionAttachmentRules::IMAGE_MIMES[$mime] ?? 'pdf'))),
                 'mime' => $mime,
                 'file_size' => (int) ($document['file_size'] ?? 0),
             ];

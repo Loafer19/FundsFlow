@@ -211,7 +211,7 @@ final class ConfirmWebAgentPendingAction
     {
         foreach (is_array($refs) ? $refs : [] as $ref) {
             // A Word file is read for its text only; it is not an attachment type.
-            if (!is_array($ref) || !isset(TransactionAttachmentRules::ALLOWED_MIMES[(string) ($ref['mime'] ?? '')])) {
+            if (!is_array($ref) || !TransactionAttachmentRules::isAccepted((string) ($ref['mime'] ?? ''))) {
                 continue;
             }
             $contents = $this->uploads->read($user, $ref);
