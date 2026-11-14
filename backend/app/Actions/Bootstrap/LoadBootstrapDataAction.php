@@ -10,6 +10,7 @@ use App\Http\Resources\BudgetResource;
 use App\Http\Resources\RecurringTransactionResource;
 use App\Http\Resources\TagResource;
 use App\Http\Resources\TransactionResource;
+use App\Http\Resources\TransactionTypeResource;
 use App\Models\User;
 use App\Support\FileRules;
 
@@ -30,6 +31,10 @@ class LoadBootstrapDataAction
         return [
             'tags' => TagResource::collection($this->listTags->execute($user))->resolve(),
             'transactions' => TransactionResource::collection($this->listTransactions->execute($user))->resolve(),
+            // Archived types too, flagged: old transactions still show their label and values.
+            'transaction_types' => TransactionTypeResource::collection(
+                $user->transactionTypes()->withTrashed()->withCount('transactions')->orderBy('name')->get(),
+            )->resolve(),
             'budgets' => BudgetResource::collection($this->listBudgets->execute($user))->resolve(),
             'recurring_transactions' => RecurringTransactionResource::collection(
                 $this->listRecurring->execute($user),

@@ -11,6 +11,8 @@ Click **Add Transaction** (or the round **+** button):
 - **Income / Expense** and **amount**. The amount field understands how people type numbers:
   `1 500,50`, `1,500.50`, `12.5`, and simple arithmetic like `120+35-5` (the result is previewed below the field).
   A leading `+` or `-` switches between income and expense.
+- **Type** — optional. A [type](/docs/web/types/) adds its own fields (liters, price, station…) and can fill the
+  amount from a computed total. Its default tags are selected for you.
 - **Tags** — pick any number of tags.
 - **Note** — optional, up to 255 characters.
 - **Attachments** — optional images (JPEG, PNG, WebP, HEIC) or PDFs, up to **5 files** of up to **8 MB** each. HEIC (iPhone)

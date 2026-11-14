@@ -261,6 +261,31 @@
                         </template>
 
                         <template v-else-if="activeSection === 'data'">
+                    <div class="grid grid-cols-2 gap-2 mb-4">
+                        <button type="button"
+                            class="text-left rounded-box border border-base-300 bg-base-100 px-3 py-3 flex items-center gap-3 hover:bg-base-200"
+                            @click="openManager('tags_modal')">
+                            <span class="shrink-0 rounded-lg p-1.5 bg-info/15 text-info">
+                                <Tags :size="18" />
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block font-medium">Manage Tags</span>
+                                <span class="block text-xs text-base-content/60">Groups, limits and goals</span>
+                            </span>
+                        </button>
+                        <button type="button"
+                            class="text-left rounded-box border border-base-300 bg-base-100 px-3 py-3 flex items-center gap-3 hover:bg-base-200"
+                            @click="openManager('types_modal')">
+                            <span class="shrink-0 rounded-lg p-1.5 bg-warning/15 text-warning">
+                                <Shapes :size="18" />
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block font-medium">Manage Types</span>
+                                <span class="block text-xs text-base-content/60">Custom fields like liters or rating</span>
+                            </span>
+                        </button>
+                    </div>
+
                     <button type="button"
                         class="w-full text-left rounded-box border border-base-300 bg-base-100 px-4 py-3 flex items-center gap-3 mb-4 hover:bg-base-200"
                         @click="openImportPreview">
@@ -308,7 +333,8 @@ account,
 tags,
 transactions (incl. attachment metadata),
 budgets,
-recurring_transactions</pre>
+recurring_transactions,
+transaction_types</pre>
                     <div v-if="!inTelegram" class="flex justify-end">
                         <button type="button" class="btn btn-primary btn-sm" :disabled="exporting" @click="exportData">
                             <span v-if="exporting" class="loading loading-spinner loading-xs"></span>
@@ -336,7 +362,7 @@ recurring_transactions</pre>
 </template>
 
 <script setup>
-import { Bot, Cable, ChevronLeft, ChevronRight, Database, Download, FileUp, Info, KeyRound, LifeBuoy, Palette, Save, Send, Settings as SettingsIcon, UserRound, X } from '@lucide/vue'
+import { Bot, Cable, ChevronLeft, ChevronRight, Database, Download, FileUp, Info, KeyRound, LifeBuoy, Palette, Save, Send, Settings as SettingsIcon, Shapes, Tags, UserRound, X } from '@lucide/vue'
 import { computed, inject, markRaw, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
     createMcpToken,
@@ -359,7 +385,7 @@ import {
 } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
 import { goToImport } from '../services/imports.js'
-import { closeSettings, settingsOpen, settingsTabRequest } from '../services/modal'
+import { closeSettings, settingsOpen, settingsTabRequest, showModal } from '../services/modal'
 import { reportErrorMessage, requestReport, saveBlob } from '../services/report.js'
 import settings, {
     updateDateFormat,
@@ -381,7 +407,7 @@ const sections = [
     { id: 'appearance', title: 'Appearance', hint: 'Date, money, timezone and theme', icon: markRaw(Palette) },
     { id: 'account', title: 'Account', hint: 'Login, email, password, social logins and AI quota', icon: markRaw(UserRound) },
     { id: 'connections', title: 'Connections', hint: 'Telegram, MCP and Monobank', icon: markRaw(Cable) },
-    { id: 'data', title: 'Data & reports', hint: 'Import a statement, export a backup, or download a report', icon: markRaw(Database) },
+    { id: 'data', title: 'Data & reports', hint: 'Tags and types, import a statement, export a backup, or download a report', icon: markRaw(Database) },
     { id: 'support', title: 'Support', hint: 'Feedback and requests', icon: markRaw(LifeBuoy) },
 ]
 const TAB_ALIASES = {
@@ -673,6 +699,11 @@ watch(settingsOpen, (open) => {
         unmountTimer = setTimeout(() => { rendered.value = false }, 260)
     }
 })
+
+const openManager = (id) => {
+    closeSettings()
+    showModal(id)
+}
 
 const openImportPreview = () => {
     closeSettings()

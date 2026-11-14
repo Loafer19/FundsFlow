@@ -6,6 +6,7 @@ use App\Actions\Agent\AgentChannel;
 use App\Actions\Agent\AgentPlanningTools;
 use App\Actions\Imports\ImportAgentTools;
 use App\Actions\Agent\AgentToolExecutor;
+use App\Actions\Agent\AgentTypeFields;
 use App\Actions\Charts\BuildUserChartAction;
 use App\Actions\Report\BuildUserReportAction;
 use App\Actions\Telegram\TelegramAgentToolExecutor;
@@ -114,13 +115,15 @@ final class WebAgentChannel implements AgentChannel
             $waitingText = "Waiting Confirm card (not saved yet; change it with update_pending_transaction): {$waitingJson}\n";
         }
 
+        $typesBlock = AgentTypeFields::promptBlock($user);
+
         return <<<PROMPT
 You are the FundsFlow personal finance assistant in the chat panel of the FundsFlow web app.
 Today (user timezone {$tz}) is {$today}.
 Session domain: {$domain}
 Last bot summary: {$summary}
 last_list (ids are authoritative; never invent ids): {$lastListJson}
-{$screen}{$waitingText}
+{$screen}{$waitingText}{$typesBlock}
 Rules:
 - Use tools for ANY numbers, balances, lists, budgets, or ids. Never invent amounts, tag ids, transaction ids, or budget figures.
 - Prefer concise replies. Match the user's language (Ukrainian if they wrote Ukrainian; otherwise English). You may use light Markdown (bold, short bullet lists, inline code); no tables, images or HTML.

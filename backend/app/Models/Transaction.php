@@ -24,6 +24,8 @@ class Transaction extends Model
         'external_id',
         'external_meta',
         'import_batch_id',
+        'transaction_type_id',
+        'data',
     ];
 
 
@@ -32,6 +34,7 @@ class Transaction extends Model
         'amount' => 'decimal:2',
         'source' => TransactionSource::class,
         'external_meta' => 'array',
+        'data' => 'array',
     ];
 
     /**
@@ -64,6 +67,16 @@ class Transaction extends Model
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class)->withTrashed();
+    }
+
+    /**
+     * The type (archived ones too: their transactions keep it).
+     *
+     * @return BelongsTo<TransactionType, Transaction>
+     */
+    public function transactionType(): BelongsTo
+    {
+        return $this->belongsTo(TransactionType::class, 'transaction_type_id')->withTrashed();
     }
 
     /**

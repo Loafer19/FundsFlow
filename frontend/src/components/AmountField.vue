@@ -16,11 +16,13 @@
         <input ref="input" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done" :required="required"
             :placeholder="placeholder" :aria-label="label" :value="display" :autofocus="autofocus"
             :aria-invalid="Boolean(shownError)" :aria-describedby="hintId" class="input w-full font-semibold"
-            :class="signed ? (isIncome ? 'input-success text-success' : 'input-error text-error') : ''"
+            :class="[signed ? (isIncome ? 'input-success text-success' : 'input-error text-error') : '', { 'bg-base-200': linked }]"
             @input="onInput" @blur="onBlur" />
 
         <p v-if="shownError" :id="hintId" class="text-error text-sm -mt-1">{{ shownError }}</p>
         <p v-else-if="preview" :id="hintId" class="text-base-content/60 text-sm -mt-1">= {{ preview }}</p>
+        <!-- e.g. "From Fuel total · 40 l × 58,90 ₴" when a type's computed field fills the amount. -->
+        <slot name="hint" />
     </div>
 </template>
 
@@ -41,7 +43,11 @@ const props = defineProps({
     /** Optional fields (a goal's start amount) may stay empty; the model is then ''. */
     required: { type: Boolean, default: true },
     label: { type: String, default: 'Amount' },
+    /** The amount follows a computed type field (tinted); typing here unlinks it (emits "manual"). */
+    linked: { type: Boolean, default: false },
 })
+
+const emit = defineEmits(['manual'])
 
 const model = defineModel({ type: [Number, String], default: '' })
 
@@ -133,6 +139,7 @@ const onInput = (event) => {
     editing.value = true
     display.value = raw
     emitModel()
+    emit('manual')
 }
 
 const onBlur = () => {
@@ -143,4 +150,6 @@ const onBlur = () => {
         display.value = toEditableAmount(parsed.value.value, settings.moneyFormat)
     }
 }
+
+defineExpose({ isIncome })
 </script>

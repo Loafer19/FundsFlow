@@ -8,6 +8,7 @@ import { useRecurringTransactionsStore } from './recurringTransactions.js'
 import { useTagsStore } from './tags.js'
 import toasts from './toasts.js'
 import { useTransactionsStore } from './transactions.js'
+import { useTransactionTypesStore } from './transactionTypes.js'
 
 // True from page load with a stored session (or a login) until the first data load ends, unless cached
 // data could be shown meanwhile. Tabs are swapped for a loader then, so their empty states don't flash.
@@ -19,18 +20,21 @@ export const bootstrapStores = async () => {
     const transactionsStore = useTransactionsStore()
     const budgetsStore = useBudgetsStore()
     const recurringStore = useRecurringTransactionsStore()
+    const typesStore = useTransactionTypesStore()
 
     const cached = {
         tags: readCache(userId, 'tags'),
         transactions: readCache(userId, 'transactions'),
         budgets: readCache(userId, 'budgets'),
         recurring: readCache(userId, 'recurring'),
+        types: readCache(userId, 'transaction_types'),
     }
 
     if (cached.tags) tagsStore.tags = cached.tags
     if (cached.transactions) transactionsStore.transactions = cached.transactions
     if (cached.budgets) budgetsStore.budgets = cached.budgets
     if (cached.recurring) recurringStore.rules = cached.recurring
+    if (cached.types) typesStore.types = cached.types
 
     const hadCache = Object.values(cached).some((value) => value != null)
 
@@ -49,11 +53,13 @@ export const bootstrapStores = async () => {
         transactionsStore.transactions = data.transactions ?? []
         budgetsStore.budgets = data.budgets ?? []
         recurringStore.rules = data.recurring_transactions ?? []
+        typesStore.types = data.transaction_types ?? []
 
         persistCache('tags', tagsStore.tags)
         persistCache('transactions', transactionsStore.transactions)
         persistCache('budgets', budgetsStore.budgets)
         persistCache('recurring', recurringStore.rules)
+        persistCache('transaction_types', typesStore.types)
     } catch (error) {
         if (hadCache) noticeCachedData()
         else toasts.error(apiErrorMessage(error, 'Could not load data: '))
@@ -85,17 +91,20 @@ const runRefresh = async () => {
         const transactionsStore = useTransactionsStore()
         const budgetsStore = useBudgetsStore()
         const recurringStore = useRecurringTransactionsStore()
+        const typesStore = useTransactionTypesStore()
 
         applyFileRules(data.file_rules)
         tagsStore.tags = data.tags ?? []
         transactionsStore.transactions = data.transactions ?? []
         budgetsStore.budgets = data.budgets ?? []
         recurringStore.rules = data.recurring_transactions ?? []
+        typesStore.types = data.transaction_types ?? []
 
         persistCache('tags', tagsStore.tags)
         persistCache('transactions', transactionsStore.transactions)
         persistCache('budgets', budgetsStore.budgets)
         persistCache('recurring', recurringStore.rules)
+        persistCache('transaction_types', typesStore.types)
     } catch (error) {
         toasts.error(apiErrorMessage(error, 'Saved, but could not refresh the data: '))
     } finally {

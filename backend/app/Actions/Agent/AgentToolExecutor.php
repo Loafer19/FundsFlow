@@ -18,9 +18,11 @@ use App\Models\Budget;
 use App\Models\BudgetPeriod;
 use App\Models\Tag;
 use App\Models\Transaction;
+use App\Models\TransactionType;
 use App\Models\User;
 use App\Support\Currency\NbuRates;
 use App\Support\TagTree;
+use App\Support\TransactionTypeData;
 use App\Support\UserFormatter;
 use Illuminate\Support\Facades\DB;
 
@@ -61,6 +63,7 @@ class AgentToolExecutor
         private readonly UpdateTagAction $updateTag,
         /** Budgets status/edits, recurring rules, upcoming charges, period comparison. */
         public readonly AgentPlanningTools $planning,
+        private readonly AgentTypeFields $typeFields,
     ) {}
 
     /**
@@ -153,15 +156,15 @@ class AgentToolExecutor
                 ],
                 'required' => ['proposals'],
             ]),
-            'create_transaction' => self::fn('create_transaction', 'Propose creating a transaction. Stages Confirm/Cancel. Amount signed: negative=expense, positive=income. Date YYYY-MM-DD.', [
+            'create_transaction' => self::fn('create_transaction', 'Propose creating a transaction. Stages Confirm/Cancel. Amount signed: negative=expense, positive=income (may be omitted when the type fills it from fields). Date YYYY-MM-DD.', [
                 'type' => 'object',
                 'properties' => [
                     'amount' => ['type' => 'number'],
                     'at' => ['type' => 'string', 'description' => 'YYYY-MM-DD; default today'],
                     'note' => ['type' => 'string'],
                     'tag_ids' => ['type' => 'array', 'items' => ['type' => 'integer']],
+                    ...AgentTypeFields::toolProperties(),
                 ],
-                'required' => ['amount'],
             ]),
             'update_transaction' => self::fn('update_transaction', 'Propose updating a transaction by id. Stages Confirm/Cancel.', [
                 'type' => 'object',
@@ -171,6 +174,7 @@ class AgentToolExecutor
                     'at' => ['type' => 'string'],
                     'note' => ['type' => 'string'],
                     'tag_ids' => ['type' => 'array', 'items' => ['type' => 'integer']],
+                    ...AgentTypeFields::toolProperties(),
                 ],
                 'required' => ['id'],
             ]),
@@ -605,17 +609,23 @@ class AgentToolExecutor
      */
     public function prepareCreateTransaction(User $user, array $args): array
     {
-        if (!isset($args['amount']) || !is_numeric($args['amount'])) {
-            throw new \InvalidArgumentException('amount is required');
-        }
-        $amount = (float) $args['amount'];
-        if ($amount == 0.0) {
-            throw new \InvalidArgumentException('amount must be non-zero');
+        $typed = $this->typeFields->fromArgs($user, $args);
+        $type = $typed['type'];
+        $values = $type ? AgentTypeFields::evaluate($type, $typed['fields']) : [];
+
+        if (isset($args['amount']) && is_numeric($args['amount']) && (float) $args['amount'] != 0.0) {
+            $amount = (float) $args['amount'];
+        } else {
+            $amount = $type ? TransactionTypeData::filledAmount($type, $values, -1) : null;
+
+            if ($amount === null) {
+                throw new \InvalidArgumentException(isset($args['amount']) ? 'amount must be non-zero' : 'amount is required');
+            }
         }
 
         $at = $this->optionalDate($args['at'] ?? null) ?? $user->todayDateString();
         $note = is_string($args['note'] ?? null) ? mb_substr(trim((string) $args['note']), 0, 255) : null;
-        $tagIds = $this->sanitizeOwnedTagIds($user, $args['tag_ids'] ?? []);
+        $tagIds = $this->sanitizeOwnedTagIds($user, [...(is_array($args['tag_ids'] ?? null) ? $args['tag_ids'] : []), ...($type?->defaultTagIds() ?? [])]);
 
         $payload = [
             'amount' => $amount,
@@ -624,9 +634,19 @@ class AgentToolExecutor
             'tag_ids' => $tagIds,
         ];
 
-        $card = $this->transactionCard($user, 'create', $payload);
+        if ($type) {
+            $payload['transaction_type_id'] = (int) $type->id;
+            $payload['fields'] = $typed['fields'];
+        }
 
-        return ['payload' => $payload, 'preview' => self::cardText($card), 'card' => $card];
+        $card = $this->transactionCard($user, 'create', $payload);
+        $out = ['payload' => $payload, 'preview' => self::cardText($card), 'card' => $card];
+
+        if ($typed['dropped'] !== []) {
+            $out['dropped_fields'] = $typed['dropped'];
+        }
+
+        return $out;
     }
 
     /**
@@ -660,9 +680,27 @@ class AgentToolExecutor
             'tag_ids' => $tagIds,
         ];
 
-        $card = $this->transactionCard($user, 'update', $payload, $tx);
+        $typed = $this->typeFields->fromArgs($user, $args, $tx);
 
-        return ['payload' => $payload, 'preview' => self::cardText($card), 'card' => $card];
+        if ($typed['touched']) {
+            $payload['transaction_type_id'] = $typed['cleared'] ? null : (int) $typed['type']->id;
+            $payload['fields'] = $typed['fields'];
+
+            if (!$typed['cleared'] && !array_key_exists('amount', $args)) {
+                // Changed inputs refill the amount while it still matched the computed total.
+                $refill = TransactionTypeData::forUpdate($user, $tx, ['transaction_type_id' => $payload['transaction_type_id'], 'data' => AgentTypeFields::evaluate($typed['type'], $typed['fields'], is_array($tx->data) ? $tx->data : [])], false);
+                $payload['amount'] = $refill['amount'] ?? $amount;
+            }
+        }
+
+        $card = $this->transactionCard($user, 'update', $payload, $tx);
+        $out = ['payload' => $payload, 'preview' => self::cardText($card), 'card' => $card];
+
+        if ($typed['dropped'] !== []) {
+            $out['dropped_fields'] = $typed['dropped'];
+        }
+
+        return $out;
     }
 
     /**
@@ -683,6 +721,8 @@ class AgentToolExecutor
             'at' => $tx->at->format('Y-m-d'),
             'note' => $tx->note,
             'tag_ids' => $tx->tags->pluck('id')->map(fn ($tagId) => (int) $tagId)->all(),
+            'transaction_type_id' => $tx->transaction_type_id,
+            'data' => is_array($tx->data) ? $tx->data : [],
         ], $tx);
 
         return ['payload' => $payload, 'preview' => self::cardText($card), 'card' => $card];
@@ -722,6 +762,16 @@ class AgentToolExecutor
             'tags' => $this->tagLabelList($user, $tagIds),
             'files' => $files,
         ];
+
+        // ⛽ Fuel · Liters 40 l · …: the type and its values (fields = new values, merged over the old ones).
+        $typeId = array_key_exists('transaction_type_id', $payload) ? $payload['transaction_type_id'] : $before?->transaction_type_id;
+        $type = $typeId ? $user->transactionTypes()->withTrashed()->find((int) $typeId) : null;
+
+        if ($type instanceof TransactionType) {
+            $previous = is_array($payload['data'] ?? null) ? $payload['data'] : (is_array($before?->data) ? $before->data : []);
+            $values = AgentTypeFields::evaluate($type, is_array($payload['fields'] ?? null) ? $payload['fields'] : [], $previous);
+            $card['type_line'] = AgentTypeFields::cardLine($type, $values, $user);
+        }
 
         if ($mode === 'update' && $before) {
             $oldTags = $before->tags->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
@@ -763,6 +813,9 @@ class AgentToolExecutor
         }
         if (($card['files'] ?? 0) > 0) {
             $lines[] = '📎 ' . ($card['files_label'] ?? ($card['files'] . ' photo' . ($card['files'] === 1 ? '' : 's')));
+        }
+        if (!empty($card['type_line'])) {
+            $lines[] = (string) $card['type_line'];
         }
         $lines[] = \App\Channels\Telegram\TelegramSupport::tagLine($diff('tags', $tags));
 
@@ -875,12 +928,19 @@ class AgentToolExecutor
     {
         $tagIds = $this->sanitizeOwnedTagIds($user, $payload['tag_ids'] ?? []);
 
-        return $this->createTransaction->execute($user, [
+        $data = [
             'amount' => (float) $payload['amount'],
             'at' => (string) $payload['at'],
             'note' => $payload['note'] ?? null,
             'tags' => $tagIds,
-        ], $source);
+        ];
+
+        if (!empty($payload['transaction_type_id'])) {
+            // Lenient like the card: a required field may still be missing; new select options are kept.
+            $data += ['transaction_type_id' => (int) $payload['transaction_type_id'], 'data' => (array) ($payload['fields'] ?? []), 'add_options' => true];
+        }
+
+        return $this->createTransaction->execute($user, $data, $source, requireAllFields: false);
     }
 
     /**
@@ -898,12 +958,18 @@ class AgentToolExecutor
 
         // UpdateTransactionAction re-checks ownership and keeps deleted tags the
         // transaction already carries; sanitizeOwnedTagIds() would drop them.
-        return $this->updateTransaction->execute($user, $tx, [
+        $data = [
             'amount' => (float) $payload['amount'],
             'at' => (string) $payload['at'],
             'note' => $payload['note'] ?? null,
             'tags' => is_array($payload['tag_ids'] ?? null) ? $payload['tag_ids'] : [],
-        ]);
+        ];
+
+        if (array_key_exists('transaction_type_id', $payload)) {
+            $data += ['transaction_type_id' => $payload['transaction_type_id'], 'data' => (array) ($payload['fields'] ?? []), 'add_options' => true];
+        }
+
+        return $this->updateTransaction->execute($user, $tx, $data, requireAllFields: false);
     }
 
     /**
@@ -1070,6 +1136,7 @@ class AgentToolExecutor
                 'title' => (string) $tag->title,
                 'emoji' => (string) $tag->emoji,
             ])->values()->all(),
+            ...AgentTypeFields::serialize($tx, $user),
         ];
     }
 

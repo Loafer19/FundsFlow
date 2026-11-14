@@ -57,7 +57,9 @@ were removed: use `/month`, or ask the [AI assistant](/docs/telegram/ai-assistan
 
 In a private chat, tap a transaction in the `/recent` widget: **✏️ Edit** opens the
 [editor](/docs/telegram/quick-add/#edit-a-transaction) as a new message below the list, and **🗑 Delete** asks
-*Delete this transaction?* first. **📎 Files (N)** above them opens the transaction's files in the widget (name and
+*Delete this transaction?* first. A transaction with a [type](/docs/web/types/) shows the type next to its tags
+and a box with its fields (*Liters 40 l*, *Price per liter 58,90 ₴*…). The editor shows them too; change fields in
+the web app or by asking the assistant. **📎 Files (N)** above them opens the transaction's files in the widget (name and
 size); **Send** next to a file sends it to the chat below the widget, 🗑 deletes it after *Delete? Yes / No*, and **+ Attach** asks for a photo or file to
 [attach](/docs/telegram/receipts/#attach-to-an-existing-transaction). A card you just saved has the same **✏️ Edit** and **🗑 Delete** buttons; **🗑 Delete**
 turns the card into *Delete this transaction?* with **🗑 Delete** and **↩️ Cancel**, and nothing is deleted until you

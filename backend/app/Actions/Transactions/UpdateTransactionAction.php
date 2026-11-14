@@ -7,6 +7,7 @@ use App\Events\TransactionsChanged;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Support\TagIds;
+use App\Support\TransactionTypeData;
 use Illuminate\Support\Facades\Gate;
 
 class UpdateTransactionAction
@@ -14,9 +15,14 @@ class UpdateTransactionAction
     /**
      * @param array<string, mixed> $data
      */
-    public function execute(User $user, Transaction $transaction, array $data): Transaction
+    public function execute(User $user, Transaction $transaction, array $data, bool $requireAllFields = true): Transaction
     {
         Gate::forUser($user)->authorize('update', $transaction);
+
+        // Only touched keys come back: type, values, and the amount a computed field refills.
+        $typed = TransactionTypeData::forUpdate($user, $transaction, $data, $requireAllFields);
+        unset($data['transaction_type_id'], $data['data'], $data['add_options'], $data['default_tags']);
+        $data = [...$data, ...$typed];
 
         // PATCH without `tags` must keep the current tags; only an explicit key (even [] / null) syncs.
         $syncTags = array_key_exists('tags', $data);
@@ -32,7 +38,7 @@ class UpdateTransactionAction
         }
 
         // Reload from DB so the response reflects stored amount (not in-memory input).
-        $transaction = $transaction->fresh()->load(['tags', 'attachments']);
+        $transaction = $transaction->fresh()->load(['tags', 'attachments', 'transactionType']);
 
         if ($syncTags) {
             app(LearnMonobankTagRuleAction::class)->execute($user, $transaction);

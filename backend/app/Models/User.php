@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Carbon\Carbon;
 use Database\Seeders\DefaultTagsSeeder;
+use Database\Seeders\DefaultTransactionTypesSeeder;
 use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthentication;
 use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthenticationRecovery;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
@@ -135,6 +136,14 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
+     * @return HasMany<TransactionType, $this>
+     */
+    public function transactionTypes(): HasMany
+    {
+        return $this->hasMany(TransactionType::class);
+    }
+
+    /**
      * @return HasMany<Identity, $this>
      */
     public function identities(): HasMany
@@ -218,6 +227,13 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     {
         static::created(function (User $user) {
             (new DefaultTagsSeeder)->run($user);
+
+            // Starter types (Fuel, Groceries, …) must never block a signup.
+            try {
+                (new DefaultTransactionTypesSeeder)->run($user);
+            } catch (\Throwable $e) {
+                report($e);
+            }
         });
     }
 

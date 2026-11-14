@@ -96,8 +96,15 @@
                                     </template>
                                 </div>
                             </td>
-                            <td class="max-w-xs" :title="transaction.note || undefined">
-                                <span class="line-clamp-2 whitespace-normal break-words">{{ transaction.note || '-' }}</span>
+                            <td class="max-w-xs" :title="rowTitle(transaction)">
+                                <span v-if="typeLine(transaction)"
+                                    class="flex items-center gap-1 text-xs text-base-content/70 mb-0.5 min-w-0">
+                                    <span class="badge badge-xs badge-soft shrink-0 gap-0.5 px-1"
+                                        :style="typeBadgeStyle(transaction)">{{ typeLine(transaction).label }}</span>
+                                    <span class="truncate">{{ typeLine(transaction).summary }}</span>
+                                </span>
+                                <span v-if="transaction.note || !typeLine(transaction)"
+                                    class="line-clamp-2 whitespace-normal break-words">{{ transaction.note || '-' }}</span>
                             </td>
                             <td>
                                 <button v-if="transaction.attachments?.length" type="button"
@@ -228,6 +235,8 @@ import { today } from '../services/clock.js'
 import { getTransactionSourceLabel, parseLocalDate, toLocalDateStr } from '../services/formatters'
 import { goToImport } from '../services/imports.js'
 import { useTransactionsStore } from '../services/transactions'
+import { useTransactionTypesStore } from '../services/transactionTypes.js'
+import { typeRows, typeSummary } from '../services/typeFields.js'
 
 const formatMoney = inject('formatMoney')
 const formatDate = inject('formatDate')
@@ -237,6 +246,25 @@ const sourceIcons = { web: Laptop, telegram: Send, recurring: Repeat, mcp: Bot, 
 const sourceIcon = (source) => sourceIcons[source] ?? sourceIcons.web
 
 const transactionsStore = useTransactionsStore()
+const typesStore = useTransactionTypesStore()
+
+// "⛽ Fuel" badge + "40 l · 58,90 ₴ · OKKO" over the note; the title lists every field.
+const typeLine = (transaction) => {
+    const type = typesStore.byId(transaction.transaction_type_id)
+    if (!type) return null
+    return { label: [type.emoji, type.name].filter(Boolean).join(' '), summary: typeSummary(type, transaction.data) }
+}
+
+const typeBadgeStyle = (transaction) => {
+    const color = typesStore.byId(transaction.transaction_type_id)?.color
+    return color ? { backgroundColor: `${color}33`, borderColor: `${color}66` } : null
+}
+
+const rowTitle = (transaction) => {
+    const type = typesStore.byId(transaction.transaction_type_id)
+    const rows = type ? typeRows(type, transaction.data).map((row) => `${row.label}: ${row.value}`) : []
+    return [...rows, transaction.note].filter(Boolean).join('\n') || undefined
+}
 
 const props = defineProps({
     dateRange: {
@@ -286,7 +314,12 @@ const filteredTransactions = computed(() => {
     const query = searchQuery.value.trim().toLowerCase()
 
     return dayTransactions.value
-        .filter((transaction) => !query || transaction.note?.toLowerCase().includes(query))
+        .filter(
+            (transaction) =>
+                !query ||
+                transaction.note?.toLowerCase().includes(query) ||
+                [typeLine(transaction)?.label, typeLine(transaction)?.summary].join(' ').toLowerCase().includes(query),
+        )
         .sort((a, b) => transactionsStore.sort(a, b, sortConfig.value.key, sortConfig.value.direction))
 })
 

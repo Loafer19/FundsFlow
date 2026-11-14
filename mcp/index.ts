@@ -15,6 +15,8 @@ const BULK_MAX_ITEMS = 50
 // Mirrors backend TransactionAttachmentRules (the API re-checks every file; HEIC/HEIF become JPEG there).
 const ATTACHMENT_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'] as const
 const ATTACHMENT_LABEL = 'JPEG, PNG, WebP, HEIC and PDF'
+// Copy of App\Support\TransactionFields::TYPES (separate service; keep in step).
+const TYPE_FIELD_KINDS = ['number', 'rating', 'duration', 'boolean', 'select', 'multiselect', 'text', 'date', 'computed'] as const
 type AttachmentMime = (typeof ATTACHMENT_MIMES)[number]
 
 const MCP_VERSION = '1.3.1'
@@ -155,7 +157,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         name: 'fundsflow',
         version: MCP_VERSION,
         title: 'FundsFlow',
-        description: 'Personal finance via FundsFlow: transactions, tags, budgets, recurring, attachments, and account export.',
+        description: 'Personal finance via FundsFlow: transactions, transaction types with custom fields, tags, budgets, recurring, attachments, and account export.',
         websiteUrl: MCP_WEBSITE_URL,
         icons: MCP_ICONS,
     })
@@ -183,7 +185,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         'get_bootstrap',
         {
             title: 'Bootstrap data',
-            description: 'Load tags, transactions, budgets, and recurring rules in one request.',
+            description: 'Load tags, transaction types, transactions, budgets, and recurring rules in one request.',
             inputSchema: {},
         },
         async () => textResult(await api(token, '/bootstrap')),
@@ -280,11 +282,84 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         async ({ limit }) => textResult(unwrapList(await api(token, '/transactions')).slice(0, limit)),
     )
 
+    // Transaction types (custom fields such as Fuel: liters, price per liter, a computed total).
+    const typeFieldSchema = z.object({
+        key: z.string().max(32).optional().describe('Stable key of an existing field; omit for a new field (made from the label). Renaming the label keeps the key and values'),
+        label: z.string().min(1).max(64),
+        type: z.enum(TYPE_FIELD_KINDS),
+        required: z.boolean().optional(),
+        hidden: z.boolean().optional().describe('Hidden = removed: its values stay on old transactions'),
+        unit: z.string().max(16).optional().describe('number / computed: e.g. l, km, ₴'),
+        min: z.number().optional(),
+        max: z.number().optional().describe('number: max value; rating: scale 3, 5 or 10'),
+        options: z.array(z.string().max(48)).max(60).optional().describe('select / multiselect options'),
+        formula: z.string().max(200).optional().describe('computed: field keys, numbers, + - * / and parentheses, e.g. liters * price_per_liter'),
+        fill_amount: z.boolean().optional().describe('computed: the result fills the transaction amount (one per type)'),
+    })
+    const typeInputSchema = {
+        name: z.string().min(1).max(64),
+        emoji: z.string().max(32).optional(),
+        color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+        fields: z.array(typeFieldSchema).max(30).describe('Up to 30 fields, hidden ones included; order = display order'),
+        default_tag_ids: z.array(z.number().int()).max(10).optional().describe('Tags added to every new transaction of this type'),
+    }
+
+    server.registerTool(
+        'list_transaction_types',
+        {
+            title: 'List transaction types',
+            description: 'List transaction types with their field schemas (keys, kinds, units, options, formulas), including archived ones (archived_at set).',
+            inputSchema: {},
+        },
+        async () => textResult(unwrapList(await api(token, '/transaction-types'))),
+    )
+
+    server.registerTool(
+        'create_transaction_type',
+        {
+            title: 'Create transaction type',
+            description: 'Create a transaction type with custom fields. Kinds: number, rating, duration (minutes), boolean, select (one of), multiselect (several of), text, date, computed (formula over number/rating/duration/boolean keys; fill_amount writes the result to the amount).',
+            inputSchema: typeInputSchema,
+        },
+        async (args) => textResult(await api(token, '/transaction-types', { method: 'POST', body: JSON.stringify(compactPayload(args)) })),
+    )
+
+    server.registerTool(
+        'update_transaction_type',
+        {
+            title: 'Update transaction type',
+            description: 'Update a transaction type by id. Send the whole fields list with the keys of existing fields; a field left out is kept hidden (its values stay).',
+            inputSchema: { id: z.number().int(), ...typeInputSchema, name: typeInputSchema.name.optional(), fields: typeInputSchema.fields.optional() },
+        },
+        async ({ id, ...body }) =>
+            textResult(await api(token, `/transaction-types/${id}`, { method: 'PATCH', body: JSON.stringify(compactPayload(body)) })),
+    )
+
+    server.registerTool(
+        'delete_transaction_type',
+        {
+            title: 'Archive transaction type',
+            description: 'Archive a transaction type by id: it leaves pickers and the assistant; its transactions keep the type and values.',
+            inputSchema: { id: z.number().int() },
+        },
+        async ({ id }) => textResult(await api(token, `/transaction-types/${id}`, { method: 'DELETE' })),
+    )
+
+    const transactionTypeInput = {
+        transaction_type_id: z.number().int().nullable().optional().describe('Transaction type id (list_transaction_types); null clears it on update'),
+        data: z
+            .record(z.string(), z.unknown())
+            .optional()
+            .describe('Field values by key: numbers in the field unit, rating int, duration minutes, boolean, select option, multiselect list, date YYYY-MM-DD. Computed fields are filled by the app'),
+        add_options: z.boolean().optional().describe('Unknown select values become new options instead of an error'),
+    }
+
     const transactionInputSchema = {
-        amount: signedAmount(TX_AMOUNT_MAX),
+        amount: signedAmount(TX_AMOUNT_MAX).optional().describe('Signed; may be omitted when the type has a computed field that fills the amount (then an expense)'),
         at: isoDate(),
         note: z.string().max(255).optional(),
         tags: z.array(z.number().int()).optional(),
+        ...transactionTypeInput,
     }
 
     server.registerTool(
@@ -295,7 +370,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
                 'Create a transaction. Amount is signed: negative expense, positive income. Date YYYY-MM-DD. Source will be recorded as mcp. For many rows prefer create_transactions.',
             inputSchema: transactionInputSchema,
         },
-        async ({ amount, at, note, tags }) =>
+        async ({ amount, at, note, tags, transaction_type_id, data, add_options }) =>
             textResult(
                 await api(token, '/transactions', {
                     method: 'POST',
@@ -305,6 +380,9 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
                             at,
                             note,
                             tags: tags ?? [],
+                            transaction_type_id,
+                            data,
+                            add_options,
                         }),
                     ),
                 }),
@@ -357,13 +435,14 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
             description: 'Update a transaction by id. For many rows prefer update_transactions.',
             inputSchema: {
                 id: z.number().int(),
-                amount: signedAmount(TX_AMOUNT_MAX),
+                amount: signedAmount(TX_AMOUNT_MAX).optional().describe('Omit to keep it (or let a fill-amount field recompute it when data changes)'),
                 at: isoDate(),
                 note: z.string().max(255).optional(),
                 tags: z.array(z.number().int()).optional(),
+                ...transactionTypeInput,
             },
         },
-        async ({ id, amount, at, note, tags }) =>
+        async ({ id, amount, at, note, tags, transaction_type_id, data, add_options }) =>
             textResult(
                 await api(token, `/transactions/${id}`, {
                     // PATCH + omitted tags keeps the current tags (backend syncs only when sent).
@@ -374,6 +453,9 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
                             at,
                             note,
                             tags,
+                            transaction_type_id,
+                            data,
+                            add_options,
                         }),
                     ),
                 }),
@@ -1006,7 +1088,7 @@ app.get('/', (_req, res) => {
         version: MCP_VERSION,
         title: 'FundsFlow',
         description:
-            'Personal finance via FundsFlow: transactions, tags, budgets, recurring, attachments, and account export.',
+            'Personal finance via FundsFlow: transactions, transaction types with custom fields, tags, budgets, recurring, attachments, and account export.',
         websiteUrl: MCP_WEBSITE_URL,
         icons: MCP_ICONS,
         mcp: '/mcp',

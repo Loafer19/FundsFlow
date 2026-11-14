@@ -22,8 +22,13 @@ class TransactionStoreRequest extends FormRequest
 
         return [
             'at' => $presence . '|string|date',
-            'amount' => $presence . '|numeric|not_in:0',
+            // A type whose computed field fills the amount may leave it out (TransactionTypeData).
+            'amount' => ($this->isMethod('PATCH') ? 'sometimes' : 'required_without:transaction_type_id') . '|nullable|numeric|not_in:0',
             'note' => 'nullable|string|max:255',
+            'transaction_type_id' => 'nullable|integer',
+            'data' => 'nullable|array',
+            'add_options' => 'sometimes|boolean',
+            'default_tags' => 'sometimes|boolean',
             'tags' => 'nullable|array',
             'tags.*' => [
                 'integer',

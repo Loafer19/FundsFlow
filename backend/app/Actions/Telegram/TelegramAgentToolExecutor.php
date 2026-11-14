@@ -5,6 +5,7 @@ namespace App\Actions\Telegram;
 use App\Actions\Agent\AgentPlanningTools;
 use App\Actions\Imports\ImportAgentTools;
 use App\Actions\Agent\AgentToolExecutor;
+use App\Actions\Agent\AgentTypeFields;
 use App\Actions\Agent\Documents\ImportTransactionsAction;
 use App\Actions\Charts\BuildUserChartAction;
 use App\Actions\Charts\ScreenshotHtmlViaGotenbergAction;
@@ -117,8 +118,8 @@ class TelegramAgentToolExecutor
                     'at' => ['type' => 'string', 'description' => 'YYYY-MM-DD; default today; not in the future'],
                     'note' => ['type' => 'string', 'description' => "Short note in the user's words, without the amount and date"],
                     'tag_titles' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Existing tag titles that fit (matched case-insensitively; unknown titles are ignored, nothing is created). Omit if unsure'],
+                    ...AgentTypeFields::toolProperties(),
                 ],
-                'required' => ['amount'],
             ]),
             $this->tools->definition('create_transaction'),
             $this->tools->definition('update_transaction'),
@@ -584,7 +585,8 @@ class TelegramAgentToolExecutor
         $this->session->setSummary($identity, $chatId, 'Transaction saved: ' . str_replace("\n", ' · ', $prepared['preview']));
         $this->support->sendSavedTransaction($chatId, $user, $tx, '✅ Saved', undo: true);
 
-        return ['ui' => 'transaction_saved', 'sent' => true, 'id' => (int) $tx->id];
+        return ['ui' => 'transaction_saved', 'sent' => true, 'id' => (int) $tx->id]
+            + (isset($prepared['dropped_fields']) ? ['dropped_fields' => $prepared['dropped_fields'], 'hint' => 'These values did not fit their fields and were not saved; mention it briefly if it matters.'] : []);
     }
 
     private function applyCreateTransaction(User $user, int|string $chatId, int|string $identity, array $payload, ?int $messageId = null): void

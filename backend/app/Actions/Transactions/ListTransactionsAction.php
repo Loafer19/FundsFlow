@@ -17,7 +17,7 @@ class ListTransactionsAction
         Gate::forUser($user)->authorize('viewAny', Transaction::class);
 
         return $user->transactions()
-            ->with(['tags', 'attachments'])
+            ->with(['tags', 'attachments', 'transactionType'])
             ->latest('at')
             ->get();
 

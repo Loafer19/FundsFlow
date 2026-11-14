@@ -129,6 +129,16 @@ class WidgetQueryHandler
                 return;
             }
 
+            if (preg_match('/^y:(\d{1,10})$/', $data, $matches)) {
+                // /recent detail of a typed transaction: its field values as [label, value] rows.
+                $transaction = $this->support->findOwnTransaction($user, (int) $matches[1]);
+                $this->answer($queryId, $transaction
+                    ? ['ok' => 1, 'r' => $this->data->typeRows($user, $transaction)]
+                    : ['ok' => 0, 'e' => 'Transaction not found']);
+
+                return;
+            }
+
             if (preg_match('/^g:(\d{1,10}):(\d{1,10})$/', $data, $matches)) {
                 // Send in the 📎 Files box: g:<attachment id>:<transaction id>, just that file.
                 $transaction = $this->support->findOwnTransaction($user, (int) $matches[2]);

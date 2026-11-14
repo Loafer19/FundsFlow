@@ -17,6 +17,8 @@ Each tag has:
 Deleting a tag uses hold-to-delete. Tags can also be created from Telegram with
 [`/newtag`](/docs/telegram/commands/#newtag) or by asking the [AI assistant](/docs/telegram/ai-assistant/).
 
+A [transaction type](/docs/web/types/) can add default tags to every new transaction of that type.
+
 ## Filter by tag
 
 Use **Filter tags** at the top of the page to show only some tags, or **Untagged** transactions, across all tabs.

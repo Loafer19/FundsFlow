@@ -12,8 +12,10 @@ use App\Models\Identity;
 use App\Models\RecurringTransaction;
 use App\Models\Tag;
 use App\Models\Transaction;
+use App\Models\TransactionType;
 use App\Models\User;
 use App\Support\TagTree;
+use App\Support\TransactionFields;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -233,7 +235,7 @@ class TelegramWidgetData
         $offset = max(0, $offset);
         $limit = max(1, min(12, $limit));
         $rows = $user->transactions()
-            ->with(['tags', 'attachments'])
+            ->with(['tags', 'attachments', 'transactionType'])
             ->latest('at')
             ->offset($offset)
             ->limit($limit + 1)
@@ -460,7 +462,7 @@ class TelegramWidgetData
      * @param list<int> $tagIds
      * @return array{chat_data: string}
      */
-    public function editor(User $user, string $kind, float $amount, string $at, ?string $note, array $tagIds, ?string $closed = null): array
+    public function editor(User $user, string $kind, float $amount, string $at, ?string $note, array $tagIds, ?string $closed = null, ?string $typeLine = null): array
     {
         if ($closed !== null) {
             return ['chat_data' => $this->json(['k' => $kind, 'x' => $closed])];
@@ -507,6 +509,11 @@ class TelegramWidgetData
             'e' => $chips(-1),
             'i' => $chips(1),
         ];
+
+        if ($typeLine !== null && $typeLine !== '') {
+            // y: "⛽ Fuel · 40 l · 58,90 ₴" (read-only; fields change in the web app or via the assistant).
+            $payload['y'] = $this->clip($typeLine, 60);
+        }
 
         // 1 KB: drop unselected chips from the end, the bigger list first.
         while (strlen($this->json($payload)) > 1000) {
@@ -748,6 +755,32 @@ class TelegramWidgetData
     }
 
     /**
+     * Field values of a typed transaction for the /recent detail (y:<id> answer):
+     * [[label, value], …], computed totals included, trimmed to fit a widget answer.
+     *
+     * @return list<array{0: string, 1: string}>
+     */
+    public function typeRows(User $user, Transaction $transaction): array
+    {
+        $type = $transaction->transactionType;
+
+        if (!$type instanceof TransactionType) {
+            return [];
+        }
+
+        $rows = array_map(
+            fn (array $row): array => [$this->clip($row[0], 24), $this->clip($row[1], 40)],
+            TransactionFields::rows($type, is_array($transaction->data) ? $transaction->data : [], $user),
+        );
+
+        while ($rows !== [] && strlen($this->json(['ok' => 1, 'r' => $rows])) > 900) {
+            array_pop($rows);
+        }
+
+        return $rows;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function recentItem(User $user, Transaction $transaction): array
@@ -774,6 +807,11 @@ class TelegramWidgetData
             // gx: how many more tags than `g` shows ("💼 Salary +1"); gs: all of them for the detail.
             $item['gx'] = count($tags) - 1;
             $item['gs'] = array_slice($tags, 0, 6);
+        }
+
+        if ($transaction->transaction_type_id !== null && $transaction->transactionType) {
+            // y: the type ("⛽ Fuel"); the detail loads its field values with y:<id>.
+            $item['y'] = $this->clip($transaction->transactionType->label(), 22);
         }
 
         if ($transaction->relationLoaded('attachments') && $transaction->attachments->isNotEmpty()) {

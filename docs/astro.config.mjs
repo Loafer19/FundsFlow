@@ -61,6 +61,7 @@ export default defineConfig({
                         { slug: 'web/transactions' },
                         { slug: 'web/tabs' },
                         { slug: 'web/tags' },
+                        { slug: 'web/types' },
                         { slug: 'web/budgets' },
                         { slug: 'web/recurring' },
                         { slug: 'web/settings' },

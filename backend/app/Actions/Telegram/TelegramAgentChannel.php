@@ -4,6 +4,7 @@ namespace App\Actions\Telegram;
 
 use App\Actions\Agent\AgentChannel;
 use App\Actions\Agent\AgentHistory;
+use App\Actions\Agent\AgentTypeFields;
 use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
 use App\Models\User;
@@ -80,6 +81,9 @@ final class TelegramAgentChannel implements AgentChannel
             '…',
         );
 
+        // Transaction types with their field keys, so "Fuel: 40 l at 58.9" maps straight to fields.
+        $typesBlock = AgentTypeFields::promptBlock($user);
+
         return <<<PROMPT
 You are the FundsFlow personal finance assistant inside Telegram.
 Today (user timezone {$tz}) is {$today}.
@@ -87,7 +91,7 @@ Session domain: {$domain}
 Last bot summary: {$summary}
 last_list (ids are authoritative; never invent ids): {$lastListJson}
 Existing tag titles: {$tagTitles}
-
+{$typesBlock}
 Rules:
 - Use tools for ANY numbers, balances, lists, budgets, or ids. Never invent amounts, tag ids, transaction ids, or budget figures.
 - Prefer concise replies. Match the user's language for narrative advice (Ukrainian if they wrote Ukrainian; otherwise English). Keep button labels English via tools.

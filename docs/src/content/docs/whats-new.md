@@ -7,6 +7,23 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
 **1.13** update that put an AI assistant in the Telegram bot. Self-hosting and technical changes are listed in the
 [GitHub releases](https://github.com/Loafer19/FundsFlow/releases).
 
+## Upcoming
+
+In the next release.
+
+### Web app
+
+- **Transaction types with your own fields.** Make a *Fuel* type with Liters, Price per liter and a Station, a
+  *Groceries* type with the store, or a rating for restaurants. A computed field (`liters * price_per_liter`) can fill
+  the amount, and you can still type your own. Pick the type in **Add Transaction**; the List shows its key values.
+  Manage types in **Settings → Data & reports → Manage Types**. New accounts start with ⛽ Fuel, 🛒 Groceries,
+  🔄 Subscription and 🍽 Restaurant. [Learn more](/docs/web/types/)
+
+### Telegram bot
+
+- **Types in the bot.** Write `Fuel: 40 l at 58.9` and the assistant saves a *Fuel* transaction with its fields and
+  the amount from the total. `/recent` shows the type and its fields. [Learn more](/docs/web/types/#with-the-assistants)
+
 ## 2.3.0
 
 ### Web app

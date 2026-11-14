@@ -7,10 +7,12 @@ use App\Actions\Tags\MatchTagTitlesAction;
 use App\Models\Identity;
 use App\Models\Tag;
 use App\Models\Transaction;
+use App\Models\TransactionType;
 use App\Models\User;
 use App\Support\QuickAddParser;
 use App\Support\TelegramAiQuota;
 use App\Support\TransactionAttachmentRules;
+use App\Support\TransactionFields;
 use App\Support\UserFormatter;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
@@ -281,6 +283,10 @@ class TelegramSupport
             $lines[] = '📝 ' . $this->escapeHtml($transaction->note);
         }
 
+        if ($typeLine = self::typeLine($user, $transaction)) {
+            $lines[] = $this->escapeHtml($typeLine);
+        }
+
         if ($transaction->relationLoaded('attachments') && $transaction->attachments->isNotEmpty()) {
             $count = $transaction->attachments->count();
             $lines[] = '📎 ' . $count . ' file' . ($count === 1 ? '' : 's');
@@ -289,6 +295,24 @@ class TelegramSupport
         $lines[] = self::tagLine($this->formatTagListHtml($transaction));
 
         return implode("\n", $lines);
+    }
+
+    /** "⛽ Fuel · 40 l · 58,90 ₴ · OKKO" (type + first values), or null for a typeless transaction. */
+    public static function typeLine(User $user, Transaction $transaction, int $limit = 4): ?string
+    {
+        if ($transaction->transaction_type_id === null) {
+            return null;
+        }
+
+        $type = $transaction->transactionType;
+
+        if (!$type instanceof TransactionType) {
+            return null;
+        }
+
+        $summary = TransactionFields::summary($type, is_array($transaction->data) ? $transaction->data : [], $user, $limit);
+
+        return $type->label() . ($summary !== '' ? ' · ' . $summary : '');
     }
 
     public function formatTransactionListItem(User $user, Transaction $transaction, int $index): string

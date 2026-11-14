@@ -30,11 +30,15 @@ button.back,button.more,button.o{background:transparent;color:var(--tg-theme-hin
 button.del{background:var(--tg-theme-secondary-bg-color);color:var(--tg-theme-destructive-text-color)}
 .lines p{margin:4px 0;font-size:.95em}
 .warn{margin:8px 0;font-size:.95em}
+.kv{margin:8px 0 0;padding:2px 10px;border-radius:10px;background:var(--tg-theme-secondary-bg-color)}
+.kv div{display:flex;justify-content:space-between;gap:8px;padding:5px 0;font-size:.92em}
+.kv div+div{border-top:1px solid var(--tg-theme-section-separator-color,rgba(127,127,127,.2))}
+.kv span:first-child{color:var(--tg-theme-hint-color)}
 </style>
 <div id="root"></div>
 <script>
 const W=window.TelegramWidget;
-let list=[],sel=null,ask=false,err='',okMsg='',busy=false,more=0,fo=false,lf=0,fl={},cf=0;
+let list=[],sel=null,ask=false,err='',okMsg='',busy=false,more=0,fo=false,lf=0,fl={},cf=0,yr={},ly=0;
 function parse(s){try{return s?JSON.parse(s):null}catch(e){return null}}
 function cls(a){return 'amt'+((a&&a.charAt(0)==='+')?' pos':' neg')}
 function sd(df){return df?String(df).slice(0,5):''}
@@ -54,7 +58,7 @@ function showList(){
     top.appendChild(el('span',cls(it.a),it.a||''));
     top.appendChild(el('span','n',it.n||'—'));
     b.appendChild(top);
-    b.appendChild(el('div','meta',sd(it.df)+(it.g?(' · '+it.g+more1(it)):'')+clip(it)));
+    b.appendChild(el('div','meta',sd(it.df)+(it.y?' · '+it.y:'')+(it.g?(' · '+it.g+more1(it)):'')+clip(it)));
     b.addEventListener('click',function(){sel=it;ask=false;fo=false;cf=0;err='';okMsg='';seen(it.id);showDetail(it)});
     r.appendChild(b);
   });
@@ -68,11 +72,12 @@ function showDetail(it){
   r.appendChild(el('h3',cls(it.a),it.a||''));
   const box=el('div','lines');
   box.appendChild(el('p','',note(it)));
-  box.appendChild(el('p','',tags(it)));
+  box.appendChild(el('p','',(it.y?it.y+' · ':'')+tags(it)));
   box.appendChild(el('p','',(it.df||'')+clip(it)));
   if(err)box.appendChild(el('p','err',err));
   if(okMsg)box.appendChild(el('p','meta',okMsg));
   r.appendChild(box);
+  if(it.y){const R=yr[it.id];if(!R&&!ly)loadType(it);const k=el('div','kv');if(!R)k.appendChild(el('p','hint','Loading…'));(R||[]).forEach(function(x){const d=el('div');d.appendChild(el('span','',x[0]));d.appendChild(el('span','',x[1]));k.appendChild(d)});if(!R||R.length)r.appendChild(k)}
   const act=el('div','actions');
   const edit=el('button','','Edit');edit.type='button';
   edit.addEventListener('click',function(){ask1(it,'e:','Editor opened below','Could not open the editor')});
@@ -127,6 +132,7 @@ function showConfirm(it){
 }
 function kb(b){return b>=1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'}
 function loadFiles(it){lf=1;askBot('l:'+it.id).then(function(r){lf=0;fl[it.id]=(r&&r.ok&&r.l)||[];if(!(r&&r.ok))err=(r&&r.e)||'Could not load files';showDetail(sel||it)},function(e){lf=0;fl[it.id]=[];err=(e&&e.code)||'Could not load files';showDetail(sel||it)})}
+function loadType(it){ly=1;askBot('y:'+it.id).then(function(r){ly=0;yr[it.id]=(r&&r.ok&&r.r)||[];showDetail(sel||it)},function(){ly=0;yr[it.id]=[];showDetail(sel||it)})}
 function sm(c,t,fn){const b=el('button',c,t);b.type='button';b.addEventListener('click',fn);return b}
 function delFile(it,f){
   if(busy)return;busy=true;err='';okMsg='';
@@ -172,7 +178,7 @@ function loadMore(){
 }
 function render(){
   const d=parse(W&&W.chatData)||{};
-  list=d.i||[];more=d.more||0;
+  list=d.i||[];more=d.more||0;yr={};
   if(sel){
     const fresh=list.filter(function(x){return x.id===sel.id})[0];
     if(!fresh){sel=null;ask=false;showList();return}

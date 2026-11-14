@@ -6,9 +6,18 @@
             </ModalHeader>
 
             <form ref="formRef" @submit.prevent="handleSubmit">
+                <TypeChips :model-value="transaction.transaction_type_id" @pick="typed.pickType" />
+
                 <DateChips v-model="transaction.at" />
 
-                <AmountField v-model="transaction.amount" />
+                <AmountField ref="amountField" v-model="transaction.amount" :linked="typed.isLinked.value"
+                    @manual="typed.onManualAmount">
+                    <template #hint>
+                        <TypeAmountHint :hint="typed.hint.value" @reset="typed.resetAmount" />
+                    </template>
+                </AmountField>
+
+                <TypeFieldsCard :type="typed.type.value" v-model:data="transaction.data" />
 
                 <input type="text" v-model="transaction.note" placeholder="Note (optional)" aria-label="Note"
                     class="input w-full mb-4" maxlength="255" />
@@ -45,11 +54,17 @@ import DeleteHold from '../components/buttons/DeleteHold.vue'
 import DateChips from '../components/DateChips.vue'
 import ModalHeader from '../components/ModalHeader.vue'
 import TagPicker from '../components/TagPicker.vue'
+import TypeAmountHint from '../components/TypeAmountHint.vue'
+import TypeChips from '../components/TypeChips.vue'
+import TypeFieldsCard from '../components/TypeFieldsCard.vue'
 import { toLocalDateStr } from '../services/formatters.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
 import { useTransactionsStore } from '../services/transactions.js'
+import { useTransactionTypesStore } from '../services/transactionTypes.js'
+import { useTypedTransaction } from '../services/typedTransaction.js'
 
 const transactionsStore = useTransactionsStore()
+const typesStore = useTransactionTypesStore()
 
 const formRef = ref(null)
 
@@ -61,7 +76,11 @@ useTelegramPrimary('transactions_edit_modal', {
 
 const transaction = ref({
     tags: [],
+    transaction_type_id: null,
+    data: {},
 })
+const amountField = ref(null)
+const typed = useTypedTransaction(transaction, amountField)
 
 const liveAttachments = computed(() => {
     if (!transaction.value.id) return []
@@ -82,7 +101,10 @@ watch(
             amount: for_edit.amount,
             note: for_edit.note,
             tags: for_edit.tags.map((tag) => tag.id),
+            transaction_type_id: for_edit.transaction_type_id ?? null,
+            data: { ...(for_edit.data ?? {}) },
         }
+        typed.load({ amount: for_edit.amount })
     },
 )
 
@@ -95,9 +117,11 @@ const syncAttachments = () => {
 }
 
 const handleSubmit = async () => {
-    const ok = await transactionsStore.update(transaction.value)
+    const payload = typed.payload(transaction.value)
+    const ok = await transactionsStore.update(payload)
 
     if (!ok) return
+    if (payload.add_options) typesStore.fetch()
 
     transactionsStore.transactionForEdit = null
     transactions_edit_modal.close()

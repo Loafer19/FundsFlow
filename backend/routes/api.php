@@ -16,6 +16,7 @@ use App\Http\Controllers\TagController;
 use App\Http\Controllers\Telegram\TelegramWebhookController;
 use App\Http\Controllers\TransactionAttachmentController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\TransactionTypeController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -55,6 +56,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/bootstrap', BootstrapController::class);
 
     Route::apiResource('tags', TagController::class)->except(['show']);
+    Route::get('/transaction-types', [TransactionTypeController::class, 'index']);
+    Route::post('/transaction-types', [TransactionTypeController::class, 'store'])->middleware('throttle:60,1,tx-types:');
+    Route::match(['put', 'patch'], '/transaction-types/{type}', [TransactionTypeController::class, 'update'])->whereNumber('type')
+        ->middleware('throttle:60,1,tx-types:');
+    Route::delete('/transaction-types/{type}', [TransactionTypeController::class, 'destroy'])->whereNumber('type');
+    Route::post('/transaction-types/{type}/restore', [TransactionTypeController::class, 'restore'])->whereNumber('type');
     Route::post('/transactions/bulk', [TransactionController::class, 'storeBulk'])
         ->middleware('throttle:30,1,tx-bulk:');
     Route::put('/transactions/bulk', [TransactionController::class, 'updateBulk'])

@@ -35,10 +35,12 @@ Click **Save** to apply.
 
 ## Data & reports
 
+- **Manage Tags** and **Manage Types** — open the [tags](/docs/web/tags/) and [transaction types](/docs/web/types/)
+  editors.
 - **Import statement** — opens the [import page](/docs/web/import/) to check a bank file before anything is saved.
 - **Report** — pick the sections and **Download PDF** or **Send to Telegram**. See [Reports](/docs/web/reports/).
 - **Backup** — **Download JSON** exports all your data in one file: account, tags, transactions (with attachment
-  metadata), budgets, and recurring rules. Not available inside the Telegram Mini App.
+  metadata), budgets, recurring rules, and transaction types. Not available inside the Telegram Mini App.
 
 ## Support
 

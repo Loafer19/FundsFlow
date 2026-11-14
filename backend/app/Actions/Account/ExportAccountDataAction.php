@@ -6,6 +6,7 @@ use App\Http\Resources\BudgetResource;
 use App\Http\Resources\RecurringTransactionResource;
 use App\Http\Resources\TagResource;
 use App\Http\Resources\TransactionResource;
+use App\Http\Resources\TransactionTypeResource;
 use App\Models\User;
 
 class ExportAccountDataAction
@@ -45,6 +46,10 @@ class ExportAccountDataAction
                 ...((new TagResource($tag))->resolve()),
                 'deleted_at' => $tag->deleted_at?->toIso8601String(),
             ])->values()->all(),
+            // Types with their field schema (hidden fields too); transactions carry transaction_type_id + data.
+            'transaction_types' => TransactionTypeResource::collection(
+                $user->transactionTypes()->withTrashed()->orderBy('id')->get(),
+            )->resolve(),
             'transactions' => TransactionResource::collection(
                 $user->transactions->sortByDesc('at')->values(),
             )->resolve(),

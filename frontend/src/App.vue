@@ -4,6 +4,7 @@
     <TagsModal />
     <TagsAddModal />
     <TagsEditModal />
+    <TypesModal />
     <TransactionsAddModal />
     <TransactionsEditModal />
     <AttachmentPreviewModal />
@@ -181,7 +182,7 @@
             v-model:more-open="moreOpen" @select-group="selectGroup" @add="showModal('transactions_add_modal')"
             @import="goImport(); moreOpen = false" @recurring="showModal('recurring_modal'); moreOpen = false"
             @settings="openSettings(); moreOpen = false" @assistant="agentStore.toggle(); moreOpen = false"
-            @tags="showModal('tags_modal'); moreOpen = false" @feedback="showModal('support_modal'); moreOpen = false"
+            @tags="showModal('tags_modal'); moreOpen = false" @types="showModal('types_modal'); moreOpen = false" @feedback="showModal('support_modal'); moreOpen = false"
             @logout="authStore.logout" />
     </div>
 </template>
@@ -241,6 +242,7 @@ import TagsEditModal from './modals/TagsEditModal.vue'
 import TagsModal from './modals/TagsModal.vue'
 import TransactionsAddModal from './modals/TransactionsAddModal.vue'
 import TransactionsEditModal from './modals/TransactionsEditModal.vue'
+import TypesModal from './modals/TypesModal.vue'
 import { useAgentStore } from './services/agent.js'
 import { useAuthStore } from './services/auth.js'
 import { bootstrapStores, isBootstrapping } from './services/bootstrap.js'

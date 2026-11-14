@@ -1,6 +1,6 @@
 ---
 title: MCP tool reference
-description: All 30 tools exposed by the FundsFlow MCP server.
+description: All 34 tools exposed by the FundsFlow MCP server.
 ---
 
 Amounts are **signed**: negative for expenses, positive for income. Dates use `YYYY-MM-DD`.
@@ -10,9 +10,9 @@ Amounts are **signed**: negative for expenses, positive for income. Dates use `Y
 | Tool | Description |
 | --- | --- |
 | `get_me` | The signed-in user and linked identities |
-| `get_bootstrap` | Tags, transactions, budgets, and recurring rules in one request |
+| `get_bootstrap` | Tags, transaction types, transactions, budgets, and recurring rules in one request |
 | `update_preferences` | Change money format, date format, decimals, or IANA timezone (only the fields you pass) |
-| `export_account` | The full JSON export: profile, tags, transactions, budgets, recurring rules |
+| `export_account` | The full JSON export: profile, tags, transactions, budgets, recurring rules, transaction types |
 
 ## Tags
 
@@ -35,6 +35,19 @@ Amounts are **signed**: negative for expenses, positive for income. Dates use `Y
 | `update_transactions` | Update up to 50 transactions, all-or-nothing |
 | `delete_transaction` | Delete a transaction by id |
 | `delete_transactions` | Delete up to 50 transactions by id, all-or-nothing |
+
+`create_transaction` and `update_transaction` also take `transaction_type_id`, `data` (field values by key, e.g.
+`{"liters": 40, "price_per_liter": 58.9}`) and `add_options` (new choices for *one of* / *several of* fields).
+`amount` can be left out when the type has a computed field that fills it; the result is saved as an expense.
+
+## Transaction types
+
+| Tool | Description |
+| --- | --- |
+| `list_transaction_types` | All types with their fields (keys, kinds, units, options, formulas), archived ones included |
+| `create_transaction_type` | Create a type: name, emoji, color, up to 30 fields, default tags |
+| `update_transaction_type` | Update a type by id; send existing fields with their keys (a field left out is hidden, its values kept) |
+| `delete_transaction_type` | Archive a type by id; its transactions keep the type and values |
 
 ## Attachments
 

@@ -39,6 +39,9 @@
                 <button type="button" class="btn btn-ghost h-auto flex-col gap-1 py-3 border border-base-300" @click="$emit('tags')">
                     <Tag :size="20" /><span class="text-xs font-medium">Tags</span>
                 </button>
+                <button type="button" class="btn btn-ghost h-auto flex-col gap-1 py-3 border border-base-300" @click="$emit('types')">
+                    <Shapes :size="20" /><span class="text-xs font-medium">Types</span>
+                </button>
                 <button type="button" class="btn btn-ghost h-auto flex-col gap-1 py-3 border border-base-300" @click="$emit('settings')">
                     <Settings :size="20" /><span class="text-xs font-medium">Settings</span>
                 </button>
@@ -49,7 +52,6 @@
                     <LifeBuoy :size="20" /><span class="text-xs font-medium">Feedback</span>
                 </button>
                 <template v-if="authenticated">
-                    <div aria-hidden="true"></div>
                     <button type="button" class="btn btn-ghost h-auto flex-col gap-1 py-3 border border-base-300 text-error" @click="$emit('logout')">
                         <LogOut :size="20" /><span class="text-xs font-medium">Logout</span>
                     </button>
@@ -60,7 +62,7 @@
 </template>
 
 <script setup>
-import { CircleHelp, LifeBuoy, LogOut, Menu, Plus, Repeat, Settings, Sparkles, Tag, Upload } from '@lucide/vue'
+import { CircleHelp, LifeBuoy, LogOut, Menu, Plus, Repeat, Settings, Shapes, Sparkles, Tag, Upload } from '@lucide/vue'
 
 defineProps({
     groups: { type: Array, required: true },
@@ -69,5 +71,17 @@ defineProps({
     // The dock is only mounted when signed in today; keep a compact order without Assistant/Logout if reused logged out.
     authenticated: { type: Boolean, default: true },
 })
-defineEmits(['select-group', 'add', 'update:moreOpen', 'import', 'recurring', 'settings', 'assistant', 'tags', 'feedback', 'logout'])
+defineEmits([
+    'select-group',
+    'add',
+    'update:moreOpen',
+    'import',
+    'recurring',
+    'settings',
+    'assistant',
+    'tags',
+    'types',
+    'feedback',
+    'logout',
+])
 </script>

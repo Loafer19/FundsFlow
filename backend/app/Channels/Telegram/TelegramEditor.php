@@ -47,6 +47,7 @@ class TelegramEditor
             $transaction->at->toDateString(),
             $transaction->note,
             $transaction->tags->pluck('id')->all(),
+            typeLine: TelegramSupport::typeLine($user, $transaction),
         )['chat_data'];
 
         return $this->open($chatId, "tx:{$transaction->id}", $chatData, [
@@ -360,6 +361,7 @@ class TelegramEditor
             $transaction->at->toDateString(),
             $transaction->note,
             $transaction->tags->pluck('id')->all(),
+            typeLine: TelegramSupport::typeLine($user, $transaction),
         )['chat_data']);
 
         if ($ref['card'] ?? null) {

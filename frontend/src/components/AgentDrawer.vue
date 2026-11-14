@@ -453,6 +453,8 @@ const cardRows = (card) => {
     const tags = (list) => (list?.length ? list.join(' · ') : 'No tags')
     const rows = [{ key: 'date', icon: '📅 ', value: card.date, before: before.date }]
     if (card.note || before.note !== undefined) rows.push({ key: 'note', icon: '📝 ', value: card.note || '—', before: before.note })
+    // "⛽ Fuel · Litres 40 l · Price per liter 58,90 ₴": the type and its field values (already has its emoji).
+    if (card.type_line) rows.push({ key: 'type', icon: '', value: card.type_line })
     if (card.files > 0) rows.push({ key: 'files', icon: '📎 ', value: card.files_label || `${card.files} photo${card.files === 1 ? '' : 's'}` })
     // No 🏷 in front of a tag that has its own emoji ("💼 Salary · 🅱️ PUMB"), as in Telegram.
     const tagIcon = /^\p{Extended_Pictographic}/u.test(card.tags?.[0] ?? '') ? '' : '🏷 '
