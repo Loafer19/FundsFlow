@@ -11,7 +11,7 @@ class SignupsChart extends ChartWidget
 {
     use HasDashboardPeriod;
 
-    protected static ?int $sort = 2;
+    protected static ?int $sort = 3;
 
     protected ?string $maxHeight = '260px';
 

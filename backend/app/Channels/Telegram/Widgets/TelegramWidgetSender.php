@@ -6,6 +6,7 @@ use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
 use App\Models\Identity;
 use App\Models\User;
+use App\Support\UserAnalytics;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -84,11 +85,7 @@ class TelegramWidgetSender
         $result = $this->client->sendWidget($chatId, $this->html($kind), $chatData, null, $allowQueries, null, null, $replyMarkup);
 
         if (!($result['ok'] ?? false)) {
-            Log::warning('Telegram sendWidget failed', [
-                'kind' => $kind,
-                'error_code' => $result['error_code'] ?? null,
-                'description' => mb_substr((string) ($result['description'] ?? ''), 0, 240),
-            ]);
+            $this->recordWidgetFailure($chatId, $kind, $result);
 
             return null;
         }
@@ -242,11 +239,7 @@ class TelegramWidgetSender
         }
 
         if (!($result['ok'] ?? false)) {
-            Log::warning('Telegram sendWidget failed', [
-                'kind' => $kind,
-                'error_code' => $result['error_code'] ?? null,
-                'description' => mb_substr((string) ($result['description'] ?? ''), 0, 240),
-            ]);
+            $this->recordWidgetFailure($chatId, $kind, $result, $user);
 
             return false;
         }
@@ -264,6 +257,28 @@ class TelegramWidgetSender
         }
 
         return true;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     */
+    private function recordWidgetFailure(int|string $chatId, string $kind, array $result, ?User $user = null): void
+    {
+        $description = mb_substr((string) ($result['description'] ?? ''), 0, 240);
+
+        Log::warning('Telegram sendWidget failed', [
+            'kind' => $kind,
+            'error_code' => $result['error_code'] ?? null,
+            'description' => $description,
+        ]);
+
+        $user ??= $this->support->resolveUser($chatId);
+
+        UserAnalytics::event($user, 'widget_failed', [
+            'kind' => $kind,
+            'error_code' => $result['error_code'] ?? null,
+            'description' => $description,
+        ]);
     }
 
     private function fitsLimits(string $kind): bool

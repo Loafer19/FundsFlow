@@ -3,6 +3,7 @@ import api from './api.js'
 import { clearUserCache } from './cache.js'
 import { apiErrorMessage } from './formatters.js'
 import { applyUserPreferences } from './settings.js'
+import { signupSource } from './signupSource.js'
 import toasts from './toasts.js'
 
 export const useAuthStore = defineStore('auth', {
@@ -40,7 +41,7 @@ export const useAuthStore = defineStore('auth', {
             this.isLoading = true
 
             try {
-                const response = await api.post('/auth/register', credentials)
+                const response = await api.post('/auth/register', { ...credentials, source: signupSource() })
 
                 this.user = response.data.user
                 this.setToken(response.data.token)

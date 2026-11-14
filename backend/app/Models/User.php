@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Database\Seeders\DefaultTagsSeeder;
 use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthentication;
 use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthenticationRecovery;
@@ -31,7 +32,6 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'timezone' => 'Europe/Kyiv',
     ];
 
-
     /**
      * @var list<string>
      */
@@ -58,13 +58,6 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'created_at',
         'updated_at',
     ];
-
-    protected static function booted(): void
-    {
-        static::created(function (User $user) {
-            (new DefaultTagsSeeder)->run($user);
-        });
-    }
 
     /**
      * Admin panel (/admin): admins only, and never a blocked account.
@@ -115,7 +108,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $timezone;
     }
 
-    public function nowInTimezone(): \Carbon\Carbon
+    public function nowInTimezone(): Carbon
     {
         return now($this->timezone());
     }
@@ -124,7 +117,6 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     {
         return $this->nowInTimezone()->toDateString();
     }
-
 
     /**
      * @return HasMany<Tag, $this>
@@ -215,6 +207,21 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
+     * @return HasMany<UserEvent, $this>
+     */
+    public function events(): HasMany
+    {
+        return $this->hasMany(UserEvent::class);
+    }
+
+    protected static function booted(): void
+    {
+        static::created(function (User $user) {
+            (new DefaultTagsSeeder)->run($user);
+        });
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -227,6 +234,9 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'ai_daily_limit' => 'integer',
             'blocked_at' => 'datetime',
             'last_active_at' => 'datetime',
+            'onboarding_completed_at' => 'datetime',
+            'first_transaction_at' => 'datetime',
+            'telegram_linked_at' => 'datetime',
         ];
     }
 }

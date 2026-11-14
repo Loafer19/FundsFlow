@@ -122,10 +122,11 @@ import ModalHeader from '../components/ModalHeader.vue'
 import { useAuthStore } from './../services/auth.js'
 import { formatTelegramCode, normalizeTelegramCode, TELEGRAM_CODE_LENGTH } from './../services/telegramCode.js'
 import { takeStashedInitData } from './../services/telegramWebApp.js'
+import { withSignupSource } from './../services/signupSource.js'
 import toasts from './../services/toasts.js'
 
-const googleAuthUrl = import.meta.env.VITE_API_URL + '/auth/google'
-const githubAuthUrl = import.meta.env.VITE_API_URL + '/auth/github'
+const googleAuthUrl = withSignupSource(import.meta.env.VITE_API_URL + '/auth/google')
+const githubAuthUrl = withSignupSource(import.meta.env.VITE_API_URL + '/auth/github')
 const telegramBotUrl = `https://t.me/${import.meta.env.VITE_TELEGRAM_BOT_USERNAME}`
 
 const authStore = useAuthStore()

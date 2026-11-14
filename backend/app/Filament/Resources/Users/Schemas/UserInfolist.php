@@ -11,6 +11,7 @@ use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Collection;
 
 class UserInfolist
 {
@@ -36,7 +37,21 @@ class UserInfolist
                                 ->unique()
                                 ->implode(', ')),
                         TextEntry::make('timezone')->state(fn (User $record): string => $record->timezone()),
+                        TextEntry::make('signup_method')
+                            ->label('Signed up via')
+                            ->placeholder('—')
+                            ->formatStateUsing(fn (?string $state): string => match ($state) {
+                                'email' => 'Email',
+                                'google' => 'Google',
+                                'github' => 'GitHub',
+                                'telegram' => 'Telegram',
+                                default => $state ?: '—',
+                            }),
+                        TextEntry::make('signup_source')->label('Signup source')->placeholder('—')->limit(40),
                         TextEntry::make('created_at')->label('Joined')->dateTime(),
+                        TextEntry::make('first_transaction_at')->label('First transaction')->dateTime()->placeholder('—'),
+                        TextEntry::make('onboarding_step')->label('Onboarding')->placeholder('—'),
+                        TextEntry::make('telegram_linked_at')->label('Telegram linked')->dateTime()->placeholder('—'),
                         TextEntry::make('last_activity')
                             ->label('Last API activity')
                             ->state(fn (User $record) => $record->tokens()->max('last_used_at'))
@@ -155,9 +170,9 @@ class UserInfolist
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, MonobankAccount>
+     * @return Collection<int, MonobankAccount>
      */
-    private static function accounts(User $user)
+    private static function accounts(User $user): Collection
     {
         return self::connection($user)?->accounts ?? collect();
     }

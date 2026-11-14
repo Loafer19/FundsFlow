@@ -197,11 +197,156 @@ class DashboardMetrics
         });
     }
 
+    /**
+     * Activation funnel for users who signed up in the period.
+     *
+     * @return array{
+     *     days: int,
+     *     signups: int,
+     *     active: int,
+     *     opened_web: int,
+     *     first_tx: int,
+     *     median_seconds_to_first_tx: null|float,
+     *     median_label: null|string,
+     *     by_method: array<string, array{signups: int, active: int, opened_web: int, first_tx: int}>
+     * }
+     */
+    public static function funnel(int $days): array
+    {
+        return Cache::remember("admin:dash:funnel:{$days}", self::TTL, function () use ($days): array {
+            $start = self::periodStart($days);
+            $users = DB::table('users')
+                ->where('created_at', '>=', $start)
+                ->get([
+                    'id', 'created_at', 'signup_method', 'last_active_at',
+                    'first_transaction_at', 'onboarding_step',
+                ]);
+
+            $emptyMethods = [];
+
+            foreach (['email', 'google', 'github', 'telegram'] as $method) {
+                $emptyMethods[$method] = ['signups' => 0, 'active' => 0, 'opened_web' => 0, 'first_tx' => 0];
+            }
+
+            if ($users->isEmpty()) {
+                return [
+                    'days' => $days,
+                    'signups' => 0,
+                    'active' => 0,
+                    'opened_web' => 0,
+                    'first_tx' => 0,
+                    'median_seconds_to_first_tx' => null,
+                    'median_label' => null,
+                    'by_method' => $emptyMethods,
+                ];
+            }
+
+            $ids = $users->pluck('id')->all();
+            $openedWeb = DB::table('personal_access_tokens')
+                ->where('tokenable_type', (new User)->getMorphClass())
+                ->whereIn('tokenable_id', $ids)
+                ->where('name', 'auth_token')
+                ->whereNotNull('last_used_at')
+                ->pluck('tokenable_id')
+                ->unique()
+                ->all();
+            $openedWebSet = array_fill_keys(array_map('intval', $openedWeb), true);
+
+            $byMethod = $emptyMethods;
+            $signups = $active = $opened = $firstTx = 0;
+            $durations = [];
+
+            foreach ($users as $user) {
+                $method = in_array((string) $user->signup_method, ['email', 'google', 'github', 'telegram'], true)
+                    ? (string) $user->signup_method
+                    : 'email';
+                $byMethod[$method]['signups']++;
+                $signups++;
+
+                $openedThis = isset($openedWebSet[(int) $user->id]);
+                $hasTx = $user->first_transaction_at !== null;
+                $cameBack = $user->last_active_at !== null
+                    && $user->created_at
+                    && strtotime((string) $user->last_active_at) >= strtotime((string) $user->created_at) + 60;
+                $isActive = $openedThis || $hasTx || $cameBack || $user->onboarding_step !== null;
+
+                if ($isActive) {
+                    $active++;
+                    $byMethod[$method]['active']++;
+                }
+
+                if ($openedThis) {
+                    $opened++;
+                    $byMethod[$method]['opened_web']++;
+                }
+
+                if ($hasTx) {
+                    $firstTx++;
+                    $byMethod[$method]['first_tx']++;
+                    $durations[] = max(0, strtotime((string) $user->first_transaction_at) - strtotime((string) $user->created_at));
+                }
+            }
+
+            $median = self::median($durations);
+
+            return [
+                'days' => $days,
+                'signups' => $signups,
+                'active' => $active,
+                'opened_web' => $opened,
+                'first_tx' => $firstTx,
+                'median_seconds_to_first_tx' => $median,
+                'median_label' => self::formatDuration($median),
+                'by_method' => $byMethod,
+            ];
+        });
+    }
+
+    /**
+     * @param list<float|int> $values
+     */
+    public static function median(array $values): ?float
+    {
+        if ($values === []) {
+            return null;
+        }
+
+        sort($values, SORT_NUMERIC);
+        $n = count($values);
+        $mid = intdiv($n, 2);
+
+        return $n % 2 === 1
+            ? (float) $values[$mid]
+            : ($values[$mid - 1] + $values[$mid]) / 2;
+    }
+
+    public static function formatDuration(?float $seconds): ?string
+    {
+        if ($seconds === null) {
+            return null;
+        }
+
+        if ($seconds < 90) {
+            return (string) max(0, (int) round($seconds)) . 's';
+        }
+
+        if ($seconds < 7200) {
+            return (string) (int) round($seconds / 60) . ' min';
+        }
+
+        if ($seconds < 172800) {
+            return rtrim(rtrim(number_format($seconds / 3600, 1, '.', ''), '0'), '.') . ' h';
+        }
+
+        return rtrim(rtrim(number_format($seconds / 86400, 1, '.', ''), '0'), '.') . ' d';
+    }
+
     public static function flush(): void
     {
         foreach (self::PERIODS as $days) {
             Cache::forget("admin:dash:overview:{$days}");
             Cache::forget("admin:dash:tx_sources:{$days}");
+            Cache::forget("admin:dash:funnel:{$days}");
         }
 
         Cache::forget('admin:dash:channels');

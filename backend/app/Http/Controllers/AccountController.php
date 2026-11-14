@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Account\ExportAccountDataAction;
 use App\Support\TelegramAiQuota;
+use App\Support\UserAnalytics;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -32,6 +33,20 @@ class AccountController extends Controller
         return response()->json([
             'user' => $user->load('identities'),
             'message' => 'Email and password saved successfully!',
+        ]);
+    }
+
+    public function updateOnboarding(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'step' => 'required|string|in:welcome,telegram,completed,dismissed',
+        ]);
+
+        $user = $request->user();
+        UserAnalytics::onboardingStep($user, $data['step']);
+
+        return response()->json([
+            'user' => $user->load('identities'),
         ]);
     }
 

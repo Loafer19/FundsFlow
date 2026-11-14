@@ -18,7 +18,6 @@ use App\Http\Controllers\TransactionAttachmentController;
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
 
-
 Route::prefix('auth')->group(function () {
     // Strict only on credential entry — not on /me/logout (those fire on every refresh).
     Route::middleware('throttle:20,1,auth-login:')->group(function () {
@@ -94,6 +93,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->middleware('throttle:10,1,tg-link-code:');
     Route::put('/account/credentials', [AccountController::class, 'updateCredentials']);
     Route::patch('/account/preferences', [AccountController::class, 'updatePreferences']);
+    Route::patch('/account/onboarding', [AccountController::class, 'updateOnboarding']);
     Route::get('/account/ai-quota', [AccountController::class, 'aiQuota']);
     Route::get('/account/mcp-token', [AccountController::class, 'mcpTokenStatus']);
     Route::post('/account/mcp-token', [AccountController::class, 'createMcpToken'])

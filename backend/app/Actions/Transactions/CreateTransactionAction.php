@@ -7,6 +7,7 @@ use App\Events\TransactionsChanged;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Support\TagIds;
+use App\Support\UserAnalytics;
 use Illuminate\Support\Facades\Gate;
 
 class CreateTransactionAction
@@ -26,6 +27,8 @@ class CreateTransactionAction
         $transaction = $user->transactions()->create($data);
 
         $transaction->tags()->attach($tags);
+
+        UserAnalytics::firstTransaction($user);
 
         // Reload from DB so the response reflects stored amount (not in-memory input).
         $transaction = $transaction->fresh()->load(['tags', 'attachments']);

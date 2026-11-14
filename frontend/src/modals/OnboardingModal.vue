@@ -53,7 +53,7 @@
                         Open Telegram to link
                     </button>
 
-                    <button type="button" class="btn btn-ghost btn-sm" @click="finish">
+                    <button type="button" class="btn btn-ghost btn-sm" @click="finish('dismissed')">
                         Skip
                     </button>
                 </div>
@@ -73,7 +73,7 @@ import ModalHeader from '../components/ModalHeader.vue'
 import { apiErrorMessage } from '../services/formatters'
 import { openTelegramLinkBot } from '../services/identities'
 import { showModal } from '../services/modal'
-import { isOnboardingDone, markOnboardingDone } from '../services/onboarding'
+import { isOnboardingDone, markOnboardingDone, reportOnboarding } from '../services/onboarding.js'
 import { useTagsStore } from '../services/tags'
 import toasts from '../services/toasts'
 
@@ -93,6 +93,7 @@ const previewTags = computed(() =>
 const goToTelegram = (action) => {
     pendingAction.value = action
     step.value = 'telegram'
+    reportOnboarding('telegram')
 }
 
 const runPendingAction = () => {
@@ -105,8 +106,9 @@ const runPendingAction = () => {
     pendingAction.value = null
 }
 
-const finish = () => {
+const finish = (result = 'completed') => {
     markOnboardingDone()
+    reportOnboarding(result)
     onboarding_modal.close()
 }
 
@@ -126,6 +128,7 @@ const linkTelegram = async () => {
 const onDialogClose = () => {
     if (!isOnboardingDone()) {
         markOnboardingDone()
+        reportOnboarding('dismissed')
     }
 
     runPendingAction()

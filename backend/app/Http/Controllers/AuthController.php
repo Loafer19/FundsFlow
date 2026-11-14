@@ -8,6 +8,7 @@ use App\Models\Identity;
 use App\Models\User;
 use App\Support\AppSettings;
 use App\Support\TelegramCode;
+use App\Support\UserAnalytics;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -47,9 +48,14 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|max:255|email:dns,rfc|unique:users',
             'password' => 'required|string|min:8',
+            'source' => 'sometimes|nullable|string|max:255',
         ]);
 
+        $source = $data['source'] ?? null;
+        unset($data['source']);
+
         $user = User::create($data);
+        UserAnalytics::signedUp($user, 'email', is_string($source) ? $source : null);
 
         return response()->json([
             'user' => $user->load('identities'),
@@ -131,14 +137,30 @@ class AuthController extends Controller
         ]);
     }
 
-    public function redirectToProvider(string $provider): RedirectResponse
+    public function redirectToProvider(Request $request, string $provider): RedirectResponse
     {
         abort_unless(in_array($provider, User::AUTH_PROVIDERS, true), 404);
+
+        $source = UserAnalytics::sanitizeSource($request->query('source'));
+
+        if ($source) {
+            cookie()->queue(cookie(
+                'ff_signup_source',
+                $source,
+                20,
+                '/',
+                null,
+                $request->isSecure(),
+                true,
+                false,
+                'lax',
+            ));
+        }
 
         return Socialite::driver($provider)->stateless()->redirect();
     }
 
-    public function handleProviderCallback(string $provider): RedirectResponse|JsonResponse
+    public function handleProviderCallback(Request $request, string $provider): RedirectResponse|JsonResponse
     {
         abort_unless(in_array($provider, User::AUTH_PROVIDERS, true), 404);
 
@@ -180,6 +202,7 @@ class AuthController extends Controller
                         'email' => $email,
                         'password' => str()->random(32),
                     ]);
+                    UserAnalytics::signedUp($user, $provider, $request->cookie('ff_signup_source'));
                 }
 
                 $user->identities()->create([

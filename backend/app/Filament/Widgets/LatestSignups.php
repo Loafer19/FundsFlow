@@ -12,7 +12,7 @@ use Filament\Widgets\TableWidget;
 
 class LatestSignups extends TableWidget
 {
-    protected static ?int $sort = 6;
+    protected static ?int $sort = 7;
 
     public function table(Table $table): Table
     {

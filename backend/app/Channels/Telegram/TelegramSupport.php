@@ -12,6 +12,8 @@ use App\Support\QuickAddParser;
 use App\Support\TelegramAiQuota;
 use App\Support\TransactionAttachmentRules;
 use App\Support\UserFormatter;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -75,7 +77,13 @@ class TelegramSupport
     /** ↩️ Undo on a freshly saved card works this long. */
     public const UNDO_SECONDS = 300;
 
+    /** Minutes a 📎 Attach prompt waits for the file. */
+    public const ATTACH_TTL_MINUTES = 10;
+
     private const TAGS_PER_PAGE = 8;
+
+    /** Inline-button prefixes whose callback data carries a transaction id (cards, prompts). */
+    private const TX_CALLBACK = '/^(?:edit|delask|delyes|delno|retag|editamt|files|attach|attx|undo|open):(\d{1,10})$/';
 
     public function __construct(
         private readonly TelegramClient $client,
@@ -102,6 +110,11 @@ class TelegramSupport
      */
     public function welcomeBlocks(bool $newAccount = false): string
     {
+        if ($newAccount) {
+            return 'Just type what you spent, e.g. <code>250 coffee</code>, or send a receipt photo.'
+                . "\n\nOr tap ➕ Add for the keypad. /website logs you in on the web, /help lists every command.";
+        }
+
         return "<b>➕ Add</b>\n"
             . "Just write or say it: <i>350 groceries yesterday</i>\n"
             . "Send a receipt photo or PDF\n"
@@ -109,9 +122,6 @@ class TelegramSupport
             . "<b>💬 Ask</b>\n"
             . "<i>How much did I spend on food this month?</i>\n"
             . "<i>Set a 5000 limit on cafes</i>\n\n"
-            . ($newAccount
-                ? "<b>🌐 Website</b>\n/website gives a one-time code to log in on the web\n\n"
-                : '')
             . "<b>⚡ AI limit</b>\n"
             . "Text, voice and receipts use your daily AI limit. ➕ Add is free\n\n"
             . 'Menu below, /help for all commands';
@@ -245,9 +255,9 @@ class TelegramSupport
      * Cards use DD.MM.YYYY everywhere in Telegram (widgets, editor, text cards), whatever the web
      * app's date display setting: a year-less "11 Nov" is ambiguous for older entries.
      */
-    public static function cardDate(\Carbon\CarbonInterface|string $date): string
+    public static function cardDate(CarbonInterface|string $date): string
     {
-        return ($date instanceof \Carbon\CarbonInterface ? $date : \Illuminate\Support\Carbon::parse($date))->format('d.m.Y');
+        return ($date instanceof CarbonInterface ? $date : Carbon::parse($date))->format('d.m.Y');
     }
 
     /**
@@ -913,12 +923,6 @@ class TelegramSupport
         return '📎 Files (' . $count . ')';
     }
 
-    /** Minutes a 📎 Attach prompt waits for the file. */
-    public const ATTACH_TTL_MINUTES = 10;
-
-    /** Inline-button prefixes whose callback data carries a transaction id (cards, prompts). */
-    private const TX_CALLBACK = '/^(?:edit|delask|delyes|delno|retag|editamt|files|attach|attx|undo|open):(\d{1,10})$/';
-
     /** "−350.00 · Silpo receipt · 13.11.2026": which transaction an attach prompt is for. */
     public function attachSummary(User $user, Transaction $transaction): string
     {
@@ -960,7 +964,7 @@ class TelegramSupport
         return null;
     }
 
-    /** @return array{id: int, prompt: int}|null */
+    /** @return null|array{id: int, prompt: int} */
     public function pendingAttach(int|string $chatId, int|string $sender): ?array
     {
         $state = Cache::get(self::attachKey($chatId, $sender));
@@ -1027,11 +1031,6 @@ class TelegramSupport
         return "telegram_attach:{$chatId}:{$sender}";
     }
 
-    private static function recentOpenKey(int|string $chatId, int $messageId): string
-    {
-        return "telegram_recent_open:{$chatId}:{$messageId}";
-    }
-
     public function findOwnTransaction(User $user, int $transactionId): ?Transaction
     {
         $transaction = Transaction::with(['tags', 'attachments'])->find($transactionId);
@@ -1057,5 +1056,10 @@ class TelegramSupport
     public function parseAmountReply(string $text, ?User $user = null): ?array
     {
         return $this->quickAdd->parseQuickAdd($text, $user);
+    }
+
+    private static function recentOpenKey(int|string $chatId, int $messageId): string
+    {
+        return "telegram_recent_open:{$chatId}:{$messageId}";
     }
 }

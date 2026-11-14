@@ -9,6 +9,8 @@ use App\Channels\Telegram\Widgets\TelegramWidgetSync;
 use App\Models\User;
 use App\Support\AppSettings;
 use App\Support\TelegramCode;
+use App\Support\UserActivity;
+use App\Support\UserAnalytics;
 
 class AuthHandler
 {
@@ -37,13 +39,13 @@ class AuthHandler
             'first_name' => $message['from']['first_name'] ?? null,
         ];
 
-        if ($payload !== '') {
+        if ($payload !== '' && TelegramCode::normalize($payload) !== null) {
             $this->linkToExistingAccount($chatId, $payload, $meta);
 
             return;
         }
 
-        $this->registerNewAccount($chatId, $meta);
+        $this->registerNewAccount($chatId, $meta, $payload !== '' ? $payload : null);
     }
 
     /**
@@ -57,7 +59,7 @@ class AuthHandler
         if (!$userId) {
             $this->client->sendMessage(
                 $chatId,
-                "This link has expired. Get a new one from FundsFlow → Settings → Accounts, "
+                'This link has expired. Get a new one from FundsFlow → Settings → Accounts, '
                     . 'or send /start with no link to create a new account.',
             );
 
@@ -84,7 +86,7 @@ class AuthHandler
     /**
      * @param array<string, mixed> $meta
      */
-    public function registerNewAccount(int|string $chatId, array $meta): void
+    public function registerNewAccount(int|string $chatId, array $meta, ?string $source = null): void
     {
         $email = "telegram-{$chatId}@fundsflow.invalid";
         $previous = User::where('email', $email)->first();
@@ -128,6 +130,9 @@ class AuthHandler
             'meta' => $meta,
         ]);
 
+        UserAnalytics::signedUp($user, 'telegram', $source);
+        UserActivity::touch($user);
+
         $this->support->sendWelcome($chatId, '👋 Welcome to FundsFlow, your account is ready', newAccount: true);
     }
 
@@ -137,7 +142,7 @@ class AuthHandler
         $display = TelegramCode::format($code);
 
         $frontend = rtrim((string) config('app.frontend_url'), '/');
-        $loginUrl = $frontend.'/?telegram_code='.rawurlencode($code);
+        $loginUrl = $frontend . '/?telegram_code=' . rawurlencode($code);
 
         $this->client->sendMessage(
             $chatId,
@@ -151,7 +156,6 @@ class AuthHandler
             'HTML',
         );
     }
-
 
     public function handleUnlink(int|string $chatId): void
     {

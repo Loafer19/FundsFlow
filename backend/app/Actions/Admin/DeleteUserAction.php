@@ -87,6 +87,7 @@ final class DeleteUserAction
                 'recurring' => DB::table('recurring_transactions')->where('user_id', $userId)->count(),
                 'identities' => DB::table('identities')->where('user_id', $userId)->count(),
                 'tokens' => $user->tokens()->count(),
+                'events' => Schema::hasTable('user_events') ? DB::table('user_events')->where('user_id', $userId)->count() : 0,
             ];
 
             AdminAudit::log('user_deleted', $user, [
@@ -122,6 +123,10 @@ final class DeleteUserAction
             DB::table('tags')->where('user_id', $userId)->update(['parent_id' => null]);
             DB::table('tags')->where('user_id', $userId)->delete();
             DB::table('identities')->where('user_id', $userId)->delete();
+
+            if (Schema::hasTable('user_events')) {
+                DB::table('user_events')->where('user_id', $userId)->delete();
+            }
 
             DB::table('users')->where('id', $userId)->delete();
 

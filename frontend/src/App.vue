@@ -248,7 +248,7 @@ import { useBudgetsStore } from './services/budgets.js'
 import { resetCachedNotice } from './services/cache.js'
 import { parseLocalDate } from './services/formatters.js'
 import { closeSettings, openSettingsTab, showModal } from './services/modal.js'
-import { shouldShowOnboarding } from './services/onboarding.js'
+import { reportOnboarding, shouldShowOnboarding, syncOnboardingFromUser } from './services/onboarding.js'
 import { useRecurringTransactionsStore } from './services/recurringTransactions.js'
 import { lazyImport } from './services/staleChunk.js'
 import { useTagsStore } from './services/tags.js'
@@ -533,10 +533,12 @@ watch(
             resetCachedNotice()
             await bootstrapStores()
 
-            if (shouldShowOnboarding(transactionsStore.transactions.length)) {
+            syncOnboardingFromUser(authStore.user)
+            if (shouldShowOnboarding(transactionsStore.transactions.length, authStore.user)) {
                 // A brand-new account starts on the current version: no "What's new" for it.
                 markWhatsNewSeen()
                 showModal('onboarding_modal')
+                reportOnboarding('welcome')
             } else if (hasUnseenWhatsNew.value) {
                 showModal('whats_new_modal')
             }

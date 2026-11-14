@@ -16,7 +16,7 @@ class TopActiveUsers extends TableWidget
 {
     use HasDashboardPeriod;
 
-    protected static ?int $sort = 7;
+    protected static ?int $sort = 8;
 
     public function table(Table $table): Table
     {

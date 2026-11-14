@@ -13,7 +13,7 @@ class UsersByChannelChart extends ChartWidget
 {
     public ?string $filter = 'channel';
 
-    protected static ?int $sort = 4;
+    protected static ?int $sort = 5;
 
     protected ?string $maxHeight = '260px';
 
