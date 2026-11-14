@@ -77,6 +77,17 @@ the amount is not repeated there — it is already in **Amount**. Tags stay as t
 it. The same segments appear in the Calendar day, in **Largest expenses**, in tag details and in the assistant's
 recent list. Search also finds the type and any of its field values.
 
+## Type analytics
+
+Click the type segment (the tinted *⛽ Fuel* part) in the List, Calendar, or other type columns, or press **Analytics**
+in **Manage Types**, to open a panel for that type in the period you are viewing. **Overview** shows how many
+transactions there were, the total and the average, a comparison with the previous period, the most common values of
+each text, select or yes/no field, and month-by-month totals and averages for number fields (for example liters per
+month and the average price per litre). **Breakdown** splits the spend by a field you pick (Fuel by station, Groceries
+by store) as a pie for the current period and stacked bars for the last six months, with the top values plus *Other*.
+Archived types still open this panel, because their transactions keep the type. A type with no fields, or with no
+transactions in the period, shows an empty state instead of empty charts.
+
 ## With the assistants
 
 The [web assistant](/docs/web/assistant/) and the [Telegram assistant](/docs/telegram/ai-assistant/) know your types.

@@ -12,6 +12,8 @@ export const useTransactionTypesStore = defineStore('transactionTypes', {
     state: () => ({
         types: [],
         isLoading: false,
+        analyticsTypeId: null,
+        analyticsSource: 'segment',
     }),
 
     getters: {
@@ -22,6 +24,21 @@ export const useTransactionTypesStore = defineStore('transactionTypes', {
     actions: {
         persist() {
             persistCache(CACHE, this.types)
+        },
+
+        openAnalytics(id, source = 'segment') {
+            if (id == null) return
+            this.analyticsSource = source === 'manage' ? 'manage' : 'segment'
+            this.analyticsTypeId = Number(id)
+        },
+
+        closeAnalytics() {
+            this.analyticsTypeId = null
+        },
+
+        async analytics(id, params = {}) {
+            const { data } = await api.get(`/transaction-types/${id}/analytics`, { params })
+            return data
         },
 
         replace(type) {

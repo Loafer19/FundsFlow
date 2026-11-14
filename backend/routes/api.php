@@ -62,6 +62,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->middleware('throttle:60,1,tx-types:');
     Route::delete('/transaction-types/{type}', [TransactionTypeController::class, 'destroy'])->whereNumber('type');
     Route::post('/transaction-types/{type}/restore', [TransactionTypeController::class, 'restore'])->whereNumber('type');
+    Route::get('/transaction-types/{type}/analytics', [TransactionTypeController::class, 'analytics'])->whereNumber('type');
     Route::post('/transactions/bulk', [TransactionController::class, 'storeBulk'])
         ->middleware('throttle:30,1,tx-bulk:');
     Route::put('/transactions/bulk', [TransactionController::class, 'updateBulk'])

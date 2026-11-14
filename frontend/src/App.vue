@@ -5,6 +5,7 @@
     <TagsAddModal />
     <TagsEditModal />
     <TypesModal />
+    <TypeAnalyticsModal />
     <TransactionsAddModal />
     <TransactionsEditModal />
     <AttachmentPreviewModal />
@@ -250,6 +251,7 @@ import TagsEditModal from './modals/TagsEditModal.vue'
 import TagsModal from './modals/TagsModal.vue'
 import TransactionsAddModal from './modals/TransactionsAddModal.vue'
 import TransactionsEditModal from './modals/TransactionsEditModal.vue'
+import TypeAnalyticsModal from './modals/TypeAnalyticsModal.vue'
 import TypesModal from './modals/TypesModal.vue'
 import { useAgentStore } from './services/agent.js'
 import { useAuthStore } from './services/auth.js'

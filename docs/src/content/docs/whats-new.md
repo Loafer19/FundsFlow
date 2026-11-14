@@ -18,6 +18,9 @@ In the next release.
   the amount, and you can still type your own. Pick the type in **Add Transaction**; the List shows its key values.
   Manage types in **Settings → Data & reports → Manage Types**. New accounts start with ⛽ Fuel, 🛒 Groceries,
   🔄 Subscription and 🍽 Restaurant. [Learn more](/docs/web/types/)
+- **Type analytics.** Click a type segment in the List or Calendar, or **Analytics** in Manage Types, to see counts,
+  totals, the average, a month-over-month comparison, top field values and numeric trends, plus a breakdown of spend
+  by a field (top values and *Other*) as a pie and six-month stacked bars. [Learn more](/docs/web/types/#type-analytics)
 - **Types in bank imports.** The import preview suggests a type for known merchants (OKKO → Fuel, Silpo →
   Groceries, Netflix → Subscription) and lets you set one per row or for the whole file.
   [Learn more](/docs/web/import/#preview-page)

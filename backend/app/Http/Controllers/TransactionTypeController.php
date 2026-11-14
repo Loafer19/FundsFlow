@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\TransactionTypes\BuildTypeAnalyticsAction;
 use App\Actions\TransactionTypes\SaveTransactionTypeAction;
 use App\Events\TransactionsChanged;
 use App\Http\Resources\TransactionTypeResource;
@@ -12,7 +13,10 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class TransactionTypeController extends Controller
 {
-    public function __construct(private readonly SaveTransactionTypeAction $save) {}
+    public function __construct(
+        private readonly SaveTransactionTypeAction $save,
+        private readonly BuildTypeAnalyticsAction $buildAnalytics,
+    ) {}
 
     /** Active and archived types (archived ones still label their old transactions). */
     public function index(Request $request): AnonymousResourceCollection
@@ -54,6 +58,17 @@ class TransactionTypeController extends Controller
         $model->restore();
 
         return new TransactionTypeResource($model->loadCount('transactions'));
+    }
+
+    /**
+     * Period totals, top field values, numeric trends and a breakdown for one type.
+     * Archived types are included: their transactions still carry the type.
+     */
+    public function analytics(Request $request, int $type): JsonResponse
+    {
+        $model = $request->user()->transactionTypes()->withTrashed()->findOrFail($type);
+
+        return response()->json($this->buildAnalytics->execute($request->user(), $model, $request->all()));
     }
 
     private function own(Request $request, int $id): TransactionType

@@ -10,7 +10,7 @@
                 :key="seg.key"
                 type="button"
                 class="type-seg truncate px-1.5 font-medium transition-colors duration-200"
-                :class="[segClass(seg), i > 0 && 'border-l', sizeClass, segMaxClass(seg)]"
+                :class="[segClass(seg), i > 0 && 'border-l', sizeClass, segMaxClass(seg), seg.kind === 'type' && 'cursor-pointer']"
                 :style="segStyle(seg)"
                 :data-seg="seg.key"
                 :tabindex="0"
@@ -19,6 +19,7 @@
                 @mouseleave="tipOff"
                 @focus="tipOn(seg, $event)"
                 @blur="tipOff"
+                @click.stop="onSegClick(seg, $event)"
             >
                 <template v-if="seg.kind === 'type'">
                     <span v-if="type.emoji" class="mr-0.5" aria-hidden="true">{{ type.emoji }}</span>{{ type.name }}
@@ -91,7 +92,13 @@ const values = computed(() => {
 const segments = computed(() => {
     if (!type.value) return []
     return [
-        { key: 'type', kind: 'type', text: type.value.name, label: type.value.name, tip: type.value.name },
+        {
+            key: 'type',
+            kind: 'type',
+            text: type.value.name,
+            label: type.value.name,
+            tip: `View ${type.value.name} analytics`,
+        },
         ...values.value.map((row) => ({
             key: row.key,
             kind: 'value',
@@ -207,6 +214,12 @@ const tipOff = () => {
         current.value = null
         anchor = null
     }, 200)
+}
+
+const onSegClick = (seg) => {
+    if (seg.kind !== 'type' || !type.value) return
+    tipOff()
+    typesStore.openAnalytics(type.value.id)
 }
 
 const onReposition = () => {

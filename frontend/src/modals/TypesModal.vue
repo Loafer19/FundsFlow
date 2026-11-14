@@ -4,6 +4,10 @@
             <ModalHeader title-id="types_modal_title" :icon="Shapes">
                 Manage Types
                 <template #actions>
+                    <button v-if="draft.id" type="button" class="btn btn-ghost btn-sm" @click="openAnalytics(draft.id)">
+                        <ChartPie :size="18" />
+                        Analytics
+                    </button>
                     <button type="button" class="btn btn-primary btn-sm" @click="startNew">
                         <Plus :size="20" />
                         New type
@@ -23,8 +27,8 @@
                         restaurant.
                     </p>
                     <ul class="flex flex-col gap-0.5">
-                        <li v-for="type in typesStore.active" :key="type.id">
-                            <button type="button" class="w-full flex items-center gap-2 rounded-field px-2 py-2 text-left hover:bg-base-200"
+                        <li v-for="type in typesStore.active" :key="type.id" class="flex items-center gap-0.5">
+                            <button type="button" class="min-w-0 flex-1 flex items-center gap-2 rounded-field px-2 py-2 text-left hover:bg-base-200"
                                 :class="{ 'bg-primary/15': draft.id === type.id }" :aria-current="draft.id === type.id"
                                 @click="select(type)">
                                 <span class="text-xl w-7 text-center shrink-0">{{ type.emoji || '🏷️' }}</span>
@@ -34,6 +38,10 @@
                                 </span>
                                 <Check v-if="draft.id === type.id" :size="16" class="shrink-0" />
                             </button>
+                            <button type="button" class="btn btn-ghost btn-xs btn-square shrink-0"
+                                :aria-label="`Analytics for ${type.name}`" @click="openAnalytics(type.id)">
+                                <ChartPie :size="14" />
+                            </button>
                         </li>
                     </ul>
                     <details v-if="archived.length" class="mt-2 px-2">
@@ -42,6 +50,10 @@
                             <li v-for="type in archived" :key="type.id" class="flex items-center gap-2 text-sm">
                                 <span class="w-6 text-center">{{ type.emoji }}</span>
                                 <span class="flex-1 truncate text-base-content/70">{{ type.name }}</span>
+                                <button type="button" class="btn btn-ghost btn-xs btn-square"
+                                    :aria-label="`Analytics for ${type.name}`" @click="openAnalytics(type.id)">
+                                    <ChartPie :size="14" />
+                                </button>
                                 <button type="button" class="btn btn-ghost btn-xs" :disabled="Boolean(typesStore.isLoading)"
                                     @click="typesStore.restore(type.id)">Restore</button>
                             </li>
@@ -242,7 +254,7 @@
 </template>
 
 <script setup>
-import { Archive, Check, ChevronDown, ChevronUp, Plus, Save, Send, Shapes, Trash2, Undo2 } from '@lucide/vue'
+import { Archive, ChartPie, Check, ChevronDown, ChevronUp, Plus, Save, Send, Shapes, Trash2, Undo2 } from '@lucide/vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import LazyEmojiPicker from '../components/LazyEmojiPicker.js'
 import ModalHeader from '../components/ModalHeader.vue'
@@ -285,6 +297,8 @@ const blank = () => ({ id: null, name: '', emoji: '🏷️', color: COLORS[0], f
 const draft = ref(blank())
 
 const archived = computed(() => typesStore.types.filter((type) => type.archived_at))
+
+const openAnalytics = (id) => typesStore.openAnalytics(id, 'manage')
 
 const countsLine = (type) => {
     const fields = (type.fields ?? []).filter((field) => !field.hidden).length
