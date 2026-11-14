@@ -42,7 +42,7 @@
                                 @click="tag.parent_id = ''; close()">
                                 No parent
                             </button>
-                            <TagPicker v-model="parentIds" single />
+                            <TagPicker v-model="parentIds" single @update:model-value="close" />
                         </template>
                     </PopoverMenu>
                 </div>

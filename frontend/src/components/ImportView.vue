@@ -365,8 +365,13 @@
             </div>
         </template>
 
-        <Teleport to="body">
-            <div v-if="tagMenu" class="fixed inset-0 z-50" @mousedown.self="closeTagMenu">
+        <!--
+          A <dialog showModal()> is in the top layer, so a menu teleported to body
+          sits behind it (z-index cannot win). Send the panel into the open dialog
+          when there is one, the same way PopoverMenu and Toasts do.
+        -->
+        <Teleport :to="menuHost">
+            <div v-if="tagMenu" class="fixed inset-0 z-[1100] pointer-events-auto" @mousedown.self="closeTagMenu">
                 <div class="fixed bg-base-100 rounded-box w-64 p-3 border border-base-300 shadow-lg"
                     role="dialog" aria-label="Choose tags"
                     :style="{ top: tagMenu.top + 'px', left: tagMenu.left + 'px' }"
@@ -441,6 +446,14 @@ const ruleBefore = ref('')
 const ruleSkipName = ref('')
 const fileInput = ref(null)
 const tagMenu = ref(null)
+const menuHost = ref('body')
+let hostObserver = null
+
+const resolveMenuHost = () => [...document.querySelectorAll('dialog.modal[open]')].at(-1) || 'body'
+
+const syncMenuHost = () => {
+    menuHost.value = tagMenu.value ? resolveMenuHost() : 'body'
+}
 const savedMenuKey = ref('')
 let pollTimer = null
 let saveSeq = 0
@@ -760,6 +773,8 @@ const closeTagMenu = () => {
     tagMenu.value = null
 }
 
+watch(tagMenu, syncMenuHost)
+
 const applyMenuTags = async (menu, ids) => {
     const key = menuKey({ ...menu, ids })
     if (key === savedMenuKey.value) return
@@ -907,8 +922,17 @@ watch(() => props.uuid, () => {
 onMounted(() => {
     if (props.uuid) reload()
     else loadHistory()
+    hostObserver = new MutationObserver(syncMenuHost)
+    hostObserver.observe(document.body, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['open'],
+        childList: true,
+    })
 })
 onUnmounted(() => {
+    hostObserver?.disconnect()
+    hostObserver = null
     stopPoll()
     closeTagMenu()
 })

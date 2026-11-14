@@ -1,8 +1,13 @@
 <template>
     <div ref="root" :class="rootClass">
         <slot name="trigger" :open="open" :toggle="toggle" :close="close" />
-        <Teleport to="body">
-            <div v-if="open" class="fixed inset-0 z-[1100]" @mousedown.self="close">
+        <!--
+          A <dialog showModal()> lives in the top layer, so a menu teleported to
+          body sits behind the modal (z-index cannot win). Send the panel into
+          the open dialog, outside modal-box, the same way Toasts.vue does.
+        -->
+        <Teleport :to="host">
+            <div v-if="open" class="fixed inset-0 z-[1100] pointer-events-auto" @mousedown.self="close">
                 <div ref="panel" class="fixed bg-base-100 rounded-box border border-base-300 shadow-lg p-3"
                     :class="panelClass" role="dialog" :aria-label="label" :style="style" @keydown.escape.stop="close">
                     <slot :close="close" />
@@ -26,6 +31,25 @@ const open = defineModel({ type: Boolean, default: false })
 const root = ref(null)
 const panel = ref(null)
 const style = ref({})
+const host = ref('body')
+let hostDialog = null
+
+const resolveHost = () => root.value?.closest('dialog[open]') || 'body'
+
+const unbindHost = () => {
+    hostDialog?.removeEventListener('close', close)
+    hostDialog = null
+}
+
+const bindHost = () => {
+    unbindHost()
+    const target = resolveHost()
+    host.value = target
+    if (target !== 'body') {
+        hostDialog = target
+        hostDialog.addEventListener('close', close)
+    }
+}
 
 const place = () => {
     const rect = root.value?.getBoundingClientRect()
@@ -57,6 +81,11 @@ const onKey = (event) => {
     }
 }
 
+watch(open, (isOpen) => {
+    if (isOpen) bindHost()
+    else unbindHost()
+}, { flush: 'sync' })
+
 watch(open, async (isOpen) => {
     if (!isOpen) return
     await nextTick()
@@ -78,6 +107,7 @@ if (typeof window !== 'undefined') {
 }
 
 onBeforeUnmount(() => {
+    unbindHost()
     window.removeEventListener('keydown', onKey, true)
     window.removeEventListener('resize', place)
 })
