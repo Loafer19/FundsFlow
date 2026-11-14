@@ -479,12 +479,13 @@ const ACTION_LABELS = {
     archive_transaction_type: 'Archive type',
 }
 
-// Type cards: the chip tint of TypeChip, and short marks for what an edit changes.
+// Type cards: the type color, and short marks for what an edit changes.
 const typeCardStyle = (color) =>
     color
         ? { backgroundColor: `${color}26`, borderColor: `${color}73`, color: 'var(--color-base-content)' }
         : { borderColor: 'color-mix(in oklab, var(--color-base-content) 25%, transparent)' }
-const fieldMark = (mark) => ({ new: 'new', renamed: 'renamed', restored: 'shown again', options: 'options' })[mark] ?? mark
+const fieldMark = (mark) =>
+    ({ new: 'new', renamed: 'renamed', restored: 'shown again', options: 'options' })[mark] ?? mark
 
 const actionLabel = (action) => ACTION_LABELS[action] ?? 'Confirm change'
 
@@ -493,13 +494,24 @@ const cardRows = (card) => {
     const before = card.before ?? {}
     const tags = (list) => (list?.length ? list.join(' · ') : 'No tags')
     const rows = [{ key: 'date', icon: '📅 ', value: card.date, before: before.date }]
-    if (card.note || before.note !== undefined) rows.push({ key: 'note', icon: '📝 ', value: card.note || '—', before: before.note })
+    if (card.note || before.note !== undefined)
+        rows.push({ key: 'note', icon: '📝 ', value: card.note || '—', before: before.note })
     // "⛽ Fuel · Litres 40 l · Price per liter 58,90 ₴": the type and its field values (already has its emoji).
     if (card.type_line) rows.push({ key: 'type', icon: '', value: card.type_line })
-    if (card.files > 0) rows.push({ key: 'files', icon: '📎 ', value: card.files_label || `${card.files} photo${card.files === 1 ? '' : 's'}` })
+    if (card.files > 0)
+        rows.push({
+            key: 'files',
+            icon: '📎 ',
+            value: card.files_label || `${card.files} photo${card.files === 1 ? '' : 's'}`,
+        })
     // No 🏷 in front of a tag that has its own emoji ("💼 Salary · 🅱️ PUMB"), as in Telegram.
     const tagIcon = /^\p{Extended_Pictographic}/u.test(card.tags?.[0] ?? '') ? '' : '🏷 '
-    rows.push({ key: 'tags', icon: tagIcon, value: tags(card.tags), before: before.tags === undefined ? undefined : tags(before.tags) })
+    rows.push({
+        key: 'tags',
+        icon: tagIcon,
+        value: tags(card.tags),
+        before: before.tags === undefined ? undefined : tags(before.tags),
+    })
     return rows
 }
 
@@ -781,9 +793,7 @@ const addFiles = async (list) => {
         } catch {
             const heic = /hei[cf]$/i.test(file.type) || /\.hei[cf]$/i.test(name)
             toasts.error(
-                heic
-                    ? `${name} is too large to send as HEIC. Send it as JPEG or PNG.`
-                    : `Couldn't read ${name}`,
+                heic ? `${name} is too large to send as HEIC. Send it as JPEG or PNG.` : `Couldn't read ${name}`,
             )
         } finally {
             preparing.value--

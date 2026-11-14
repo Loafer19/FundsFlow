@@ -11,8 +11,8 @@
                             <p class="truncate">{{ tx.note || tagText(tx.tags) || '—' }}</p>
                             <p class="text-xs text-base-content/60 flex items-center gap-1.5 min-w-0">
                                 <span class="shrink-0">{{ tx.at ? formatDate(tx.at) : '' }}</span>
-                                <TypeChip v-if="typedTx(tx)" :transaction="typedTx(tx)" size="xs"
-                                    :preset-values="chipValues(tx)" />
+                                <TypeSegments v-if="typedTx(tx)" :transaction="typedTx(tx)" size="xs"
+                                    :rows="segmentRows(tx)" />
                                 <span v-if="tx.note && tx.tags?.length" class="truncate">{{ tagText(tx.tags) }}</span>
                             </p>
                         </div>
@@ -278,7 +278,8 @@ import { useTagsStore } from '../services/tags.js'
 import { hasTelegramLinked } from '../services/telegramSend.js'
 import { isTelegramWebApp } from '../services/telegramWebApp.js'
 import { useTransactionTypesStore } from '../services/transactionTypes.js'
-import TypeChip from './TypeChip.vue'
+import { fillField } from '../services/typeFields.js'
+import TypeSegments from './TypeSegments.vue'
 
 const props = defineProps({
     item: {
@@ -307,10 +308,14 @@ const typedTx = (tx) => {
     const type = typesStore.types.find((t) => t.name === tx.type)
     return type ? { transaction_type_id: type.id, data: null } : null
 }
-const chipValues = (tx) => {
-    const values = Object.values(tx.fields ?? {}).map(String).filter((v) => v.length <= 18)
-    const two = values.slice(0, 2).join(' · ')
-    return values.length > 1 && two.length <= 18 ? two : (values[0] ?? '')
+const segmentRows = (tx) => {
+    const type = typesStore.types.find((item) => item.name === tx.type)
+    if (!type) return []
+    const fill = fillField(type)?.key
+    const labels = Object.fromEntries((type.fields ?? []).map((field) => [field.key, field.label]))
+    return Object.entries(tx.fields ?? {})
+        .filter(([key, value]) => key !== fill && value != null && String(value) !== '')
+        .map(([key, value]) => ({ key, label: labels[key] ?? key, value: String(value) }))
 }
 const tagText = (list) => (list ?? []).map((tag) => `${tag.emoji ?? ''} ${tag.title ?? ''}`.trim()).join(', ')
 const upcoming = computed(() => data.value.items ?? [])

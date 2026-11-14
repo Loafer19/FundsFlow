@@ -69,10 +69,13 @@ for example *From Fuel total · 40 l × 58,90 ₴*.
 You can still type a different amount (a discount at the station, say). The hint then shows the computed total with
 ↺ to go back to it; changing a field also brings the computed amount back.
 
-In the [List](/docs/web/tabs/#list), a transaction with a type shows it as the first chip in **Tags**, tinted with
-the type color: *⛽ Fuel · 40 l · 58,90 ₴* (the first one or two values). The note stays as you wrote it; hover the
-chip to see all fields. The same chip appears in **Largest expenses**, tag details, the Calendar day (name only) and
-the assistant's recent list. Search also finds the type and any of its field values.
+In the [List](/docs/web/tabs/#list), a transaction with a type has a color stripe on the row and a **Type** column
+that splits the type and its fields into segments: *⛽ Fuel | 40 l | 58,90 ₴ | +1*. The type segment is tinted with
+the type color; the values stay neutral. Hover a segment to see the field name (for example *Service: Netflix* or
+*Period: Monthly*); if there are more fields than fit, a *+N* segment lists the rest. A computed total that fills
+the amount is not repeated there — it is already in **Amount**. Tags stay as tags, and the note stays as you wrote
+it. The same segments appear in the Calendar day, in **Largest expenses**, in tag details and in the assistant's
+recent list. Search also finds the type and any of its field values.
 
 ## With the assistants
 

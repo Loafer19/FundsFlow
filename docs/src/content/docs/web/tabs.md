@@ -70,8 +70,9 @@ A line chart of your running balance over the selected period, with cards for **
 
 A table of all transactions in the period:
 
-- **Search notes** to filter by note text.
+- **Search notes** to filter by note text, type name or field values.
 - Sort by **Date** or **Amount** (click the column header).
-- Each row shows the source icon, date, amount, tags, note, and attachments.
+- Each row shows the source icon, date, amount, type (when the transaction has one), tags, note and attachments. A
+  type appears as a color stripe plus a **Type** column of field segments — see [Transaction types](/docs/web/types/).
 - Click a tag to open its details, the same view as on the Tags tab.
 - Edit or hold-to-delete each row.

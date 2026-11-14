@@ -95,7 +95,7 @@
                                 <span class="truncate">{{ t.note || t.tagLabel || '-' }}</span>
                                 <span class="text-xs text-base-content/60 flex items-center gap-1.5 min-w-0">
                                     <span class="shrink-0">{{ formatDate(t.at) }}</span>
-                                    <TypeChip :transaction="t.transaction" size="xs" />
+                                    <TypeSegments :transaction="t.transaction" size="xs" />
                                     <span v-if="t.note && t.tagLabel" class="truncate">{{ t.tagLabel }}</span>
                                 </span>
                             </span>
@@ -123,7 +123,7 @@ import { useTagsStore } from '../services/tags.js'
 import { useTransactionsStore } from '../services/transactions.js'
 import BarChart from './charts/BarChart.vue'
 import StatCard from './StatCard.vue'
-import TypeChip from './TypeChip.vue'
+import TypeSegments from './TypeSegments.vue'
 
 const props = defineProps({
     dateRange: {

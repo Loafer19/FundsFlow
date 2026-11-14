@@ -33,7 +33,7 @@
         <EmptyState v-if="!filteredTransactions.length" :icon="Search" title="No transactions match the current filters"
             :description="listDay ? 'Try a different search term, clear the tag filter or show the whole period' : 'Try a different search term or clear the tag filter (including Untagged)'" />
 
-        <div v-else class="card card-border border-base-300 bg-base-100 overflow-hidden">
+        <div v-else class="card card-border border-base-300 bg-base-100 overflow-hidden" data-type-row-list>
             <div class="overflow-x-auto">
                 <table class="table">
                     <thead>
@@ -57,6 +57,7 @@
                                     {{ sortConfig.direction === 'asc' ? '↑' : '↓' }}
                                 </span>
                             </th>
+                            <th class="whitespace-nowrap max-sm:max-w-28">Type</th>
                             <th>Tags</th>
                             <th>Note</th>
                             <th class="w-0">
@@ -67,76 +68,81 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="transaction in filteredTransactions" :key="transaction.id">
-                            <td>
-                                <span class="tooltip tooltip-right" :data-tip="sourceLabel(transaction.source)"
-                                    :aria-label="sourceLabel(transaction.source)">
-                                    <component :is="sourceIcon(transaction.source)" :size="18" aria-hidden="true" />
-                                </span>
-                            </td>
-                            <td class="min-w-18">{{ formatDate(transaction.at) }}</td>
-                            <td>
-                                <div class="badge badge-outline font-semibold"
-                                    :class="[transaction.amount > 0 ? 'badge-success' : 'badge-error']">
-                                    {{ transaction.amount > 0 ? '+' : '' }}{{ formatMoney(transaction.amount) }}
-                                </div>
-                            </td>
-                            <td>
-                                <div class="flex flex-wrap gap-2">
-                                    <TypeChip :transaction="transaction" />
-                                    <template v-for="tag in transaction.tags" :key="tag.id">
-                                        <div v-if="inReport" class="badge badge-soft badge-info px-1 gap-1">
-                                            <span>{{ tag.emoji }}</span><span>{{ tag.title }}</span>
-                                        </div>
-                                        <button v-else type="button"
-                                            class="badge badge-soft badge-info px-1 gap-1 cursor-pointer transition-colors hover:bg-info/25 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-info"
-                                            :aria-label="`Open ${tag.title} details`"
-                                            @click.stop="openTagDetail(tag, transaction)">
-                                            <span>{{ tag.emoji }}</span><span>{{ tag.title }}</span>
-                                        </button>
-                                    </template>
-                                </div>
-                            </td>
-                            <td class="max-w-xs" :title="rowTitle(transaction)">
-                                <span class="line-clamp-2 whitespace-normal break-words">{{ transaction.note || '-' }}</span>
-                            </td>
-                            <td>
-                                <button v-if="transaction.attachments?.length" type="button"
-                                    class="btn btn-ghost btn-xs gap-0.5 px-1 items-center"
-                                    :aria-label="'Preview ' + transaction.attachments.length + ' attachments'"
-                                    @click="previewAttachments(transaction)">
-                                    <template v-for="file in transaction.attachments.slice(0, 2)" :key="file.id">
-                                        <FileText v-if="file.mime === 'application/pdf'" :size="14"
-                                            aria-hidden="true" />
-                                        <ImageIcon v-else :size="14" aria-hidden="true" />
-                                    </template>
-                                    <span v-if="transaction.attachments.length > 2"
-                                        class="inline-flex items-center text-[10px] leading-none translate-y-px opacity-70">
-                                        +{{ transaction.attachments.length - 2 }}
-                                    </span>
-
-                                </button>
-
-                            </td>
-
-
-
-                            <td class="table-actions-col flex gap-1">
-                                <button v-if="transactionsStore.isLoading == transaction.id"
-                                    class="btn btn-outline btn-error btn-square btn-sm" disabled>
-                                    <span class="loading loading-spinner text-error"></span>
-                                </button>
-                                <button v-else type="button" class="btn btn-outline btn-secondary btn-square btn-sm"
-                                    aria-label="Edit" @click="editTransaction(transaction)"
-                                    :disabled="transactionsStore.isLoading">
-                                    <Pencil :size="20" />
-                                </button>
-
-                                <DeleteHold :id="transaction.id" :disabled="transactionsStore.isLoading"
-                                    :isLoading="transactionsStore.isLoading == transaction.id"
-                                    @delete="(id) => transactionsStore.delete(id)" />
-                            </td>
-                        </tr>
+                        <tr v-for="transaction in filteredTransactions" :key="transaction.id"
+                            :data-tx-id="transaction.id" class="type-list-row transition-colors duration-200">
+                                <td class="relative">
+                                    <span v-if="typeColor(transaction)"
+                                        class="absolute inset-y-0 left-0 w-1 rounded-r-full"
+                                        :style="{ backgroundColor: typeColor(transaction) }"
+                                        aria-hidden="true" />
+                                    <div class="flex items-center gap-1.5" :class="typeColor(transaction) && 'pl-2'">
+                                        <span class="tooltip tooltip-right" :data-tip="sourceLabel(transaction.source)"
+                                            :aria-label="sourceLabel(transaction.source)">
+                                            <component :is="sourceIcon(transaction.source)"
+                                                :size="18"
+                                                aria-hidden="true" />
+                                        </span>
+                                    </div>
+                                </td>
+                                <td class="min-w-18">{{ formatDate(transaction.at) }}</td>
+                                <td>
+                                    <div class="badge badge-outline font-semibold"
+                                        :class="[transaction.amount > 0 ? 'badge-success' : 'badge-error']">
+                                        {{ transaction.amount > 0 ? '+' : '' }}{{ formatMoney(transaction.amount) }}
+                                    </div>
+                                </td>
+                                <td class="whitespace-nowrap max-sm:max-w-28">
+                                    <TypeSegments :transaction="transaction" />
+                                </td>
+                                <td>
+                                    <div class="flex flex-wrap gap-2">
+                                        <template v-for="tag in transaction.tags" :key="tag.id">
+                                            <div v-if="inReport" class="badge badge-soft badge-info px-1 gap-1">
+                                                <span>{{ tag.emoji }}</span><span>{{ tag.title }}</span>
+                                            </div>
+                                            <button v-else type="button"
+                                                class="badge badge-soft badge-info px-1 gap-1 cursor-pointer transition-colors hover:bg-info/25 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-info"
+                                                :aria-label="`Open ${tag.title} details`"
+                                                @click.stop="openTagDetail(tag, transaction)">
+                                                <span>{{ tag.emoji }}</span><span>{{ tag.title }}</span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </td>
+                                <td class="max-w-xs">
+                                    <span class="line-clamp-2 whitespace-normal break-words">{{ transaction.note || '-' }}</span>
+                                </td>
+                                <td>
+                                    <button v-if="transaction.attachments?.length" type="button"
+                                        class="btn btn-ghost btn-xs gap-0.5 px-1 items-center"
+                                        :aria-label="'Preview ' + transaction.attachments.length + ' attachments'"
+                                        @click="previewAttachments(transaction)">
+                                        <template v-for="file in transaction.attachments.slice(0, 2)" :key="file.id">
+                                            <FileText v-if="file.mime === 'application/pdf'" :size="14"
+                                                aria-hidden="true" />
+                                            <ImageIcon v-else :size="14" aria-hidden="true" />
+                                        </template>
+                                        <span v-if="transaction.attachments.length > 2"
+                                            class="inline-flex items-center text-[10px] leading-none translate-y-px opacity-70">
+                                            +{{ transaction.attachments.length - 2 }}
+                                        </span>
+                                    </button>
+                                </td>
+                                <td class="table-actions-col flex gap-1">
+                                    <button v-if="transactionsStore.isLoading == transaction.id"
+                                        class="btn btn-outline btn-error btn-square btn-sm" disabled>
+                                        <span class="loading loading-spinner text-error"></span>
+                                    </button>
+                                    <button v-else type="button" class="btn btn-outline btn-secondary btn-square btn-sm"
+                                        aria-label="Edit" @click="editTransaction(transaction)"
+                                        :disabled="transactionsStore.isLoading">
+                                        <Pencil :size="20" />
+                                    </button>
+                                    <DeleteHold :id="transaction.id" :disabled="transactionsStore.isLoading"
+                                        :isLoading="transactionsStore.isLoading == transaction.id"
+                                        @delete="(id) => transactionsStore.delete(id)" />
+                                </td>
+                            </tr>
                     </tbody>
                 </table>
             </div>
@@ -219,13 +225,28 @@
 </template>
 
 <script setup>
-import { Bot, CalendarDays, FileText, FileUp, Image as ImageIcon, Landmark, Laptop, List, Paperclip, Pencil, Repeat, Search, Send, X } from '@lucide/vue'
+import {
+    Bot,
+    CalendarDays,
+    FileText,
+    FileUp,
+    Image as ImageIcon,
+    Landmark,
+    Laptop,
+    List,
+    Paperclip,
+    Pencil,
+    Repeat,
+    Search,
+    Send,
+    X,
+} from '@lucide/vue'
 
 import { computed, inject, ref } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
 import TagDetailModal from '../components/TagDetailModal.vue'
-import TypeChip from '../components/TypeChip.vue'
+import TypeSegments from '../components/TypeSegments.vue'
 import { today } from '../services/clock.js'
 import { getTransactionSourceLabel, parseLocalDate, toLocalDateStr } from '../services/formatters'
 import { goToImport } from '../services/imports.js'
@@ -243,18 +264,14 @@ const sourceIcon = (source) => sourceIcons[source] ?? sourceIcons.web
 const transactionsStore = useTransactionsStore()
 const typesStore = useTransactionTypesStore()
 
-// The type is the first chip in the Tags cell (TypeChip); the note cell's title still lists every field.
 // Search matches the type name and every field value, not only what the chip shows.
 const typeSearchText = (transaction) => {
     const type = typesStore.byId(transaction.transaction_type_id)
     if (!type) return ''
     return [type.name, ...typeRows(type, transaction.data).map((row) => row.value)].join(' ').toLowerCase()
 }
-const rowTitle = (transaction) => {
-    const type = typesStore.byId(transaction.transaction_type_id)
-    const rows = type ? typeRows(type, transaction.data).map((row) => `${row.label}: ${row.value}`) : []
-    return [...rows, transaction.note].filter(Boolean).join('\n') || undefined
-}
+
+const typeColor = (transaction) => typesStore.byId(transaction?.transaction_type_id)?.color
 
 const props = defineProps({
     dateRange: {
@@ -391,5 +408,4 @@ const editTransaction = (transaction) => {
 const previewAttachments = (transaction) => {
     transactionsStore.openAttachmentPreview(transaction)
 }
-
 </script>

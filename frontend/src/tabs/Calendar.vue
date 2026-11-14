@@ -9,7 +9,7 @@
                 :previous="item.previous" :note="item.note" :lower-is-better="item.lowerIsBetter" />
         </div>
 
-        <div class="grid grid-cols-1 gap-3 items-start" :class="{ 'lg:grid-cols-[1fr_300px]': dateSelectionType !== 'year' }">
+        <div class="grid grid-cols-1 gap-3 items-start" data-cal-layout :class="{ 'lg:grid-cols-[1fr_300px]': dateSelectionType !== 'year' }">
             <div class="card card-border border-base-300 bg-base-100">
                 <div class="card-body p-3 sm:p-6">
                     <CalendarYearMonths v-if="dateSelectionType === 'year'" :months="yearMonths"
@@ -67,13 +67,16 @@
                         description="No transactions or upcoming payments on this date" action-label="Add Transaction"
                         @action="addForSelectedDate" />
 
-                    <div v-else class="grid grid-cols-2 gap-2">
+                    <div v-else class="grid grid-cols-2 gap-2" data-cal-day-list>
                         <div v-for="item in selectedItems" :key="item.key" role="button" tabindex="0"
-                            class="card card-border border-base-300 bg-base-100 p-2 justify-between text-center cursor-pointer hover:border-primary hover:bg-base-200"
+                            class="card card-border border-base-300 bg-base-100 p-2 justify-between text-center cursor-pointer hover:border-primary hover:bg-base-200 relative overflow-hidden transition-colors duration-200"
                             :aria-label="itemAriaLabel(item)" @click="openItem(item)"
                             @keydown.enter.prevent="openItem(item)" @keydown.space.prevent="openItem(item)">
+                            <span v-if="itemTypeColor(item)"
+                                class="absolute inset-y-0 left-0 w-1 rounded-r-full"
+                                :style="{ backgroundColor: itemTypeColor(item) }" aria-hidden="true" />
                             <div class="flex flex-wrap justify-center items-center gap-1 mb-1">
-                                <TypeChip v-if="item.transaction" :transaction="item.transaction" size="sm" compact />
+                                <TypeSegments v-if="item.transaction" :transaction="item.transaction" size="sm" />
                                 <span v-for="tag in item.tags" :key="tag.id" class="text-lg tooltip"
                                     :data-tip="tag.title">{{ tag.emoji }}</span>
                             </div>
@@ -93,7 +96,9 @@
                                         +{{ item.attachments.length - 2 }}
                                     </span>
                                 </button>
-                                <div v-if="item.note" class="text-xs text-base-content/60 truncate">{{ item.note }}</div>
+                                <div class="min-w-0 text-left">
+                                    <div v-if="item.note" class="text-xs text-base-content/60 truncate">{{ item.note }}</div>
+                                </div>
                             </div>
                             <div class="badge w-full justify-center" :class="badgeClass(item)">
                                 {{ item.amount > 0 ? '+' : '' }}{{ formatMoney(item.amount) }}
@@ -128,7 +133,7 @@
                             <div class="flex-1 min-w-0 flex items-center gap-1 text-sm">
                                 <span class="shrink-0 text-base-content/60">{{ formatDate(item.date) }}</span>
                                 <span class="text-base-content/50">·</span>
-                                <TypeChip v-if="item.transaction" :transaction="item.transaction" size="xs"
+                                <TypeSegments v-if="item.transaction" :transaction="item.transaction" size="xs"
                                     class="shrink min-w-0" />
                                 <span v-for="tag in item.tags" :key="tag.id" class="tooltip shrink-0"
                                     :data-tip="tag.title">{{ tag.emoji }}</span>
@@ -155,16 +160,18 @@ import { computed, ref, watch } from 'vue'
 import CalendarYearMonths from '../components/CalendarYearMonths.vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatCard from '../components/StatCard.vue'
-import TypeChip from '../components/TypeChip.vue'
+import TypeSegments from '../components/TypeSegments.vue'
 import { formatDate, formatMoney, nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
-
 import { showModal } from '../services/modal.js'
 import { projectOccurrences } from '../services/recurringSchedule.js'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 import { useTransactionsStore } from '../services/transactions.js'
+import { useTransactionTypesStore } from '../services/transactionTypes.js'
 
 const transactionsStore = useTransactionsStore()
 const recurringStore = useRecurringTransactionsStore()
+const typesStore = useTransactionTypesStore()
+const itemTypeColor = (item) => typesStore.byId(item.transaction?.transaction_type_id)?.color
 
 const props = defineProps({
     dateRange: {

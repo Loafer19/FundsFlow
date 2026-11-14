@@ -111,7 +111,7 @@
                                     <span class="truncate">{{ t.label }}</span>
                                     <span class="text-xs text-base-content/60 flex items-center gap-1.5 min-w-0">
                                         <span class="shrink-0">{{ formatDate(t.at) }}</span>
-                                        <TypeChip :transaction="t.transaction" size="xs" />
+                                        <TypeSegments :transaction="t.transaction" size="xs" />
                                     </span>
                                 </span>
                                 <span class="flex flex-col items-end shrink-0">
@@ -178,7 +178,7 @@ import { ChartPie, ChevronDown, ChevronRight, Flame, Info, Lightbulb, Presentati
 import { computed, inject, ref } from 'vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatCard from '../components/StatCard.vue'
-import TypeChip from '../components/TypeChip.vue'
+import TypeSegments from '../components/TypeSegments.vue'
 import { today } from '../services/clock.js'
 import { tagChange } from '../services/comparison.js'
 import { parseLocalDate, toLocalDateStr } from '../services/formatters.js'
