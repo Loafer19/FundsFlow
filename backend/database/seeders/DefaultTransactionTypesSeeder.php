@@ -45,7 +45,7 @@ class DefaultTransactionTypesSeeder extends Seeder
             'name' => 'Subscription',
             'emoji' => '🔄',
             'color' => '#6366f1',
-            'tag' => 'Subscriptions',
+            'tag' => 'Bills & subscriptions',
             'fields' => [
                 ['key' => 'service', 'label' => 'Service', 'type' => 'text'],
                 ['key' => 'period', 'label' => 'Period', 'type' => 'select', 'options' => ['Monthly', 'Yearly']],

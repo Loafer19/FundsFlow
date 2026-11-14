@@ -48,7 +48,10 @@ class UserFormatter
             }
         }
 
-        return number_format($amount, $decimals ? 2 : 0, '.', ',');
+        // Without intl: same shape as NumberFormatter above (0–2 decimals, "-120" not "-120.00").
+        $text = number_format($amount, $decimals ? 2 : 0, '.', ',');
+
+        return str_contains($text, '.') ? rtrim(rtrim($text, '0'), '.') : $text;
     }
 
     public static function formatDate(User $user, CarbonInterface|string $date): string

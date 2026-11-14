@@ -6,6 +6,7 @@ use App\Actions\Agent\Documents\DocumentFile;
 use App\Actions\Agent\Documents\DocumentImport;
 use App\Actions\Imports\ApplyImportRulesAction;
 use App\Actions\Imports\CommitImportBatchAction;
+use App\Actions\Imports\ImportTypeAssigner;
 use App\Actions\Imports\UndoImportBatchAction;
 use App\Actions\Imports\UpdateImportRowAction;
 use App\Http\Resources\ImportBatchResource;
@@ -58,7 +59,7 @@ class ImportController extends Controller
         return new ImportBatchResource($this->batch($request, $import));
     }
 
-    public function store(Request $request, DocumentImport $documents): JsonResponse
+    public function store(Request $request, DocumentImport $documents, ImportTypeAssigner $types): JsonResponse
     {
         $data = $request->validate([
             'file' => 'required|file|max:20480',
@@ -90,6 +91,8 @@ class ImportController extends Controller
 
         $batch = $request->user()->importBatches()->where('uuid', $result['batch_id'])->firstOrFail();
         $batch->update(['source' => 'web']);
+        // Type suggestions are for the web preview, where each one can be seen and changed.
+        $types->assign($request->user(), $batch);
 
         return (new ImportBatchResource($batch->fresh()))->response()->setStatusCode(201);
     }
@@ -117,6 +120,8 @@ class ImportController extends Controller
             'include_ids.*' => 'integer',
             'skip_ids' => 'sometimes|array',
             'skip_ids.*' => 'integer',
+            'type_id' => 'sometimes|nullable|integer',
+            'type_match' => 'sometimes|nullable|string|max:80',
         ]);
         $batch = $apply->execute($request->user(), $batch, $data);
 
@@ -133,6 +138,7 @@ class ImportController extends Controller
             'status' => 'sometimes|in:new,skipped,transfer,needs_tag',
             'tag_ids' => 'sometimes|array',
             'tag_ids.*' => 'integer',
+            'transaction_type_id' => 'sometimes|nullable|integer',
         ]);
         $update->execute($request->user(), $batch, $row, $data);
 

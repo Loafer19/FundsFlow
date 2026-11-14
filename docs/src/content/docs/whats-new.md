@@ -18,11 +18,15 @@ In the next release.
   the amount, and you can still type your own. Pick the type in **Add Transaction**; the List shows its key values.
   Manage types in **Settings → Data & reports → Manage Types**. New accounts start with ⛽ Fuel, 🛒 Groceries,
   🔄 Subscription and 🍽 Restaurant. [Learn more](/docs/web/types/)
+- **Types in bank imports.** The import preview suggests a type for known merchants (OKKO → Fuel, Silpo →
+  Groceries, Netflix → Subscription) and lets you set one per row or for the whole file.
+  [Learn more](/docs/web/import/#preview-page)
 
 ### Telegram bot
 
 - **Types in the bot.** Write `Fuel: 40 l at 58.9` and the assistant saves a *Fuel* transaction with its fields and
-  the amount from the total. `/recent` shows the type and its fields. [Learn more](/docs/web/types/#with-the-assistants)
+  the amount from the total. Anything that doesn't fit a field is kept in the note. `/recent` shows the type and its
+  fields. [Learn more](/docs/web/types/#with-the-assistants)
 
 ## 2.3.0
 

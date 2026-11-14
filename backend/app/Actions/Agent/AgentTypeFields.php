@@ -54,7 +54,7 @@ class AgentTypeFields
      * Type + values from tool arguments. `type` = '' / 'none' on update clears the type.
      *
      * @param array<string, mixed> $args
-     * @return array{type: ?TransactionType, touched: bool, cleared: bool, fields: array<string, mixed>, dropped: list<string>}
+     * @return array{type: ?TransactionType, touched: bool, cleared: bool, fields: array<string, mixed>, dropped: list<string>, dropped_values?: array<string, mixed>}
      */
     public function fromArgs(User $user, array $args, ?Transaction $before = null): array
     {
@@ -85,6 +85,16 @@ class AgentTypeFields
         $probe = TransactionTypeData::absorbOptions(clone $type, $mapped, persist: false);
         [$values, $dropped] = TransactionFields::validSubset($probe, $mapped);
         $unmapped = array_values(array_diff(array_map('strval', array_keys($rawFields)), array_keys($mapped)));
+        $labels = array_column($type->fields ?? [], 'label', 'key');
+        $droppedValues = [];
+
+        foreach ($dropped as $key) {
+            $droppedValues[(string) ($labels[$key] ?? $key)] = $mapped[$key] ?? null;
+        }
+
+        foreach ($unmapped as $key) {
+            $droppedValues[$key] = $rawFields[$key] ?? null;
+        }
 
         return [
             'type' => $type,
@@ -92,7 +102,36 @@ class AgentTypeFields
             'cleared' => false,
             'fields' => $mapped === [] ? [] : array_intersect_key($mapped, $values),
             'dropped' => [...$dropped, ...$unmapped],
+            'dropped_values' => $droppedValues,
         ];
+    }
+
+    /**
+     * Values that did not fit a field go into the note instead of being lost:
+     * "Full tank · Mood: great; Odometer: 120k" (note capped at 255 characters).
+     *
+     * @param array<string, mixed> $droppedValues label => raw value
+     */
+    public static function noteWithDropped(?string $note, array $droppedValues): ?string
+    {
+        $parts = [];
+
+        foreach ($droppedValues as $label => $value) {
+            $text = is_scalar($value) ? (is_bool($value) ? ($value ? 'yes' : 'no') : trim((string) $value)) : (is_array($value) ? implode(', ', array_filter(array_map(static fn ($v) => is_scalar($v) ? (string) $v : '', $value))) : '');
+
+            if ($text === '' || ($note !== null && str_contains(mb_strtolower($note), mb_strtolower($text)))) {
+                continue;
+            }
+            $parts[] = "{$label}: {$text}";
+        }
+
+        if ($parts === []) {
+            return $note;
+        }
+        $extra = implode('; ', $parts);
+        $note = trim((string) $note);
+
+        return mb_strimwidth($note === '' ? $extra : "{$note} · {$extra}", 0, 255, '…');
     }
 
     /**

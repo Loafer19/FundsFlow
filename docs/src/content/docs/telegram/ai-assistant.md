@@ -108,7 +108,7 @@ and, optionally, some tags (“PDF report for groceries and coffee this year”)
 **Transaction types.** The assistant knows your [types](/docs/web/types/) and their fields. `Fuel: 40 l at 58.9`
 saves a *Fuel* transaction with Liters 40 and Price per liter 58,90, and the amount comes from the type's computed
 total; the type's default tags are added. To change a field later, just say so (*make it 42 liters*). Values that
-don't fit a field are left out rather than guessed.
+don't fit a field are added to the note (*mood: great*) instead of being guessed or lost.
 
 Amounts in another currency (*і це 2200 доларів*, *it was €30*) are converted to hryvnias at the official NBU rate
 for the transaction's date, and the original amount and rate go into the note.

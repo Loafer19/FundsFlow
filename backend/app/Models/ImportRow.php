@@ -16,7 +16,7 @@ class ImportRow extends Model
 
     protected $fillable = [
         'import_batch_id', 'line', 'status', 'at', 'amount', 'note', 'currency',
-        'raw', 'category', 'tag_ids', 'suggested_tag_ids', 'new_tag_titles', 'manual', 'skip_reason',
+        'raw', 'category', 'tag_ids', 'transaction_type_id', 'type_source', 'suggested_tag_ids', 'new_tag_titles', 'manual', 'skip_reason',
         'error', 'matched_transaction_id',
     ];
 

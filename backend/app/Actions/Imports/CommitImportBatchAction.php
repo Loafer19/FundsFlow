@@ -64,6 +64,7 @@ class CommitImportBatchAction
 
                 $rows = $batch->rows()->whereIn('status', [ImportRow::STATUS_NEW, ImportRow::STATUS_NEEDS_TAG])->get();
                 $owned = array_fill_keys($user->tags()->pluck('id')->map(fn ($id) => (int) $id)->all(), true);
+                $activeTypes = array_fill_keys($user->transactionTypes()->pluck('id')->map(fn ($id) => (int) $id)->all(), true);
                 $items = [];
                 foreach ($rows as $row) {
                     if (!$row->at || $row->amount === null || (float) $row->amount == 0.0) {
@@ -82,20 +83,26 @@ class CommitImportBatchAction
                             $tags[] = $id;
                         }
                     }
-                    $items[] = [
+                    $item = [
                         'amount' => round((float) $row->amount, 2),
                         'at' => $row->at->toDateString(),
                         'note' => $row->note,
                         'tags' => $tags,
                         'import_batch_id' => $batch->id,
                     ];
+                    // A type archived since the preview is left off rather than failing the import.
+                    if ($row->transaction_type_id && isset($activeTypes[(int) $row->transaction_type_id])) {
+                        $item['transaction_type_id'] = (int) $row->transaction_type_id;
+                    }
+                    $items[] = $item;
                 }
 
                 $batch->update(['progress' => 40]);
 
                 return $items === []
                     ? collect()
-                    : $this->createTransactions->execute($user, $items, TransactionSource::Import);
+                    // Field values are filled in later; required fields do not block the import.
+                    : $this->createTransactions->execute($user, $items, TransactionSource::Import, requireAllFields: false);
             });
 
             $batch->forceFill([

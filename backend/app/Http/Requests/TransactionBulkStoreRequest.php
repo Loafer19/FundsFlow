@@ -22,7 +22,10 @@ class TransactionBulkStoreRequest extends FormRequest
             'transactions' => 'required|array|min:1|max:' . TransactionBulkRules::MAX_ITEMS,
 
             'transactions.*.at' => 'required|string|date',
-            'transactions.*.amount' => 'required|numeric|not_in:0',
+            'transactions.*.amount' => 'required_without:transactions.*.transaction_type_id|nullable|numeric|not_in:0',
+            'transactions.*.transaction_type_id' => 'nullable|integer',
+            'transactions.*.data' => 'nullable|array',
+            'transactions.*.add_options' => 'sometimes|boolean',
             'transactions.*.note' => 'nullable|string|max:255',
             'transactions.*.tags' => 'nullable|array',
             'transactions.*.tags.*' => [

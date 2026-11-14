@@ -586,7 +586,7 @@ class TelegramAgentToolExecutor
         $this->support->sendSavedTransaction($chatId, $user, $tx, '✅ Saved', undo: true);
 
         return ['ui' => 'transaction_saved', 'sent' => true, 'id' => (int) $tx->id]
-            + (isset($prepared['dropped_fields']) ? ['dropped_fields' => $prepared['dropped_fields'], 'hint' => 'These values did not fit their fields and were not saved; mention it briefly if it matters.'] : []);
+            + (isset($prepared['dropped_fields']) ? ['dropped_fields' => $prepared['dropped_fields'], 'hint' => 'These values did not fit their fields, so they were added to the note.'] : []);
     }
 
     private function applyCreateTransaction(User $user, int|string $chatId, int|string $identity, array $payload, ?int $messageId = null): void

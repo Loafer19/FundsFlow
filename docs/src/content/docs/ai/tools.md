@@ -36,7 +36,8 @@ Amounts are **signed**: negative for expenses, positive for income. Dates use `Y
 | `delete_transaction` | Delete a transaction by id |
 | `delete_transactions` | Delete up to 50 transactions by id, all-or-nothing |
 
-`create_transaction` and `update_transaction` also take `transaction_type_id`, `data` (field values by key, e.g.
+`create_transaction`, `update_transaction` and each item of `create_transactions` / `update_transactions` also take
+`transaction_type_id`, `data` (field values by key, e.g.
 `{"liters": 40, "price_per_liter": 58.9}`) and `add_options` (new choices for *one of* / *several of* fields).
 `amount` can be left out when the type has a computed field that fills it; the result is saved as an expense.
 

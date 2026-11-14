@@ -128,6 +128,7 @@ class ImportBatchResource extends JsonResource
                 'skipped' => $this->skipped_count,
                 'needs_tag' => $this->needs_tag_count,
                 'error' => $this->error_count,
+                'typed' => $this->rows->filter(fn (ImportRow $row) => $row->transaction_type_id && $row->isImportable())->count(),
                 'income_total' => (float) $this->income_total,
                 'expense_total' => (float) $this->expense_total,
                 'period_from' => $this->period_from?->toDateString(),
@@ -153,6 +154,8 @@ class ImportBatchResource extends JsonResource
                 'currency' => $row->currency,
                 'manual' => (bool) $row->manual,
                 'tag_ids' => $row->tag_ids ?? [],
+                'transaction_type_id' => $row->transaction_type_id ? (int) $row->transaction_type_id : null,
+                'type_source' => $row->type_source,
                 'tags' => collect($row->tag_ids ?? [])->map(function ($id) use ($tags) {
                     $tag = $tags->get((int) $id);
                     return $tag ? ['id' => $tag->id, 'title' => $tag->title, 'emoji' => $tag->emoji] : null;

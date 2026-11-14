@@ -21,6 +21,11 @@ After a file is read you land on `/import/{id}`:
 - **Bank categories**: each category from the file, with a default (map to a matching tag, or ignore). You can map it to one of your tags, create it as a new tag (and rename it first), or leave it ignored.
 - A table you can filter (new, duplicate, transfer, skipped, needs a tag, error) and page through.
 - Inline tag edits and bulk rules such as *all Glovo → Food* or *skip before 2025*. A tag you set on one row is kept when you later apply a bulk rule.
+- A **Type** column when you have [transaction types](/docs/web/types/). Expenses at a known merchant get a suggested
+  type (✨): OKKO or WOG → *Fuel*, Silpo or ATB → *Groceries*, Netflix or Spotify → *Subscription*, Glovo or a café →
+  *Restaurant*, and a type whose name is in the note. Change it on any row, or use **Set type** in the bulk rules
+  (*OKKO → Fuel*, or leave the text empty for every row). A type you pick on one row is kept when you apply rules.
+  Imported rows get the type and its default tags; fill in the field values later in **Edit Transaction**.
 - **Import** saves the new rows (large files run in the background and show progress). New tags from “create” decisions are added then.
 - **Undo import** deletes every transaction created by that batch, and any new tags it created that you are not using elsewhere.
 

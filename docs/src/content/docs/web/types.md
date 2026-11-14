@@ -11,7 +11,7 @@ New accounts start with four types you can change or archive:
 - **⛽ Fuel** — Liters, Price per liter, Fuel (A-95, A-95+, Diesel, LPG), Station, and a Total that fills the amount;
   tagged *Transport*.
 - **🛒 Groceries** — Store and Kind (Big shop, Quick buy).
-- **🔄 Subscription** — Service, Period (Monthly, Yearly) and Next charge.
+- **🔄 Subscription** — Service, Period (Monthly, Yearly) and Next charge; tagged *Bills & subscriptions*.
 - **🍽 Restaurant** — Place, Format (Cafe, Restaurant, Delivery) and Tip.
 
 Accounts created before types appeared start with none — add your own in **Manage Types**.
@@ -80,4 +80,5 @@ OKKO, and the amount from the total. MCP clients can manage types and fill field
 [tool reference](/docs/ai/tools/#transaction-types).
 
 Types and their fields are part of the **Backup** JSON (`transaction_types`, plus `transaction_type_id` and `data` on
-each transaction). Bank statement imports don't set a type.
+each transaction). [Bank statement imports](/docs/web/import/#preview-page) suggest a type for known merchants, and you
+can set one per row or for the whole file.

@@ -627,6 +627,9 @@ class AgentToolExecutor
         $note = is_string($args['note'] ?? null) ? mb_substr(trim((string) $args['note']), 0, 255) : null;
         $tagIds = $this->sanitizeOwnedTagIds($user, [...(is_array($args['tag_ids'] ?? null) ? $args['tag_ids'] : []), ...($type?->defaultTagIds() ?? [])]);
 
+        // Values the type could not take ("mood: great") are kept in the note, not lost.
+        $note = AgentTypeFields::noteWithDropped($note, $typed['dropped_values'] ?? []);
+
         $payload = [
             'amount' => $amount,
             'at' => $at,
@@ -681,6 +684,10 @@ class AgentToolExecutor
         ];
 
         $typed = $this->typeFields->fromArgs($user, $args, $tx);
+
+        if (($typed['dropped_values'] ?? []) !== []) {
+            $payload['note'] = AgentTypeFields::noteWithDropped($payload['note'], $typed['dropped_values']);
+        }
 
         if ($typed['touched']) {
             $payload['transaction_type_id'] = $typed['cleared'] ? null : (int) $typed['type']->id;

@@ -16,6 +16,7 @@ class ApplyImportRulesAction
     public function __construct(
         private readonly CreateImportBatchAction $batches,
         private readonly ListTagsAction $listTags,
+        private readonly ImportTypeAssigner $types,
     ) {}
 
     /**
@@ -114,8 +115,18 @@ class ApplyImportRulesAction
         }
 
         $batch->save();
+        $typeRule = array_key_exists('type_id', $rules);
+        if ($typeRule) {
+            $typeId = $rules['type_id'] === null ? null : (int) $rules['type_id'];
+            if ($typeId !== null && !$user->transactionTypes()->whereKey($typeId)->exists()) {
+                throw ValidationException::withMessages(['type_id' => 'Type not found!']);
+            }
+            $this->types->addRule($batch, ['match' => (string) ($rules['type_match'] ?? ''), 'type_id' => $typeId]);
+        }
         if ($this->shouldRebuild($rules, $text)) {
             $this->batches->rebuildRows($user, $batch);
+        } elseif ($typeRule) {
+            $this->types->assign($user, $batch);
         }
         if ($this->applyInclusion($batch, $rules)) {
             $this->batches->recalculate($batch);

@@ -19,7 +19,7 @@ const ATTACHMENT_LABEL = 'JPEG, PNG, WebP, HEIC and PDF'
 const TYPE_FIELD_KINDS = ['number', 'rating', 'duration', 'boolean', 'select', 'multiselect', 'text', 'date', 'computed'] as const
 type AttachmentMime = (typeof ATTACHMENT_MIMES)[number]
 
-const MCP_VERSION = '1.3.1'
+const MCP_VERSION = '1.4.0'
 const MCP_WEBSITE_URL = 'https://fundsflow.fun'
 const MCP_ICONS = [
     {
@@ -394,15 +394,16 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         {
             title: 'Create transactions (bulk)',
             description:
-                'Create up to 50 transactions in one request (all-or-nothing). Amount is signed: negative expense, positive income. Date YYYY-MM-DD. Source will be recorded as mcp.',
+                'Create up to 50 transactions in one request (all-or-nothing). Amount is signed: negative expense, positive income. Date YYYY-MM-DD. Each item may set transaction_type_id and data (then amount may come from the type). Source will be recorded as mcp.',
             inputSchema: {
                 transactions: z
                     .array(
                         z.object({
-                            amount: signedAmount(TX_AMOUNT_MAX),
+                            amount: signedAmount(TX_AMOUNT_MAX).optional().describe('Signed; may be omitted when the type fills it'),
                             at: isoDate(),
                             note: z.string().max(255).optional(),
                             tags: z.array(z.number().int()).optional(),
+                            ...transactionTypeInput,
                         }),
                     )
                     .min(1)
@@ -421,6 +422,9 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
                                 at: row.at,
                                 note: row.note,
                                 tags: row.tags ?? [],
+                                transaction_type_id: row.transaction_type_id,
+                                data: row.data,
+                                add_options: row.add_options,
                             }),
                         ),
                     }),
@@ -467,16 +471,17 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         {
             title: 'Update transactions (bulk)',
             description:
-                'Update up to 50 transactions in one request (all-or-nothing). Each item needs id, amount, at; note and tags optional (omit tags to clear them).',
+                'Update up to 50 transactions in one request (all-or-nothing). Each item needs id and at; amount, note, tags, transaction_type_id, data and add_options are optional (omit tags to clear them).',
             inputSchema: {
                 transactions: z
                     .array(
                         z.object({
                             id: z.number().int(),
-                            amount: signedAmount(TX_AMOUNT_MAX),
+                            amount: signedAmount(TX_AMOUNT_MAX).optional().describe('Omit to keep it (or let a fill-amount field recompute it)'),
                             at: isoDate(),
                             note: z.string().max(255).optional(),
                             tags: z.array(z.number().int()).optional(),
+                            ...transactionTypeInput,
                         }),
                     )
                     .min(1)
@@ -496,6 +501,9 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
                                 at: row.at,
                                 note: row.note,
                                 tags: row.tags ?? [],
+                                transaction_type_id: row.transaction_type_id,
+                                data: row.data,
+                                add_options: row.add_options,
                             }),
                         ),
                     }),

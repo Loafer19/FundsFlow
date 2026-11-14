@@ -19,6 +19,7 @@ class CreateImportBatchAction
     public function __construct(
         private readonly ListTagsAction $listTags,
         private readonly BankCategoryResolver $categories,
+        private readonly ImportTypeAssigner $types,
     ) {}
 
     /** @param  array<string, mixed>  $draft */
@@ -219,6 +220,7 @@ class CreateImportBatchAction
             $notes[] = $line;
         }
         $batch->notes = array_values(array_unique($notes));
+        $this->types->assign($user, $batch);
         $this->recalculate($batch);
     }
 

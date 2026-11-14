@@ -9,7 +9,10 @@ use Illuminate\Validation\ValidationException;
 
 class UpdateImportRowAction
 {
-    public function __construct(private readonly CreateImportBatchAction $batches) {}
+    public function __construct(
+        private readonly CreateImportBatchAction $batches,
+        private readonly ImportTypeAssigner $types,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -47,6 +50,15 @@ class UpdateImportRowAction
         }
 
         $row->save();
+
+        if (array_key_exists('transaction_type_id', $data)) {
+            $typeId = $data['transaction_type_id'] === null ? null : (int) $data['transaction_type_id'];
+            if ($typeId !== null && !$user->transactionTypes()->whereKey($typeId)->exists()) {
+                throw ValidationException::withMessages(['transaction_type_id' => 'Type not found!']);
+            }
+            $this->types->setLine($batch, (int) $row->line, $typeId);
+            $this->types->assign($user, $batch);
+        }
         $this->batches->recalculate($batch);
 
         return $row->fresh();

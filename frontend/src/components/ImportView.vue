@@ -188,7 +188,7 @@
                         <div class="min-w-0">
                             <h2 class="font-semibold">Bulk rules</h2>
                             <p class="text-sm text-base-content/60">
-                                Tag a shop in one go, or skip old rows and transfers before you import
+                                Tag or type a shop in one go, or skip old rows and transfers before you import
                             </p>
                         </div>
                     </div>
@@ -212,6 +212,23 @@
                             </button>
                             <button type="button" class="btn btn-sm btn-primary"
                                 :disabled="busy || !canApplyMerchant" @click="applyMerchant">
+                                Apply
+                            </button>
+                        </div>
+                        <div v-if="typesStore.active.length" class="flex flex-wrap items-center gap-2 py-2">
+                            <span class="font-medium min-w-28">Set type</span>
+                            <input v-model="typeMatch" class="input input-sm input-bordered w-40"
+                                placeholder="OKKO, or all rows" aria-label="Rows whose note contains" />
+                            <select v-model="typeRuleId" class="select select-sm select-bordered w-auto min-w-36"
+                                aria-label="Type for these rows">
+                                <option :value="undefined" disabled>Choose type</option>
+                                <option v-for="type in typesStore.active" :key="type.id" :value="type.id">
+                                    {{ typeLabel(type) }}
+                                </option>
+                                <option :value="null">No type</option>
+                            </select>
+                            <button type="button" class="btn btn-sm btn-primary"
+                                :disabled="busy || typeRuleId === undefined" @click="applyTypeRule">
                                 Apply
                             </button>
                         </div>
@@ -272,6 +289,7 @@
                                 <th>Amount</th>
                                 <th>Note</th>
                                 <th>Tags</th>
+                                <th v-if="typesStore.active.length || batch.summary?.typed">Type</th>
                                 <th>Status</th>
                                 <th class="text-center w-0">
                                     <label class="flex flex-col items-center gap-1 cursor-pointer">
@@ -325,6 +343,25 @@
                                         </span>
                                     </div>
                                 </td>
+                                <td v-if="typesStore.active.length || batch.summary?.typed">
+                                    <div class="flex items-center gap-1">
+                                        <select class="select select-xs select-ghost w-36"
+                                            :class="row.transaction_type_id ? '' : 'text-base-content/40'"
+                                            :value="row.transaction_type_id ?? ''"
+                                            :disabled="!editable || busy || !isIncluded(row)"
+                                            :aria-label="`Type for line ${row.line}`"
+                                            @change="setRowType(row, $event.target.value)">
+                                            <option value="">No type</option>
+                                            <option v-for="type in rowTypeOptions(row)" :key="type.id" :value="type.id">
+                                                {{ typeLabel(type) }}
+                                            </option>
+                                        </select>
+                                        <span v-if="row.type_source === 'suggested' && row.transaction_type_id"
+                                            class="tooltip tooltip-left" data-tip="Suggested from the merchant">
+                                            <Sparkles :size="12" class="text-primary/70" aria-label="Suggested" />
+                                        </span>
+                                    </div>
+                                </td>
                                 <td>
                                     <span class="badge badge-sm tooltip tooltip-left whitespace-nowrap"
                                         :class="statusBadge(row.status)" :data-tip="statusTip(row)">
@@ -340,7 +377,7 @@
                                 </td>
                             </tr>
                             <tr v-if="!batch.rows.length">
-                                <td colspan="6" class="text-center text-base-content/60">No rows in this filter</td>
+                                <td :colspan="typesStore.active.length || batch.summary?.typed ? 7 : 6" class="text-center text-base-content/60">No rows in this filter</td>
                             </tr>
                         </tbody>
                     </table>
@@ -408,6 +445,7 @@ import { applyImportRules, commitImport, fetchImport, fetchImports, goToImport, 
 import { showModal } from '../services/modal.js'
 import { useTagsStore } from '../services/tags.js'
 import toasts from '../services/toasts.js'
+import { useTransactionTypesStore } from '../services/transactionTypes.js'
 import DateField from './DateField.vue'
 import EmptyState from './EmptyState.vue'
 import SegmentedControl from './SegmentedControl.vue'
@@ -420,6 +458,7 @@ const props = defineProps({
 
 const authStore = useAuthStore()
 const tagsStore = useTagsStore()
+const typesStore = useTransactionTypesStore()
 const categoryActionOptions = [
     { value: 'map', label: 'Map' },
     { value: 'create', label: 'Create' },
@@ -444,6 +483,8 @@ const ruleMerchant = ref('')
 const ruleTagId = ref(null)
 const ruleBefore = ref('')
 const ruleSkipName = ref('')
+const typeMatch = ref('')
+const typeRuleId = ref(undefined)
 const fileInput = ref(null)
 const tagMenu = ref(null)
 const menuHost = ref('body')
@@ -679,6 +720,33 @@ const applyMerchant = async () => {
     await runRules({ merchant_map: { [ruleMerchant.value.trim()]: ruleTag.value.title } })
     ruleMerchant.value = ''
     ruleTagId.value = null
+}
+const typeLabel = (type) => `${type.emoji ? `${type.emoji} ` : ''}${type.name}`
+// Active types, plus an archived one the row already has, so the select can still show it.
+const rowTypeOptions = (row) => {
+    const list = typesStore.active
+    const current = row.transaction_type_id ? typesStore.byId(row.transaction_type_id) : null
+    return current && !list.includes(current) ? [...list, current] : list
+}
+const applyTypeRule = async () => {
+    if (typeRuleId.value === undefined) return
+    await runRules({ type_id: typeRuleId.value, type_match: typeMatch.value.trim() })
+    typeMatch.value = ''
+    typeRuleId.value = undefined
+}
+const setRowType = async (row, value) => {
+    const id = value === '' ? null : Number(value)
+    busy.value = true
+    try {
+        const updated = await updateImportRow(props.uuid, row.id, { transaction_type_id: id })
+        // Keep the current filter and page: only the row and the counts change.
+        Object.assign(row, { transaction_type_id: id, type_source: 'manual' })
+        if (updated?.summary && batch.value) batch.value.summary = updated.summary
+    } catch (error) {
+        toasts.error(apiErrorMessage(error, 'Could not update the row: '))
+    } finally {
+        busy.value = false
+    }
 }
 const onCategoryAction = async (cat, action) => {
     if (action === 'map') {
@@ -920,6 +988,7 @@ watch(() => props.uuid, () => {
 })
 
 onMounted(() => {
+    if (!typesStore.types.length) typesStore.fetch()
     if (props.uuid) reload()
     else loadHistory()
     hostObserver = new MutationObserver(syncMenuHost)
