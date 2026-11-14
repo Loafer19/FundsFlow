@@ -272,6 +272,17 @@ export const typeSummary = (type, data, limit = 3) => {
         .join(' · ')
 }
 
+/** "40 l" or "40 l · 58,90 ₴": the first one or two values for the type chip, kept short. */
+export const typeChipValues = (type, data, max = 18) => {
+    const fill = fillField(type)?.key
+    const values = typeRows(type, data)
+        .filter((row) => row.key !== fill && String(row.value).length <= max)
+        .map((row) => String(row.value))
+    if (!values.length) return ''
+    const two = values.slice(0, 2).join(' · ')
+    return values.length > 1 && two.length <= max ? two : values[0]
+}
+
 /** "40 l × 58,90 ₴": the formula with its keys replaced by the shown values. */
 export const formulaText = (type, field, data) => {
     try {

@@ -60,6 +60,13 @@
                     <Tag :size="24" />
                 </button>
 
+                <!-- Phones reach Types from More (the header already wraps there), so no duplicate. -->
+                <button type="button" @click="showModal('types_modal')"
+                    class="btn btn-ghost btn-square tooltip tooltip-bottom max-md:hidden" data-tip="Types"
+                    aria-label="Types">
+                    <Shapes :size="24" />
+                </button>
+
                 <button type="button" @click="openSettings()"
                     class="btn btn-ghost btn-square tooltip tooltip-bottom" data-tip="Settings"
                     aria-label="Settings">
@@ -208,6 +215,7 @@ import {
     Presentation,
     Repeat,
     Settings,
+    Shapes,
     Sparkles,
     Table,
     Tag,

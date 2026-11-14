@@ -72,7 +72,8 @@
                             class="card card-border border-base-300 bg-base-100 p-2 justify-between text-center cursor-pointer hover:border-primary hover:bg-base-200"
                             :aria-label="itemAriaLabel(item)" @click="openItem(item)"
                             @keydown.enter.prevent="openItem(item)" @keydown.space.prevent="openItem(item)">
-                            <div class="flex flex-wrap justify-center gap-1 mb-1">
+                            <div class="flex flex-wrap justify-center items-center gap-1 mb-1">
+                                <TypeChip v-if="item.transaction" :transaction="item.transaction" size="sm" compact />
                                 <span v-for="tag in item.tags" :key="tag.id" class="text-lg tooltip"
                                     :data-tip="tag.title">{{ tag.emoji }}</span>
                             </div>
@@ -127,6 +128,8 @@
                             <div class="flex-1 min-w-0 flex items-center gap-1 text-sm">
                                 <span class="shrink-0 text-base-content/60">{{ formatDate(item.date) }}</span>
                                 <span class="text-base-content/50">·</span>
+                                <TypeChip v-if="item.transaction" :transaction="item.transaction" size="xs"
+                                    class="shrink min-w-0" />
                                 <span v-for="tag in item.tags" :key="tag.id" class="tooltip shrink-0"
                                     :data-tip="tag.title">{{ tag.emoji }}</span>
                                 <template v-if="item.note">
@@ -152,6 +155,7 @@ import { computed, ref, watch } from 'vue'
 import CalendarYearMonths from '../components/CalendarYearMonths.vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatCard from '../components/StatCard.vue'
+import TypeChip from '../components/TypeChip.vue'
 import { formatDate, formatMoney, nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 
 import { showModal } from '../services/modal.js'

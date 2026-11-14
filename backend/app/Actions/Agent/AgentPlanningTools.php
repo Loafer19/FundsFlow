@@ -37,14 +37,14 @@ use InvalidArgumentException;
 
 /**
  * Planning tools shared by every agent transport: budget status / edits,
- * recurring rules and upcoming charges, period comparison.
+ * recurring rules and upcoming charges, period comparison, and transaction types (AgentTypeTools).
  * Reads return plain arrays; writes are split into prepare() (validated
  * payload + human preview for Confirm/Cancel) and apply() (after Confirm),
  * always through the regular Budget / Recurring actions (same Gate checks).
  */
 class AgentPlanningTools
 {
-    public const READ_TOOLS = ['budget_status', 'upcoming_recurring', 'compare_periods'];
+    public const READ_TOOLS = ['budget_status', 'upcoming_recurring', 'compare_periods', ...AgentTypeTools::READ_TOOLS];
 
     public const STAGING_TOOLS = [
         'update_budget',
@@ -57,6 +57,7 @@ class AgentPlanningTools
         'resume_recurring',
         'delete_recurring',
         'create_support_ticket',
+        ...AgentTypeTools::STAGING_TOOLS,
     ];
 
     public const MAX_UPCOMING_DAYS = 90;
@@ -82,6 +83,8 @@ class AgentPlanningTools
         private readonly CalculateGoalProgressAction $goalProgress,
         private readonly CalculateLimitStatusAction $limitStatus,
         private readonly CreateSupportTicketAction $createSupportTicket,
+        /** Transaction types: list, create (several at once), edit, archive. */
+        public readonly AgentTypeTools $types,
     ) {}
 
     public static function isRead(string $name): bool
@@ -108,6 +111,7 @@ class AgentPlanningTools
         $tagIds = ['type' => 'array', 'items' => ['type' => 'integer']];
 
         return [
+            ...$this->types->definitions(),
             $fn('budget_status', 'Budget status. Limits (type limit), for the current period: limit, spent, left, days left, safe daily allowance, average daily spend and projected end-of-period spend (status on_track|at_risk|over). Savings goals (type goal): saved of target, remaining, percent, deadline days left, required amount per month/week, monthly pace and projected reach date (status completed|on_track|behind|in_progress). Optional budget_id for one budget; include_paused also lists paused budgets (status paused).', [
                 'type' => 'object',
                 'properties' => [
@@ -232,6 +236,7 @@ class AgentPlanningTools
             'budget_status' => $this->budgetStatus($user, $session, $args),
             'upcoming_recurring' => $this->upcomingRecurring($user, $args),
             'compare_periods' => $this->comparePeriods($user, $args),
+            'list_transaction_types' => $this->types->read($user, $args),
             default => throw new InvalidArgumentException("Unknown read tool: {$name}"),
         };
     }
@@ -253,6 +258,7 @@ class AgentPlanningTools
             'resume_recurring' => $this->prepareRecurringState($user, $args, 'resume'),
             'delete_recurring' => $this->prepareRecurringState($user, $args, 'delete'),
             'create_support_ticket' => $this->prepareSupportTicket($user, $args),
+            'create_transaction_types', 'update_transaction_type', 'archive_transaction_type' => $this->types->prepare($user, $name, $args),
             default => throw new InvalidArgumentException("Unknown staging tool: {$name}"),
         };
     }
@@ -269,6 +275,7 @@ class AgentPlanningTools
             'update_budget', 'pause_budget', 'resume_budget', 'delete_budget' => $this->applyBudget($user, $action, $payload),
             'create_recurring', 'update_recurring', 'pause_recurring', 'resume_recurring', 'delete_recurring' => $this->applyRecurring($user, $action, $payload),
             'create_support_ticket' => $this->applySupportTicket($user, $payload),
+            'create_transaction_types', 'update_transaction_type', 'archive_transaction_type' => $this->types->apply($user, $action, $payload),
             default => ['ok' => false, 'message' => 'Nothing to confirm.', 'summary' => 'Nothing to confirm.'],
         };
     }

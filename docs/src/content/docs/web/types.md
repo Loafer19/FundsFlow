@@ -18,7 +18,8 @@ Accounts created before types appeared start with none — add your own in **Man
 
 ## Manage types
 
-Open **Settings → Data & reports → Manage Types** (on a phone also **More → Types**). The list on the left shows each
+Click the **Types** button in the header, next to Tags, or open **Settings → Data & reports → Manage Types** (on a
+phone: **More → Types**). The list on the left shows each
 type with its number of fields and transactions; **New type** starts an empty one.
 
 Each type has:
@@ -68,15 +69,22 @@ for example *From Fuel total · 40 l × 58,90 ₴*.
 You can still type a different amount (a discount at the station, say). The hint then shows the computed total with
 ↺ to go back to it; changing a field also brings the computed amount back.
 
-In the [List](/docs/web/tabs/#list), a transaction with a type shows a small badge (*⛽ Fuel*) and its first values
-(*40 l · 58,90 ₴ · OKKO*) above the note; hover the cell to see all fields. Search also finds the type and its
-values.
+In the [List](/docs/web/tabs/#list), a transaction with a type shows it as the first chip in **Tags**, tinted with
+the type color: *⛽ Fuel · 40 l · 58,90 ₴* (the first one or two values). The note stays as you wrote it; hover the
+chip to see all fields. The same chip appears in **Largest expenses**, tag details, the Calendar day (name only) and
+the assistant's recent list. Search also finds the type and any of its field values.
 
 ## With the assistants
 
 The [web assistant](/docs/web/assistant/) and the [Telegram assistant](/docs/telegram/ai-assistant/) know your types.
 Write `Fuel: 40 l at 58.9 OKKO` and the transaction is saved as *Fuel* with Liters 40, Price per liter 58,90, Station
-OKKO, and the amount from the total. MCP clients can manage types and fill fields too — see the
+OKKO, and the amount from the total.
+
+They can also manage the types. Ask *create these types: Fuel (liters, price/l, fuel type A-95/A-95+/Diesel/LPG,
+station, total computed), Groceries, Subscription, Restaurant* and one **Confirm** card lists every new type with its
+emoji, name, fields and default tags. Nothing is created until you press **Confirm**. The same works for changes
+(*add an Odometer field to Fuel*, *rename Station to Gas station*, *hide Fuel type*, *add A-100 to the options*) and
+for archiving a type. A hidden field keeps its saved values. MCP clients can manage types and fill fields too — see the
 [tool reference](/docs/ai/tools/#transaction-types).
 
 Types and their fields are part of the **Backup** JSON (`transaction_types`, plus `transaction_type_id` and `data` on

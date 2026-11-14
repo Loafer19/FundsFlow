@@ -196,6 +196,37 @@
                                         </p>
                                     </li>
                                 </ul>
+                                <!-- Transaction types: one block per type (emoji + name, its fields, default tags). -->
+                                <ul v-else-if="item.card?.type === 'transaction_types'" class="flex flex-col gap-3 text-sm">
+                                    <li v-for="(row, i) in item.card.rows" :key="i" class="flex flex-col gap-1">
+                                        <p class="flex items-center gap-1.5">
+                                            <span class="badge badge-soft border gap-1 px-1.5 font-medium"
+                                                :class="{ 'line-through opacity-60': item.card.mode === 'archive' }"
+                                                :style="typeCardStyle(row.color)">
+                                                <span v-if="row.emoji" aria-hidden="true">{{ row.emoji }}</span>{{ row.name }}
+                                            </span>
+                                            <span v-if="item.card.mode !== 'archive'" class="text-xs text-base-content/50">
+                                                {{ row.fields.length }} field{{ row.fields.length === 1 ? '' : 's' }}
+                                            </span>
+                                        </p>
+                                        <ul v-if="row.changes?.length" class="flex flex-col text-xs text-base-content/80 pl-1">
+                                            <li v-for="change in row.changes" :key="change">✎ {{ change }}</li>
+                                        </ul>
+                                        <ul v-if="item.card.mode !== 'archive'" class="flex flex-col gap-0.5 pl-1">
+                                            <li v-for="field in row.fields" :key="field.key" class="flex items-baseline gap-1.5 min-w-0"
+                                                :class="{ 'text-base-content/40 line-through': field.mark === 'hidden' }">
+                                                <span class="shrink-0">{{ field.label }}</span>
+                                                <span class="text-xs text-base-content/60 truncate">{{ field.kind }}</span>
+                                                <span v-if="field.mark && field.mark !== 'hidden'"
+                                                    class="badge badge-xs badge-soft badge-primary shrink-0">{{ fieldMark(field.mark) }}</span>
+                                            </li>
+                                        </ul>
+                                        <p v-if="item.card.mode !== 'archive'" class="text-xs text-base-content/70 pl-1">
+                                            🏷 {{ row.tags?.length ? row.tags.join(' · ') : 'No default tags' }}
+                                        </p>
+                                        <p v-for="note in row.notes" :key="note" class="text-xs text-base-content/60 pl-1">{{ note }}</p>
+                                    </li>
+                                </ul>
                                 <p v-else class="text-sm whitespace-pre-wrap break-words">{{ item.preview }}</p>
                                 <div v-if="item.status === 'pending'" class="card-actions justify-end">
                                     <button type="button" class="btn btn-sm btn-ghost agent-press"
@@ -443,7 +474,17 @@ const ACTION_LABELS = {
     create_tags: 'New tags',
     rename_tags: 'Rename tags',
     create_support_ticket: 'Support request',
+    create_transaction_types: 'New types',
+    update_transaction_type: 'Edit type',
+    archive_transaction_type: 'Archive type',
 }
+
+// Type cards: the chip tint of TypeChip, and short marks for what an edit changes.
+const typeCardStyle = (color) =>
+    color
+        ? { backgroundColor: `${color}26`, borderColor: `${color}73`, color: 'var(--color-base-content)' }
+        : { borderColor: 'color-mix(in oklab, var(--color-base-content) 25%, transparent)' }
+const fieldMark = (mark) => ({ new: 'new', renamed: 'renamed', restored: 'shown again', options: 'options' })[mark] ?? mark
 
 const actionLabel = (action) => ACTION_LABELS[action] ?? 'Confirm change'
 

@@ -87,7 +87,7 @@ help, and *open the web app* tools.
 - **Ask you** a clarifying question when something is missing, often with reply buttons — tap one or type your own
   answer.
 - **Propose changes** — add, edit, or delete a transaction; create, edit, pause, resume, or delete a budget; create,
-  edit, pause, resume, or delete a recurring rule; create tags, or rename tags.
+  edit, pause, resume, or delete a recurring rule; create tags, or rename tags; create, edit, or archive [transaction types](/docs/web/types/#with-the-assistants).
 
 Savings goals work the same way: the assistant can create, edit (including the start date), pause, resume, or delete
 a goal, and tells you how much is left and when you will reach it. See [Budgets](/docs/web/budgets/).

@@ -93,8 +93,10 @@
                             class="py-2 flex items-center gap-3 min-w-0 border-b border-base-300/60 last:border-b-0">
                             <span class="flex flex-col min-w-0 flex-1">
                                 <span class="truncate">{{ t.note || t.tagLabel || '-' }}</span>
-                                <span class="text-xs text-base-content/60 truncate">
-                                    {{ formatDate(t.at) }}<template v-if="t.note && t.tagLabel"> · {{ t.tagLabel }}</template>
+                                <span class="text-xs text-base-content/60 flex items-center gap-1.5 min-w-0">
+                                    <span class="shrink-0">{{ formatDate(t.at) }}</span>
+                                    <TypeChip :transaction="t.transaction" size="xs" />
+                                    <span v-if="t.note && t.tagLabel" class="truncate">{{ t.tagLabel }}</span>
                                 </span>
                             </span>
                             <span class="font-semibold tabular-nums shrink-0"
@@ -121,6 +123,7 @@ import { useTagsStore } from '../services/tags.js'
 import { useTransactionsStore } from '../services/transactions.js'
 import BarChart from './charts/BarChart.vue'
 import StatCard from './StatCard.vue'
+import TypeChip from './TypeChip.vue'
 
 const props = defineProps({
     dateRange: {
@@ -227,6 +230,7 @@ const largest = computed(() =>
             id: t.id,
             at: t.at,
             note: t.note,
+            transaction: t,
             value: Math.abs(t.amount),
             tagLabel: (t.tags ?? [])
                 .filter((x) => x.id !== tagId.value)

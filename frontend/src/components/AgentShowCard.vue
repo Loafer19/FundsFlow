@@ -9,9 +9,11 @@
                     <li v-for="tx in transactions" :key="tx.id" class="flex justify-between gap-2 py-1.5 text-sm">
                         <div class="min-w-0">
                             <p class="truncate">{{ tx.note || tagText(tx.tags) || '—' }}</p>
-                            <p class="text-xs text-base-content/60 truncate">
-                                {{ tx.at ? formatDate(tx.at) : '' }}<template v-if="tx.note && tx.tags?.length">
-                                    · {{ tagText(tx.tags) }}</template>
+                            <p class="text-xs text-base-content/60 flex items-center gap-1.5 min-w-0">
+                                <span class="shrink-0">{{ tx.at ? formatDate(tx.at) : '' }}</span>
+                                <TypeChip v-if="typedTx(tx)" :transaction="typedTx(tx)" size="xs"
+                                    :preset-values="chipValues(tx)" />
+                                <span v-if="tx.note && tx.tags?.length" class="truncate">{{ tagText(tx.tags) }}</span>
                             </p>
                         </div>
                         <span class="tabular-nums shrink-0" :class="tx.amount < 0 ? 'text-error' : 'text-success'">
@@ -275,6 +277,8 @@ import { saveBlob } from '../services/report.js'
 import { useTagsStore } from '../services/tags.js'
 import { hasTelegramLinked } from '../services/telegramSend.js'
 import { isTelegramWebApp } from '../services/telegramWebApp.js'
+import { useTransactionTypesStore } from '../services/transactionTypes.js'
+import TypeChip from './TypeChip.vue'
 
 const props = defineProps({
     item: {
@@ -286,6 +290,7 @@ const props = defineProps({
 const formatDate = inject('formatDate')
 const formatMoney = inject('formatMoney')
 const tagsStore = useTagsStore()
+const typesStore = useTransactionTypesStore()
 const agent = useAgentStore()
 const inTelegram = isTelegramWebApp()
 const telegramLinked = computed(() => hasTelegramLinked())
@@ -296,6 +301,17 @@ const budgets = computed(() => data.value.budgets ?? [])
 const tags = computed(() => data.value.tags ?? [])
 const recurring = computed(() => data.value.recurring ?? [])
 
+// Assistant rows carry the type name and formatted field values, not the id and raw data.
+const typedTx = (tx) => {
+    if (!tx.type) return null
+    const type = typesStore.types.find((t) => t.name === tx.type)
+    return type ? { transaction_type_id: type.id, data: null } : null
+}
+const chipValues = (tx) => {
+    const values = Object.values(tx.fields ?? {}).map(String).filter((v) => v.length <= 18)
+    const two = values.slice(0, 2).join(' · ')
+    return values.length > 1 && two.length <= 18 ? two : (values[0] ?? '')
+}
 const tagText = (list) => (list ?? []).map((tag) => `${tag.emoji ?? ''} ${tag.title ?? ''}`.trim()).join(', ')
 const upcoming = computed(() => data.value.items ?? [])
 const compareTags = computed(() => (data.value.tags ?? []).slice(0, 8))

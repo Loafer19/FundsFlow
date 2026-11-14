@@ -109,7 +109,10 @@
                                 </span>
                                 <span class="flex flex-col min-w-0 flex-1">
                                     <span class="truncate">{{ t.label }}</span>
-                                    <span class="text-xs text-base-content/60">{{ formatDate(t.at) }}</span>
+                                    <span class="text-xs text-base-content/60 flex items-center gap-1.5 min-w-0">
+                                        <span class="shrink-0">{{ formatDate(t.at) }}</span>
+                                        <TypeChip :transaction="t.transaction" size="xs" />
+                                    </span>
                                 </span>
                                 <span class="flex flex-col items-end shrink-0">
                                     <span class="font-semibold tabular-nums">{{ formatMoney(t.amount) }}</span>
@@ -175,6 +178,7 @@ import { ChartPie, ChevronDown, ChevronRight, Flame, Info, Lightbulb, Presentati
 import { computed, inject, ref } from 'vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatCard from '../components/StatCard.vue'
+import TypeChip from '../components/TypeChip.vue'
 import { today } from '../services/clock.js'
 import { tagChange } from '../services/comparison.js'
 import { parseLocalDate, toLocalDateStr } from '../services/formatters.js'
@@ -435,6 +439,7 @@ const largestExpenses = computed(() => {
             amount: t.amount,
             emoji: tagEmoji(t),
             label: t.note || (t.tags ?? []).map((tag) => tag.title).join(', ') || 'Untitled',
+            transaction: t,
             share: total > 0 ? (-t.amount / total) * 100 : 0,
         }))
 })

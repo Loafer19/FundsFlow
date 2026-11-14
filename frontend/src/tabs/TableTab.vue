@@ -83,6 +83,7 @@
                             </td>
                             <td>
                                 <div class="flex flex-wrap gap-2">
+                                    <TypeChip :transaction="transaction" />
                                     <template v-for="tag in transaction.tags" :key="tag.id">
                                         <div v-if="inReport" class="badge badge-soft badge-info px-1 gap-1">
                                             <span>{{ tag.emoji }}</span><span>{{ tag.title }}</span>
@@ -97,14 +98,7 @@
                                 </div>
                             </td>
                             <td class="max-w-xs" :title="rowTitle(transaction)">
-                                <span v-if="typeLine(transaction)"
-                                    class="flex items-center gap-1 text-xs text-base-content/70 mb-0.5 min-w-0">
-                                    <span class="badge badge-xs badge-soft shrink-0 gap-0.5 px-1"
-                                        :style="typeBadgeStyle(transaction)">{{ typeLine(transaction).label }}</span>
-                                    <span class="truncate">{{ typeLine(transaction).summary }}</span>
-                                </span>
-                                <span v-if="transaction.note || !typeLine(transaction)"
-                                    class="line-clamp-2 whitespace-normal break-words">{{ transaction.note || '-' }}</span>
+                                <span class="line-clamp-2 whitespace-normal break-words">{{ transaction.note || '-' }}</span>
                             </td>
                             <td>
                                 <button v-if="transaction.attachments?.length" type="button"
@@ -231,12 +225,13 @@ import { computed, inject, ref } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
 import TagDetailModal from '../components/TagDetailModal.vue'
+import TypeChip from '../components/TypeChip.vue'
 import { today } from '../services/clock.js'
 import { getTransactionSourceLabel, parseLocalDate, toLocalDateStr } from '../services/formatters'
 import { goToImport } from '../services/imports.js'
 import { useTransactionsStore } from '../services/transactions'
 import { useTransactionTypesStore } from '../services/transactionTypes.js'
-import { typeRows, typeSummary } from '../services/typeFields.js'
+import { typeRows } from '../services/typeFields.js'
 
 const formatMoney = inject('formatMoney')
 const formatDate = inject('formatDate')
@@ -248,18 +243,13 @@ const sourceIcon = (source) => sourceIcons[source] ?? sourceIcons.web
 const transactionsStore = useTransactionsStore()
 const typesStore = useTransactionTypesStore()
 
-// "⛽ Fuel" badge + "40 l · 58,90 ₴ · OKKO" over the note; the title lists every field.
-const typeLine = (transaction) => {
+// The type is the first chip in the Tags cell (TypeChip); the note cell's title still lists every field.
+// Search matches the type name and every field value, not only what the chip shows.
+const typeSearchText = (transaction) => {
     const type = typesStore.byId(transaction.transaction_type_id)
-    if (!type) return null
-    return { label: [type.emoji, type.name].filter(Boolean).join(' '), summary: typeSummary(type, transaction.data) }
+    if (!type) return ''
+    return [type.name, ...typeRows(type, transaction.data).map((row) => row.value)].join(' ').toLowerCase()
 }
-
-const typeBadgeStyle = (transaction) => {
-    const color = typesStore.byId(transaction.transaction_type_id)?.color
-    return color ? { backgroundColor: `${color}33`, borderColor: `${color}66` } : null
-}
-
 const rowTitle = (transaction) => {
     const type = typesStore.byId(transaction.transaction_type_id)
     const rows = type ? typeRows(type, transaction.data).map((row) => `${row.label}: ${row.value}`) : []
@@ -318,7 +308,7 @@ const filteredTransactions = computed(() => {
             (transaction) =>
                 !query ||
                 transaction.note?.toLowerCase().includes(query) ||
-                [typeLine(transaction)?.label, typeLine(transaction)?.summary].join(' ').toLowerCase().includes(query),
+                typeSearchText(transaction).includes(query),
         )
         .sort((a, b) => transactionsStore.sort(a, b, sortConfig.value.key, sortConfig.value.direction))
 })

@@ -27,6 +27,9 @@ In the next release.
 - **Types in the bot.** Write `Fuel: 40 l at 58.9` and the assistant saves a *Fuel* transaction with its fields and
   the amount from the total. Anything that doesn't fit a field is kept in the note. `/recent` shows the type and its
   fields. [Learn more](/docs/web/types/#with-the-assistants)
+- **Assistants manage types.** In the web app or in Telegram, ask *create these types: Fuel (liters, price/l, fuel type,
+  station, total), Groceries, Subscription, Restaurant* and confirm one card. You can also add, rename or hide fields,
+  change options and default tags, or archive a type the same way.
 
 ## 2.3.0
 

@@ -7,6 +7,7 @@ use App\Actions\Agent\AgentPlanningTools;
 use App\Actions\Imports\ImportAgentTools;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Agent\AgentTypeFields;
+use App\Actions\Agent\AgentTypeTools;
 use App\Actions\Charts\BuildUserChartAction;
 use App\Actions\Report\BuildUserReportAction;
 use App\Actions\Telegram\TelegramAgentToolExecutor;
@@ -62,6 +63,10 @@ final class WebAgentChannel implements AgentChannel
         'resume_recurring' => 'Preparing recurring resume',
         'delete_recurring' => 'Preparing recurring delete',
         'create_support_ticket' => 'Preparing support request',
+        'list_transaction_types' => 'Reading transaction types',
+        'create_transaction_types' => 'Preparing types',
+        'update_transaction_type' => 'Preparing type changes',
+        'archive_transaction_type' => 'Preparing type archive',
         'read_receipt' => 'Reading receipt',
         'convert_currency' => 'Checking the NBU rate',
         'update_pending_transaction' => 'Updating the card',
@@ -116,6 +121,7 @@ final class WebAgentChannel implements AgentChannel
         }
 
         $typesBlock = AgentTypeFields::promptBlock($user);
+        $typesRule = AgentTypeTools::PROMPT_RULE;
 
         return <<<PROMPT
 You are the FundsFlow personal finance assistant in the chat panel of the FundsFlow web app.
@@ -130,6 +136,7 @@ Rules:
 - For "show recent/budgets/tags/recurring/month" prefer the matching show_* tool: it renders a card in the chat. Then stop.
 - For any request to see a chart/graph/diagram/visual (e.g. "покажи витрати по тегах за місяць", "chart of spending", "графік доходів і витрат", "balance trend"), call send_chart once with the best type/period (spending by tag -> expenses_by_tag; income vs expenses -> income_vs_expenses; balance over time -> balance_trend; "за місяць"/"this month" -> this_month unless they say last month). It renders an interactive chart in the chat; then stop.
 - For analysis questions (e.g. what do you think about my finances), call period_summary, list_budgets, list_recent_transactions (and more if needed), then answer with real figures.
+{$typesRule}
 - Budgets: for "how is my budget / скільки лишилось / can I still spend" call budget_status (spent, left, days left, per-day allowance, projection) and answer with the figures; to show it as a card use show_budget_status. To change, pause, resume or delete a budget use update_budget / pause_budget / resume_budget / delete_budget (ids from list_budgets or budget_status; include_paused=true to find paused ones).
 - Spending limits count their tags and the tags' child tags (no need to list children). They run on calendar weeks/months/years by default (create_budget without start_date: spending since the start of the current period counts). Pass start_date only when the user names a start day ("monthly from the 15th" = start_date on the 15th). Editing amount, length or tags applies to the whole current period: spent still counts from its start. Goal deadlines must be today or later.
 - Savings goals are budgets with type goal: a target amount reached through transactions with the goal's savings tag(s) or their child tags since the goal started (transfers into savings logged as expenses add, withdrawals subtract; plus an optional start_amount already saved). For "how is my goal / when will I reach it" call budget_status (saved, remaining, deadline, required per month/week, pace, projected date). To create one use create_budget with type goal (amount = target, tag_ids = savings tag(s), optional start_date if the user started saving earlier (today or a past day; progress counts from it), target_date and start_amount); if the user has no savings tag, suggest creating one (create_tags) first. Edit, pause, resume, delete goals with the same budget tools.
