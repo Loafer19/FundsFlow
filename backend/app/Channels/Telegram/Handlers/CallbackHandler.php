@@ -597,11 +597,36 @@ class CallbackHandler
             return;
         }
 
-        $this->client->answerCallbackQuery($callbackId);
+        $headline = TelegramSupport::cardHeadline($this->messageText);
 
-        if (!$this->editor->openForTransaction($user, $chatId, $transaction, $messageId, TelegramSupport::cardHeadline($this->messageText))) {
-            $this->client->sendMessage($chatId, "Couldn't open the editor. Try again in a moment");
+        if ($this->editor->openForTransaction($user, $chatId, $transaction, $messageId, $headline)) {
+            $this->client->answerCallbackQuery($callbackId);
+
+            return;
         }
+
+        // No widget (Telegram refuses widgets for the bot, or the send failed): the card itself
+        // becomes the editor with the text flows (🏷 Tags picker, ✏️ Amount, 📎 Attach).
+        $this->client->answerCallbackQuery($callbackId, 'Edit with the buttons below');
+
+        if ($messageId) {
+            $this->client->editMessageText(
+                $chatId,
+                $messageId,
+                $this->support->formatTransactionCard($user, $transaction, $headline),
+                $this->support->textEditKeyboard($transaction, str_starts_with($headline, '✅ Saved')),
+                TelegramSupport::PARSE_HTML,
+            );
+
+            return;
+        }
+
+        $this->client->sendMessage(
+            $chatId,
+            $this->support->formatTransactionCard($user, $transaction, $headline),
+            $this->support->textEditKeyboard($transaction),
+            TelegramSupport::PARSE_HTML,
+        );
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Channels\Telegram;
 
 use App\Actions\Tags\ListTagsAction;
 use App\Actions\Tags\MatchTagTitlesAction;
+use App\Channels\Telegram\Widgets\WidgetAvailability;
 use App\Models\Identity;
 use App\Models\Tag;
 use App\Models\Transaction;
@@ -401,14 +402,27 @@ class TelegramSupport
         $undoButton = ['text' => '↩️ Undo', 'callback_data' => "undo:{$id}"];
         $delete = ['text' => '🗑 Delete', 'callback_data' => "delask:{$id}"];
 
-        if ($chatId === null || self::isPrivateChat($chatId)) {
+        if (self::widgetEditorAvailable($chatId)) {
             // Private chat: one ✏️ Edit opens the widget editor (amount, date, tags, note).
             $row = [['text' => '✏️ Edit', 'callback_data' => "edit:{$id}"], $delete];
 
             return ['inline_keyboard' => [$undo ? [$undoButton, ...$row] : $row]];
         }
 
-        // Groups have no widgets: tag picker and a typed amount, as before.
+        return $this->textEditKeyboard($transaction, $undo);
+    }
+
+    /**
+     * Groups (and private chats while Telegram refuses widgets): tag picker, a typed amount, files.
+     *
+     * @return array<string, mixed>
+     */
+    public function textEditKeyboard(Transaction $transaction, bool $undo = false): array
+    {
+        $id = $transaction->id;
+        $undo = $undo && $this->canUndo($transaction);
+        $undoButton = ['text' => '↩️ Undo', 'callback_data' => "undo:{$id}"];
+        $delete = ['text' => '🗑 Delete', 'callback_data' => "delask:{$id}"];
         $rows = [[
             ['text' => '🏷 Tags', 'callback_data' => "retag:{$id}"],
             ['text' => '✏️ Amount', 'callback_data' => "editamt:{$id}"],
@@ -452,6 +466,14 @@ class TelegramSupport
         $first = trim(strtok((string) $messageText, "\n") ?: '');
 
         return preg_match('/^(✅ |🔁 |✏️ |Transaction$)/u', $first) ? $first : $fallback;
+    }
+
+    /**
+     * The ✏️ Edit widget works only in a private chat and only while Telegram accepts widgets.
+     */
+    public static function widgetEditorAvailable(int|string|null $chatId): bool
+    {
+        return ($chatId === null || self::isPrivateChat($chatId)) && !WidgetAvailability::blocked();
     }
 
     public static function isPrivateChat(int|string $chatId): bool
@@ -578,8 +600,8 @@ class TelegramSupport
      */
     public function receiptDraftKeyboard(string $nonce, int|string|null $chatId = null): array
     {
-        // Private chat: ✏️ Edit opens the widget editor; groups type a new amount.
-        $private = $chatId === null || self::isPrivateChat($chatId);
+        // Private chat: ✏️ Edit opens the widget editor; groups (or no widgets) type a new amount.
+        $private = self::widgetEditorAvailable($chatId);
 
         return [
             'inline_keyboard' => [[
@@ -763,8 +785,9 @@ class TelegramSupport
                 ));
                 $lines[] = self::tagLine($label);
             } else {
+                // None of the guesses is one of the user's tags: Confirm saves without tags, so say so.
                 $hint = implode(', ', array_map(fn ($t) => $this->escapeHtml((string) $t), $titles));
-                $lines[] = '🏷 suggested: ' . $hint;
+                $lines[] = '🏷 No tags (not in your tags: ' . $hint . ')';
             }
         } else {
             $lines[] = '🏷 No tags';

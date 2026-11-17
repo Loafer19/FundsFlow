@@ -75,12 +75,13 @@ Rules:
 - amount: total paid as a signed number. Prefer expense (negative) for purchases. Use null if the total is missing, ambiguous, or a food/menu photo without a clear price.
 - at: receipt date if clearly visible, else null (caller uses today).
 - note: short merchant/place or description, max ~80 chars, no currency symbols required.
-- suggested_tag_titles: 0–3 short English tag names that fit (e.g. "Food", "Transport", "Groceries").
+- suggested_tag_titles: 0–3 tag titles copied exactly from the user's tags (listed in the user message). Only the
+  user's own titles count: never invent a title, and use [] when none of them fits.
 - category: coarse label like food, groceries, transport, utilities, health, shopping, entertainment, other — or null.
 - User caption: when the user's caption gives an amount ("350 groceries", "-350", "+500 refund", "кава 80"), use it as
   the amount (no sign = expense, negative; "+" or income words = positive) even if the image shows a different total,
   and set needs_price false. A leading DD.MM or DD.MM.YYYY (this year if no year) or "yesterday"/"вчора" in the caption
-  sets at. Words in the caption describe the purchase: prefer them for note and suggested_tag_titles.
+  sets at. Words in the caption describe the purchase: prefer them for note and for picking suggested_tag_titles.
 - needs_price: true when amount is null OR the image is food/unclear and the user must type the price. Never invent a total.
 - confidence: 0–1 how sure you are about the amount (null if needs_price).
 - is_transaction_list: true when the image is NOT one receipt but a list of several operations (a banking app's
@@ -89,7 +90,7 @@ Rules:
   Otherwise is_transaction_list is false and "transactions" is [].
 PROMPT;
 
-        $userText = "Today (user timezone date) is {$today}. Extract the receipt fields.{$hint}";
+        $userText = "Today (user timezone date) is {$today}. Extract the receipt fields.{$hint}\n" . $this->tagListLine($user);
 
         try {
             $response = Http::withToken($apiKey)
@@ -144,6 +145,28 @@ PROMPT;
 
             return null;
         }
+    }
+
+    /**
+     * The user's own tag titles (as "Parent › Child" where nested) for suggested_tag_titles: the
+     * draft only applies titles that match a tag, so generic guesses like "Pets" were dropped on Confirm.
+     */
+    public function tagListLine(User $user): string
+    {
+        $tags = $user->tags()->orderBy('title')->limit(120)->get(['id', 'title', 'parent_id']);
+
+        if ($tags->isEmpty()) {
+            return "User's tags: none (return suggested_tag_titles: []).";
+        }
+
+        $byId = $tags->keyBy('id');
+        $labels = $tags->map(function ($tag) use ($byId): string {
+            $parent = $tag->parent_id !== null ? $byId->get($tag->parent_id) : null;
+
+            return $parent ? "{$parent->title} › {$tag->title}" : (string) $tag->title;
+        })->all();
+
+        return "User's tags (suggest the last part, the tag title itself): " . implode('; ', $labels);
     }
 
     public function hasQuota(User $user): bool

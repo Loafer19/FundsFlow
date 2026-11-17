@@ -266,6 +266,11 @@ class TelegramWidgetSender
     {
         $description = mb_substr((string) ($result['description'] ?? ''), 0, 240);
 
+        if (WidgetAvailability::isNotAllowed($result)) {
+            // Bot-wide refusal: skip widgets (and their buttons) for a while instead of failing every tap.
+            WidgetAvailability::markBlocked();
+        }
+
         Log::warning('Telegram sendWidget failed', [
             'kind' => $kind,
             'error_code' => $result['error_code'] ?? null,
@@ -283,6 +288,11 @@ class TelegramWidgetSender
 
     private function fitsLimits(string $kind): bool
     {
+        if (WidgetAvailability::blocked()) {
+            // Telegram refuses widgets right now: callers take their text fallback without a request.
+            return false;
+        }
+
         $html = $this->html($kind);
         $raw = strlen($html);
         $compressed = strlen(gzcompress($html, 9) ?: '');

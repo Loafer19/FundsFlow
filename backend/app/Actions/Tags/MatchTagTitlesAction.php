@@ -31,7 +31,9 @@ final class MatchTagTitlesAction
             if (!is_string($title)) {
                 continue;
             }
-            $normalized = mb_strtolower(trim($title));
+            // "Home › Items" or "Home / Items": the tag is the last part.
+            $parts = preg_split('/\s*(?:›|»|>|\/)\s*/u', $title) ?: [$title];
+            $normalized = mb_strtolower(trim((string) end($parts)));
 
             if ($normalized !== '') {
                 $wanted[$normalized] = true;
