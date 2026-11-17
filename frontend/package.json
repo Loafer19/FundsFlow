@@ -21,6 +21,7 @@
     "packageManager": "bun@1.4.4",
     "scripts": {
         "check": "biome check --write .",
+        "ci": "biome ci .",
         "dev": "vite --open",
         "prod": "vite build"
     },

@@ -3,9 +3,10 @@ name: CI Pipeline
 on:
   push:
     branches: [ main ]
+  pull_request:
 
 jobs:
-  check:
+  frontend:
     runs-on: ubuntu-24.04
 
     steps:
@@ -16,14 +17,51 @@ jobs:
         with:
           bun-version: 1.4.4
 
-      - name: Run Biome Check
+      - name: Biome
         run: |
           cd frontend
           bun install --frozen-lockfile
-          bun run check
+          bun run ci
+
+  mcp:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Typecheck
+        run: |
+          cd mcp
+          bun install --frozen-lockfile
+          bunx tsc --noEmit -p .
+
+  backend:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: bcmath, intl, zip
+          coverage: none
+
+      - name: Pint
+        run: |
+          cd backend
+          composer install --no-interaction --no-scripts --prefer-dist
+          vendor/bin/pint --test
 
   release:
-    needs: check
+    needs: [frontend, mcp, backend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
