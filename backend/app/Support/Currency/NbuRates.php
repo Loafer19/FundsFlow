@@ -37,9 +37,11 @@ final class NbuRates
     public static function normalize(string $currency): ?string
     {
         $value = mb_strtolower(trim($currency));
+
         if ($value === '') {
             return null;
         }
+
         foreach (self::ALIASES as $code => $aliases) {
             if (in_array($value, $aliases, true)) {
                 return $code;
@@ -50,20 +52,23 @@ final class NbuRates
     }
 
     /**
-     * @return array{currency: string, rate: float, rate_date: string}|null
+     * @return null|array{currency: string, rate: float, rate_date: string}
      */
     public function rate(string $currency, string $date): ?array
     {
         $code = self::normalize($currency);
+
         if ($code === null) {
             return null;
         }
+
         if ($code === 'UAH') {
             return ['currency' => 'UAH', 'rate' => 1.0, 'rate_date' => $date];
         }
 
         $day = CarbonImmutable::parse($date)->startOfDay();
         $today = CarbonImmutable::now('Europe/Kyiv')->startOfDay();
+
         // NBU sets tomorrow's rate in the afternoon; never ask for a later day than today.
         if ($day->greaterThan($today)) {
             $day = $today;
@@ -71,6 +76,7 @@ final class NbuRates
 
         $key = "nbu-rate:{$code}:" . $day->format('Ymd');
         $cached = Cache::get($key);
+
         if (is_array($cached)) {
             return $cached;
         }
@@ -104,11 +110,12 @@ final class NbuRates
     /**
      * Convert an amount in $currency to UAH at the NBU rate for $date (sign kept).
      *
-     * @return array{amount: float, currency: string, rate: float, rate_date: string, uah: float}|null
+     * @return null|array{amount: float, currency: string, rate: float, rate_date: string, uah: float}
      */
     public function toUah(float $amount, string $currency, string $date): ?array
     {
         $rate = $this->rate($currency, $date);
+
         if ($rate === null) {
             return null;
         }

@@ -14,9 +14,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-
-
 
 class TransactionAttachmentController extends Controller
 {
@@ -72,10 +71,12 @@ class TransactionAttachmentController extends Controller
         abort_if($disk->missing($attachment->path), 404, 'Attachment file is missing from storage!');
 
         return $disk->response(
-
             $attachment->path,
             $attachment->original_name,
-            ['Content-Type' => $attachment->mime],
+            [
+                'Content-Type' => $attachment->mime,
+                'X-Content-Type-Options' => 'nosniff',
+            ],
             'inline',
         );
 
@@ -99,12 +100,26 @@ class TransactionAttachmentController extends Controller
             abort(404, 'Attachment file is missing from storage!');
         }
 
+        $caption = $request->input('caption');
+
+        if ($caption !== null && !is_string($caption)) {
+            throw ValidationException::withMessages([
+                'caption' => 'Caption must be text.',
+            ]);
+        }
+
+        if (is_string($caption) && mb_strlen($caption) > 1024) {
+            throw ValidationException::withMessages([
+                'caption' => 'Caption must be 1024 characters or fewer.',
+            ]);
+        }
+
         $this->sendFileToTelegram->execute(
             $request->user(),
             $contents,
             $attachment->original_name ?: 'attachment',
             (string) ($attachment->mime ?: 'application/octet-stream'),
-            filled($request->input('caption')) ? (string) $request->input('caption') : null,
+            filled($caption) ? $caption : null,
         );
 
         return response()->json([

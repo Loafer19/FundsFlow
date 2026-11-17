@@ -23,7 +23,7 @@ class ConvertHtmlToPdfViaGotenbergAction
         $response = Http::timeout((int) config('telegram.timeouts.gotenberg_pdf'))
             ->connectTimeout((int) config('telegram.timeouts.gotenberg_connect'))
             ->attach('files', $html, 'index.html')
-            ->post($base.'/forms/chromium/convert/html', [
+            ->post($base . '/forms/chromium/convert/html', [
                 'landscape' => 'true',
                 'printBackground' => 'true',
                 'emulatedMediaType' => 'print',
@@ -34,16 +34,16 @@ class ConvertHtmlToPdfViaGotenbergAction
                 'marginRight' => '0.2',
             ]);
 
-        if (! $response->successful()) {
+        if (!$response->successful()) {
             $body = trim($response->body());
             $hint = $body !== '' ? mb_substr($body, 0, 300) : 'no body';
 
-            throw new RuntimeException('Gotenberg PDF conversion failed (HTTP '.$response->status().'): '.$hint);
+            throw new RuntimeException('Gotenberg PDF conversion failed (HTTP ' . $response->status() . '): ' . $hint);
         }
 
         $pdf = $response->body();
 
-        if ($pdf === '' || ! str_starts_with($pdf, '%PDF')) {
+        if ($pdf === '' || !str_starts_with($pdf, '%PDF')) {
             throw new RuntimeException('Gotenberg returned an empty or invalid PDF.');
         }
 

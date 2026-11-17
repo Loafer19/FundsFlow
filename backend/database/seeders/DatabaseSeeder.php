@@ -34,7 +34,7 @@ class DatabaseSeeder extends Seeder
 
     private function clearUserData(User $user): void
     {
-        Tag::where('user_id', $user->id)->delete();
+        Tag::where('user_id', $user->id)->forceDelete();
         Transaction::where('user_id', $user->id)->delete();
     }
 

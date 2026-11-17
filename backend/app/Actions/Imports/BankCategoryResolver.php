@@ -190,19 +190,22 @@ final class BankCategoryResolver
     ];
 
     /**
-     * @param  array<string, int>  $tagsByTitle  lowercase title => tag id
+     * @param array<string, int> $tagsByTitle lowercase title => tag id
      * @return array{action: string, tag_id?: int, title?: string}
      */
     public function defaultDecision(string $name, array $tagsByTitle): array
     {
         $lower = mb_strtolower(trim($name));
+
         if ($lower === '') {
             return ['action' => self::ACTION_IGNORE];
         }
+
         if (isset($tagsByTitle[$lower])) {
             return ['action' => self::ACTION_MAP, 'tag_id' => $tagsByTitle[$lower]];
         }
         $mapped = self::SYNONYMS[$lower] ?? null;
+
         if ($mapped !== null && isset($tagsByTitle[mb_strtolower($mapped)])) {
             return ['action' => self::ACTION_MAP, 'tag_id' => $tagsByTitle[mb_strtolower($mapped)]];
         }
@@ -211,26 +214,31 @@ final class BankCategoryResolver
     }
 
     /**
-     * @param  array<string, mixed>  $decision
-     * @param  array<int, true>  $ownedTagIds
-     * @return array{action: string, tag_id?: int, title?: string}|null
+     * @param array<string, mixed> $decision
+     * @param array<int, true> $ownedTagIds
+     * @return null|array{action: string, tag_id?: int, title?: string}
      */
     public function normalizeDecision(array $decision, array $ownedTagIds, ?string $fallbackTitle = null): ?array
     {
         $action = $decision['action'] ?? null;
+
         if ($action === self::ACTION_IGNORE) {
             return ['action' => self::ACTION_IGNORE];
         }
+
         if ($action === self::ACTION_MAP) {
             $id = isset($decision['tag_id']) ? (int) $decision['tag_id'] : 0;
+
             if ($id > 0 && isset($ownedTagIds[$id])) {
                 return ['action' => self::ACTION_MAP, 'tag_id' => $id];
             }
 
             return null;
         }
+
         if ($action === self::ACTION_CREATE) {
             $title = trim((string) ($decision['title'] ?? $fallbackTitle ?? ''));
+
             if ($title === '') {
                 return null;
             }
@@ -242,8 +250,8 @@ final class BankCategoryResolver
     }
 
     /**
-     * @param  array<string, mixed>  $map
-     * @return array<string, mixed>|null
+     * @param array<string, mixed> $map
+     * @return null|array<string, mixed>
      */
     public function findDecision(array $map, string $name): ?array
     {
@@ -251,6 +259,7 @@ final class BankCategoryResolver
             return $map[$name];
         }
         $lower = mb_strtolower($name);
+
         foreach ($map as $key => $decision) {
             if (is_string($key) && mb_strtolower($key) === $lower && is_array($decision)) {
                 return $decision;
@@ -263,7 +272,7 @@ final class BankCategoryResolver
     /**
      * Existing key for $name, or $name itself when the map has no match.
      *
-     * @param  array<string, mixed>  $map
+     * @param array<string, mixed> $map
      */
     public function canonicalName(array $map, string $name): string
     {
@@ -271,6 +280,7 @@ final class BankCategoryResolver
             return $name;
         }
         $lower = mb_strtolower($name);
+
         foreach (array_keys($map) as $key) {
             if (is_string($key) && mb_strtolower($key) === $lower) {
                 return $key;

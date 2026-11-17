@@ -27,11 +27,12 @@ final class AgentHistory
     public const MAX_TEXT = 1500;
 
     /**
-     * @param array{turn_id?: string|null, ref?: string|null, status?: string|null, kind?: string} $meta
+     * @param array{turn_id?: null|string, ref?: null|string, status?: null|string, kind?: string} $meta
      */
     public function add(User|int $user, string $channel, string $role, string $text, array $meta = []): void
     {
         $text = trim($text);
+
         if ($text === '') {
             return;
         }
@@ -44,6 +45,7 @@ final class AgentHistory
             'text' => mb_substr($text, 0, self::MAX_TEXT),
             'at' => now()->toIso8601String(),
         ];
+
         foreach (['turn_id', 'ref', 'status'] as $key) {
             if (is_string($meta[$key] ?? null) && $meta[$key] !== '') {
                 $item[$key] = $meta[$key];
@@ -79,6 +81,7 @@ final class AgentHistory
                     && ($item['status'] ?? null) === 'pending'
                     && ($ref === null || ($item['ref'] ?? null) === $ref)
                     && ($channel === null || ($item['channel'] ?? null) === $channel);
+
                 if ($match) {
                     $items[$i]['status'] = $status;
                 }
@@ -109,7 +112,7 @@ final class AgentHistory
      * $dropTrailingAsk removes the last item when it is this channel's pending question
      * (the agent loop re-adds that question itself as the ask context).
      *
-     * @return list<array{role: 'user'|'assistant', content: string}>
+     * @return list<array{role: 'assistant'|'user', content: string}>
      */
     public function messages(User|int $user, string $channel, bool $dropTrailingAsk = false, ?int $limit = null): array
     {
@@ -117,17 +120,20 @@ final class AgentHistory
 
         if ($dropTrailingAsk && $items !== []) {
             $last = $items[count($items) - 1];
+
             if (($last['kind'] ?? null) === 'ask' && ($last['channel'] ?? null) === $channel) {
                 array_pop($items);
             }
         }
 
         $limit ??= max(0, (int) config('agent.web_history_turns'));
+
         if ($limit === 0) {
             return [];
         }
 
         $out = [];
+
         foreach (array_slice($items, -$limit) as $item) {
             $via = ($item['channel'] ?? null) === self::TELEGRAM ? 'Telegram' : 'web';
             $text = (string) ($item['text'] ?? '');

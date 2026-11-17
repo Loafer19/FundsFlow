@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery
@@ -226,14 +227,16 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     protected static function booted(): void
     {
         static::created(function (User $user) {
-            (new DefaultTagsSeeder)->run($user);
+            DB::transaction(function () use ($user) {
+                (new DefaultTagsSeeder)->run($user);
 
-            // Starter types (Fuel, Groceries, …) must never block a signup.
-            try {
-                (new DefaultTransactionTypesSeeder)->run($user);
-            } catch (\Throwable $e) {
-                report($e);
-            }
+                // Starter types (Fuel, Groceries, …) must never block a signup.
+                try {
+                    (new DefaultTransactionTypesSeeder)->run($user);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            });
         });
     }
 

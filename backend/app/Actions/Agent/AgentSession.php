@@ -11,9 +11,9 @@ interface AgentSession
 {
     /**
      * @return array{
-     *     domain: 'tags'|'budgets'|'transactions'|null,
+     *     domain: null|'budgets'|'tags'|'transactions',
      *     last_list: list<array{id: int, title: string, emoji?: string}>,
-     *     pending: array<string, mixed>|null,
+     *     pending: null|array<string, mixed>,
      *     last_bot_summary: string
      * }
      */
@@ -27,7 +27,7 @@ interface AgentSession
     public function setLastList(array $items): void;
 
     /**
-     * @param array<string, mixed>|null $pending
+     * @param null|array<string, mixed> $pending
      */
     public function setPending(?array $pending): void;
 

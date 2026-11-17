@@ -13,6 +13,9 @@ class TelegramWebAppInitData
     /**
      * Validate Telegram WebApp initData and return parsed fields.
      *
+     *
+     * @throws ValidationException
+     *
      * @return array{
      *     user: array{
      *         id: int,
@@ -25,8 +28,6 @@ class TelegramWebAppInitData
      *     auth_date: int,
      *     raw: array<string, string>
      * }
-     *
-     * @throws ValidationException
      */
     public function parse(string $initData): array
     {
@@ -152,7 +153,7 @@ class TelegramWebAppInitData
      * Refresh the Telegram profile fields on an existing identity while keeping
      * app-owned keys such as `muted` (set by /mute in the bot).
      *
-     * @param array<string, mixed>|null $existing
+     * @param null|array<string, mixed> $existing
      * @param array{
      *     id: int,
      *     username: ?string,

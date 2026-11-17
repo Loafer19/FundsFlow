@@ -28,7 +28,6 @@ class Transaction extends Model
         'data',
     ];
 
-
     protected $casts = [
         'at' => 'datetime',
         'amount' => 'decimal:2',

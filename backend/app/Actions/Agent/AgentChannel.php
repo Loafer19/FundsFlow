@@ -16,7 +16,7 @@ interface AgentChannel
     /**
      * Prior conversation turns placed between the system prompt and the new user message.
      *
-     * @return list<array{role: 'user'|'assistant', content: string}>
+     * @return list<array{role: 'assistant'|'user', content: string}>
      */
     public function historyMessages(): array;
 

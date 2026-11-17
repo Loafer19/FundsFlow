@@ -23,7 +23,7 @@ class ScreenshotHtmlViaGotenbergAction
         $response = Http::timeout((int) config('telegram.timeouts.gotenberg_screenshot'))
             ->connectTimeout((int) config('telegram.timeouts.gotenberg_connect'))
             ->attach('files', $html, 'index.html')
-            ->post($base.'/forms/chromium/screenshot/html', [
+            ->post($base . '/forms/chromium/screenshot/html', [
                 'width' => (string) $width,
                 'height' => (string) $height,
                 'clip' => 'true',
@@ -31,13 +31,13 @@ class ScreenshotHtmlViaGotenbergAction
                 'optimizeForSpeed' => 'true',
             ]);
 
-        if (! $response->successful()) {
-            throw new RuntimeException('Gotenberg screenshot failed (HTTP '.$response->status().'): '.mb_substr(trim($response->body()), 0, 300));
+        if (!$response->successful()) {
+            throw new RuntimeException('Gotenberg screenshot failed (HTTP ' . $response->status() . '): ' . mb_substr(trim($response->body()), 0, 300));
         }
 
         $png = $response->body();
 
-        if (! str_starts_with($png, "\x89PNG")) {
+        if (!str_starts_with($png, "\x89PNG")) {
             throw new RuntimeException('Gotenberg returned an invalid PNG.');
         }
 

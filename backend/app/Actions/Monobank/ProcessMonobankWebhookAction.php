@@ -3,13 +3,14 @@
 namespace App\Actions\Monobank;
 
 use App\Models\MonobankConnection;
+use Illuminate\Support\Facades\Cache;
 
 class ProcessMonobankWebhookAction
 {
     public function __construct(private readonly ImportStatementItemAction $importItem) {}
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param array<string, mixed> $payload
      */
     public function execute(int $connectionId, array $payload): void
     {
@@ -95,6 +96,6 @@ class ProcessMonobankWebhookAction
     private function scheduleJarRefresh(int $connectionId): void
     {
         // No queue worker on prod: flag it, the scheduler picks it up within a few minutes.
-        \Illuminate\Support\Facades\Cache::put('monobank:jar-refresh:'.$connectionId, true, now()->addHours(2));
+        Cache::put('monobank:jar-refresh:' . $connectionId, true, now()->addHours(2));
     }
 }

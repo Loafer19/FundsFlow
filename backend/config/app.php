@@ -29,7 +29,7 @@ return [
 
     // Build identifier shown on the admin dashboard (e.g. a git SHA or tag set at deploy).
     'version' => (function () {
-        foreach ([__DIR__.'/../storage/app-version.json', __DIR__.'/../../frontend/package.json'] as $file) {
+        foreach ([__DIR__ . '/../storage/app-version.json', __DIR__ . '/../../frontend/package.json'] as $file) {
             $json = is_file($file) ? json_decode((string) file_get_contents($file), true) : null;
 
             if (is_array($json) && !empty($json['version'])) {

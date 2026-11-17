@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -61,7 +62,13 @@ final class TelegramAiQuota
     /** Admin: add assists for today only (gone at the user's midnight). */
     public function grantBonus(User $user, int $assists): void
     {
-        Cache::put($this->bonusKey($user), $this->bonus($user) + max(0, $assists), now()->addDays(2));
+        $key = $this->bonusKey($user);
+        $add = max(0, $assists);
+        Cache::add($key, 0, now()->addDays(2));
+
+        if ($add > 0) {
+            Cache::increment($key, $add);
+        }
     }
 
     /** Admin: zero today's counter (and drop today's bonus). */
@@ -89,7 +96,7 @@ final class TelegramAiQuota
     /**
      * Next midnight in the user's timezone (when the daily counter rolls over).
      */
-    public function resetAt(User $user): \Carbon\Carbon
+    public function resetAt(User $user): Carbon
     {
         return $user->nowInTimezone()->copy()->startOfDay()->addDay();
     }
@@ -164,9 +171,10 @@ final class TelegramAiQuota
     public function consume(User $user): void
     {
         $key = $this->key($user);
-        $used = (int) Cache::get($key, 0);
-        // Keep until well after the user's calendar day rolls over.
-        Cache::put($key, $used + 1, now()->addDays(2));
+        // add + increment so two successful calls at once both count. The key outlives
+        // the user's calendar day; the date is in the key, so yesterday's counter is unused.
+        Cache::add($key, 0, now()->addDays(2));
+        Cache::increment($key);
     }
 
     public function key(User $user): string

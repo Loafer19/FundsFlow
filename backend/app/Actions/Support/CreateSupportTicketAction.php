@@ -34,6 +34,7 @@ class CreateSupportTicketAction
 
         $body = trim(mb_substr($body, 0, self::BODY_MAX));
         $subject = trim((string) $subject);
+
         if ($subject === '') {
             $subject = self::subjectFrom($body);
         }

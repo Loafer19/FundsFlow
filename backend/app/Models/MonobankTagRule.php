@@ -14,14 +14,6 @@ class MonobankTagRule extends Model
         'tag_id',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'mcc' => 'integer',
-            'tag_id' => 'integer',
-        ];
-    }
-
     /**
      * @return BelongsTo<User, $this>
      */
@@ -36,5 +28,13 @@ class MonobankTagRule extends Model
     public function tag(): BelongsTo
     {
         return $this->belongsTo(Tag::class);
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'mcc' => 'integer',
+            'tag_id' => 'integer',
+        ];
     }
 }

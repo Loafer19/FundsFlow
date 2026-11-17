@@ -25,12 +25,12 @@ class TelegramClient
         ?array $replyMarkup = null,
         ?string $parseMode = null,
     ): void {
-        Http::post($this->baseUrl . 'sendMessage', array_filter([
+        $this->post('sendMessage', [
             'chat_id' => $chatId,
             'text' => $text,
             'parse_mode' => $parseMode,
             'reply_markup' => $replyMarkup ? json_encode($replyMarkup) : null,
-        ]));
+        ]);
     }
 
     /**
@@ -48,7 +48,7 @@ class TelegramClient
         ?int $replyTo = null,
     ): array {
         try {
-            $response = Http::post($this->baseUrl . 'sendMessage', array_filter([
+            $response = Http::timeout(20)->post($this->baseUrl . 'sendMessage', $this->fields([
                 'chat_id' => $chatId,
                 'text' => $text,
                 'parse_mode' => $parseMode,
@@ -161,13 +161,13 @@ class TelegramClient
         ?array $replyMarkup = null,
         ?string $parseMode = null,
     ): void {
-        Http::post($this->baseUrl . 'editMessageText', array_filter([
+        $this->post('editMessageText', [
             'chat_id' => $chatId,
             'message_id' => $messageId,
             'text' => $text,
             'parse_mode' => $parseMode,
             'reply_markup' => $replyMarkup ? json_encode($replyMarkup) : null,
-        ]));
+        ]);
     }
 
     /**
@@ -339,6 +339,42 @@ class TelegramClient
             'chat_id' => $chatId,
             'menu_button' => json_encode($menuButton),
         ], static fn ($value) => $value !== null))->json();
+    }
+
+    /**
+     * Drop only nulls. array_filter() without a callback also drops the text "0".
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function fields(array $payload): array
+    {
+        return array_filter($payload, static fn ($value) => $value !== null);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function post(string $method, array $payload): void
+    {
+        try {
+            $response = Http::timeout(20)->post($this->baseUrl . $method, $this->fields($payload));
+        } catch (\Throwable $e) {
+            Log::warning('TelegramClient: ' . $method . ' failed', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        $json = $response->json();
+
+        if (!is_array($json) || ($json['ok'] ?? false) !== true) {
+            Log::warning('TelegramClient: ' . $method . ' rejected', [
+                'status' => $response->status(),
+                'description' => mb_substr((string) (is_array($json) ? ($json['description'] ?? '') : ''), 0, 200),
+            ]);
+        }
     }
 
     /**

@@ -67,6 +67,7 @@ class LinkMonobankJarGoalAction
         }
 
         $target = round((float) ($jar->goal_amount ?? 0), 2);
+
         if ($target <= 0) {
             $target = max($balance, 1.0);
         }

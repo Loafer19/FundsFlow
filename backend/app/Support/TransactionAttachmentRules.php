@@ -124,11 +124,13 @@ final class TransactionAttachmentRules
     }
 
     /**
-     * Real type of an accepted file from its bytes (the claimed type only breaks a tie for formats
-     * finfo doesn't know). Null when it isn't an accepted type.
+     * Real type from the bytes. The client-supplied MIME is ignored: a lie must not become
+     * the stored Content-Type. Null when the bytes are not an accepted type.
      */
     public static function detectMime(string $contents, ?string $claimed = null): ?string
     {
+        unset($claimed);
+
         if (self::isHeic($contents)) {
             return 'image/heic';
         }
@@ -136,15 +138,11 @@ final class TransactionAttachmentRules
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
         $detected = $finfo->buffer($contents) ?: null;
 
-        if ($detected && self::isAccepted($detected)) {
+        if (is_string($detected) && $detected !== 'application/octet-stream' && self::isAccepted($detected)) {
             return $detected === 'image/heif' ? 'image/heic' : $detected;
         }
 
-        if ($claimed && isset(self::ALLOWED_MIMES[$claimed])) {
-            return $claimed;
-        }
-
-        return null;
+        return self::magicMime($contents);
     }
 
     /** ISO-BMFF "ftyp" box with a HEIC/HEIF brand (iPhone photos). */
@@ -155,5 +153,27 @@ final class TransactionAttachmentRules
         }
 
         return in_array(substr($contents, 8, 4), ['heic', 'heix', 'heim', 'heis', 'hevc', 'hevx', 'mif1', 'msf1'], true);
+    }
+
+    /** Signatures for the stored types, used when finfo only says octet-stream. */
+    private static function magicMime(string $contents): ?string
+    {
+        if (str_starts_with($contents, "\xFF\xD8\xFF")) {
+            return 'image/jpeg';
+        }
+
+        if (str_starts_with($contents, "\x89PNG\r\n\x1a\n")) {
+            return 'image/png';
+        }
+
+        if (strlen($contents) >= 12 && str_starts_with($contents, 'RIFF') && substr($contents, 8, 4) === 'WEBP') {
+            return 'image/webp';
+        }
+
+        if (str_starts_with($contents, '%PDF')) {
+            return 'application/pdf';
+        }
+
+        return null;
     }
 }

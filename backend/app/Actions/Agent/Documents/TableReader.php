@@ -24,7 +24,7 @@ final class TableReader
     private const MAX_CELL_CHARS = 500;
 
     /**
-     * @return array{rows: list<list<string|float|int|DateTimeInterface|null>>, delimiter: ?string, truncated: bool}|array{error: string}
+     * @return array{error: string}|array{rows: list<list<null|DateTimeInterface|float|int|string>>, delimiter: ?string, truncated: bool}
      */
     public function read(string $kind, string $bytes): array
     {
@@ -42,11 +42,12 @@ final class TableReader
     }
 
     /**
-     * @return array{rows: list<list<string|null>>, delimiter: string, truncated: bool}|array{error: string}
+     * @return array{error: string}|array{rows: list<list<null|string>>, delimiter: string, truncated: bool}
      */
     private function csv(string $bytes, int $limit): array
     {
         $text = $this->toUtf8($bytes);
+
         if ($text === null) {
             return ['error' => "Couldn't read the text encoding of this CSV. Save it as UTF-8 and resend it."];
         }
@@ -58,9 +59,11 @@ final class TableReader
 
         $rows = [];
         $truncated = false;
+
         while (($row = fgetcsv($stream, null, $delimiter, '"', '')) !== false) {
             if (count($rows) >= $limit) {
                 $truncated = true;
+
                 break;
             }
             $rows[] = $this->cells($row);
@@ -71,11 +74,12 @@ final class TableReader
     }
 
     /**
-     * @return array{rows: list<list<string|float|int|DateTimeInterface|null>>, delimiter: null, truncated: bool}
+     * @return array{rows: list<list<null|DateTimeInterface|float|int|string>>, delimiter: null, truncated: bool}
      */
     private function sheet(string $kind, string $bytes, int $limit): array
     {
         $path = tempnam(sys_get_temp_dir(), 'ffdoc');
+
         if ($path === false) {
             return ['rows' => [], 'delimiter' => null, 'truncated' => false];
         }
@@ -88,14 +92,17 @@ final class TableReader
 
         try {
             $reader->open($file);
+
             foreach ($reader->getSheetIterator() as $sheet) {
                 foreach ($sheet->getRowIterator() as $row) {
                     if (count($rows) >= $limit) {
                         $truncated = true;
+
                         break;
                     }
                     $rows[] = $this->cells($row->toArray());
                 }
+
                 break;
             }
         } finally {
@@ -109,11 +116,12 @@ final class TableReader
 
     /**
      * @param array<int, mixed> $row
-     * @return list<string|float|int|DateTimeInterface|null>
+     * @return list<null|DateTimeInterface|float|int|string>
      */
     private function cells(array $row): array
     {
         $cells = [];
+
         foreach (array_slice(array_values($row), 0, self::MAX_COLUMNS) as $value) {
             $cells[] = match (true) {
                 $value === null, $value === '' => null,
@@ -167,6 +175,7 @@ final class TableReader
 
         foreach ([';', ',', "\t", '|'] as $candidate) {
             $counts = array_map(static fn (string $line): int => count(str_getcsv($line, $candidate, '"', '')), $lines);
+
             if ($counts === []) {
                 continue;
             }
@@ -174,6 +183,7 @@ final class TableReader
             arsort($frequency);
             $columns = (int) array_key_first($frequency);
             $score = $columns > 1 ? $columns * $frequency[$columns] : 0;
+
             if ($score > $bestScore) {
                 $best = $candidate;
                 $bestScore = $score;

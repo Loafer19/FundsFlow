@@ -112,11 +112,13 @@ class BuildUserReportAction
             . $card('Net', $cur['net'], $prev['net'], $cur['net'] < 0 ? 'neg' : 'pos')
             . '<div class="card"><div class="k">Transactions</div><div class="v">' . $cur['count'] . '</div><div class="p">' . $e($range->previousLabel) . ': ' . $prev['count'] . '</div></div>'
             . '</div>';
+
         if ($range->isPartial()) {
             $html .= '<p class="note">The period is still in progress; the previous period is shown in full.</p>';
         }
 
         $html .= $this->tagTable('Expenses by tag', $expenseTags, $money, $e, $delta, $range->previousLabel, 'neg');
+
         if ($incomeTags !== []) {
             $html .= $this->tagTable('Income by tag', $incomeTags, $money, $e, $delta, $range->previousLabel, 'pos');
         }
@@ -125,16 +127,19 @@ class BuildUserReportAction
 
         $rows = $current->sortByDesc(fn (Transaction $tx) => $tx->at?->format('Y-m-d H:i:s'))->values();
         $html .= '<h2>Transactions</h2>';
+
         if ($rows->isEmpty()) {
             $html .= '<p class="muted">No transactions in this period.</p>';
         } else {
             $html .= '<table><thead><tr><th>Date</th><th>Note</th><th>Tags</th><th class="r">Amount</th></tr></thead><tbody>';
+
             foreach ($rows->take(self::MAX_TRANSACTION_ROWS) as $tx) {
                 $tags = $tx->tags->map(fn (Tag $t) => trim($t->emoji . ' ' . $t->title))->implode(', ');
                 $html .= '<tr><td class="nw">' . $e($date($tx->at)) . '</td><td>' . $e((string) ($tx->note ?? '')) . '</td><td>' . $e($tags)
                     . '</td><td class="r nw ' . ($tx->amount < 0 ? 'neg' : 'pos') . '">' . $e($money((float) $tx->amount)) . '</td></tr>';
             }
             $html .= '</tbody></table>';
+
             if ($rows->count() > self::MAX_TRANSACTION_ROWS) {
                 $html .= '<p class="note">Showing the latest ' . self::MAX_TRANSACTION_ROWS . ' of ' . $rows->count() . ' transactions.</p>';
             }
@@ -163,6 +168,7 @@ class BuildUserReportAction
         if ($tagIds === [] && !$untagged) {
             return true;
         }
+
         if ($untagged && $tx->tags->isEmpty()) {
             return true;
         }
@@ -206,6 +212,7 @@ class BuildUserReportAction
     private function byTag(TagTree $tree, Collection $current, Collection $previous, bool $income): array
     {
         $rows = [];
+
         foreach (['current' => $current, 'previous' => $previous] as $side => $txs) {
             foreach ($txs as $tx) {
                 if ($income ? $tx->amount <= 0 : $tx->amount >= 0) {
@@ -215,6 +222,7 @@ class BuildUserReportAction
                 $keys = $tx->tags->isEmpty()
                     ? ['untagged' => 'Untagged']
                     : collect($tree->rootsOf($tx->tags->pluck('id')))->mapWithKeys(fn (int $id) => [$id => $tree->label($id)])->all();
+
                 foreach ($keys as $key => $label) {
                     $rows[$key] ??= ['label' => $label, 'current' => 0.0, 'previous' => 0.0];
                     $rows[$key][$side] += $amount;
@@ -234,6 +242,7 @@ class BuildUserReportAction
     private function tagTable(string $title, array $rows, callable $money, callable $e, callable $delta, string $previousLabel, string $cls): string
     {
         $out = '<h2>' . $e($title) . '</h2>';
+
         if ($rows === []) {
             return $out . '<p class="muted">Nothing in this period.</p>';
         }
@@ -243,6 +252,7 @@ class BuildUserReportAction
         $sign = $cls === 'neg' ? -1 : 1;
         $out .= '<table><thead><tr><th>Tag</th><th class="r">Amount</th><th class="r">Share</th><th class="barcol"></th><th class="r">'
             . $e($previousLabel) . '</th><th class="r">Change</th></tr></thead><tbody>';
+
         foreach (array_slice($rows, 0, 30) as $row) {
             $share = $total > 0 ? round($row['current'] / $total * 100) : 0;
             $out .= '<tr><td>' . $e($row['label']) . '</td><td class="r nw">' . $e($money($sign * $row['current'])) . '</td><td class="r">' . $share . '%</td>'
@@ -264,15 +274,19 @@ class BuildUserReportAction
         $goalRows = '';
         $tree = TagTree::for($user);
         $filterIds = $tree->expand($tagIds);
+
         foreach ($this->listBudgets->execute($user) as $budget) {
             $period = $budget->periods->first(fn (BudgetPeriod $p) => $p->ends_at === null);
+
             if (!$period) {
                 continue;
             }
+
             // Shown when the budget's tags and the filter overlap, child tags included on both sides.
             if ($tagIds !== [] && array_intersect($tree->expand($period->tags->pluck('id')), $filterIds) === []) {
                 continue;
             }
+
             if ($budget->isGoal()) {
                 $goalRows .= $this->goalRow($user, $budget, $e);
 
@@ -286,10 +300,12 @@ class BuildUserReportAction
                 . '</td><td class="r nw">' . $s['days_left'] . '</td><td class="nw">' . $e(str_replace('_', ' ', $s['status'])) . '</td></tr>';
         }
         $out = '';
+
         if ($rows !== '') {
             $out .= '<h2>Budgets (current period, as of today)</h2><table><thead><tr><th>Budget</th><th>Length</th><th class="r">Spent / limit</th><th class="barcol"></th><th class="r">Left</th><th class="r">Days left</th><th>Status</th></tr></thead><tbody>'
                 . $rows . '</tbody></table>';
         }
+
         if ($goalRows !== '') {
             $out .= '<h2>Savings goals (as of today)</h2><table><thead><tr><th>Goal</th><th class="r">Saved / target</th><th class="barcol"></th><th class="r">Left</th><th class="nw">Deadline</th><th>Pace</th><th>Status</th></tr></thead><tbody>'
                 . $goalRows . '</tbody></table>';
@@ -326,6 +342,7 @@ class BuildUserReportAction
             return '';
         }
         $labels = $user->tags()->whereIn('id', $tagIds)->get()->map(fn (Tag $t) => trim($t->emoji . ' ' . $t->title))->all();
+
         if ($untagged) {
             $labels[] = 'Untagged';
         }

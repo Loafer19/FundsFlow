@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Tag;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -15,7 +16,7 @@ class TagStoreRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<mixed>|\Illuminate\Contracts\Validation\ValidationRule|string>
+     * @return array<string, array<mixed>|string|ValidationRule>
      */
     public function rules(): array
     {
@@ -45,7 +46,7 @@ class TagStoreRequest extends FormRequest
             $tag = $this->route('tag');
             $parentId = $this->input('parent_id');
 
-            if (! $tag instanceof Tag || $parentId === null || $parentId === '') {
+            if (!$tag instanceof Tag || $parentId === null || $parentId === '') {
                 return;
             }
 

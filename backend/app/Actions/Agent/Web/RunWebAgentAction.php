@@ -35,8 +35,8 @@ final class RunWebAgentAction
      * @param Closure(string, array<string, mixed>): void $emit
      * @param array<string, mixed> $context validated screen context (tab, period, tag filter)
      * @param list<array{id: string, name: string, mime: string, file_size: int}> $files receipt photos, or one document (WebAgentUploads refs)
-     * @param array{prior_question: string}|null $rewoundAsk the question an edited / regenerated turn answered
-     *        (WebAgentSession::rewindLastTurn already dropped that turn)
+     * @param null|array{prior_question: string} $rewoundAsk the question an edited / regenerated turn answered
+     *                                                       (WebAgentSession::rewindLastTurn already dropped that turn)
      */
     public function execute(
         User $user,
@@ -119,6 +119,7 @@ final class RunWebAgentAction
 
         if (RunWebReceiptAction::isReceiptPending($pending)) {
             $status = $this->receipt->continue($user, $channel, $session, $pending, $message);
+
             if ($status !== null) {
                 $session->patchItems(
                     static fn (array $item): bool => ($item['id'] ?? null) === ($userItem['id'] ?? false),
@@ -167,6 +168,23 @@ final class RunWebAgentAction
     }
 
     /**
+     * Quota snapshot for the drawer badge. `resets_at` is the next midnight in the user's timezone
+     * (ISO 8601 with offset); `low_threshold` is when the badge turns into a warning.
+     *
+     * @return array<string, mixed>
+     */
+    public function quotaPayload(User $user): array
+    {
+        $snapshot = $this->quota->snapshot($user);
+
+        return $snapshot + [
+            'resets_at' => $snapshot['reset_at'],
+            'low_threshold' => max(0, (int) config('telegram.low_quota_threshold')),
+            'hint' => $this->quota->lowRemainingHint($user),
+        ];
+    }
+
+    /**
      * @param Closure(string, array<string, mixed>): void $emit
      */
     private function fail(WebAgentChannel $channel, Closure $emit, string $code, string $message): void
@@ -182,22 +200,5 @@ final class RunWebAgentAction
     {
         $emit('quota', $this->quotaPayload($user));
         $emit('done', ['status' => $status, 'conversation_id' => $session->conversationId()]);
-    }
-
-    /**
-     * Quota snapshot for the drawer badge. `resets_at` is the next midnight in the user's timezone
-     * (ISO 8601 with offset); `low_threshold` is when the badge turns into a warning.
-     *
-     * @return array<string, mixed>
-     */
-    public function quotaPayload(User $user): array
-    {
-        $snapshot = $this->quota->snapshot($user);
-
-        return $snapshot + [
-            'resets_at' => $snapshot['reset_at'],
-            'low_threshold' => max(0, (int) config('telegram.low_quota_threshold')),
-            'hint' => $this->quota->lowRemainingHint($user),
-        ];
     }
 }

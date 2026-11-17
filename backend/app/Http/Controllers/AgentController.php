@@ -14,6 +14,7 @@ use App\Support\TransactionAttachmentRules;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -109,34 +110,41 @@ class AgentController extends Controller
         $documents = $request->file('documents', []);
         $documents = array_values(array_filter(
             array_merge([$request->file('document')], is_array($documents) ? $documents : []),
-            static fn ($file) => $file instanceof \Illuminate\Http\UploadedFile,
+            static fn ($file) => $file instanceof UploadedFile,
         ));
+
         if (count($documents) > DocumentFile::maxFiles()) {
             return response()->json(['message' => 'Send up to ' . DocumentFile::maxFiles() . ' files at a time.'], 422);
         }
         $totalBytes = array_sum(array_map(static fn ($file) => (int) $file->getSize(), $documents));
+
         if ($totalBytes > DocumentFile::maxTotalBytes()) {
             return response()->json(['message' => 'These files are ' . DocumentFile::formatBytes($totalBytes) . ' together; up to '
                 . DocumentFile::formatBytes(DocumentFile::maxTotalBytes()) . ' per message.'], 422);
         }
         $document = $documents[0] ?? null;
         $rewind = isset($data['rewind']) ? (string) $data['rewind'] : null;
+
         if ($rewind !== null && ($images !== [] || $document !== null)) {
             return response()->json(['message' => "Files can't be attached when editing or regenerating a message."], 422);
         }
+
         if ($document !== null && $images !== []) {
             return response()->json(['message' => 'Send a document on its own, without photos.'], 422);
         }
+
         if ($message === '' && $images === [] && $document === null && $rewind !== WebAgentSession::REWIND_REGENERATE) {
             return response()->json(['message' => 'The message field is required.'], 422);
         }
 
         // Private temp copies; the receipt flow attaches them on Confirm and deletes them.
         $files = [];
+
         try {
             foreach ($images as $image) {
                 $files[] = $this->uploads->store($user, $image);
             }
+
             foreach ($documents as $upload) {
                 try {
                     $files[] = $this->uploads->storeDocument($user, $upload);
@@ -145,16 +153,19 @@ class AgentController extends Controller
                         throw $e;
                     }
                     $name = TransactionAttachmentRules::sanitizeOriginalName((string) ($upload->getClientOriginalName() ?: 'file'));
+
                     throw ValidationException::withMessages(['documents' => $name . ': ' . collect($e->errors())->flatten()->first()]);
                 }
             }
         } catch (Throwable $e) {
             $this->uploads->delete($user, $files);
+
             throw $e;
         }
 
         // One running turn per user (double submit / several tabs).
         $lock = Cache::lock('web_agent_run:' . $user->id, self::RUN_LOCK_SECONDS);
+
         if (!$lock->get()) {
             $this->uploads->delete($user, $files);
 
@@ -166,11 +177,13 @@ class AgentController extends Controller
 
         if ($rewind !== null) {
             $rewound = $this->rewind($user, $rewind, (string) $data['turn_id'], $conversationId);
+
             if (!$rewound['ok']) {
                 $lock->release();
 
                 return response()->json(['message' => $rewound['message'], 'reason' => $rewound['reason']], 409);
             }
+
             if ($rewind === WebAgentSession::REWIND_REGENERATE) {
                 $message = $rewound['text'];
             }
@@ -185,6 +198,7 @@ class AgentController extends Controller
                 $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
                 echo 'event: ' . $event . "\n";
                 echo 'data: ' . (is_string($json) ? $json : '{}') . "\n\n";
+
                 if (ob_get_level() > 0) {
                     @ob_flush();
                 }
@@ -194,6 +208,7 @@ class AgentController extends Controller
             try {
                 // Padding comment pushes the headers + first bytes through any proxy buffer.
                 echo ':' . str_repeat(' ', 2048) . "\n\n";
+
                 if (ob_get_level() > 0) {
                     @ob_flush();
                 }
@@ -215,61 +230,6 @@ class AgentController extends Controller
     }
 
     /**
-     * Drop the last turn for an edit / regenerate (under the edit lock, so a Confirm can't land in between).
-     *
-     * @return array{ok: true, text: string, ask_context: array{prior_question: string}|null}|array{ok: false, reason: string, message: string}
-     */
-    private function rewind(User $user, string $mode, string $turnId, ?string $conversationId): array
-    {
-        $session = new WebAgentSession($user);
-        if ($conversationId === null || $conversationId !== $session->conversationId()) {
-            return ['ok' => false, 'reason' => 'outdated', 'message' => 'This chat has changed. Send it as a new message instead.'];
-        }
-
-        try {
-            $result = Cache::lock('web_agent_edit:' . $user->id, self::EDIT_LOCK_SECONDS)
-                ->block(5, static fn (): array => $session->rewindLastTurn($turnId, $mode));
-        } catch (LockTimeoutException) {
-            return ['ok' => false, 'reason' => 'busy', 'message' => 'The assistant is busy. Try again in a moment.'];
-        }
-
-        if ($result['ok'] && is_array($result['dropped_pending'])) {
-            $this->uploads->delete($user, WebAgentUploads::refsIn($result['dropped_pending']));
-        }
-
-        return $result;
-    }
-
-    /**
-     * Keep only the known, validated screen-context keys (tag ownership is checked when used).
-     *
-     * @param array<string, mixed> $raw
-     * @return array<string, mixed>
-     */
-    private function screenContext(array $raw): array
-    {
-        $ctx = [];
-        if (isset($raw['tab'])) {
-            $ctx['tab'] = (string) $raw['tab'];
-        }
-        if (isset($raw['period_type'])) {
-            $ctx['period_type'] = (string) $raw['period_type'];
-        }
-        if (isset($raw['from'], $raw['to']) && (string) $raw['from'] <= (string) $raw['to']) {
-            $ctx['from'] = (string) $raw['from'];
-            $ctx['to'] = (string) $raw['to'];
-        }
-        if (is_array($raw['tag_ids'] ?? null) && $raw['tag_ids'] !== []) {
-            $ctx['tag_ids'] = array_values(array_unique(array_map('intval', $raw['tag_ids'])));
-        }
-        if (filter_var($raw['untagged'] ?? false, FILTER_VALIDATE_BOOL)) {
-            $ctx['untagged'] = true;
-        }
-
-        return $ctx;
-    }
-
-    /**
      * POST /api/agent/confirm — apply or cancel the staged change of a Confirm card.
      */
     public function confirm(Request $request): JsonResponse
@@ -280,6 +240,7 @@ class AgentController extends Controller
         ]);
 
         $user = $request->user();
+
         try {
             $result = Cache::lock('web_agent_edit:' . $user->id, self::EDIT_LOCK_SECONDS)
                 ->block(5, fn (): array => $this->confirm->execute($user, (string) $data['pending_id'], (string) $data['action']));
@@ -326,5 +287,66 @@ class AgentController extends Controller
             'conversation_id' => $session->conversationId(),
             'quota' => $this->run->quotaPayload($user),
         ]);
+    }
+
+    /**
+     * Drop the last turn for an edit / regenerate (under the edit lock, so a Confirm can't land in between).
+     *
+     * @return array{ok: false, reason: string, message: string}|array{ok: true, text: string, ask_context: null|array{prior_question: string}}
+     */
+    private function rewind(User $user, string $mode, string $turnId, ?string $conversationId): array
+    {
+        $session = new WebAgentSession($user);
+
+        if ($conversationId === null || $conversationId !== $session->conversationId()) {
+            return ['ok' => false, 'reason' => 'outdated', 'message' => 'This chat has changed. Send it as a new message instead.'];
+        }
+
+        try {
+            $result = Cache::lock('web_agent_edit:' . $user->id, self::EDIT_LOCK_SECONDS)
+                ->block(5, static fn (): array => $session->rewindLastTurn($turnId, $mode));
+        } catch (LockTimeoutException) {
+            return ['ok' => false, 'reason' => 'busy', 'message' => 'The assistant is busy. Try again in a moment.'];
+        }
+
+        if ($result['ok'] && is_array($result['dropped_pending'])) {
+            $this->uploads->delete($user, WebAgentUploads::refsIn($result['dropped_pending']));
+        }
+
+        return $result;
+    }
+
+    /**
+     * Keep only the known, validated screen-context keys (tag ownership is checked when used).
+     *
+     * @param array<string, mixed> $raw
+     * @return array<string, mixed>
+     */
+    private function screenContext(array $raw): array
+    {
+        $ctx = [];
+
+        if (isset($raw['tab'])) {
+            $ctx['tab'] = (string) $raw['tab'];
+        }
+
+        if (isset($raw['period_type'])) {
+            $ctx['period_type'] = (string) $raw['period_type'];
+        }
+
+        if (isset($raw['from'], $raw['to']) && (string) $raw['from'] <= (string) $raw['to']) {
+            $ctx['from'] = (string) $raw['from'];
+            $ctx['to'] = (string) $raw['to'];
+        }
+
+        if (is_array($raw['tag_ids'] ?? null) && $raw['tag_ids'] !== []) {
+            $ctx['tag_ids'] = array_values(array_unique(array_map('intval', $raw['tag_ids'])));
+        }
+
+        if (filter_var($raw['untagged'] ?? false, FILTER_VALIDATE_BOOL)) {
+            $ctx['untagged'] = true;
+        }
+
+        return $ctx;
     }
 }

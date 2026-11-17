@@ -27,15 +27,6 @@ class MonobankConnection extends Model
         'last_error',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'token' => 'encrypted',
-            'notify' => 'boolean',
-            'last_synced_at' => 'datetime',
-        ];
-    }
-
     /**
      * @return BelongsTo<User, $this>
      */
@@ -55,5 +46,14 @@ class MonobankConnection extends Model
     public function webhookUrl(): string
     {
         return rtrim((string) config('app.url'), '/') . '/api/webhooks/monobank/' . $this->webhook_uuid;
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'token' => 'encrypted',
+            'notify' => 'boolean',
+            'last_synced_at' => 'datetime',
+        ];
     }
 }

@@ -11,7 +11,7 @@ class UpdateMonobankSettingsAction
     public function __construct(private readonly LinkMonobankJarGoalAction $link) {}
 
     /**
-     * @param  array{notify?: bool, accounts?: list<array{id: int, enabled?: bool, tag_id?: int|null}>, jars?: list<array{id: int, track_as_goal?: bool}>}  $data
+     * @param array{notify?: bool, accounts?: list<array{id: int, enabled?: bool, tag_id?: null|int}>, jars?: list<array{id: int, track_as_goal?: bool}>} $data
      */
     public function execute(User $user, array $data): MonobankConnection
     {

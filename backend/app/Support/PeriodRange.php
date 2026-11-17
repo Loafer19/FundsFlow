@@ -57,6 +57,14 @@ final class PeriodRange
     }
 
     /**
+     * A real calendar day that fits the TIMESTAMP column (transactions.at).
+     */
+    public static function isStorableDate(mixed $value): bool
+    {
+        return self::isDate($value) && $value >= '1970-01-01' && $value <= '2038-01-18';
+    }
+
+    /**
      * @param array<string, mixed> $args period (preset) or from/to (YYYY-MM-DD)
      */
     public static function resolve(User $user, array $args, string $default = 'this_month'): self
@@ -81,6 +89,7 @@ final class PeriodRange
         if ($from->gt($to)) {
             [$from, $to] = [$to, $from];
         }
+
         if ($from->lt($to->subYears(self::MAX_YEARS))) {
             $from = $to->subYears(self::MAX_YEARS);
         }
@@ -94,40 +103,6 @@ final class PeriodRange
         $previousFrom = $previousTo->subDays($days - 1);
 
         return new self($from, $to, $label, $previousFrom, $previousTo, "Previous {$days} days", $to, $today, null);
-    }
-
-    /**
-     * A from/to range that is exactly one calendar month, quarter or year (e.g. the web date picker)
-     * compares with the previous calendar month/quarter/year and gets a readable label.
-     * A range that is still running is cut at today, like the this_* presets.
-     */
-    private static function calendarRange(CarbonImmutable $from, CarbonImmutable $to, CarbonImmutable $today): ?self
-    {
-        $from = $from->startOfDay();
-        $to = $to->startOfDay();
-        if ($from->day !== 1 || $from->gt($today)) {
-            return null;
-        }
-
-        $kind = match (true) {
-            $to->equalTo($from->endOfMonth()->startOfDay()) => 'month',
-            $from->month % 3 === 1 && $to->equalTo($from->endOfQuarter()->startOfDay()) => 'quarter',
-            $from->month === 1 && $to->equalTo($from->endOfYear()->startOfDay()) => 'year',
-            default => null,
-        };
-        if ($kind === null) {
-            return null;
-        }
-
-        [$prevFrom, $label, $prevLabel] = match ($kind) {
-            'month' => [$from->subMonthNoOverflow(), $from->format('F Y'), $from->subMonthNoOverflow()->format('F Y')],
-            'quarter' => [$from->subMonthsNoOverflow(3), 'Q' . $from->quarter . ' ' . $from->year, 'Q' . $from->subMonthsNoOverflow(3)->quarter . ' ' . $from->subMonthsNoOverflow(3)->year],
-            'year' => [$from->subYear(), (string) $from->year, (string) ($from->year - 1)],
-        };
-        $prevTo = $from->subDay();
-        $cutTo = $to->gt($today) ? $today : $to;
-
-        return new self($from, $cutTo, $label, $prevFrom, $prevTo, $prevLabel, $to, $today, null);
     }
 
     public static function preset(string $preset, CarbonImmutable $today): self
@@ -225,5 +200,41 @@ final class PeriodRange
     public function toArray(): array
     {
         return ['from' => $this->from->toDateString(), 'to' => $this->to->toDateString(), 'label' => $this->label];
+    }
+
+    /**
+     * A from/to range that is exactly one calendar month, quarter or year (e.g. the web date picker)
+     * compares with the previous calendar month/quarter/year and gets a readable label.
+     * A range that is still running is cut at today, like the this_* presets.
+     */
+    private static function calendarRange(CarbonImmutable $from, CarbonImmutable $to, CarbonImmutable $today): ?self
+    {
+        $from = $from->startOfDay();
+        $to = $to->startOfDay();
+
+        if ($from->day !== 1 || $from->gt($today)) {
+            return null;
+        }
+
+        $kind = match (true) {
+            $to->equalTo($from->endOfMonth()->startOfDay()) => 'month',
+            $from->month % 3 === 1 && $to->equalTo($from->endOfQuarter()->startOfDay()) => 'quarter',
+            $from->month === 1 && $to->equalTo($from->endOfYear()->startOfDay()) => 'year',
+            default => null,
+        };
+
+        if ($kind === null) {
+            return null;
+        }
+
+        [$prevFrom, $label, $prevLabel] = match ($kind) {
+            'month' => [$from->subMonthNoOverflow(), $from->format('F Y'), $from->subMonthNoOverflow()->format('F Y')],
+            'quarter' => [$from->subMonthsNoOverflow(3), 'Q' . $from->quarter . ' ' . $from->year, 'Q' . $from->subMonthsNoOverflow(3)->quarter . ' ' . $from->subMonthsNoOverflow(3)->year],
+            'year' => [$from->subYear(), (string) $from->year, (string) ($from->year - 1)],
+        };
+        $prevTo = $from->subDay();
+        $cutTo = $to->gt($today) ? $today : $to;
+
+        return new self($from, $cutTo, $label, $prevFrom, $prevTo, $prevLabel, $to, $today, null);
     }
 }

@@ -5,7 +5,7 @@ namespace App\Actions\Budgets;
 use App\Models\Budget;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
-use RuntimeException;
+use Illuminate\Validation\ValidationException;
 
 class ResumeBudgetAction
 {
@@ -17,10 +17,12 @@ class ResumeBudgetAction
             return $budget->load('periods.tags');
         }
 
-        $last = $budget->periods()->first();
+        $last = $budget->periods()->orderByDesc('id')->first();
 
-        if (! $last) {
-            throw new RuntimeException('Cannot resume a budget with no periods.');
+        if (!$last) {
+            throw ValidationException::withMessages([
+                'budget' => 'Cannot resume a budget with no periods.',
+            ]);
         }
 
         $period = $budget->periods()->create([

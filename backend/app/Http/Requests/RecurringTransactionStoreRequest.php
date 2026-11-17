@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\RecurringFrequency;
 use App\Models\RecurringTransaction;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -15,7 +16,7 @@ class RecurringTransactionStoreRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<mixed>|\Illuminate\Contracts\Validation\ValidationRule|string>
+     * @return array<string, array<mixed>|string|ValidationRule>
      */
     public function rules(): array
     {
@@ -26,6 +27,7 @@ class RecurringTransactionStoreRequest extends FormRequest
         // A PATCH may change ends_at alone; compare it with the stored start then.
         $startsAt = 'starts_at';
         $rule = $this->route('recurringTransaction');
+
         if ($patch && !$this->has('starts_at') && $rule instanceof RecurringTransaction) {
             $startsAt = $rule->starts_at->toDateString();
         }

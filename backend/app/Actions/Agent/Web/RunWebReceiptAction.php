@@ -5,6 +5,8 @@ namespace App\Actions\Agent\Web;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Agent\Documents\DocumentFile;
 use App\Actions\Agent\Documents\DocumentImport;
+use App\Actions\Imports\ApplyImportRulesAction;
+use App\Actions\Imports\CreateImportBatchAction;
 use App\Actions\Tags\MatchTagTitlesAction;
 use App\Actions\Telegram\AnalyzeReceiptAction;
 use App\Models\User;
@@ -64,9 +66,11 @@ final class RunWebReceiptAction
 
         $read = [];
         $failed = [];
+
         foreach (array_slice($files, 0, DocumentFile::maxFiles()) as $file) {
             $kind = DocumentFile::kindOfMime((string) $file['mime']);
             $contents = $kind !== null ? $this->uploads->read($user, $file) : null;
+
             if ($contents === null) {
                 $failed[] = (string) $file['name'];
 
@@ -75,6 +79,7 @@ final class RunWebReceiptAction
             $read[] = ['name' => (string) $file['name'], 'kind' => $kind, 'bytes' => $contents];
         }
         $this->uploads->delete($user, $files);
+
         if ($read === []) {
             return $this->notice($channel, $session, "Couldn't open the files. Send them again.", 'error');
         }
@@ -86,6 +91,7 @@ final class RunWebReceiptAction
             trim($caption) !== '' ? trim($caption) : null,
             'Until then, send CSV / Excel / OFX / QIF files with date and amount columns: those need no AI.',
         );
+
         if ($failed !== [] && in_array($result['type'], ['confirm', 'ask'], true)) {
             $this->notice($channel, $session, "Couldn't open: " . implode(', ', $failed) . '. The other files were read.', 'warning', 'ok');
         }
@@ -116,6 +122,7 @@ final class RunWebReceiptAction
 
         // A PDF receipt with the amount in the message: no AI, same as a photo with a caption.
         $parsed = $isPdf && $caption !== '' ? $this->quickAdd->parseQuickAdd($caption, $user) : null;
+
         if (is_array($parsed) && !isset($parsed['error'])) {
             return $this->stageOne($user, $channel, (float) $parsed['amount'], (string) $parsed['at'], $parsed['note'], [], [$file]);
         }
@@ -129,6 +136,7 @@ final class RunWebReceiptAction
         );
         // Only a PDF can become an attachment; other documents are read and dropped.
         $keep = $isPdf && $result['type'] === 'single' ? [$file] : [];
+
         if ($keep === [] && !($isPdf && $result['type'] === 'quota')) {
             $this->uploads->delete($user, [$file]);
         }
@@ -229,6 +237,7 @@ final class RunWebReceiptAction
         if (($pending['type'] ?? null) === 'import_tags') {
             return $this->continueImport($user, $channel, $session, $pending, $message);
         }
+
         if (($pending['type'] ?? null) === 'import_preview') {
             return $this->continueImportPreview($user, $channel, $session, $pending, $message);
         }
@@ -238,6 +247,7 @@ final class RunWebReceiptAction
         }
 
         $answer = mb_strtolower(trim($message));
+
         if (preg_match('/^(cancel|скасу|відмін|отмен)/u', $answer)) {
             $this->uploads->delete($user, $files);
 
@@ -257,6 +267,35 @@ final class RunWebReceiptAction
     }
 
     /**
+     * "Photo 2 couldn't be read and was skipped. Photos 3 and 4 have no clear total and were skipped."
+     *
+     * @param array<int, string> $skipped photo number => reason
+     */
+    public static function skippedText(array $skipped): string
+    {
+        $byReason = [];
+
+        foreach ($skipped as $n => $why) {
+            $byReason[$why][] = (int) $n;
+        }
+
+        $sentences = [];
+
+        foreach ($byReason as $why => $numbers) {
+            $one = count($numbers) === 1;
+            $last = array_pop($numbers);
+            $label = ($one ? 'Photo ' : 'Photos ') . ($numbers === [] ? $last : implode(', ', $numbers) . ' and ' . $last);
+            $sentences[] = $label . match ($why) {
+                'no clear total' => $one ? ' has no clear total and was skipped.' : ' have no clear total and were skipped.',
+                'no AI assists left' => ($one ? ' was' : ' were') . ' skipped: no AI assists left today.',
+                default => $one ? " couldn't be read and was skipped." : " couldn't be read and were skipped.",
+            };
+        }
+
+        return implode(' ', $sentences);
+    }
+
+    /**
      * Reply to "these tags don't exist": create / map / without, or any other edit of the import.
      *
      * @param array<string, mixed> $pending
@@ -265,16 +304,18 @@ final class RunWebReceiptAction
     {
         $uuid = is_string($pending['batch_id'] ?? null) ? $pending['batch_id'] : null;
         $batch = $uuid ? $user->importBatches()->where('uuid', $uuid)->first() : null;
+
         if (!$batch) {
             return $this->notice($channel, $session, 'That import preview is no longer available.', 'muted', 'ok');
         }
+
         if (preg_match('/^(cancel|скасу|відмін|отмен)/u', mb_strtolower(trim($message)))) {
             return $this->notice($channel, $session, 'The preview is still open at ' . $batch->previewUrl() . ' if you want it later.', 'muted', 'ok');
         }
         $channel->status('read_document', 'Updating the import');
-        app(\App\Actions\Imports\ApplyImportRulesAction::class)->execute($user, $batch, ['instruction' => $message]);
+        app(ApplyImportRulesAction::class)->execute($user, $batch, ['instruction' => $message]);
         $batch = $batch->fresh();
-        $summary = app(\App\Actions\Imports\CreateImportBatchAction::class)->summaryLine($user, $batch);
+        $summary = app(CreateImportBatchAction::class)->summaryLine($user, $batch);
         $session->setPending(['type' => 'import_preview', 'batch_id' => $batch->uuid]);
         $channel->pushImportPreview([
             'type' => 'preview',
@@ -295,16 +336,19 @@ final class RunWebReceiptAction
     private function continueImport(User $user, WebAgentChannel $channel, WebAgentSession $session, array $pending, string $message): ?string
     {
         $draft = is_array($pending['draft'] ?? null) ? $pending['draft'] : null;
+
         if ($draft === null) {
             return null;
         }
         $channel->status('read_document', 'Updating the import');
         $result = $this->documents->reply($user, $draft, $message);
+
         if ($result === null) {
             $this->notice($channel, $session, 'The import was dropped. Send the file again to import it.', 'muted', 'ok');
 
             return null;
         }
+
         if ($result['type'] === 'cancelled') {
             return $this->notice($channel, $session, 'Import cancelled.', 'muted', 'cancelled');
         }
@@ -321,8 +365,10 @@ final class RunWebReceiptAction
     {
         $images = [];
         $skipped = 0;
+
         foreach ($files as $file) {
             $contents = $this->analyze->isVisionMime((string) $file['mime']) ? $this->uploads->read($user, $file) : null;
+
             if ($contents === null) {
                 $skipped++;
 
@@ -331,6 +377,7 @@ final class RunWebReceiptAction
             $images[] = ['bytes' => $contents, 'mime' => (string) $file['mime']];
         }
         $this->uploads->delete($user, $files);
+
         if ($images === [] || (string) config('services.xai.api_key') === '') {
             return $this->notice($channel, $session, $images === []
                 ? 'Screenshots must be JPEG or PNG to be read. Send them again.'
@@ -344,6 +391,7 @@ final class RunWebReceiptAction
             $caption !== '' ? $caption : null,
             'Until then, export the statement as CSV, Excel, OFX or QIF from the bank app: those need no AI.',
         );
+
         if ($skipped > 0 && in_array($result['type'], ['confirm', 'ask'], true)) {
             $this->notice($channel, $session, "{$skipped} image" . ($skipped === 1 ? ' was' : 's were') . ' not JPEG / PNG and ' . ($skipped === 1 ? 'was' : 'were') . ' skipped.', 'warning', 'ok');
         }
@@ -365,18 +413,21 @@ final class RunWebReceiptAction
 
             return 'import_preview';
         }
+
         if ($result['type'] === 'confirm') {
             $channel->stageConfirm('import_transactions', ['payload' => $result['payload'], 'preview' => $result['preview']]);
             $session->setSummary(mb_substr('Import preview: ' . $result['summary'], 0, 500));
 
             return 'confirm_staged';
         }
+
         if ($result['type'] === 'ask') {
             $session->setPending(['type' => 'import_tags', 'draft' => $result['draft']]);
             $this->ask($channel, $session, (string) $result['question'], $result['suggestions'] ?? DocumentImport::SUGGESTIONS);
 
             return 'ask_user';
         }
+
         if ($result['type'] === 'single') {
             // Only reachable for one file, handled by startDocument; treat as "nothing to import".
             return $this->notice($channel, $session, 'That file looks like one receipt. Send it on its own to save it as one transaction.', 'error');
@@ -404,6 +455,7 @@ final class RunWebReceiptAction
         if ($one) {
             $files = array_slice($files, 0, TransactionAttachmentRules::MAX_PER_TRANSACTION);
             $parsed = is_array($pending['caption_parsed'] ?? null) ? $pending['caption_parsed'] : null;
+
             if ($parsed !== null) {
                 return $this->stageOne($user, $channel, (float) $parsed['amount'], (string) $parsed['at'], $parsed['note'] ?? null, [], $files);
             }
@@ -521,6 +573,7 @@ final class RunWebReceiptAction
 
         foreach ($files as $i => $file) {
             $n = $i + 1;
+
             if (!$this->canUseVision($user, (string) $file['mime'])) {
                 $skipped[$n] = $this->analyze->hasQuota($user) ? 'could not be read' : 'no AI assists left';
                 $this->uploads->delete($user, [$file]);
@@ -530,6 +583,7 @@ final class RunWebReceiptAction
 
             $channel->status('read_receipt', "Reading receipt {$n} of {$total}");
             $analysis = $this->read($user, $file, $hint);
+
             if ($analysis === null) {
                 $skipped[$n] = 'could not be read';
                 $this->uploads->delete($user, [$file]);
@@ -582,6 +636,7 @@ final class RunWebReceiptAction
 
         $lines = [];
         $cards = [];
+
         foreach ($rows as $n => $row) {
             $lines[] = $this->previewLine($user, $row, "Photo {$n}");
             $cards[] = ['label' => "Photo {$n}"] + $this->tools->transactionCard($user, 'create', $row, files: count($row['files']));
@@ -594,33 +649,6 @@ final class RunWebReceiptAction
         ]);
 
         return 'confirm_staged';
-    }
-
-    /**
-     * "Photo 2 couldn't be read and was skipped. Photos 3 and 4 have no clear total and were skipped."
-     *
-     * @param array<int, string> $skipped photo number => reason
-     */
-    public static function skippedText(array $skipped): string
-    {
-        $byReason = [];
-        foreach ($skipped as $n => $why) {
-            $byReason[$why][] = (int) $n;
-        }
-
-        $sentences = [];
-        foreach ($byReason as $why => $numbers) {
-            $one = count($numbers) === 1;
-            $last = array_pop($numbers);
-            $label = ($one ? 'Photo ' : 'Photos ') . ($numbers === [] ? $last : implode(', ', $numbers) . ' and ' . $last);
-            $sentences[] = $label . match ($why) {
-                'no clear total' => $one ? ' has no clear total and was skipped.' : ' have no clear total and were skipped.',
-                'no AI assists left' => ($one ? ' was' : ' were') . ' skipped: no AI assists left today.',
-                default => $one ? " couldn't be read and was skipped." : " couldn't be read and were skipped.",
-            };
-        }
-
-        return implode(' ', $sentences);
     }
 
     /**
@@ -659,7 +687,7 @@ final class RunWebReceiptAction
 
     /**
      * @param list<array<string, mixed>> $files
-     * @param array<string, mixed>|null $draft
+     * @param null|array<string, mixed> $draft
      */
     private function askPrice(WebAgentChannel $channel, WebAgentSession $session, array $files, ?array $draft, string $question): string
     {
@@ -705,7 +733,7 @@ final class RunWebReceiptAction
 
     /**
      * @param array<string, mixed> $file
-     * @return array<string, mixed>|null
+     * @return null|array<string, mixed>
      */
     private function read(User $user, array $file, ?string $hint): ?array
     {
@@ -722,6 +750,7 @@ final class RunWebReceiptAction
     private function photoCount(array $files): string
     {
         $n = count($files);
+
         if ($n === 1 && WebAgentUploads::isDocumentRef($files[0])) {
             return '1 file: ' . (string) ($files[0]['name'] ?? 'document');
         }

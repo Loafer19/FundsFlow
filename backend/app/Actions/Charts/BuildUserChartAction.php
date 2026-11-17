@@ -10,6 +10,7 @@ use App\Support\TagTree;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
 /**
@@ -26,6 +27,10 @@ class BuildUserChartAction
     /** Chart types that support `compare` (current vs previous period). */
     public const COMPARABLE_TYPES = ['expenses_by_tag', 'income_vs_expenses'];
 
+    public const WIDTH = 1000;
+
+    public const HEIGHT = 620;
+
     /** Short labels kept for the original presets (Telegram captions unchanged). */
     private const LEGACY_LABELS = [
         'this_month' => 'This month',
@@ -35,10 +40,6 @@ class BuildUserChartAction
         'this_year' => 'This year',
     ];
 
-    public const WIDTH = 1000;
-
-    public const HEIGHT = 620;
-
     private const PALETTE = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#06b6d4', '#8b5cf6', '#ec4899', '#84cc16', '#94a3b8'];
 
     public function __construct(
@@ -47,13 +48,13 @@ class BuildUserChartAction
 
     /**
      * @param array<string, mixed> $args
-     * `data` is the same chart as structured series (for clients that draw charts themselves, e.g. the web agent).
-     *
+     *                                   `data` is the same chart as structured series (for clients that draw charts themselves, e.g. the web agent).
      * @return array{html: string, caption: string, summary: array<string, mixed>, data: array<string, mixed>}
      */
     public function execute(User $user, array $args): array
     {
         $type = (string) ($args['type'] ?? 'expenses_by_tag');
+
         if (!in_array($type, self::TYPES, true)) {
             throw new InvalidArgumentException('Unknown chart type: ' . $type);
         }
@@ -101,11 +102,13 @@ class BuildUserChartAction
                 $caption = "Expenses by tag · {$periodLabel} vs {$period->previousLabel}\n"
                     . 'Now: ' . $money($expenses) . ' · Before: ' . $money($previous['expenses'])
                     . $this->deltaText($expenses, $previous['expenses']);
+
                 if ($period->isPartial()) {
                     $caption .= "\nCurrent period is still in progress.";
                 }
                 $summary = ['rows' => count($rows), 'compare' => true];
                 $data = ['style' => 'compare', 'rows' => $rows];
+
                 break;
 
             case 'income_vs_expenses_compare':
@@ -119,11 +122,13 @@ class BuildUserChartAction
                     . 'Income: ' . $money($income) . ' (before ' . $money($previous['income']) . ')'
                     . "\nExpenses: " . $money($expenses) . ' (before ' . $money($previous['expenses']) . ')'
                     . "\nNet: " . $money($net) . ' (before ' . $money($previous['net']) . ')';
+
                 if ($period->isPartial()) {
                     $caption .= "\nCurrent period is still in progress.";
                 }
                 $summary = ['buckets' => 2, 'group_by' => 'period', 'compare' => true];
                 $data = ['group_by' => 'period', 'buckets' => $buckets];
+
                 break;
 
             case 'expenses_by_tag':
@@ -132,11 +137,13 @@ class BuildUserChartAction
                 $title = 'Expenses by tag';
                 $svg = $style === 'bar' ? $this->svgHorizontalBars($rows, $money) : $this->svgDonut($rows, $money, $expenses);
                 $caption = "Expenses by tag · {$periodLabel}\nTotal expenses: " . $money($expenses);
+
                 if ($rows !== []) {
                     $caption .= "\nTop: " . $rows[0]['label'] . ' ' . $money(-$rows[0]['value']);
                 }
                 $summary = ['rows' => count($rows)];
                 $data = ['style' => $style, 'rows' => $rows];
+
                 break;
 
             case 'income_vs_expenses':
@@ -150,6 +157,7 @@ class BuildUserChartAction
                     . "\nExpenses: " . $money($expenses) . "\nNet: " . $money($net);
                 $summary = ['buckets' => count($buckets), 'group_by' => $group];
                 $data = ['group_by' => $group, 'buckets' => $buckets];
+
                 break;
 
             default: // balance_trend
@@ -162,6 +170,7 @@ class BuildUserChartAction
                     . "\nEnd: " . $money($end) . "\nChange: " . $money($end - $start);
                 $summary = ['start' => $start, 'end' => $end];
                 $data = ['points' => $points];
+
                 break;
         }
 
@@ -195,9 +204,9 @@ class BuildUserChartAction
 
     /**
      * @param iterable<Transaction> $all
-     * @return \Illuminate\Support\Collection<int, Transaction>
+     * @return Collection<int, Transaction>
      */
-    private function between(iterable $all, string $fromKey, string $toKey): \Illuminate\Support\Collection
+    private function between(iterable $all, string $fromKey, string $toKey): Collection
     {
         return collect($all)->filter(function (Transaction $tx) use ($fromKey, $toKey): bool {
             if (!$tx->at) {
@@ -219,10 +228,12 @@ class BuildUserChartAction
     private function compareByTag(TagTree $tree, iterable $current, iterable $previous): array
     {
         $rows = [];
+
         foreach (['value' => $current, 'previous' => $previous] as $side => $transactions) {
             foreach ($this->expensesByTagAll($tree, $transactions) as $key => $row) {
                 $rows[$key] ??= ['label' => $row['label'], 'value' => 0.0, 'previous' => 0.0, 'id' => $row['id'], 'emoji' => $row['emoji'], 'title' => $row['title'], 'count' => 0];
                 $rows[$key][$side] += $row['value'];
+
                 if ($side === 'value') {
                     $rows[$key]['count'] += $row['count'];
                 }
@@ -230,6 +241,7 @@ class BuildUserChartAction
         }
 
         $rows = collect($rows)->sortByDesc(fn (array $r) => max($r['value'], $r['previous']))->values();
+
         if ($rows->count() > 8) {
             $rest = $rows->slice(7);
             $rows = $rows->take(7)->push([
@@ -248,17 +260,21 @@ class BuildUserChartAction
     private function expensesByTagAll(TagTree $tree, iterable $transactions): array
     {
         $byTag = [];
+
         foreach ($transactions as $tx) {
             if ($tx->amount >= 0) {
                 continue;
             }
             $amount = abs((float) $tx->amount);
+
             if ($tx->tags->isEmpty()) {
                 $byTag['untagged'] ??= ['label' => 'Untagged', 'value' => 0.0, 'id' => 'untagged', 'emoji' => '🏷️', 'title' => 'Untagged', 'count' => 0];
                 $byTag['untagged']['value'] += $amount;
                 $byTag['untagged']['count']++;
+
                 continue;
             }
+
             // Top-level tags, each including its child tags; once per top-level tag (like Analytics).
             foreach ($tree->rootsOf($tx->tags->pluck('id')) as $id) {
                 $meta = $tree->meta($id);
@@ -296,17 +312,21 @@ class BuildUserChartAction
     private function expensesByTag(TagTree $tree, iterable $transactions): array
     {
         $byTag = [];
+
         foreach ($transactions as $tx) {
             if ($tx->amount >= 0) {
                 continue;
             }
             $amount = abs((float) $tx->amount);
+
             if ($tx->tags->isEmpty()) {
                 $byTag['untagged'] ??= ['label' => 'Untagged', 'value' => 0.0, 'id' => 'untagged', 'emoji' => '🏷️', 'title' => 'Untagged', 'count' => 0];
                 $byTag['untagged']['value'] += $amount;
                 $byTag['untagged']['count']++;
+
                 continue;
             }
+
             // Top-level tags, each including its child tags; once per top-level tag (like Analytics).
             foreach ($tree->rootsOf($tx->tags->pluck('id')) as $id) {
                 $meta = $tree->meta($id);
@@ -317,6 +337,7 @@ class BuildUserChartAction
         }
 
         $rows = collect($byTag)->sortByDesc('value')->values();
+
         if ($rows->count() > 8) {
             $other = (float) $rows->slice(7)->sum('value');
             $otherCount = (int) $rows->slice(7)->sum('count');
@@ -340,8 +361,10 @@ class BuildUserChartAction
 
         $buckets = [];
         $cursor = $from;
+
         while ($cursor->lte($to) && count($buckets) < 400) {
             $key = $keyOf($cursor);
+
             if (!isset($buckets[$key])) {
                 $label = match ($group) {
                     'month' => $cursor->format('M y'),
@@ -360,9 +383,11 @@ class BuildUserChartAction
 
         foreach ($transactions as $tx) {
             $key = $keyOf($tx->at);
+
             if (!isset($buckets[$key])) {
                 continue;
             }
+
             if ($tx->amount > 0) {
                 $buckets[$key]['income'] += (float) $tx->amount;
             } else {
@@ -382,11 +407,13 @@ class BuildUserChartAction
         $fromKey = $from->toDateString();
         $opening = 0.0;
         $daily = [];
+
         foreach ($all as $tx) {
             if (!$tx->at) {
                 continue;
             }
             $d = $tx->at->format('Y-m-d');
+
             if ($d < $fromKey) {
                 $opening += (float) $tx->amount;
             } else {
@@ -397,6 +424,7 @@ class BuildUserChartAction
         $points = [];
         $balance = $opening;
         $cursor = $from;
+
         while ($cursor->lte($to) && count($points) < 1200) {
             $key = $cursor->toDateString();
             $balance += $daily[$key] ?? 0.0;
@@ -423,15 +451,21 @@ class BuildUserChartAction
     private function svgDonut(array $rows, callable $money, float $expenses): string
     {
         $total = array_sum(array_column($rows, 'value'));
+
         if ($total <= 0) {
             return $this->emptySvg();
         }
-        $cx = 260; $cy = 260; $r = 200; $ri = 120;
+        $cx = 260;
+        $cy = 260;
+        $r = 200;
+        $ri = 120;
         $out = '';
         $angle = -M_PI / 2;
+
         foreach ($rows as $i => $row) {
             $color = self::PALETTE[$i % count(self::PALETTE)];
             $sweep = $row['value'] / $total * 2 * M_PI;
+
             if ($sweep >= 2 * M_PI - 1e-6) {
                 $out .= sprintf('<circle cx="%d" cy="%d" r="%d" fill="none" stroke="%s" stroke-width="%d"/>', $cx, $cy, ($r + $ri) / 2, $color, $r - $ri);
             } else {
@@ -440,7 +474,17 @@ class BuildUserChartAction
                 $p = fn ($rad, $a) => sprintf('%.2f %.2f', $cx + $rad * cos($a), $cy + $rad * sin($a));
                 $out .= sprintf(
                     '<path d="M %s A %d %d 0 %d 1 %s L %s A %d %d 0 %d 0 %s Z" fill="%s" stroke="#fff" stroke-width="2"/>',
-                    $p($r, $angle), $r, $r, $large, $p($r, $a2), $p($ri, $a2), $ri, $ri, $large, $p($ri, $angle), $color,
+                    $p($r, $angle),
+                    $r,
+                    $r,
+                    $large,
+                    $p($r, $a2),
+                    $p($ri, $a2),
+                    $ri,
+                    $ri,
+                    $large,
+                    $p($ri, $angle),
+                    $color,
                 );
             }
             $angle += $sweep;
@@ -463,11 +507,13 @@ class BuildUserChartAction
     private function svgHorizontalBars(array $rows, callable $money): string
     {
         $max = $rows === [] ? 0 : max(array_column($rows, 'value'));
+
         if ($max <= 0) {
             return $this->emptySvg();
         }
         $out = '';
         $rowH = min(60, intdiv(500, max(1, count($rows))));
+
         foreach ($rows as $i => $row) {
             $y = 20 + $i * $rowH;
             $w = max(2, ($row['value'] / $max) * 520);
@@ -488,15 +534,18 @@ class BuildUserChartAction
     private function svgCompareBars(array $rows, callable $money, string $currentLabel, string $previousLabel): string
     {
         $max = 0.0;
+
         foreach ($rows as $row) {
             $max = max($max, $row['value'], $row['previous']);
         }
+
         if ($max <= 0) {
             return $this->emptySvg();
         }
         $out = '';
         $rowH = min(56, intdiv(470, max(1, count($rows))));
         $barH = max(6, intdiv($rowH - 12, 2));
+
         foreach ($rows as $i => $row) {
             $y = 10 + $i * $rowH;
             $color = self::PALETTE[$i % count(self::PALETTE)];
@@ -520,24 +569,31 @@ class BuildUserChartAction
     private function svgGroupedBars(array $buckets, callable $money): string
     {
         $max = 0.0;
+
         foreach ($buckets as $b) {
             $max = max($max, $b['income'], $b['expenses']);
         }
+
         if ($max <= 0) {
             return $this->emptySvg();
         }
-        $left = 110; $top = 20; $w = 870; $h = 430;
+        $left = 110;
+        $top = 20;
+        $w = 870;
+        $h = 430;
         $out = $this->yAxis($left, $top, $w, $h, 0, $max, $money);
         $n = count($buckets);
         $slot = $w / max(1, $n);
         $bw = max(1.5, $slot * 0.38);
         $every = (int) max(1, ceil($n / 16));
+
         foreach ($buckets as $i => $b) {
             $x = $left + $i * $slot + $slot * 0.1;
             $ih = $b['income'] / $max * $h;
             $eh = $b['expenses'] / $max * $h;
             $out .= sprintf('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="2" fill="#10b981"/>', $x, $top + $h - $ih, $bw, $ih);
             $out .= sprintf('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="2" fill="#ef4444"/>', $x + $bw, $top + $h - $eh, $bw, $eh);
+
             if ($i % $every === 0) {
                 $out .= sprintf('<text x="%.1f" y="%d" font-size="15" text-anchor="middle" fill="#64748b">%s</text>', $x + $bw, $top + $h + 24, $this->e($b['label']));
             }
@@ -557,29 +613,40 @@ class BuildUserChartAction
             return $this->emptySvg();
         }
         $values = array_column($points, 'value');
-        $min = min($values); $max = max($values);
+        $min = min($values);
+        $max = max($values);
+
         if ($max - $min < 1e-9) {
-            $min -= 1; $max += 1;
+            $min -= 1;
+            $max += 1;
         }
         $pad = ($max - $min) * 0.08;
-        $min -= $pad; $max += $pad;
-        $left = 130; $top = 20; $w = 850; $h = 450;
+        $min -= $pad;
+        $max += $pad;
+        $left = 130;
+        $top = 20;
+        $w = 850;
+        $h = 450;
         $out = $this->yAxis($left, $top, $w, $h, $min, $max, $money);
         $n = count($points);
         $coords = [];
+
         foreach ($points as $i => $p) {
             $x = $left + ($n === 1 ? $w / 2 : $i / ($n - 1) * $w);
             $y = $top + $h - ($p['value'] - $min) / ($max - $min) * $h;
             $coords[] = sprintf('%.1f,%.1f', $x, $y);
         }
-        $first = explode(',', $coords[0]); $last = explode(',', $coords[$n - 1]);
+        $first = explode(',', $coords[0]);
+        $last = explode(',', $coords[$n - 1]);
         $out .= sprintf('<polygon points="%s,%d %s %s,%d" fill="#6366f1" fill-opacity="0.12"/>', $first[0], $top + $h, implode(' ', $coords), $last[0], $top + $h);
         $out .= sprintf('<polyline points="%s" fill="none" stroke="#6366f1" stroke-width="3" stroke-linejoin="round"/>', implode(' ', $coords));
+
         if ($min < 0 && $max > 0) {
             $zy = $top + $h - (0 - $min) / ($max - $min) * $h;
             $out .= sprintf('<line x1="%d" x2="%d" y1="%.1f" y2="%.1f" stroke="#ef4444" stroke-dasharray="6 4"/>', $left, $left + $w, $zy, $zy);
         }
         $every = (int) max(1, ceil($n / 10));
+
         foreach ($points as $i => $p) {
             if ($i % $every === 0 || $i === $n - 1) {
                 $x = $left + ($n === 1 ? $w / 2 : $i / ($n - 1) * $w);
@@ -593,6 +660,7 @@ class BuildUserChartAction
     private function yAxis(int $left, int $top, int $w, int $h, float $min, float $max, callable $money): string
     {
         $out = '';
+
         for ($i = 0; $i <= 4; $i++) {
             $v = $min + ($max - $min) * $i / 4;
             $y = $top + $h - $h * $i / 4;

@@ -23,7 +23,8 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'email' => 'required|string|max:255|email:dns,rfc',
+            // rfc only: a DNS lookup on every attempt makes login depend on the resolver.
+            'email' => 'required|string|max:255|email:rfc',
             'password' => 'required|string|min:8',
         ]);
 
@@ -218,6 +219,8 @@ class AuthController extends Controller
 
             return redirect($frontend . '#token=' . urlencode($this->issueAuthToken($user)));
         } catch (Exception $e) {
+            report($e);
+
             return redirect($frontend . '#auth_error=' . urlencode('Authentication failed'));
         }
     }

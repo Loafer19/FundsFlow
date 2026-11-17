@@ -55,12 +55,14 @@ final class WebAgentUploads
     {
         $contents = (string) $file->getContent();
         $size = strlen($contents);
+
         if ($size === 0 || $size > self::MAX_BYTES) {
             throw ValidationException::withMessages(['images' => 'Each photo must be 8 MB or smaller.']);
         }
 
         // Sniff the bytes; the client-declared type is ignored.
         $mime = TransactionAttachmentRules::detectMime($contents) ?? '';
+
         if (!isset(self::MIMES[$mime])) {
             throw ValidationException::withMessages(['images' => 'Only JPEG, PNG, WebP and HEIC photos are supported.']);
         }
@@ -87,6 +89,7 @@ final class WebAgentUploads
         $contents = (string) $file->getContent();
         $name = TransactionAttachmentRules::sanitizeOriginalName((string) ($file->getClientOriginalName() ?: 'document'));
         $detected = DocumentFile::detect($contents, $name);
+
         if (isset($detected['error'])) {
             throw ValidationException::withMessages(['document' => $detected['error']]);
         }
@@ -116,6 +119,7 @@ final class WebAgentUploads
     public function read(User $user, array $ref): ?string
     {
         $path = $this->refPath($user, $ref);
+
         if ($path === null || !Storage::disk(self::DISK)->exists($path)) {
             return null;
         }
@@ -131,6 +135,7 @@ final class WebAgentUploads
     public function delete(User $user, array $refs): void
     {
         $paths = array_values(array_filter(array_map(fn (array $ref): ?string => $this->refPath($user, $ref), $refs)));
+
         if ($paths !== []) {
             Storage::disk(self::DISK)->delete($paths);
         }
@@ -169,7 +174,6 @@ final class WebAgentUploads
     /**
      * Photo refs held by a pending state (receipt ask, receipt Confirm card).
      *
-     * @param mixed $pending
      * @return list<array<string, mixed>>
      */
     public static function refsIn(mixed $pending): array
@@ -190,6 +194,7 @@ final class WebAgentUploads
         $collect($pending['files'] ?? null);
         $payload = is_array($pending['payload'] ?? null) ? $pending['payload'] : [];
         $collect($payload['files'] ?? null);
+
         foreach (is_array($payload['transactions'] ?? null) ? $payload['transactions'] : [] as $tx) {
             $collect(is_array($tx) ? ($tx['files'] ?? null) : null);
         }
@@ -204,6 +209,7 @@ final class WebAgentUploads
     {
         $id = is_string($ref['id'] ?? null) ? $ref['id'] : '';
         $mime = is_string($ref['mime'] ?? null) ? $ref['mime'] : '';
+
         if (!preg_match(self::ID_PATTERN, $id) || (!isset(self::MIMES[$mime]) && !isset(self::DOCUMENT_MIMES[$mime]))) {
             return null;
         }

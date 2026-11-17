@@ -41,6 +41,7 @@ final class ImportInstructions
             $to = is_numeric($range['to'] ?? null) ? max($from, (int) $range['to']) : $from;
             $ops['skip_lines'][] = ['from' => $from, 'to' => min($to, $from + 100000), 'file' => is_int($range['file'] ?? null) ? $range['file'] : null];
         }
+
         if (($skip = $strings($json['skip_match'] ?? null)) !== []) {
             $ops['skip_match'] = $skip;
         }
@@ -53,11 +54,13 @@ final class ImportInstructions
             'match' => $strings($only['match'] ?? null) ?: null,
             'currency' => ($c = $str($only['currency'] ?? null, 10)) !== null ? mb_strtoupper($c) : null,
         ], static fn ($v) => $v !== null);
+
         if ($onlyOps !== []) {
             $ops['only'] = $onlyOps;
         }
 
         $flip = is_array($json['flip_sign'] ?? null) ? $json['flip_sign'] : [];
+
         if (($flip['all'] ?? false) === true) {
             $ops['flip_sign'] = ['all' => true, 'match' => []];
         } elseif (($match = $strings($flip['match'] ?? null)) !== []) {
@@ -66,6 +69,7 @@ final class ImportInstructions
 
         foreach (array_slice(is_array($json['set_tags'] ?? null) ? $json['set_tags'] : [], 0, self::MAX_ITEMS) as $set) {
             $tag = is_array($set) ? $str($set['tag'] ?? null, 60) : null;
+
             if ($tag !== null) {
                 $ops['set_tags'][] = ['match' => $strings($set['match'] ?? null), 'tag' => $tag, 'replace' => ($set['replace'] ?? false) === true];
             }
@@ -74,17 +78,21 @@ final class ImportInstructions
         if (in_array($json['date_order'] ?? null, ['dmy', 'mdy'], true)) {
             $ops['date_order'] = $json['date_order'];
         }
+
         if (in_array($json['unknown_tags'] ?? null, ['create', 'none'], true)) {
             $ops['unknown_tags'] = $json['unknown_tags'];
         }
+
         foreach (array_slice(is_array($json['tag_map'] ?? null) ? $json['tag_map'] : [], 0, 100, true) as $from => $to) {
             if (is_string($from) && trim($from) !== '' && (is_string($to) || $to === null)) {
                 $ops['tag_map'][mb_strtolower(trim($from))] = mb_substr(trim((string) $to), 0, 60);
             }
         }
+
         if (is_bool($json['suggest_tags'] ?? null)) {
             $ops['suggest_tags'] = $json['suggest_tags'];
         }
+
         if (($unsupported = $strings($json['unsupported'] ?? null)) !== []) {
             $ops['unsupported'] = array_slice($unsupported, 0, 5);
         }
@@ -136,11 +144,13 @@ final class ImportInstructions
 
         // "Кафе → Їжа", "Taxi = Transport", "Gym -> none" (one per line or separated by , ;).
         $unknownByLower = [];
+
         foreach ($unknown as $title) {
             $unknownByLower[mb_strtolower(trim($title))] = $title;
         }
         $none = '/^(none|no|nothing|no tag|without( a)? tag|without|skip|-|—|без тегу|без тега|без тегів|без|нічого|ничего|пропусти)$/u';
         $create = '/^(create|new|create it|створи|створити|новий|новий тег|создай|создать|новый)$/u';
+
         foreach (preg_split('/\R|[;,]/u', (string) $text) ?: [] as $segment) {
             if (!preg_match('/^\s*(.+?)\s*(?:→|->|=>|=|—>|:)\s*(.+?)\s*\.?$/u', $segment, $m)) {
                 continue;
@@ -148,9 +158,11 @@ final class ImportInstructions
             $from = mb_strtolower(trim($m[1], " \t\"'«»“”"));
             $to = trim($m[2], " \t\"'«»“”");
             $toLower = mb_strtolower($to);
+
             if (!isset($unknownByLower[$from])) {
                 continue;
             }
+
             if (preg_match($none, $toLower)) {
                 $ops['tag_map'][$from] = '';
             } elseif (preg_match($create, $toLower)) {
@@ -162,6 +174,7 @@ final class ImportInstructions
         }
 
         $others = '(the rest|rest|others|other|all others|решта|решту|інші|інших|остальные|остальное|другие)';
+
         if ($take('/\b' . $others . '\b[^.;,\n]*?(without( a)? tags?|no tags?|без тег\w*|без)/u')
             || $take('/(without( a)? tags?|без тег\w*)[^.;,\n]*?\b' . $others . '\b/u')) {
             $ops['unknown_tags'] = 'none';
@@ -172,6 +185,7 @@ final class ImportInstructions
             $ops['unknown_tags'] = 'create';
         } elseif ($take('/(without|no|skip)( the)? tags?|(імпортуй |импортируй )?без тег\w*|^\s*(none|без)\s*$/u')) {
             $ops['unknown_tags'] = 'none';
+
             if (!$reply) {
                 $ops['suggest_tags'] = false;
             }
@@ -221,6 +235,7 @@ final class ImportInstructions
         $applied = [];
         $matches = static function (array $row, array $patterns): bool {
             $note = mb_strtolower((string) ($row['note'] ?? ''));
+
             foreach ($patterns as $pattern) {
                 if ($pattern !== '' && str_contains($note, mb_strtolower($pattern))) {
                     return true;
@@ -233,9 +248,11 @@ final class ImportInstructions
 
         if (isset($ops['date_order'])) {
             $swapped = 0;
+
             foreach ($rows as &$row) {
                 $wants = $ops['date_order'];
                 $read = $row['order'] ?? null;
+
                 if (isset($row['swap']) && $read !== null && $read !== $wants) {
                     [$row['at'], $row['swap']] = [$row['swap'], $row['at']];
                     $row['order'] = $wants;
@@ -254,6 +271,7 @@ final class ImportInstructions
                 && $row['line'] >= $range['from'] && $row['line'] <= $range['to']
             )));
             $label = $range['from'] === $range['to'] ? "line {$range['from']}" : "lines {$range['from']}–{$range['to']}";
+
             if ($range['file'] !== null && $files > 1) {
                 $label .= ' of file ' . ($range['file'] + 1);
             }
@@ -268,6 +286,7 @@ final class ImportInstructions
 
         if (isset($ops['flip_sign'])) {
             $count = 0;
+
             foreach ($rows as &$row) {
                 if ($ops['flip_sign']['all'] || $matches($row, $ops['flip_sign']['match'])) {
                     $row['amount'] = -$row['amount'];
@@ -291,15 +310,19 @@ final class ImportInstructions
                 );
             }));
             $parts = [];
+
             if (isset($only['type'])) {
                 $parts[] = $only['type'] === 'expense' ? 'expenses' : 'income';
             }
+
             if (isset($only['from']) || isset($only['to'])) {
                 $parts[] = (isset($only['from']) ? UserFormatter::formatDate($user, $only['from']) : '…') . ' – ' . (isset($only['to']) ? UserFormatter::formatDate($user, $only['to']) : '…');
             }
+
             if (isset($only['match'])) {
                 $parts[] = 'rows with ' . $quote($only['match']);
             }
+
             if (isset($only['currency'])) {
                 $parts[] = $only['currency'] . ' rows';
             }
@@ -309,6 +332,7 @@ final class ImportInstructions
         foreach ($ops['set_tags'] ?? [] as $set) {
             $title = $existing[mb_strtolower($set['tag'])] ?? $set['tag'];
             $count = 0;
+
             foreach ($rows as &$row) {
                 if ($set['match'] === [] || $matches($row, $set['match'])) {
                     if ($set['replace']) {

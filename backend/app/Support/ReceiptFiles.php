@@ -12,6 +12,7 @@ final class ReceiptFiles
      * Each file needs `mime` and (optionally) `file_size`; the winning element is returned as is.
      *
      * @template T of array<string, mixed>
+     *
      * @param non-empty-list<T> $files
      * @return T
      */
@@ -31,6 +32,7 @@ final class ReceiptFiles
                 default => 0,
             };
             $score = $mimeBonus + $size;
+
             if ($score > $bestScore) {
                 $bestScore = $score;
                 $best = $file;

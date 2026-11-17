@@ -62,13 +62,16 @@ final class DocumentImport
 
         foreach ($files as $file) {
             $result = $this->read->execute($user, $file['kind'], $file['bytes'], $file['name'], $caption, $withoutAi);
+
             if ($single && $result['type'] !== 'rows') {
                 return $result;
             }
+
             if ($result['type'] === 'single') {
                 // Several files: a receipt among statements is one more row (its file is not attached).
                 $aiUsed = true;
                 $analysis = $result['analysis'];
+
                 if ($analysis['amount'] === null || $analysis['needs_price']) {
                     $notes[] = "⚠️ {$file['name']}: no total found, left out";
 
@@ -91,12 +94,14 @@ final class DocumentImport
                     'ai_used' => true,
                 ];
             }
+
             if ($result['type'] === 'rows') {
                 $parts[] = $result;
                 $aiUsed = $aiUsed || $result['ai_used'];
 
                 continue;
             }
+
             if ($result['type'] === 'quota') {
                 $quotaMessage = (string) $result['message'];
                 $errors[] = "{$file['name']}: needs an AI assist and none are left today";
@@ -110,6 +115,7 @@ final class DocumentImport
                 ? ['type' => 'quota', 'message' => $quotaMessage]
                 : ['type' => 'error', 'message' => "Nothing to import:\n" . implode("\n", array_map(static fn ($e) => '• ' . $e, $errors))];
         }
+
         foreach ($errors as $error) {
             $notes[] = '⚠️ Not imported: ' . $error;
         }
@@ -129,13 +135,16 @@ final class DocumentImport
     public function fromScreenshots(User $user, array $images, ?string $caption, string $withoutAi): array
     {
         $images = array_slice($images, 0, max(1, (int) config('agent.documents.max_screenshots', self::MAX_SCREENSHOTS)));
+
         if ($images === []) {
             return ['type' => 'error', 'message' => 'No screenshots to read (JPEG or PNG).'];
         }
+
         if (!$this->quota->hasQuota($user)) {
             return ['type' => 'quota', 'message' => $this->quota->exhaustedMessage($user, $withoutAi)];
         }
         $perImage = $this->ai->readScreenshots($user, $images, $caption);
+
         if ($perImage === null) {
             return ['type' => 'error', 'message' => "Couldn't read the screenshots: " . $this->ai->failureReason() . '. No AI assist was used; send them again in a minute, or export the statement as CSV / PDF from the bank app.'];
         }
@@ -153,9 +162,11 @@ final class DocumentImport
     public function fromScreenshotRows(User $user, array $perImage, ?string $caption): array
     {
         $parts = [];
+
         foreach ($perImage as $i => $items) {
             $rows = [];
             $skipped = [];
+
             foreach ($items as $j => $item) {
                 if ($item['at'] === null) {
                     $skipped[] = ['line' => $j + 1, 'reason' => 'no date visible'];
@@ -171,6 +182,7 @@ final class DocumentImport
                 'capped' => false,
             ];
         }
+
         if (array_sum(array_map(static fn (array $p) => count($p['rows']), $parts)) === 0) {
             return ['type' => 'error', 'message' => count($perImage) === 1
                 ? 'No dated transactions found on this screenshot.'
@@ -188,20 +200,23 @@ final class DocumentImport
      * message isn't about the import: the caller then treats it as a normal message.
      *
      * @param array<string, mixed> $draft
-     * @return array<string, mixed>|null
+     * @return null|array<string, mixed>
      */
     public function reply(User $user, array $draft, string $text): ?array
     {
         $text = trim($text);
+
         if ($text === '') {
             return null;
         }
+
         if (preg_match('/^(cancel|stop|no|nope|скасуй\w*|скасувати|відміни\w*|відмін\w*|ні|не треба|отмен\w*|нет|не надо)[.!]?$/iu', $text)) {
             return ['type' => 'cancelled'];
         }
 
         $draft['rounds'] = (int) ($draft['rounds'] ?? 0) + 1;
         $read = $this->interpret($user, $draft, $text, true);
+
         if (!$read['understood']) {
             if ($read['note'] !== null) {
                 return [
@@ -228,9 +243,11 @@ final class DocumentImport
     private function withCaption(User $user, array $draft, ?string $caption): array
     {
         $caption = trim((string) $caption);
+
         if ($caption !== '') {
             $read = $this->interpret($user, $draft, $caption, false);
             $draft = $read['draft'];
+
             if ($read['note'] !== null) {
                 $draft['notes'][] = $read['note'];
             }
@@ -246,10 +263,12 @@ final class DocumentImport
     private function plan(User $user, array $draft): array
     {
         $built = $this->plan->build($user, $draft);
+
         if (isset($built['ask']) && (int) ($draft['rounds'] ?? 0) >= self::MAX_ROUNDS) {
             $draft['ops']['unknown_tags'] = 'none';
             $built = $this->plan->build($user, $draft);
         }
+
         if (isset($built['error'])) {
             return ['type' => 'error', 'message' => $built['error']];
         }
@@ -290,8 +309,10 @@ final class DocumentImport
         $words = preg_match_all('/[\p{L}\p{N}]{2,}/u', $stripped);
         // A caption of a word or two ("October", "Monobank") is a label, not an instruction.
         $worthAi = !$quick['complete'] && ($reply ? $words > 0 : $words > 2);
+
         if ($worthAi) {
             $free = (bool) ($draft['ai_used'] ?? false);
+
             if ($free || $this->quota->hasQuota($user)) {
                 $json = $this->ai->instructions($user, $text, [
                     'tags' => array_values($existing),
@@ -301,6 +322,7 @@ final class DocumentImport
                     'date_samples' => $this->dateSamples($draft),
                     'reply' => $reply,
                 ]);
+
                 if ($json !== null) {
                     if (!$free) {
                         $this->quota->consume($user);
@@ -343,28 +365,34 @@ final class DocumentImport
             $files[] = $part['file'];
             $capped = $capped || $part['capped'];
             $local = [];
+
             foreach ($part['rows'] as $row) {
                 $key = ImportPlan::key($row['at'], (float) $row['amount'], $row['note'] ?? null);
                 $local[$key] = ($local[$key] ?? 0) + 1;
+
                 if ($local[$key] <= ($kept[$key] ?? 0)) {
                     $overlap++;
 
                     continue;
                 }
+
                 if (count($rows) >= $max) {
                     $capped = true;
 
                     continue;
                 }
                 $row['f'] = $f;
+
                 if ($part['file']['ambiguous'] ?? false) {
                     $row['order'] = $part['file']['order'];
                 }
                 $rows[] = $row;
             }
+
             foreach ($local as $key => $n) {
                 $kept[$key] = max($kept[$key] ?? 0, $n);
             }
+
             foreach ($part['skipped'] as $skip) {
                 $skipped[] = ['f' => $f, 'line' => $skip['line'], 'reason' => $skip['reason']];
             }
@@ -398,6 +426,7 @@ final class DocumentImport
     private function existingTitles(User $user): array
     {
         $titles = [];
+
         foreach ($this->listTags->execute($user) as $tag) {
             $titles[mb_strtolower(trim((string) $tag->title))] ??= trim((string) $tag->title);
         }
@@ -413,12 +442,15 @@ final class DocumentImport
     private function unknownTitles(array $draft, array $existing): array
     {
         $unknown = [];
+
         foreach ($draft['rows'] ?? [] as $row) {
             if ($row['soft'] ?? false) {
                 continue;
             }
+
             foreach ($row['tags'] ?? [] as $title) {
                 $lower = mb_strtolower(trim((string) $title));
+
                 if ($lower !== '' && !isset($existing[$lower])) {
                     $unknown[$lower] ??= trim((string) $title);
                 }
@@ -435,6 +467,7 @@ final class DocumentImport
     private function fileContext(array $draft): array
     {
         $out = [];
+
         foreach ($draft['files'] ?? [] as $f => $file) {
             $lines = array_map(static fn (array $row) => (int) $row['line'], array_filter($draft['rows'], static fn (array $row) => $row['f'] === $f));
             $out[] = ['name' => (string) $file['name'], 'rows' => count($lines), 'lines' => $lines !== [] ? min($lines) . '-' . max($lines) : ''];
@@ -450,10 +483,12 @@ final class DocumentImport
     private function sampleNotes(array $draft): array
     {
         $notes = [];
+
         foreach ($draft['rows'] ?? [] as $row) {
             if (is_string($row['note'] ?? null) && $row['note'] !== '') {
                 $notes[mb_strtolower($row['note'])] = mb_substr($row['note'], 0, 60);
             }
+
             if (count($notes) >= 25) {
                 break;
             }
@@ -469,6 +504,7 @@ final class DocumentImport
     private function dateSamples(array $draft): array
     {
         $samples = [];
+
         foreach ($draft['files'] ?? [] as $file) {
             if ($file['ambiguous'] ?? false) {
                 array_push($samples, ...array_slice($file['samples'] ?? [], 0, 6));

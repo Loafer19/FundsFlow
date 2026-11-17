@@ -301,16 +301,19 @@ class AgentPlanningTools
                 continue;
             }
             $open = $budget->periods->first(fn (BudgetPeriod $p) => $p->ends_at === null);
+
             if (!$open && !$includePaused) {
                 continue;
             }
             $period = $open ?? $budget->periods->sortByDesc(fn (BudgetPeriod $p) => $p->starts_at?->toDateString())->first();
+
             if (!$period) {
                 continue;
             }
 
             $label = $this->budgetLabel($budget, $period);
             $list[] = ['id' => (int) $budget->id, 'title' => $label];
+
             if ($budget->isGoal()) {
                 $items[] = $this->goalStatus($user, $budget, $label);
 
@@ -465,6 +468,7 @@ class AgentPlanningTools
 
         $expenses = 0.0;
         $income = 0.0;
+
         foreach ($items as $item) {
             if ($item['amount'] < 0) {
                 $expenses += $item['amount'];
@@ -503,6 +507,7 @@ class AgentPlanningTools
                 continue;
             }
             $cursor = $from;
+
             if ($rule->next_run_at && $rule->next_run_at->toDateString() > $cursor->toDateString()) {
                 $cursor = CarbonImmutable::parse($rule->next_run_at->toDateString());
             }
@@ -549,6 +554,7 @@ class AgentPlanningTools
         $tagFilter = $this->ownedTagIds($user, $args['tag_ids'] ?? []);
         $tagTree = TagTree::for($user);
         $all = $this->listTransactions->execute($user);
+
         if ($tagFilter !== []) {
             // A selected parent tag includes its child tags.
             $matchIds = $tagTree->expand($tagFilter);
@@ -563,6 +569,7 @@ class AgentPlanningTools
         $curTags = $this->expenseByTag($tagTree, $current);
         $prevTags = $this->expenseByTag($tagTree, $before);
         $rows = [];
+
         foreach (array_unique(array_merge(array_keys($curTags), array_keys($prevTags))) as $key) {
             $meta = $curTags[$key] ?? $prevTags[$key];
             $now = $curTags[$key]['amount'] ?? 0.0;
@@ -588,6 +595,7 @@ class AgentPlanningTools
             'tags_truncated' => count($rows) > self::MAX_COMPARE_TAGS,
             'note' => 'Expense amounts per tag are positive numbers; a transaction with several tags counts under each tag.',
         ];
+
         if ($tagFilter !== []) {
             $out['tag_filter'] = $tagFilter;
         }
@@ -628,6 +636,42 @@ class AgentPlanningTools
         return (string) $raw;
     }
 
+    /**
+     * @return list<int>
+     */
+    public function ownedTagIds(User $user, mixed $raw): array
+    {
+        if (!is_array($raw) || $raw === []) {
+            return [];
+        }
+        $owned = array_fill_keys($this->listTags->execute($user)->pluck('id')->map(fn ($id) => (int) $id)->all(), true);
+        $ids = [];
+
+        foreach ($raw as $id) {
+            if (is_numeric($id) && isset($owned[(int) $id])) {
+                $ids[] = (int) $id;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param list<int> $ids
+     */
+    public function tagLabels(User $user, array $ids): string
+    {
+        $tags = $this->listTags->execute($user)->keyBy('id');
+        $labels = [];
+
+        foreach ($ids as $id) {
+            $tag = $tags->get($id);
+            $labels[] = $tag ? trim($tag->emoji . ' ' . $tag->title) : "#{$id}";
+        }
+
+        return $labels !== [] ? implode(', ', $labels) : '—';
+    }
+
     // ---------------------------------------------------------------------
     // Budget writes
     // ---------------------------------------------------------------------
@@ -641,6 +685,7 @@ class AgentPlanningTools
         $budget = $this->findBudget($user, $args['id'] ?? null);
         $current = $budget->periods->first(fn (BudgetPeriod $p) => $p->ends_at === null);
         $base = $current ?? $budget->periods->sortByDesc(fn (BudgetPeriod $p) => $p->starts_at?->toDateString())->first();
+
         if (!$base) {
             throw new InvalidArgumentException('budget has no periods');
         }
@@ -650,6 +695,7 @@ class AgentPlanningTools
         }
 
         $amount = (float) $base->amount;
+
         if (array_key_exists('amount', $args) && $args['amount'] !== null) {
             if (!is_numeric($args['amount']) || (float) $args['amount'] < 0.01) {
                 throw new InvalidArgumentException('amount must be a positive number');
@@ -658,6 +704,7 @@ class AgentPlanningTools
         }
 
         $length = $base->length->value;
+
         if (isset($args['length'])) {
             if (!in_array($args['length'], ['week', 'month', 'year'], true)) {
                 throw new InvalidArgumentException('length must be week|month|year');
@@ -667,11 +714,13 @@ class AgentPlanningTools
 
         $baseTagIds = $this->periodTagIds($base);
         $tagIds = $baseTagIds;
+
         if (is_array($args['tag_ids'] ?? null)) {
             // Keep tags the budget already has (even if since deleted); new ones must be owned.
             $owned = $this->ownedTagIds($user, $args['tag_ids']);
             $kept = array_values(array_intersect(array_map('intval', array_filter($args['tag_ids'], 'is_numeric')), $baseTagIds));
             $tagIds = array_values(array_unique(array_merge($owned, $kept)));
+
             if ($tagIds === []) {
                 throw new InvalidArgumentException('tag_ids must contain at least one of the user\'s tags');
             }
@@ -682,6 +731,7 @@ class AgentPlanningTools
 
         $title = $budget->title;
         $titleChanged = false;
+
         if (array_key_exists('title', $args) && is_string($args['title'])) {
             $new = mb_substr(trim($args['title']), 0, 255);
             $new = $new === '' ? null : $new;
@@ -783,6 +833,7 @@ class AgentPlanningTools
         $changed = false;
 
         $amount = (float) $base->amount;
+
         if (array_key_exists('amount', $args) && $args['amount'] !== null) {
             $amount = $this->goalAmount($args['amount'], 'amount', 0.01);
         }
@@ -793,10 +844,12 @@ class AgentPlanningTools
 
         $baseTagIds = $this->periodTagIds($base);
         $tagIds = $baseTagIds;
+
         if (is_array($args['tag_ids'] ?? null)) {
             $owned = $this->ownedTagIds($user, $args['tag_ids']);
             $kept = array_values(array_intersect(array_map('intval', array_filter($args['tag_ids'], 'is_numeric')), $baseTagIds));
             $tagIds = array_values(array_unique(array_merge($owned, $kept)));
+
             if ($tagIds === []) {
                 throw new InvalidArgumentException('tag_ids must contain at least one of the user\'s tags');
             }
@@ -926,9 +979,11 @@ class AgentPlanningTools
         if ($op === 'pause' && !$current) {
             throw new InvalidArgumentException('budget is already paused');
         }
+
         if ($op === 'resume' && $current) {
             throw new InvalidArgumentException('budget is already active');
         }
+
         if ($op === 'resume' && !$base) {
             throw new InvalidArgumentException('budget has no periods to resume');
         }
@@ -953,6 +1008,7 @@ class AgentPlanningTools
     private function applyBudget(User $user, string $action, array $payload): array
     {
         $budget = $user->budgets()->with('periods.tags')->find((int) ($payload['id'] ?? 0));
+
         if (!$budget) {
             return ['ok' => false, 'message' => 'That budget no longer exists.', 'summary' => 'Budget to change no longer exists.'];
         }
@@ -968,9 +1024,11 @@ class AgentPlanningTools
                         'target_date' => $payload['target_date'] ?? null,
                         'start_amount' => isset($payload['start_amount']) ? (float) $payload['start_amount'] : null,
                     ];
+
                     if (!empty($payload['start_date'])) {
                         $data['start_date'] = (string) $payload['start_date'];
                     }
+
                     if (!empty($payload['title_changed'])) {
                         $data['title'] = $payload['title'] ?? null;
                     }
@@ -986,6 +1044,7 @@ class AgentPlanningTools
                     'start_date' => $payload['start_date'] ?? null,
                     'align_to_calendar' => (bool) ($payload['align_to_calendar'] ?? false),
                 ];
+
                 if (!empty($payload['title_changed'])) {
                     $data['title'] = $payload['title'] ?? null;
                 }
@@ -993,14 +1052,17 @@ class AgentPlanningTools
                 $label = $budget->title ?: ('Budget #' . $budget->id);
 
                 return ['ok' => true, 'message' => '✅ Budget updated: ' . $label, 'summary' => 'Budget updated via agent confirm.'];
+
             case 'pause_budget':
                 $this->pauseBudget->execute($user, $budget);
 
                 return ['ok' => true, 'message' => "⏸ {$noun} paused: " . $label, 'summary' => "{$noun} paused via agent confirm."];
+
             case 'resume_budget':
                 $this->resumeBudget->execute($user, $budget);
 
                 return ['ok' => true, 'message' => "▶️ {$noun} resumed: " . $label, 'summary' => "{$noun} resumed via agent confirm."];
+
             default:
                 $this->deleteBudget->execute($user, $budget);
 
@@ -1023,6 +1085,7 @@ class AgentPlanningTools
         $today = PeriodRange::today($user);
         $startsAt = $this->dateArg($args['starts_at'] ?? null, 'starts_at') ?? $today->toDateString();
         $endsAt = $this->dateArg($args['ends_at'] ?? null, 'ends_at');
+
         if ($endsAt !== null && $endsAt < $startsAt) {
             throw new InvalidArgumentException('ends_at must be on or after starts_at');
         }
@@ -1033,10 +1096,12 @@ class AgentPlanningTools
             'Create recurring rule:',
             UserFormatter::formatMoney($user, $amount) . ' · ' . $frequency . ' · from ' . $startsAt . ($endsAt ? ' until ' . $endsAt : ''),
         ];
+
         if ($note !== '') {
             $lines[] = 'Note: ' . $note;
         }
         $lines[] = 'Tags: ' . ($tagIds !== [] ? $this->tagLabels($user, $tagIds) : '—');
+
         if ($startsAt < $today->toDateString()) {
             $missed = $this->countOccurrences(RecurringFrequency::from($frequency), $startsAt, $endsAt, $today->subDay()->toDateString());
             $lines[] = "⚠️ Start is in the past: {$missed} past occurrence(s) will be added automatically by the next daily run.";
@@ -1070,23 +1135,28 @@ class AgentPlanningTools
 
         if (array_key_exists('amount', $args) && $args['amount'] !== null) {
             $amount = $this->signedAmount($args['amount']);
+
             if (abs($amount - (float) $rule->amount) > 0.001) {
                 $changes['amount'] = $amount;
                 $lines[] = 'Amount: ' . $money((float) $rule->amount) . ' → ' . $money($amount);
             }
         }
+
         if (isset($args['frequency'])) {
             $frequency = $this->frequency($args['frequency']);
+
             if ($frequency !== $rule->frequency->value) {
                 $changes['frequency'] = $frequency;
                 $lines[] = "Frequency: {$rule->frequency->value} → {$frequency}";
             }
         }
         $startsAt = $this->dateArg($args['starts_at'] ?? null, 'starts_at');
+
         if ($startsAt !== null && $startsAt !== $rule->starts_at->toDateString()) {
             $changes['starts_at'] = $startsAt;
             $lines[] = 'Start: ' . $rule->starts_at->toDateString() . ' → ' . $startsAt;
         }
+
         if (filter_var($args['clear_ends_at'] ?? false, FILTER_VALIDATE_BOOL)) {
             if ($rule->ends_at) {
                 $changes['ends_at'] = null;
@@ -1094,6 +1164,7 @@ class AgentPlanningTools
             }
         } else {
             $endsAt = $this->dateArg($args['ends_at'] ?? null, 'ends_at');
+
             if ($endsAt !== null && $endsAt !== $rule->ends_at?->toDateString()) {
                 $changes['ends_at'] = $endsAt;
                 $lines[] = 'End date: ' . ($rule->ends_at?->toDateString() ?? 'none') . ' → ' . $endsAt;
@@ -1101,21 +1172,26 @@ class AgentPlanningTools
         }
         $effectiveStart = $changes['starts_at'] ?? $rule->starts_at->toDateString();
         $effectiveEnd = array_key_exists('ends_at', $changes) ? $changes['ends_at'] : $rule->ends_at?->toDateString();
+
         if ($effectiveEnd !== null && $effectiveEnd < $effectiveStart) {
             throw new InvalidArgumentException('ends_at must be on or after starts_at');
         }
+
         if (array_key_exists('note', $args) && is_string($args['note'])) {
             $note = mb_substr(trim($args['note']), 0, 255);
+
             if ($note !== (string) ($rule->note ?? '')) {
                 $changes['note'] = $note !== '' ? $note : null;
                 $lines[] = 'Note: ' . ($rule->note ?: '—') . ' → ' . ($note !== '' ? $note : '—');
             }
         }
+
         if (is_array($args['tag_ids'] ?? null)) {
             $current = $rule->tags->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
             $kept = array_values(array_intersect(array_map('intval', array_filter($args['tag_ids'], 'is_numeric')), $current));
             $new = array_values(array_unique(array_merge($this->ownedTagIds($user, $args['tag_ids']), $kept)));
             sort($new);
+
             if ($new !== $current) {
                 $changes['tags'] = $new;
                 $lines[] = 'Tags: ' . ($current ? $this->tagLabels($user, $current) : '—') . ' → ' . ($new ? $this->tagLabels($user, $new) : '—');
@@ -1125,6 +1201,7 @@ class AgentPlanningTools
         if ($changes === []) {
             throw new InvalidArgumentException('nothing to change: values equal the current rule');
         }
+
         if (isset($changes['starts_at']) || isset($changes['frequency'])) {
             $lines[] = 'Next transaction: ' . $this->nextRunAfterUpdate($user, $rule, $changes);
         }
@@ -1145,6 +1222,7 @@ class AgentPlanningTools
         if ($op === 'pause' && !$rule->active) {
             throw new InvalidArgumentException('rule is already paused');
         }
+
         if ($op === 'resume' && $rule->active) {
             throw new InvalidArgumentException('rule is already active');
         }
@@ -1181,6 +1259,7 @@ class AgentPlanningTools
         }
 
         $rule = $user->recurringTransactions()->with('tags')->find((int) ($payload['id'] ?? 0));
+
         if (!$rule) {
             return ['ok' => false, 'message' => 'That recurring rule no longer exists.', 'summary' => 'Recurring rule to change no longer exists.'];
         }
@@ -1190,20 +1269,24 @@ class AgentPlanningTools
             case 'update_recurring':
                 $changes = is_array($payload['changes'] ?? null) ? $payload['changes'] : [];
                 $allowed = array_intersect_key($changes, array_flip(['amount', 'frequency', 'starts_at', 'ends_at', 'note', 'tags']));
+
                 if (isset($allowed['frequency'])) {
                     $allowed['frequency'] = RecurringFrequency::from((string) $allowed['frequency'])->value;
                 }
                 $rule = $this->updateRecurring->execute($user, $rule, $allowed);
 
                 return ['ok' => true, 'message' => '✅ Recurring rule updated: ' . $this->ruleLabel($user, $rule), 'summary' => 'Recurring rule updated via agent confirm.'];
+
             case 'pause_recurring':
                 $this->updateRecurring->execute($user, $rule, ['active' => false]);
 
                 return ['ok' => true, 'message' => '⏸ Recurring rule paused: ' . $label, 'summary' => 'Recurring rule paused via agent confirm.'];
+
             case 'resume_recurring':
                 $rule = $this->updateRecurring->execute($user, $rule, ['active' => true]);
 
                 return ['ok' => true, 'message' => '▶️ Recurring rule resumed: ' . $label . ' · next ' . $rule->next_run_at?->toDateString(), 'summary' => 'Recurring rule resumed via agent confirm.'];
+
             default:
                 $this->deleteRecurring->execute($user, $rule);
 
@@ -1224,10 +1307,12 @@ class AgentPlanningTools
     private function prepareSupportTicket(User $user, array $args): array
     {
         $message = trim(mb_substr((string) ($args['message'] ?? ''), 0, CreateSupportTicketAction::BODY_MAX));
+
         if ($message === '') {
             throw new InvalidArgumentException('message is required: describe the problem');
         }
         $subject = trim(mb_substr((string) ($args['subject'] ?? ''), 0, CreateSupportTicketAction::SUBJECT_MAX));
+
         if ($subject === '') {
             $subject = CreateSupportTicketAction::subjectFrom($message);
         }
@@ -1279,6 +1364,7 @@ class AgentPlanningTools
     private function findBudget(User $user, mixed $id): Budget
     {
         $budget = is_numeric($id) ? $user->budgets()->with('periods.tags')->find((int) $id) : null;
+
         if (!$budget) {
             throw new InvalidArgumentException('budget not found (use list_budgets or budget_status for ids)');
         }
@@ -1290,6 +1376,7 @@ class AgentPlanningTools
     private function findRule(User $user, mixed $id): RecurringTransaction
     {
         $rule = is_numeric($id) ? $user->recurringTransactions()->with('tags')->find((int) $id) : null;
+
         if (!$rule) {
             throw new InvalidArgumentException('recurring rule not found (use list_recurring for ids)');
         }
@@ -1320,45 +1407,12 @@ class AgentPlanningTools
         return $period->tags->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
     }
 
-    /**
-     * @return list<int>
-     */
-    public function ownedTagIds(User $user, mixed $raw): array
-    {
-        if (!is_array($raw) || $raw === []) {
-            return [];
-        }
-        $owned = array_fill_keys($this->listTags->execute($user)->pluck('id')->map(fn ($id) => (int) $id)->all(), true);
-        $ids = [];
-        foreach ($raw as $id) {
-            if (is_numeric($id) && isset($owned[(int) $id])) {
-                $ids[] = (int) $id;
-            }
-        }
-
-        return array_values(array_unique($ids));
-    }
-
-    /**
-     * @param list<int> $ids
-     */
-    public function tagLabels(User $user, array $ids): string
-    {
-        $tags = $this->listTags->execute($user)->keyBy('id');
-        $labels = [];
-        foreach ($ids as $id) {
-            $tag = $tags->get($id);
-            $labels[] = $tag ? trim($tag->emoji . ' ' . $tag->title) : "#{$id}";
-        }
-
-        return $labels !== [] ? implode(', ', $labels) : '—';
-    }
-
     private function signedAmount(mixed $raw): float
     {
         if (!is_numeric($raw) || abs((float) $raw) < 0.005) {
             throw new InvalidArgumentException('amount must be a non-zero number (negative = expense, positive = income)');
         }
+
         if (abs((float) $raw) > 1e12) {
             throw new InvalidArgumentException('amount is too large');
         }
@@ -1380,6 +1434,7 @@ class AgentPlanningTools
         $anchor = CarbonImmutable::parse($startsAt);
         $limit = $endsAt !== null && $endsAt < $until ? $endsAt : $until;
         $n = 0;
+
         while ($n < 1000 && $frequency->occurrence($anchor, $n)->toDateString() <= $limit) {
             $n++;
         }
@@ -1440,7 +1495,7 @@ class AgentPlanningTools
     }
 
     /**
-     * @return array{delta: float, delta_formatted: string, percent: int|null}
+     * @return array{delta: float, delta_formatted: string, percent: null|int}
      */
     private function change(User $user, float $now, float $was): array
     {
@@ -1457,21 +1512,25 @@ class AgentPlanningTools
      * Expenses per top-level tag, each including its child tags; a transaction counts once per top-level tag.
      *
      * @param Collection<int, Transaction> $txs
-     * @return array<int|string, array{id: int|null, label: string, amount: float}>
+     * @return array<int|string, array{id: null|int, label: string, amount: float}>
      */
     private function expenseByTag(TagTree $tree, Collection $txs): array
     {
         $out = [];
+
         foreach ($txs as $tx) {
             if ($tx->amount >= 0) {
                 continue;
             }
             $amount = abs((float) $tx->amount);
+
             if ($tx->tags->isEmpty()) {
                 $out['untagged'] ??= ['id' => null, 'label' => 'Untagged', 'amount' => 0.0];
                 $out['untagged']['amount'] += $amount;
+
                 continue;
             }
+
             foreach ($tree->rootsOf($tx->tags->pluck('id')) as $id) {
                 $out[$id] ??= ['id' => $id, 'label' => $tree->label($id), 'amount' => 0.0];
                 $out[$id]['amount'] += $amount;

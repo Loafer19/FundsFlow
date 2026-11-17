@@ -10,9 +10,13 @@ use Illuminate\Support\Str;
 class ImportBatch extends Model
 {
     public const STATUS_PREVIEWING = 'previewing';
+
     public const STATUS_COMMITTING = 'committing';
+
     public const STATUS_COMMITTED = 'committed';
+
     public const STATUS_UNDONE = 'undone';
+
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
@@ -22,6 +26,26 @@ class ImportBatch extends Model
         'needs_tag_count', 'error_count', 'income_total', 'expense_total',
         'period_from', 'period_to', 'progress', 'error_message', 'committed_at', 'undone_at',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function rows(): HasMany
+    {
+        return $this->hasMany(ImportRow::class);
+    }
+
+    public function previewUrl(): string
+    {
+        return rtrim((string) config('app.frontend_url'), '/') . '/import/' . $this->uuid;
+    }
+
+    public function isMutable(): bool
+    {
+        return in_array($this->status, [self::STATUS_PREVIEWING, self::STATUS_FAILED], true);
+    }
 
     protected function casts(): array
     {
@@ -49,25 +73,5 @@ class ImportBatch extends Model
                 $batch->uuid = (string) Str::uuid();
             }
         });
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function rows(): HasMany
-    {
-        return $this->hasMany(ImportRow::class);
-    }
-
-    public function previewUrl(): string
-    {
-        return rtrim((string) config('app.frontend_url'), '/') . '/import/' . $this->uuid;
-    }
-
-    public function isMutable(): bool
-    {
-        return in_array($this->status, [self::STATUS_PREVIEWING, self::STATUS_FAILED], true);
     }
 }

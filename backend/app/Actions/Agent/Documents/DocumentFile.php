@@ -64,6 +64,8 @@ final class DocumentFile
         'htm' => self::HTML,
     ];
 
+    public const UNSUPPORTED = 'Send a PDF, Word (.docx), CSV, Excel (.xlsx), OpenDocument (.ods), JSON, OFX / QFX, QIF or HTML file.';
+
     /** Known but unsupported: a friendly hint instead of "unsupported file". */
     private const LEGACY = [
         'xls' => 'Old Excel (.xls) files are not supported yet. Save it as .xlsx or .csv and send it again.',
@@ -74,8 +76,6 @@ final class DocumentFile
         'rtf' => 'RTF files are not supported. Save it as .docx or PDF and send it again.',
         'numbers' => 'Numbers files are not supported. Export it as .csv or .xlsx and send it again.',
     ];
-
-    public const UNSUPPORTED = 'Send a PDF, Word (.docx), CSV, Excel (.xlsx), OpenDocument (.ods), JSON, OFX / QFX, QIF or HTML file.';
 
     /** Zip entries an Office/ODF file may have (a real one has a few dozen). */
     private const MAX_ZIP_ENTRIES = 2000;
@@ -147,7 +147,7 @@ final class DocumentFile
     }
 
     /**
-     * @return array{kind: string}|array{error: string}
+     * @return array{error: string}|array{kind: string}
      */
     public static function detect(string $bytes, string $name): array
     {
@@ -218,14 +218,17 @@ final class DocumentFile
             }
             $limit = (int) config('agent.documents.max_unzipped_bytes', 60 * 1024 * 1024);
             $total = 0;
+
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $stat = $zip->statIndex($i);
+
                 if ($stat === false) {
                     return false;
                 }
                 $size = (int) $stat['size'];
                 $compressed = max(1, (int) $stat['comp_size']);
                 $total += $size;
+
                 if ($total > $limit || ($size > 1024 * 1024 && $size / $compressed > self::MAX_ZIP_RATIO)) {
                     return false;
                 }
@@ -242,6 +245,7 @@ final class DocumentFile
     {
         return self::withZip($bytes, static function (ZipArchive $zip) use ($entry, $maxBytes): ?string {
             $stat = $zip->statName($entry);
+
             if ($stat === false || (int) $stat['size'] > $maxBytes) {
                 return null;
             }
@@ -249,6 +253,38 @@ final class DocumentFile
 
             return is_string($data) ? $data : null;
         });
+    }
+
+    /**
+     * OFX / QIF / JSON / HTML from the first bytes of a text file, else null (CSV or plain text).
+     */
+    public static function sniffTextKind(string $bytes): ?string
+    {
+        $head = ltrim(substr($bytes, 0, 4096), "\xEF\xBB\xBF \t\r\n");
+        $lower = strtolower($head);
+
+        if (str_starts_with($lower, 'ofxheader') || preg_match('/<\?ofx\b|<ofx>/', $lower)) {
+            return self::OFX;
+        }
+
+        if (preg_match('/^!(type|account|option|clear)\b/i', $head)) {
+            return self::QIF;
+        }
+
+        if ((str_starts_with($head, '{') || str_starts_with($head, '[')) && json_validate(self::stripBom($bytes), 64)) {
+            return self::JSON;
+        }
+
+        if (preg_match('/<!doctype html|<html[\s>]|<table[\s>]|<body[\s>]/', $lower)) {
+            return self::HTML;
+        }
+
+        return null;
+    }
+
+    public static function stripBom(string $bytes): string
+    {
+        return str_starts_with($bytes, "\xEF\xBB\xBF") ? substr($bytes, 3) : $bytes;
     }
 
     private static function isZip(string $bytes): bool
@@ -268,6 +304,7 @@ final class DocumentFile
                     return false;
                 }
             }
+
             foreach ($forbidden as $name) {
                 if ($zip->locateName($name) !== false) {
                     return false;
@@ -285,34 +322,6 @@ final class DocumentFile
             && $zip->locateName('Basic/') === false) ?? false;
     }
 
-    /**
-     * OFX / QIF / JSON / HTML from the first bytes of a text file, else null (CSV or plain text).
-     */
-    public static function sniffTextKind(string $bytes): ?string
-    {
-        $head = ltrim(substr($bytes, 0, 4096), "\xEF\xBB\xBF \t\r\n");
-        $lower = strtolower($head);
-        if (str_starts_with($lower, 'ofxheader') || preg_match('/<\?ofx\b|<ofx>/', $lower)) {
-            return self::OFX;
-        }
-        if (preg_match('/^!(type|account|option|clear)\b/i', $head)) {
-            return self::QIF;
-        }
-        if ((str_starts_with($head, '{') || str_starts_with($head, '[')) && json_validate(self::stripBom($bytes), 64)) {
-            return self::JSON;
-        }
-        if (preg_match('/<!doctype html|<html[\s>]|<table[\s>]|<body[\s>]/', $lower)) {
-            return self::HTML;
-        }
-
-        return null;
-    }
-
-    public static function stripBom(string $bytes): string
-    {
-        return str_starts_with($bytes, "\xEF\xBB\xBF") ? substr($bytes, 3) : $bytes;
-    }
-
     private static function isText(string $bytes, string $sniffed): bool
     {
         if (str_contains(substr($bytes, 0, 65536), "\0")) {
@@ -325,12 +334,14 @@ final class DocumentFile
 
     /**
      * @template T
+     *
      * @param callable(ZipArchive): T $fn
-     * @return T|null
+     * @return null|T
      */
     private static function withZip(string $bytes, callable $fn): mixed
     {
         $path = tempnam(sys_get_temp_dir(), 'ffdoc');
+
         if ($path === false) {
             return null;
         }
@@ -338,9 +349,11 @@ final class DocumentFile
         try {
             file_put_contents($path, $bytes);
             $zip = new ZipArchive;
+
             if ($zip->open($path, ZipArchive::RDONLY) !== true) {
                 return null;
             }
+
             try {
                 return $fn($zip);
             } finally {

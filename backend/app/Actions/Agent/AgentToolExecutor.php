@@ -12,6 +12,7 @@ use App\Actions\Transactions\CreateTransactionAction;
 use App\Actions\Transactions\DeleteTransactionAction;
 use App\Actions\Transactions\ListTransactionsAction;
 use App\Actions\Transactions\UpdateTransactionAction;
+use App\Channels\Telegram\TelegramSupport;
 use App\Enums\BudgetLength;
 use App\Enums\TransactionSource;
 use App\Models\Budget;
@@ -21,10 +22,12 @@ use App\Models\Transaction;
 use App\Models\TransactionType;
 use App\Models\User;
 use App\Support\Currency\NbuRates;
+use App\Support\PeriodRange;
 use App\Support\TagTree;
 use App\Support\TransactionTypeData;
 use App\Support\UserFormatter;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Transport-agnostic agent tools: shared tool schemas, read tools, validation of
@@ -257,6 +260,19 @@ class AgentToolExecutor
     }
 
     /**
+     * Text safe to hand back to the model. Our own validation stays; driver and SQL
+     * messages stay in the log at the call site.
+     */
+    public static function safeToolError(\Throwable $e): string
+    {
+        if ($e instanceof \InvalidArgumentException || $e instanceof ValidationException) {
+            return $e->getMessage();
+        }
+
+        return 'Tool failed';
+    }
+
+    /**
      * @return array{ok: bool, control: null, result: array<string, mixed>}
      */
     public static function fail(string $message): array
@@ -352,15 +368,19 @@ class AgentToolExecutor
 
         $transactions = $this->listTransactions->execute($user)->filter(function (Transaction $tx) use ($from, $to, $tagId, $tagIds, $noteContains): bool {
             $at = $tx->at?->format('Y-m-d');
+
             if ($from !== null && ($at === null || $at < $from)) {
                 return false;
             }
+
             if ($to !== null && ($at === null || $at > $to)) {
                 return false;
             }
+
             if ($tagId !== null && !$tx->tags->contains(fn (Tag $tag): bool => in_array((int) $tag->id, $tagIds, true))) {
                 return false;
             }
+
             if ($noteContains !== '' && !str_contains(mb_strtolower((string) ($tx->note ?? '')), mb_strtolower($noteContains))) {
                 return false;
             }
@@ -404,6 +424,7 @@ class AgentToolExecutor
 
         foreach ($budgets as $budget) {
             $period = $budget->periods->first(fn (BudgetPeriod $period) => $period->ends_at === null);
+
             if (!$period) {
                 continue;
             }
@@ -455,11 +476,13 @@ class AgentToolExecutor
         $amount = (float) $args['amount'];
         $currency = (string) ($args['currency'] ?? '');
         $date = $this->optionalDate($args['date'] ?? null) ?? $user->todayDateString();
+
         if (NbuRates::normalize($currency) === null) {
             return ['ok' => false, 'error' => "Unknown currency: {$currency}. Ask the user which currency it is."];
         }
 
         $converted = app(NbuRates::class)->toUah($amount, $currency, $date);
+
         if ($converted === null) {
             return ['ok' => false, 'error' => 'No NBU rate is available for ' . strtoupper($currency) . " on {$date}. Ask the user for the UAH amount or the rate."];
         }
@@ -473,11 +496,6 @@ class AgentToolExecutor
             'uah_formatted' => UserFormatter::formatMoney($user, $converted['uah']),
             'note_suffix' => '(' . $original . ' @ ' . $rate . ' NBU ' . UserFormatter::formatDate($user, $converted['rate_date']) . ')',
         ];
-    }
-
-    private static function plainNumber(float $value): string
-    {
-        return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
     }
 
     /**
@@ -499,6 +517,7 @@ class AgentToolExecutor
         // Top-level tags, each including its child tags; a transaction counts once per top-level tag.
         $tagTree = TagTree::for($user);
         $byTag = [];
+
         foreach ($transactions->filter(fn (Transaction $tx) => $tx->amount < 0) as $tx) {
             foreach ($tagTree->rootsOf($tx->tags->pluck('id')) as $id) {
                 $meta = $tagTree->meta($id);
@@ -548,21 +567,25 @@ class AgentToolExecutor
     public function stageAsk(AgentSession $session, array $args): array
     {
         $question = trim((string) ($args['question'] ?? ''));
+
         if ($question === '') {
             throw new \InvalidArgumentException('question is required');
         }
         $question = mb_substr($question, 0, 2000);
 
         $suggestions = [];
+
         if (is_array($args['suggestions'] ?? null)) {
             foreach ($args['suggestions'] as $suggestion) {
                 if (!is_string($suggestion)) {
                     continue;
                 }
                 $label = mb_substr(trim($suggestion), 0, 64);
+
                 if ($label !== '') {
                     $suggestions[] = $label;
                 }
+
                 if (count($suggestions) >= 6) {
                     break;
                 }
@@ -660,6 +683,7 @@ class AgentToolExecutor
     {
         $id = isset($args['id']) && is_numeric($args['id']) ? (int) $args['id'] : 0;
         $tx = $user->transactions()->with('tags')->find($id);
+
         if (!$tx) {
             throw new \InvalidArgumentException('transaction not found');
         }
@@ -718,6 +742,7 @@ class AgentToolExecutor
     {
         $id = isset($args['id']) && is_numeric($args['id']) ? (int) $args['id'] : 0;
         $tx = $user->transactions()->with('tags')->find($id);
+
         if (!$tx) {
             throw new \InvalidArgumentException('transaction not found');
         }
@@ -741,7 +766,7 @@ class AgentToolExecutor
      * view, 📅 DD.MM.YYYY (user date format), 📝 note, 📎 files, 🏷 tags. Updates carry the old
      * value of each changed field in `before`.
      *
-     * @param 'create'|'update'|'delete' $mode
+     * @param 'create'|'delete'|'update' $mode
      * @param array{amount?: mixed, at?: mixed, note?: mixed, tag_ids?: mixed} $payload
      * @return array<string, mixed>
      */
@@ -783,15 +808,19 @@ class AgentToolExecutor
         if ($mode === 'update' && $before) {
             $oldTags = $before->tags->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
             $changed = [];
+
             if (round((float) $before->amount, 2) !== round($amount, 2)) {
                 $changed['amount_formatted'] = self::signedMoney($user, (float) $before->amount);
             }
+
             if ($before->at->format('Y-m-d') !== $at) {
                 $changed['date'] = UserFormatter::formatDate($user, $before->at->format('Y-m-d'));
             }
+
             if (($before->note ?: null) !== $note) {
                 $changed['note'] = $before->note ?: '—';
             }
+
             if ($oldTags !== collect($tagIds)->sort()->values()->all()) {
                 $changed['tags'] = $this->tagLabelList($user, $oldTags);
             }
@@ -815,16 +844,19 @@ class AgentToolExecutor
         $tags = $card['tags'] === [] ? 'No tags' : implode(' · ', $card['tags']);
 
         $lines = [$card['title'], $diff('amount_formatted', (string) $card['amount_formatted']), '📅 ' . $diff('date', (string) $card['date'])];
+
         if ($card['note'] !== null || isset($before['note'])) {
             $lines[] = '📝 ' . $diff('note', (string) ($card['note'] ?? '—'));
         }
+
         if (($card['files'] ?? 0) > 0) {
             $lines[] = '📎 ' . ($card['files_label'] ?? ($card['files'] . ' photo' . ($card['files'] === 1 ? '' : 's')));
         }
+
         if (!empty($card['type_line'])) {
             $lines[] = (string) $card['type_line'];
         }
-        $lines[] = \App\Channels\Telegram\TelegramSupport::tagLine($diff('tags', $tags));
+        $lines[] = TelegramSupport::tagLine($diff('tags', $tags));
 
         return implode("\n", $lines);
     }
@@ -835,20 +867,6 @@ class AgentToolExecutor
         $formatted = UserFormatter::formatMoney($user, $amount);
 
         return $amount > 0 && !str_starts_with($formatted, '+') ? '+' . $formatted : $formatted;
-    }
-
-    /**
-     * @param list<int> $tagIds
-     * @return list<string>
-     */
-    private function tagLabelList(User $user, array $tagIds): array
-    {
-        if ($tagIds === []) {
-            return [];
-        }
-
-        return $user->tags()->whereIn('id', $tagIds)->orderBy('title')->get(['emoji', 'title'])
-            ->map(fn (Tag $tag): string => trim($tag->emoji . ' ' . $tag->title))->values()->all();
     }
 
     /**
@@ -959,6 +977,7 @@ class AgentToolExecutor
     {
         $id = (int) ($payload['id'] ?? 0);
         $tx = $user->transactions()->find($id);
+
         if (!$tx) {
             return null;
         }
@@ -988,6 +1007,7 @@ class AgentToolExecutor
     {
         $id = (int) ($payload['id'] ?? 0);
         $tx = $user->transactions()->find($id);
+
         if (!$tx) {
             return false;
         }
@@ -1005,6 +1025,7 @@ class AgentToolExecutor
     public function applyCreateBudget(User $user, array $payload): ?Budget
     {
         $tagIds = $this->sanitizeOwnedTagIds($user, $payload['tag_ids'] ?? []);
+
         if ($tagIds === []) {
             return null;
         }
@@ -1042,6 +1063,7 @@ class AgentToolExecutor
     public function createTags(User $user, array $titles): array
     {
         $created = [];
+
         foreach ($titles as $title) {
             $tag = $this->createTag->execute($user, [
                 'title' => $title,
@@ -1063,6 +1085,7 @@ class AgentToolExecutor
     public function normalizeRenameProposals(mixed $rawProposals): array
     {
         $proposals = [];
+
         foreach (is_array($rawProposals) ? $rawProposals : [] as $proposal) {
             if (!is_array($proposal)) {
                 continue;
@@ -1070,6 +1093,7 @@ class AgentToolExecutor
             $id = is_numeric($proposal['id'] ?? null) ? (int) $proposal['id'] : 0;
             $before = is_string($proposal['before'] ?? null) ? (string) $proposal['before'] : '';
             $after = is_string($proposal['after'] ?? null) ? (string) $proposal['after'] : '';
+
             if ($id < 1 || $after === '') {
                 continue;
             }
@@ -1154,13 +1178,16 @@ class AgentToolExecutor
     public function filterNewTagTitles(User $user, array $titles): array
     {
         $existing = [];
+
         foreach ($this->listTags->execute($user) as $tag) {
             $existing[mb_strtolower(trim((string) $tag->title))] = true;
         }
 
         $out = [];
+
         foreach ($titles as $title) {
             $key = mb_strtolower(trim($title));
+
             if ($key === '' || isset($existing[$key])) {
                 continue;
             }
@@ -1172,7 +1199,6 @@ class AgentToolExecutor
     }
 
     /**
-     * @param mixed $raw
      * @return list<int>
      */
     public function sanitizeOwnedTagIds(User $user, mixed $raw): array
@@ -1184,11 +1210,13 @@ class AgentToolExecutor
         $owned = $this->listTags->execute($user)->pluck('id')->map(fn ($id) => (int) $id)->all();
         $ownedSet = array_fill_keys($owned, true);
         $ids = [];
+
         foreach ($raw as $id) {
             if (!is_numeric($id)) {
                 continue;
             }
             $id = (int) $id;
+
             if ($id > 0 && isset($ownedSet[$id])) {
                 $ids[] = $id;
             }
@@ -1204,9 +1232,11 @@ class AgentToolExecutor
     {
         $tags = $this->listTags->execute($user)->keyBy('id');
         $labels = [];
+
         foreach ($tagIds as $id) {
-            /** @var Tag|null $tag */
+            /** @var null|Tag $tag */
             $tag = $tags->get($id);
+
             if ($tag) {
                 $labels[] = trim($tag->emoji . ' ' . $tag->title);
             }
@@ -1215,8 +1245,26 @@ class AgentToolExecutor
         return implode(', ', $labels);
     }
 
+    private static function plainNumber(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+    }
+
     /**
-     * @param mixed $raw
+     * @param list<int> $tagIds
+     * @return list<string>
+     */
+    private function tagLabelList(User $user, array $tagIds): array
+    {
+        if ($tagIds === []) {
+            return [];
+        }
+
+        return $user->tags()->whereIn('id', $tagIds)->orderBy('title')->get(['emoji', 'title'])
+            ->map(fn (Tag $tag): string => trim($tag->emoji . ' ' . $tag->title))->values()->all();
+    }
+
+    /**
      * @return list<string>
      */
     private function parseTitles(mixed $raw): array
@@ -1226,11 +1274,13 @@ class AgentToolExecutor
         }
 
         $titles = [];
+
         foreach ($raw as $title) {
             if (!is_string($title)) {
                 continue;
             }
             $title = mb_substr(trim($title), 0, 255);
+
             if ($title === '') {
                 continue;
             }
@@ -1248,6 +1298,7 @@ class AgentToolExecutor
     {
         $lastList = $session->get()['last_list'];
         $byId = [];
+
         foreach ($lastList as $item) {
             $byId[(int) $item['id']] = true;
         }
@@ -1262,25 +1313,30 @@ class AgentToolExecutor
                 continue;
             }
             $id = is_numeric($proposal['id'] ?? null) ? (int) $proposal['id'] : null;
+
             if ($id === null) {
                 continue;
             }
+
             if ($byId !== [] && !isset($byId[$id]) && !$tags->has($id)) {
                 continue;
             }
 
-            /** @var Tag|null $tag */
+            /** @var null|Tag $tag */
             $tag = $tags->get($id);
+
             if (!$tag) {
                 continue;
             }
 
             $before = trim((string) ($proposal['before'] ?? ''));
+
             if ($before !== '' && mb_strtolower($before) !== mb_strtolower($tag->title)) {
                 continue;
             }
 
             $after = mb_substr(trim((string) ($proposal['after'] ?? '')), 0, 255);
+
             if ($after === '' || mb_strtolower($after) === mb_strtolower($tag->title)) {
                 continue;
             }
@@ -1289,6 +1345,7 @@ class AgentToolExecutor
             $duplicate = $tags->contains(function (Tag $other) use ($afterKey, $id): bool {
                 return (int) $other->id !== $id && mb_strtolower(trim($other->title)) === $afterKey;
             });
+
             if ($duplicate || isset($usedAfter[$afterKey])) {
                 continue;
             }
@@ -1306,8 +1363,17 @@ class AgentToolExecutor
 
     private function optionalDate(mixed $value): ?string
     {
-        if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+        if (!is_string($value) || $value === '') {
             return null;
+        }
+
+        // Free text ("tomorrow") still means "no date", so the caller keeps its fallback.
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
+            return null;
+        }
+
+        if (!PeriodRange::isStorableDate($value)) {
+            throw new \InvalidArgumentException('date must be a real calendar date (YYYY-MM-DD)');
         }
 
         return $value;

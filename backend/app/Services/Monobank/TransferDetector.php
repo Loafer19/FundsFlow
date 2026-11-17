@@ -7,9 +7,9 @@ class TransferDetector
     /**
      * Transfers between the user's own Mono cards/jars must not become income or expense.
      *
-     * @param  array<string, mixed>  $item
-     * @param  list<string>  $ownIbans  Uppercase, no spaces
-     * @param  list<string>  $jarTitles
+     * @param array<string, mixed> $item
+     * @param list<string> $ownIbans Uppercase, no spaces
+     * @param list<string> $jarTitles
      */
     public static function isInternal(array $item, array $ownIbans, array $jarTitles): bool
     {

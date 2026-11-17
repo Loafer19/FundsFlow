@@ -87,7 +87,6 @@ class GenerateRecurringTransactionsAction
         // catch up in order rather than only firing the latest one.
         $created = 0;
 
-
         while ($rule->next_run_at->toDateString() <= $today && $created < self::MAX_CATCH_UP) {
             if ($rule->ends_at && $rule->next_run_at->toDateString() > $rule->ends_at->toDateString()) {
                 $rule->update(['active' => false]);
@@ -118,7 +117,6 @@ class GenerateRecurringTransactionsAction
             $created++;
         }
     }
-
 
     // One combined message per user per run, not one per transaction — a
     // rule catching up several missed days shouldn't spam a message each.

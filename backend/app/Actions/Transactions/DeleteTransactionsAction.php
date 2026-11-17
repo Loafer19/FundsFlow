@@ -13,7 +13,7 @@ class DeleteTransactionsAction
     ) {}
 
     /**
-     * @param  list<int>  $ids
+     * @param list<int> $ids
      */
     public function execute(User $user, array $ids): int
     {

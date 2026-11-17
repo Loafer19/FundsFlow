@@ -25,12 +25,13 @@ final class TableImport
      * Column guess from header names, or null when date + amount (or debit/credit) aren't found.
      *
      * @param list<list<mixed>> $rows
-     * @return array<string, int|string|null>|null mapping: header (row index), FIELDS => column index
+     * @return null|array<string, null|int|string> mapping: header (row index), FIELDS => column index
      */
     public function guessMapping(array $rows): ?array
     {
         foreach (array_slice($rows, 0, self::HEADER_SCAN, true) as $index => $row) {
             $mapping = $this->mapHeader($row);
+
             if ($mapping !== null) {
                 return ['header' => $index] + $mapping;
             }
@@ -44,16 +45,18 @@ final class TableImport
      *
      * @param array<string, mixed> $proposed
      * @param list<list<mixed>> $rows
-     * @return array<string, int|string|null>|null
+     * @return null|array<string, null|int|string>
      */
     public function acceptMapping(array $proposed, array $rows, int $sampleRows): ?array
     {
         $width = max(array_map('count', array_slice($rows, 0, $sampleRows + 1)) ?: [0]);
         $mapping = [];
+
         foreach (self::FIELDS as $field) {
             $value = $proposed[$field] ?? null;
             $mapping[$field] = is_int($value) && $value >= 0 && $value < $width ? $value : null;
         }
+
         if ($mapping['date'] === null || ($mapping['amount'] === null && $mapping['debit'] === null && $mapping['credit'] === null)) {
             return null;
         }
@@ -68,7 +71,7 @@ final class TableImport
 
     /**
      * @param list<list<mixed>> $rows
-     * @param array<string, int|string|null> $mapping
+     * @param array<string, null|int|string> $mapping
      * @return array{
      *     rows: list<array{line: int, at: string, amount: float, note: ?string, tag_titles: list<string>, currency: ?string}>,
      *     skipped: list<array{line: int, reason: string}>,
@@ -91,6 +94,7 @@ final class TableImport
         $ambiguous = $samples !== [];
         $other = $order === 'mdy' ? 'dmy' : 'mdy';
         $styles = [];
+
         foreach (['amount', 'debit', 'credit'] as $field) {
             if (is_int($mapping[$field] ?? null)) {
                 $styles[$field] = $this->decimalStyle($data, $mapping[$field]);
@@ -112,18 +116,22 @@ final class TableImport
                 // Footer / subtotal lines ("Total", "Balance at end") are not data.
                 continue;
             }
+
             if ($at === null) {
                 $skipped[] = ['line' => $line, 'reason' => 'no valid date'];
 
                 continue;
             }
+
             if ($amount === null || round($amount, 2) == 0.0) {
                 $skipped[] = ['line' => $line, 'reason' => $amount === null ? 'no valid amount' : 'zero amount'];
 
                 continue;
             }
+
             if (count($out) >= $max) {
                 $capped = true;
+
                 break;
             }
 
@@ -141,8 +149,10 @@ final class TableImport
                     : [],
                 'currency' => $currency !== null ? mb_strtoupper(mb_substr($currency, 0, 10)) : null,
             ];
+
             if ($ambiguous) {
                 $swap = $this->parseDate($dateCell, $other);
+
                 if ($swap !== null && $swap !== $at) {
                     $out[array_key_last($out)]['swap'] = $swap;
                 }
@@ -160,6 +170,7 @@ final class TableImport
         if ($value instanceof DateTimeInterface) {
             return $this->plausible((int) $value->format('Y')) ? $value->format('Y-m-d') : null;
         }
+
         if (is_int($value) || is_float($value)) {
             // Excel serial day (1900 system) from a CSV or an unformatted cell.
             if ($value >= 25000 && $value <= 80000) {
@@ -168,14 +179,17 @@ final class TableImport
 
             return null;
         }
+
         if (!is_string($value)) {
             return null;
         }
 
         $value = trim($value);
+
         if (preg_match('/^(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})(?:$|[T\s])/u', $value, $m)) {
             return $this->ymd((int) $m[1], (int) $m[2], (int) $m[3]);
         }
+
         if (preg_match('/^(\d{1,2})([-.\/])(\d{1,2})\2(\d{2}|\d{4})(?:$|[T\s,])/u', $value, $m)) {
             $year = (int) $m[4];
             $year = $year < 100 ? 2000 + $year : $year;
@@ -186,12 +200,15 @@ final class TableImport
 
             return $this->ymd($year, $month, $day);
         }
+
         if (preg_match('/^\d{8}$/', $value)) {
             return $this->ymd((int) substr($value, 0, 4), (int) substr($value, 4, 2), (int) substr($value, 6, 2));
         }
+
         if (preg_match('/^\d+(\.\d+)?$/', $value)) {
             return $this->parseDate((float) $value, $order);
         }
+
         // "26 Oct 2026", "Oct 26, 2026".
         if (preg_match('/\p{L}{3,}/u', $value) && preg_match('/\d{4}/', $value)) {
             try {
@@ -216,33 +233,39 @@ final class TableImport
         if (is_int($value) || is_float($value)) {
             return (float) $value;
         }
+
         if (!is_string($value)) {
             return null;
         }
 
         $s = trim($value);
+
         if ($s === '' || !preg_match('/\d/', $s)) {
             return null;
         }
 
         $negative = false;
+
         if (preg_match('/^\((.*)\)$/u', $s, $m)) {
             $negative = true;
             $s = $m[1];
         }
         $s = str_replace(["\u{2212}", "\u{2013}", "\u{2014}"], '-', $s);
+
         if (preg_match('/^[^\d]*-/u', $s) || preg_match('/\d\s*-\s*\D*$/u', $s)) {
             $negative = true;
         }
         // Thousands spaces (regular, NBSP, thin), apostrophes; currency signs and codes.
         $s = preg_replace('/[\s\x{00A0}\x{202F}\x{2009}\'’]/u', '', $s) ?? $s;
         $s = preg_replace('/[^\d.,]/u', '', $s) ?? $s;
+
         if ($s === '' || !preg_match('/^\d[\d.,]*$/', $s)) {
             return null;
         }
 
         $lastComma = strrpos($s, ',');
         $lastDot = strrpos($s, '.');
+
         if ($lastComma !== false && $lastDot !== false) {
             $decimal = $lastComma > $lastDot ? ',' : '.';
         } elseif ($lastComma !== false) {
@@ -254,10 +277,12 @@ final class TableImport
         }
 
         $thousands = $decimal === ',' ? '.' : ($decimal === '.' ? ',' : null);
+
         if ($thousands !== null) {
             $s = str_replace($thousands, '', $s);
         }
         $s = $decimal === null ? str_replace([',', '.'], '', $s) : str_replace(',', '.', $s);
+
         if (!is_numeric($s)) {
             return null;
         }
@@ -268,8 +293,55 @@ final class TableImport
     }
 
     /**
+     * @param array<int, list<mixed>> $data
+     */
+    public function dateEvidence(array $data, int $column): ?string
+    {
+        foreach ($data as $row) {
+            $cell = $row[$column] ?? null;
+
+            if (is_string($cell) && preg_match('/^(\d{1,2})[-\/](\d{1,2})[-\/]\d{2,4}/', trim($cell), $m)) {
+                if ((int) $m[1] > 12) {
+                    return 'dmy';
+                }
+
+                if ((int) $m[2] > 12) {
+                    return 'mdy';
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Up to 8 "a/b/yyyy" values that read differently day-first vs month-first ([] = no ambiguity).
+     *
+     * @param array<int, list<mixed>> $data
+     * @return list<string>
+     */
+    public function dateSamples(array $data, int $column): array
+    {
+        $samples = [];
+
+        foreach ($data as $row) {
+            $cell = $row[$column] ?? null;
+
+            if (is_string($cell) && preg_match('/^(\d{1,2})[-\/](\d{1,2})[-\/]\d{2,4}/', trim($cell), $m) && $m[1] !== $m[2]) {
+                $samples[trim($cell)] = true;
+
+                if (count($samples) >= 8) {
+                    break;
+                }
+            }
+        }
+
+        return array_map('strval', array_keys($samples));
+    }
+
+    /**
      * @param list<mixed> $row
-     * @return array<string, int|null>|null
+     * @return null|array<string, null|int>
      */
     private function mapHeader(array $row): ?array
     {
@@ -280,10 +352,12 @@ final class TableImport
                 continue;
             }
             $name = $this->normalize($cell);
+
             if ($name === '' || mb_strlen($name) > 60) {
                 continue;
             }
             $field = $this->fieldOf($name);
+
             if ($field !== null && $mapping[$field] === null) {
                 $mapping[$field] = $column;
             }
@@ -329,48 +403,6 @@ final class TableImport
     }
 
     /**
-     * @param array<int, list<mixed>> $data
-     */
-    public function dateEvidence(array $data, int $column): ?string
-    {
-        foreach ($data as $row) {
-            $cell = $row[$column] ?? null;
-            if (is_string($cell) && preg_match('/^(\d{1,2})[-\/](\d{1,2})[-\/]\d{2,4}/', trim($cell), $m)) {
-                if ((int) $m[1] > 12) {
-                    return 'dmy';
-                }
-                if ((int) $m[2] > 12) {
-                    return 'mdy';
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Up to 8 "a/b/yyyy" values that read differently day-first vs month-first ([] = no ambiguity).
-     *
-     * @param array<int, list<mixed>> $data
-     * @return list<string>
-     */
-    public function dateSamples(array $data, int $column): array
-    {
-        $samples = [];
-        foreach ($data as $row) {
-            $cell = $row[$column] ?? null;
-            if (is_string($cell) && preg_match('/^(\d{1,2})[-\/](\d{1,2})[-\/]\d{2,4}/', trim($cell), $m) && $m[1] !== $m[2]) {
-                $samples[trim($cell)] = true;
-                if (count($samples) >= 8) {
-                    break;
-                }
-            }
-        }
-
-        return array_map('strval', array_keys($samples));
-    }
-
-    /**
      * 'comma' when the column writes decimals with a comma (12,50), else 'dot'.
      *
      * @param array<int, list<mixed>> $data
@@ -379,12 +411,15 @@ final class TableImport
     {
         $comma = 0;
         $dot = 0;
+
         foreach ($data as $row) {
             $cell = $row[$column] ?? null;
+
             if (!is_string($cell)) {
                 continue;
             }
             $cell = trim($cell, " \t\n\r\0\x0B()");
+
             if (preg_match('/,\d{1,2}(\D*)$/u', $cell)) {
                 $comma++;
             } elseif (preg_match('/\.\d{1,2}(\D*)$/u', $cell)) {
@@ -397,18 +432,21 @@ final class TableImport
 
     /**
      * @param list<mixed> $row
-     * @param array<string, int|string|null> $mapping
+     * @param array<string, null|int|string> $mapping
      * @param array<string, string> $styles
      */
     private function rowAmount(array $row, array $mapping, array $styles): ?float
     {
         if (is_int($mapping['amount'] ?? null)) {
             $amount = $this->parseAmount($row[$mapping['amount']] ?? null, $styles['amount'] ?? 'dot');
+
             if ($amount !== null) {
                 $type = is_int($mapping['type'] ?? null) ? mb_strtolower((string) $this->text($row[$mapping['type']] ?? null)) : '';
+
                 if ($type !== '' && preg_match('/^(debit|dr|d|expense|out|outgoing|withdrawal|payment|витрата|витрати|списання|видаток|расход|списание|-)$/u', $type)) {
                     return -abs($amount);
                 }
+
                 if ($type !== '' && preg_match('/^(credit|cr|c|income|in|incoming|deposit|надходження|зарахування|поповнення|дохід|доход|приход|зачисление|\+)$/u', $type)) {
                     return abs($amount);
                 }
@@ -419,6 +457,7 @@ final class TableImport
 
         $debit = is_int($mapping['debit'] ?? null) ? $this->parseAmount($row[$mapping['debit']] ?? null, $styles['debit'] ?? 'dot') : null;
         $credit = is_int($mapping['credit'] ?? null) ? $this->parseAmount($row[$mapping['credit']] ?? null, $styles['credit'] ?? 'dot') : null;
+
         if ($debit === null && $credit === null) {
             return null;
         }
@@ -431,9 +470,11 @@ final class TableImport
         if ($value instanceof DateTimeInterface) {
             return $value->format('Y-m-d');
         }
+
         if (is_int($value) || is_float($value)) {
             return (string) $value;
         }
+
         if (!is_string($value)) {
             return null;
         }

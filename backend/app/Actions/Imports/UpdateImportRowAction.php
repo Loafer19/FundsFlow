@@ -15,7 +15,7 @@ class UpdateImportRowAction
     ) {}
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param array<string, mixed> $data
      */
     public function execute(User $user, ImportBatch $batch, ImportRow $row, array $data): ImportRow
     {
@@ -24,10 +24,12 @@ class UpdateImportRowAction
         }
 
         $changed = false;
+
         if (isset($data['status']) && in_array($data['status'], [
             ImportRow::STATUS_NEW, ImportRow::STATUS_SKIPPED, ImportRow::STATUS_TRANSFER, ImportRow::STATUS_NEEDS_TAG,
         ], true)) {
             $row->status = $data['status'];
+
             if ($data['status'] === ImportRow::STATUS_SKIPPED) {
                 $row->skip_reason = $row->skip_reason ?: 'Skipped by you';
             }
@@ -38,6 +40,7 @@ class UpdateImportRowAction
             $owned = $user->tags()->whereIn('id', array_map('intval', $data['tag_ids']))->pluck('id')->all();
             $row->tag_ids = array_values(array_map('intval', $owned));
             $row->new_tag_titles = [];
+
             if ($row->status === ImportRow::STATUS_NEEDS_TAG && $row->tag_ids !== []) {
                 $row->status = ImportRow::STATUS_NEW;
                 $row->skip_reason = null;
@@ -53,6 +56,7 @@ class UpdateImportRowAction
 
         if (array_key_exists('transaction_type_id', $data)) {
             $typeId = $data['transaction_type_id'] === null ? null : (int) $data['transaction_type_id'];
+
             if ($typeId !== null && !$user->transactionTypes()->whereKey($typeId)->exists()) {
                 throw ValidationException::withMessages(['transaction_type_id' => 'Type not found!']);
             }

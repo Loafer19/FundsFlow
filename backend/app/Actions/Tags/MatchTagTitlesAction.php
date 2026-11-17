@@ -26,11 +26,13 @@ final class MatchTagTitlesAction
         }
 
         $wanted = [];
+
         foreach ($titles as $title) {
             if (!is_string($title)) {
                 continue;
             }
             $normalized = mb_strtolower(trim($title));
+
             if ($normalized !== '') {
                 $wanted[$normalized] = true;
             }
@@ -41,8 +43,10 @@ final class MatchTagTitlesAction
         }
 
         $matched = [];
+
         foreach ($this->listTags->execute($user) as $tag) {
             $key = mb_strtolower(trim((string) $tag->title));
+
             if (isset($wanted[$key])) {
                 $matched[] = $tag;
                 unset($wanted[$key]);

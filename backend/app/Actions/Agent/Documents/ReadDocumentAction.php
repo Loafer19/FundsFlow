@@ -34,9 +34,9 @@ final class ReadDocumentAction
     /**
      * @param string $withoutAi tail of the "no AI assists left" message (channel specific)
      * @return array{type: 'error', message: string}
-     *     |array{type: 'quota', message: string}
-     *     |array{type: 'single', analysis: array{amount: ?float, at: ?string, note: ?string, suggested_tag_titles: list<string>, needs_price: bool}}
-     *     |array{type: 'rows', file: array<string, mixed>, rows: list<array<string, mixed>>, skipped: list<array{line: int, reason: string}>, capped: bool, ai_used: bool}
+     *                                               |array{type: 'quota', message: string}
+     *                                               |array{type: 'single', analysis: array{amount: ?float, at: ?string, note: ?string, suggested_tag_titles: list<string>, needs_price: bool}}
+     *                                               |array{type: 'rows', file: array<string, mixed>, rows: list<array<string, mixed>>, skipped: list<array{line: int, reason: string}>, capped: bool, ai_used: bool}
      *
      * rows: {line, at, amount, note, tags: list<string>, soft?: true (AI-suggested tags), cur?: string, swap?: string}
      */
@@ -57,6 +57,7 @@ final class ReadDocumentAction
     private function spreadsheet(User $user, string $kind, string $bytes, string $fileName): array
     {
         $read = $this->tables->read($kind, $bytes);
+
         if (isset($read['error'])) {
             return $this->error($read['error']);
         }
@@ -67,6 +68,7 @@ final class ReadDocumentAction
     private function json(User $user, string $bytes, string $fileName): array
     {
         $read = $this->formats->json($user, $bytes, $fileName);
+
         if (isset($read['table'])) {
             return $this->table($user, DocumentFile::JSON, $read['table'], $fileName, count($read['table']) > DocumentFile::maxRows() + 1);
         }
@@ -77,9 +79,11 @@ final class ReadDocumentAction
     private function html(User $user, string $bytes, string $fileName, ?string $caption, string $withoutAi): array
     {
         $read = $this->formats->html($bytes, $fileName);
+
         if (isset($read['error'])) {
             return $this->error($read['error']);
         }
+
         if (isset($read['table'])) {
             return $this->table($user, DocumentFile::HTML, $read['table'], $fileName, false);
         }
@@ -97,6 +101,7 @@ final class ReadDocumentAction
         if (isset($read['error'])) {
             return $this->error($read['error']);
         }
+
         if ($read['rows'] === []) {
             return $this->error("No transactions found in {$fileName}.");
         }
@@ -119,44 +124,52 @@ final class ReadDocumentAction
 
         $aiUsed = false;
         $mapping = $this->import->guessMapping($rows);
+
         if ($mapping === null) {
             $headerRow = $this->headerCells($rows);
             $signature = $headerRow !== [] ? ImportTemplate::signature($headerRow) : null;
             $template = $signature ? $user->importTemplates()->where('header_signature', $signature)->first() : null;
+
             if ($template && is_array($template->mapping)) {
                 $mapping = $this->import->acceptMapping($template->mapping + ['header_row' => $template->mapping['header'] ?? null], $rows, count($rows));
             }
         }
+
         if ($mapping === null) {
             if (!$this->quota->hasQuota($user)) {
                 return ['type' => 'quota', 'message' => $this->quota->exhaustedMessage(
                     $user,
-                    "Until then, name the columns date, amount and note (see the CSV template in the help) and send the file again: that needs no AI.",
+                    'Until then, name the columns date, amount and note (see the CSV template in the help) and send the file again: that needs no AI.',
                 )];
             }
             $sample = array_slice($rows, 0, self::MAPPING_ROWS);
             $proposed = $this->ai->mapColumns($sample, $this->dateLikeValues($rows));
+
             if ($proposed === null) {
                 return $this->error("Couldn't recognise the columns of {$fileName}: " . $this->ai->failureReason() . '. Send it again in a minute, or name the columns date, amount and note (that needs no AI).');
             }
             $this->quota->consume($user);
             $aiUsed = true;
             $mapping = $this->import->acceptMapping($proposed, $rows, count($sample));
+
             if ($mapping === null) {
                 return $this->error("Couldn't find date and amount columns in {$fileName}. Name them date and amount (and optionally note, tag) and send it again.");
             }
         }
 
         $parsed = $this->import->parse($rows, $mapping, $this->defaultDateOrder($user));
+
         if ($parsed['rows'] === []) {
             return $this->error("No transactions found in {$fileName}: no row has both a valid date and a non-zero amount.");
         }
 
         $out = array_map(static function (array $row): array {
             $item = ['line' => $row['line'], 'at' => $row['at'], 'amount' => $row['amount'], 'note' => $row['note'], 'tags' => $row['tag_titles']];
+
             if ($row['currency'] !== null) {
                 $item['cur'] = $row['currency'];
             }
+
             if (isset($row['swap'])) {
                 $item['swap'] = $row['swap'];
             }
@@ -165,6 +178,7 @@ final class ReadDocumentAction
         }, $parsed['rows']);
 
         $headerIndex = is_int($mapping['header'] ?? null) ? $mapping['header'] : 0;
+
         return $this->rows($fileName, $kind, $out, $parsed['skipped'], $parsed['capped'] || $truncated, $aiUsed, [
             'ambiguous' => $parsed['ambiguous'],
             'order' => $parsed['order'],
@@ -176,6 +190,7 @@ final class ReadDocumentAction
     private function pdf(User $user, string $bytes, string $fileName, ?string $caption, string $withoutAi): array
     {
         $read = $this->text->pdf($bytes);
+
         if (isset($read['error'])) {
             return $this->error($read['error']);
         }
@@ -185,10 +200,12 @@ final class ReadDocumentAction
                 return ['type' => 'quota', 'message' => $this->quota->exhaustedMessage($user, $withoutAi)];
             }
             $jpeg = $this->text->pdfFirstPageJpeg($bytes);
+
             if ($jpeg === null) {
                 return $this->error("This PDF is a scan without text and couldn't be read. Send a photo of the receipt instead.");
             }
             $analysis = $this->vision->execute($user, $jpeg, 'image/jpeg', $caption);
+
             if ($analysis === null) {
                 return $this->error("Couldn't read this scanned PDF right now. Send a photo, or type the amount like -350 groceries.");
             }
@@ -209,9 +226,11 @@ final class ReadDocumentAction
     private function docx(User $user, string $bytes, string $fileName, ?string $caption, string $withoutAi): array
     {
         $text = $this->text->docx($bytes);
+
         if ($text === null) {
             return $this->error("Couldn't open {$fileName}. Save it again as .docx or PDF and resend it.");
         }
+
         if (preg_match_all('/[\p{L}\p{N}]/u', $text) < 5) {
             return $this->error("{$fileName} has no text to read.");
         }
@@ -226,14 +245,17 @@ final class ReadDocumentAction
         }
 
         $result = $this->ai->extractTransactions($user, $text, $fileName, $caption);
+
         if ($result === null) {
             return $this->error($this->aiFailedMessage($fileName, $kind, mb_strlen($text)));
         }
         $this->quota->consume($user);
 
         $items = $result['transactions'];
+
         if ($result['kind'] === 'receipt' || count($items) === 1 || $result['needs_price']) {
             $first = $items[0] ?? null;
+
             if ($first === null && !$result['needs_price']) {
                 return $this->error("No transactions found in {$fileName}.");
             }
@@ -253,6 +275,7 @@ final class ReadDocumentAction
 
         $rows = [];
         $skipped = [];
+
         foreach ($items as $i => $item) {
             if ($item['at'] === null) {
                 $skipped[] = ['line' => $i + 1, 'reason' => 'no date'];
@@ -261,6 +284,7 @@ final class ReadDocumentAction
             }
             $rows[] = ['line' => $i + 1, 'at' => $item['at'], 'amount' => $item['amount'], 'note' => $item['note'], 'tags' => $item['suggested_tag_titles'], 'soft' => true];
         }
+
         if ($rows === []) {
             return $this->error("No dated transactions found in {$fileName}.");
         }
@@ -300,10 +324,12 @@ final class ReadDocumentAction
     {
         foreach (array_slice($rows, 0, 30) as $row) {
             $filled = array_filter($row, static fn ($cell) => trim((string) $cell) !== '');
+
             if (count($filled) >= 2) {
                 return array_values($row);
             }
         }
+
         return [];
     }
 
@@ -316,12 +342,14 @@ final class ReadDocumentAction
     private function dateLikeValues(array $rows): array
     {
         $found = [];
+
         foreach (array_slice($rows, self::MAPPING_ROWS, 300) as $row) {
             foreach ($row as $cell) {
                 if (is_string($cell) && preg_match('/^\d{1,2}[-\/.]\d{1,2}[-\/.]\d{2,4}/', trim($cell))) {
                     $found[trim($cell)] = true;
                 }
             }
+
             if (count($found) >= 16) {
                 break;
             }
@@ -346,10 +374,12 @@ final class ReadDocumentAction
     {
         $failure = $this->ai->lastFailure();
         $message = "Couldn't read {$fileName}: " . $this->ai->failureReason() . '.';
+
         if ($failure === 'not_configured') {
             return $message . ($kind === DocumentFile::PDF ? ' Send the amount like -350 groceries instead.' : ' Send a CSV or Excel file instead.');
         }
         $message .= in_array($failure, ['busy', 'unavailable'], true) ? ' No AI assist was used; send it again in a minute' : ' No AI assist was used; try sending it again';
+
         if ($chars > 15000) {
             return $message . ', or export a long statement as CSV or Excel instead.';
         }

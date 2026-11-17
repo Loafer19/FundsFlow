@@ -87,8 +87,8 @@ class SyncMonobankConnectionAction
     }
 
     /**
-     * @param  list<string>  $ownIbans
-     * @param  list<string>  $jarTitles
+     * @param list<string> $ownIbans
+     * @param list<string> $jarTitles
      */
     private function importAccount(
         MonobankConnection $connection,

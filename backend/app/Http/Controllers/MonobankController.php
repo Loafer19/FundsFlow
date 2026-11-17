@@ -8,6 +8,7 @@ use App\Actions\Monobank\UpdateMonobankSettingsAction;
 use App\Exceptions\MonobankException;
 use App\Http\Resources\MonobankConnectionResource;
 use App\Jobs\SyncMonobankConnectionJob;
+use App\Models\MonobankConnection;
 use App\Services\Monobank\MonobankClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -82,7 +83,7 @@ class MonobankController extends Controller
         }
 
         $connection->forceFill([
-            'status' => \App\Models\MonobankConnection::STATUS_SYNCING,
+            'status' => MonobankConnection::STATUS_SYNCING,
             'last_error' => null,
         ])->save();
 

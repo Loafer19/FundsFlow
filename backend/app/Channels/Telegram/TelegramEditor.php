@@ -187,6 +187,14 @@ class TelegramEditor
         $this->client->sendMessage($chatId, $note === null ? 'Note removed!' : 'Note updated!');
     }
 
+    /** Transaction an open editor widget (by its message id) belongs to; null for drafts. */
+    public function transactionIdFor(int|string $chatId, int $messageId): ?int
+    {
+        $ref = Cache::get($this->editorKey($chatId, $messageId));
+
+        return is_array($ref) && ($ref['t'] ?? null) === 'tx' && isset($ref['id']) ? (int) $ref['id'] : null;
+    }
+
     /**
      * @param array<string, mixed> $ref
      * @return array<string, mixed>
@@ -455,14 +463,6 @@ class TelegramEditor
         Cache::put($this->targetKey($chatId, $target), $editorId, now()->addDays(self::TTL_DAYS));
 
         return true;
-    }
-
-    /** Transaction an open editor widget (by its message id) belongs to; null for drafts. */
-    public function transactionIdFor(int|string $chatId, int $messageId): ?int
-    {
-        $ref = Cache::get($this->editorKey($chatId, $messageId));
-
-        return is_array($ref) && ($ref['t'] ?? null) === 'tx' && isset($ref['id']) ? (int) $ref['id'] : null;
     }
 
     private function editorKey(int|string $chatId, int $editorId): string

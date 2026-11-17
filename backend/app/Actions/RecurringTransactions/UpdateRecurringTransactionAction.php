@@ -48,6 +48,7 @@ class UpdateRecurringTransactionAction
         }
 
         $recurringTransaction->update($data);
+
         if ($syncTags) {
             $recurringTransaction->tags()->sync($tagIds);
         }

@@ -22,7 +22,7 @@ class ImportStatementItemAction
     ) {}
 
     /**
-     * @param  array<string, mixed>  $item
+     * @param array<string, mixed> $item
      * @return array{status: string, transaction: ?Transaction}
      */
     public function execute(
@@ -97,7 +97,7 @@ class ImportStatementItemAction
     }
 
     /**
-     * @param  array<string, mixed>  $item
+     * @param array<string, mixed> $item
      * @return array{status: string, transaction: Transaction}
      */
     private function refreshExisting(User $user, Transaction $existing, array $item, float $amount): array
@@ -120,7 +120,7 @@ class ImportStatementItemAction
     }
 
     /**
-     * @param  array<string, mixed>  $item
+     * @param array<string, mixed> $item
      */
     private function noteFrom(array $item): string
     {
@@ -151,7 +151,7 @@ class ImportStatementItemAction
     }
 
     /**
-     * @param  array<string, mixed>  $item
+     * @param array<string, mixed> $item
      * @return array<string, mixed>
      */
     private function metaFrom(array $item, string $accountId): array

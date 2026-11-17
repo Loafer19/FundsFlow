@@ -4,6 +4,8 @@ namespace App\Channels\Telegram\Handlers;
 
 use App\Actions\Agent\Documents\DocumentFile;
 use App\Actions\Agent\Documents\DocumentImport;
+use App\Actions\Imports\ApplyImportRulesAction;
+use App\Actions\Imports\CreateImportBatchAction;
 use App\Actions\Telegram\AnalyzeReceiptAction;
 use App\Actions\Transactions\CreateTransactionAction;
 use App\Actions\Transactions\StoreTransactionAttachmentAction;
@@ -18,6 +20,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Support\ReceiptFiles;
 use App\Support\TransactionAttachmentRules;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -97,142 +100,13 @@ class MediaHandler
     }
 
     /**
-     * @param array<string, mixed> $message
-     */
-    private function handleSingleMedia(User $user, int|string $chatId, array $message): void
-    {
-        $caption = trim((string) ($message['caption'] ?? ''));
-        $file = $this->extractTelegramFile($message);
-
-        if ($file === null) {
-            $this->client->sendMessage($chatId, 'Send a receipt photo (JPEG, PNG, WebP, HEIC) or a file: PDF, Word (.docx), CSV, Excel (.xlsx), .ods, JSON, OFX / QFX, QIF or HTML.');
-
-            return;
-        }
-
-        // "statement" / "виписка" with a screenshot: a transaction list, not a receipt.
-        if (!isset($message['document']) && DocumentImport::isListCaption($caption)) {
-            $this->readScreenshots($user, $chatId, $this->identity($message, $chatId), [$file], $caption);
-
-            return;
-        }
-
-        // The caption (amount, date, words) goes to the receipt AI with the image; no text parsing here.
-        $this->handleReceiptWithoutAmount($user, $chatId, $file, $caption !== '' ? $caption : null);
-    }
-
-    /**
-     * @param array<string, mixed> $message
-     */
-    private function bufferAlbumItem(User $user, int|string $chatId, array $message): void
-    {
-        $groupId = (string) $message['media_group_id'];
-        $file = $this->extractTelegramFile($message);
-        $caption = trim((string) ($message['caption'] ?? ''));
-
-        if ($file === null) {
-            return;
-        }
-
-        $bufferKey = $this->albumBufferKey($chatId, $groupId);
-        $debounceKey = $this->albumDebounceKey($chatId, $groupId);
-
-        $buffer = Cache::get($bufferKey);
-        if (!is_array($buffer)) {
-            $buffer = [
-                'group_id' => $groupId,
-                'chat_id' => $chatId,
-                'user_id' => $user->id,
-                'files' => [],
-                'caption_hint' => null,
-            ];
-        }
-
-        $seen = [];
-        foreach ($buffer['files'] as $existing) {
-            if (is_array($existing) && isset($existing['file_id'])) {
-                $seen[(string) $existing['file_id']] = true;
-            }
-        }
-
-        if (!isset($seen[$file['file_id']])) {
-            $buffer['files'][] = $file;
-        }
-
-        if ($caption !== '') {
-            if ($buffer['caption_hint'] === null) {
-                $buffer['caption_hint'] = $caption;
-            }
-        }
-
-        Cache::put($bufferKey, $buffer, now()->addSeconds((int) config('telegram.album.collect_ttl_seconds')));
-
-        // First item in the group waits briefly so siblings can arrive, then asks 1-vs-several.
-        if (!Cache::add($debounceKey, true, now()->addSeconds((int) config('telegram.album.collect_ttl_seconds')))) {
-            return;
-        }
-
-        sleep((int) config('telegram.album.debounce_seconds'));
-
-        $this->promptAlbumChoice($user, $chatId, $groupId, $this->identity($message, $chatId));
-    }
-
-    private function promptAlbumChoice(User $user, int|string $chatId, string $groupId, int|string|null $identity = null): void
-    {
-        $bufferKey = $this->albumBufferKey($chatId, $groupId);
-        $buffer = Cache::get($bufferKey);
-
-        if (!is_array($buffer) || !isset($buffer['files']) || !is_array($buffer['files']) || $buffer['files'] === []) {
-            return;
-        }
-
-        $files = array_values(array_filter($buffer['files'], 'is_array'));
-        $n = count($files);
-
-        if ($n === 0) {
-            return;
-        }
-
-        $caption = is_string($buffer['caption_hint'] ?? null) ? $buffer['caption_hint'] : '';
-        $this->history->input($chatId, $user, "Sent {$n} receipt photo" . ($n === 1 ? '' : 's') . ($caption !== '' ? ": {$caption}" : ''));
-
-        if ($n === 1) {
-            Cache::forget($bufferKey);
-            $file = $files[0];
-            $hint = isset($buffer['caption_hint']) && is_string($buffer['caption_hint'])
-                ? $buffer['caption_hint']
-                : null;
-
-            $this->handleReceiptWithoutAmount($user, $chatId, $file, $hint);
-
-            return;
-        }
-
-        // "statement" / "виписка" in the caption: screenshots of a transaction list, no question.
-        if (DocumentImport::isListCaption($caption)) {
-            Cache::forget($bufferKey);
-            $this->readScreenshots($user, $chatId, $identity ?? $chatId, $files, $caption);
-
-            return;
-        }
-
-        // Keep buffer for the choice callbacks (extend TTL).
-        Cache::put($bufferKey, $buffer, now()->addMinutes((int) config('telegram.pending_ttl_minutes')));
-
-        $this->client->sendMessage(
-            $chatId,
-            "Got {$n} photos. Is this one receipt, separate receipts, or screenshots of a transaction list (bank app history)?",
-            $this->support->albumChoiceKeyboard($groupId),
-        );
-    }
-
-    /**
      * Album → "Transaction list": all photos are read in one vision call and become ONE import.
      */
     public function handleAlbumList(User $user, int|string $chatId, string $groupId, int|string $identity): void
     {
         $buffer = $this->pullAlbumBuffer($chatId, $groupId);
         $files = $buffer !== null ? array_values(array_filter($buffer['files'] ?? [], 'is_array')) : [];
+
         if ($files === []) {
             $this->client->sendMessage($chatId, 'That album expired. Please send the photos again.');
 
@@ -241,46 +115,6 @@ class MediaHandler
         $hint = is_string($buffer['caption_hint'] ?? null) ? $buffer['caption_hint'] : '';
 
         $this->readScreenshots($user, $chatId, $identity, $files, $hint);
-    }
-
-    /**
-     * @param list<array{file_id: string, name: string, mime: string, file_size?: int}> $files
-     */
-    private function readScreenshots(User $user, int|string $chatId, int|string $identity, array $files, string $caption): void
-    {
-        $max = max(1, (int) config('agent.documents.max_screenshots', DocumentImport::MAX_SCREENSHOTS));
-        $images = [];
-        $skipped = 0;
-        foreach (array_slice($files, 0, $max) as $file) {
-            $downloaded = $this->analyzeReceipt->isVisionMime($file['mime']) ? $this->downloadTelegramFile($chatId, $file, notify: false) : null;
-            if ($downloaded === null) {
-                $skipped++;
-
-                continue;
-            }
-            $images[] = ['bytes' => $downloaded[0], 'mime' => $file['mime']];
-        }
-        $skipped += max(0, count($files) - $max);
-        if ($images === [] || (string) config('services.xai.api_key') === '') {
-            $this->client->sendMessage($chatId, $images === []
-                ? "Couldn't download the screenshots. Send them again (JPEG or PNG)."
-                : "Screenshots can't be read right now. Export the statement as CSV or PDF from the bank app instead.");
-
-            return;
-        }
-
-        $this->client->sendMessage($chatId, 'Reading ' . count($images) . ' screenshot' . (count($images) === 1 ? '' : 's') . '…');
-        $result = $this->documents->fromScreenshots(
-            $user,
-            $images,
-            $caption !== '' ? $caption : null,
-            'Until then, export the statement as CSV, Excel, OFX or QIF from the bank app: those need no AI.',
-        );
-        if ($skipped > 0 && in_array($result['type'], ['confirm', 'ask'], true)) {
-            $this->client->sendMessage($chatId, "{$skipped} image" . ($skipped === 1 ? " wasn't" : "s weren't") . " read (only the first {$max} JPEG / PNG screenshots are).");
-        }
-
-        $this->presentImport($user, $chatId, $identity, $result, 'screenshots');
     }
 
     public function handleAlbumOne(User $user, int|string $chatId, string $groupId): void
@@ -294,6 +128,7 @@ class MediaHandler
         }
 
         $files = array_values(array_filter($buffer['files'] ?? [], 'is_array'));
+
         if ($files === []) {
             $this->client->sendMessage($chatId, 'That album expired. Please send the photos again.');
 
@@ -321,6 +156,7 @@ class MediaHandler
         }
 
         $files = array_values(array_filter($buffer['files'] ?? [], 'is_array'));
+
         if ($files === []) {
             $this->client->sendMessage($chatId, 'That album expired. Please send the photos again.');
 
@@ -347,6 +183,7 @@ class MediaHandler
     public function continueAlbumQueue(User $user, int|string $chatId): void
     {
         $queue = Cache::get($this->albumQueueKey($chatId));
+
         if (!is_array($queue) || !isset($queue['files']) || !is_array($queue['files']) || $queue['files'] === []) {
             Cache::forget($this->albumQueueKey($chatId));
 
@@ -354,6 +191,7 @@ class MediaHandler
         }
 
         $files = array_values(array_filter($queue['files'], 'is_array'));
+
         if ($files === []) {
             Cache::forget($this->albumQueueKey($chatId));
 
@@ -374,7 +212,7 @@ class MediaHandler
         $this->client->sendMessage(
             $chatId,
             $remaining > 0
-                ? 'Next receipt (' . ($remaining + 1) . ' left after this)…'
+                ? 'Next receipt (' . $remaining . ' left after this)…'
                 : 'Last receipt from the album…',
         );
 
@@ -384,201 +222,6 @@ class MediaHandler
             $next,
             $hint,
             albumPhoto: $total > $remaining ? $total - $remaining : null,
-        );
-    }
-
-    /**
-     * @param array{file_id: string, name: string, mime: string, file_size: int} $file
-     * @param list<array{file_id: string, name: string, mime: string, file_size?: int}>|null $allFiles
-     * @param int|null $albumPhoto 1-based number of this photo in a "Separate" album: a photo that can't be
-     *        downloaded is then skipped with a message naming it, and the next one is processed
-     */
-    private function handleReceiptWithoutAmount(
-        User $user,
-        int|string $chatId,
-        array $file,
-        ?string $captionHint,
-        ?array $allFiles = null,
-        ?int $albumPhoto = null,
-    ): void {
-        $attachmentFiles = $allFiles ?? [$file];
-
-        $canUseVision = $this->analyzeReceipt->isVisionMime($file['mime'])
-            && $this->analyzeReceipt->hasQuota($user)
-            && (string) config('services.xai.api_key') !== '';
-
-        if (!$canUseVision) {
-            $this->fallbackToAmountKeyboard(
-                $user,
-                $chatId,
-                $file,
-                overLimit: !$this->analyzeReceipt->hasQuota($user),
-                allFiles: $attachmentFiles,
-            );
-
-            return;
-        }
-
-        $status = $this->client->sendMessageResult($chatId, 'Reading receipt…');
-        $this->statusMessageId = is_int($status['result']['message_id'] ?? null) ? $status['result']['message_id'] : null;
-
-        try {
-            $this->readReceipt($user, $chatId, $file, $captionHint, $attachmentFiles, $albumPhoto);
-        } finally {
-            // Whatever came out (an import preview, a download error) is its own message.
-            if ($this->statusMessageId !== null) {
-                $this->client->deleteMessage($chatId, $this->statusMessageId);
-                $this->statusMessageId = null;
-            }
-        }
-    }
-
-    /**
-     * @param array{file_id: string, name: string, mime: string, file_size: int} $file
-     * @param list<array{file_id: string, name: string, mime: string, file_size?: int}> $attachmentFiles
-     */
-    private function readReceipt(User $user, int|string $chatId, array $file, ?string $captionHint, array $attachmentFiles, ?int $albumPhoto): void
-    {
-        $downloaded = $this->downloadTelegramFile($chatId, $file, notify: $albumPhoto === null);
-
-        if ($downloaded === null) {
-            if ($albumPhoto !== null) {
-                // Otherwise the rest of the album would wait for a Confirm that never comes.
-                $this->client->sendMessage($chatId, "Photo {$albumPhoto} couldn't be read and was skipped. Send it again, or tap ➕ Add");
-                $this->history->outcome($chatId, $user, "Receipt photo {$albumPhoto} skipped (couldn't be read).");
-                $this->continueAlbumQueue($user, $chatId);
-            }
-
-            return;
-        }
-
-        [$contents] = $downloaded;
-        $analysis = $this->analyzeReceipt->execute($user, $contents, $file['mime'], $captionHint);
-
-        if ($analysis === null) {
-            $this->fallbackToAmountKeyboard($user, $chatId, $file, overLimit: false, aiFailed: true, allFiles: $attachmentFiles);
-
-            return;
-        }
-
-        $this->analyzeReceipt->consumeQuota($user);
-
-        // One screenshot of a whole transaction list: its rows become an import (no extra assist).
-        if ($albumPhoto === null && count($attachmentFiles) === 1 && is_array($analysis['transaction_list'] ?? null)) {
-            Cache::forget($this->pendingKey($chatId));
-            $this->presentImport($user, $chatId, $this->currentIdentity ?? $chatId, $this->documents->fromScreenshotRows($user, [$analysis['transaction_list']], $captionHint), 'a screenshot');
-
-            return;
-        }
-
-        $this->presentAnalysis($user, $chatId, $file, $analysis, $attachmentFiles);
-    }
-
-    /**
-     * Receipt draft card from an analysis (photo vision or a document), or the price question.
-     *
-     * @param array{file_id: string, name: string, mime: string, file_size: int} $file
-     * @param array<string, mixed> $analysis
-     * @param list<array{file_id: string, name: string, mime: string, file_size?: int}> $attachmentFiles [] = save without a file
-     */
-    private function presentAnalysis(User $user, int|string $chatId, array $file, array $analysis, array $attachmentFiles): void
-    {
-        $draft = $this->buildDraftFromAnalysis($file, $analysis, $user, $attachmentFiles);
-        if ($attachmentFiles === []) {
-            $draft['no_attachment'] = true;
-        }
-
-        if ($analysis['needs_price'] || $analysis['amount'] === null) {
-            $draft['amount'] = null;
-            $draft['awaiting_price'] = true;
-            $this->putDraft($chatId, $draft);
-            Cache::forget($this->pendingKey($chatId));
-            Cache::forget($this->awaitTextKey($chatId));
-
-            $this->replaceStatus(
-                $chatId,
-                "Couldn't read a clear total (e.g. food photo). Send the amount, like 350, or pick a button",
-                $this->support->mediaAmountKeyboard(),
-            );
-
-            return;
-        }
-
-        Cache::forget($this->pendingKey($chatId));
-        Cache::forget($this->awaitTextKey($chatId));
-
-        $this->showDraft($user, $chatId, $draft);
-    }
-
-    /**
-     * @param array{file_id: string, name: string, mime: string, file_size: int} $file
-     * @param array<string, mixed> $analysis
-     * @param list<array{file_id: string, name: string, mime: string, file_size?: int}> $allFiles
-     * @return array<string, mixed>
-     */
-    private function buildDraftFromAnalysis(array $file, array $analysis, User $user, array $allFiles): array
-    {
-        return [
-            'file_id' => $file['file_id'],
-            'name' => $file['name'],
-            'mime' => $file['mime'],
-            'file_size' => $file['file_size'],
-            'files' => array_values($allFiles),
-            'amount' => $analysis['amount'],
-            'at' => $analysis['at'] ?? $user->todayDateString(),
-            'note' => $analysis['note'],
-            'suggested_tag_titles' => $analysis['suggested_tag_titles'],
-            'category' => $analysis['category'],
-            'needs_price' => $analysis['needs_price'],
-            'confidence' => $analysis['confidence'],
-            'awaiting_price' => false,
-            'awaiting_edit_amount' => false,
-        ];
-    }
-
-    /**
-     * @param array{file_id: string, name: string, mime: string, file_size: int} $file
-     * @param list<array{file_id: string, name: string, mime: string, file_size?: int}>|null $allFiles
-     */
-    private function fallbackToAmountKeyboard(
-        User $user,
-        int|string $chatId,
-        array $file,
-        bool $overLimit = false,
-        bool $aiFailed = false,
-        ?array $allFiles = null,
-    ): void {
-        $files = $allFiles ?? [$file];
-        $this->cachePendingMedia($chatId, $file, $files);
-        $this->forgetDraft($chatId);
-
-        if ($overLimit) {
-            $this->client->sendMessage(
-                $chatId,
-                $this->analyzeReceipt->quota()->exhaustedMessage(
-                    $user,
-                    'Until then, pick an amount below or send it, like 350',
-                ),
-                $this->support->mediaAmountKeyboard(),
-            );
-
-            return;
-        }
-
-        if ($aiFailed) {
-            $this->replaceStatus(
-                $chatId,
-                "Couldn't read that receipt automatically. Pick an amount or send it, like 350",
-                $this->support->mediaAmountKeyboard(),
-            );
-
-            return;
-        }
-
-        $this->client->sendMessage(
-            $chatId,
-            'Receipt received. Pick an amount or send it, like 350',
-            $this->support->mediaAmountKeyboard(),
         );
     }
 
@@ -713,6 +356,7 @@ class MediaHandler
 
         $draft['amount'] = $parsed['amount'];
         $draft['at'] = $parsed['at'];
+
         if ($parsed['note'] !== null) {
             $draft['note'] = $parsed['note'];
         }
@@ -872,6 +516,502 @@ class MediaHandler
             && (($draft['awaiting_price'] ?? false) || ($draft['awaiting_edit_amount'] ?? false));
     }
 
+    /**
+     * A text reply while the tags question is open: create / map / without, or another edit of
+     * the import ("only October", "skip Rent"). False when it isn't about the import (the
+     * question is dropped and the message is handled as usual).
+     */
+    public function handleImportReply(User $user, int|string $chatId, int|string $identity, string $text): bool
+    {
+        $pending = $this->session->get($identity, $chatId)['pending'] ?? null;
+
+        if (is_array($pending) && ($pending['type'] ?? null) === 'import_preview' && is_string($pending['batch_id'] ?? null)) {
+            $batch = $user->importBatches()->where('uuid', $pending['batch_id'])->first();
+
+            if (!$batch) {
+                $this->session->clearPending($identity, $chatId);
+                $this->client->sendMessage($chatId, 'That import preview is no longer available. Send the file again.');
+
+                return true;
+            }
+            $this->history->input($chatId, $user, $text);
+            app(ApplyImportRulesAction::class)->execute($user, $batch, ['instruction' => $text]);
+            $batch = $batch->fresh();
+            $summary = app(CreateImportBatchAction::class)->summaryLine($user, $batch);
+            $this->client->sendMessage(
+                $chatId,
+                "Updated preview:\n{$summary}\n\nReview and import: {$batch->previewUrl()}\nNothing will be saved until you press Import on that page.",
+            );
+            $this->session->setPending($identity, $chatId, ['type' => 'import_preview', 'batch_id' => $batch->uuid]);
+            $this->session->setSummary($identity, $chatId, mb_substr('Import preview updated: ' . $summary, 0, 500));
+
+            return true;
+        }
+
+        if (!is_array($pending) || ($pending['type'] ?? null) !== 'import_tags' || !is_array($pending['draft'] ?? null)) {
+            return false;
+        }
+        $this->session->clearPending($identity, $chatId);
+
+        $result = $this->documents->reply($user, $pending['draft'], $text);
+
+        if ($result !== null) {
+            $this->history->input($chatId, $user, $text);
+        }
+
+        if ($result === null) {
+            $this->client->sendMessage($chatId, 'The import was dropped. Send the files again to import them.');
+
+            return false;
+        }
+
+        if ($result['type'] === 'cancelled') {
+            $this->client->sendMessage($chatId, 'Import cancelled.');
+            $this->history->outcome($chatId, $user, 'Import cancelled.');
+
+            return true;
+        }
+        $this->presentImport($user, $chatId, $identity, $result, 'files');
+
+        return true;
+    }
+
+    /**
+     * The buttons under the tags question: imp:create|none|cancel:{nonce}.
+     */
+    public function handleImportButton(User $user, int|string $chatId, int|string $identity, string $choice, string $nonce): string
+    {
+        $pending = $this->session->get($identity, $chatId)['pending'] ?? null;
+
+        if (!is_array($pending) || ($pending['type'] ?? null) !== 'import_tags' || ($pending['nonce'] ?? null) !== $nonce) {
+            return 'This question is outdated. Send the files again.';
+        }
+        $text = match ($choice) {
+            'create' => DocumentImport::SUGGESTIONS[0],
+            'none' => DocumentImport::SUGGESTIONS[1],
+            default => DocumentImport::SUGGESTIONS[2],
+        };
+        $this->handleImportReply($user, $chatId, $identity, $text);
+
+        return $choice === 'cancel' ? 'Cancelled' : 'OK';
+    }
+
+    /**
+     * @param array<string, mixed> $message
+     * @return null|array{file_id: string, name: string, mime: string, file_size: int}
+     */
+    public function extractTelegramFile(array $message): ?array
+    {
+        if (isset($message['document']) && is_array($message['document'])) {
+            $document = $message['document'];
+            $mime = (string) ($document['mime_type'] ?? '');
+
+            if (!TransactionAttachmentRules::isAccepted($mime)) {
+                // iPhone HEIC sent "as file" often arrives as application/octet-stream.
+                $mime = (string) TransactionAttachmentRules::mimeForExtension((string) ($document['file_name'] ?? ''));
+            }
+
+            if (!TransactionAttachmentRules::isAccepted($mime)) {
+                return null;
+            }
+
+            return [
+                'file_id' => (string) $document['file_id'],
+                'name' => (string) ($document['file_name'] ?? ('receipt.' . (TransactionAttachmentRules::IMAGE_MIMES[$mime] ?? 'pdf'))),
+                'mime' => $mime,
+                'file_size' => (int) ($document['file_size'] ?? 0),
+            ];
+        }
+
+        if (isset($message['photo']) && is_array($message['photo']) && $message['photo'] !== []) {
+            $photo = $message['photo'][array_key_last($message['photo'])];
+
+            return [
+                'file_id' => (string) $photo['file_id'],
+                'name' => 'receipt.jpg',
+                'mime' => 'image/jpeg',
+                'file_size' => (int) ($photo['file_size'] ?? 0),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $message
+     */
+    private function handleSingleMedia(User $user, int|string $chatId, array $message): void
+    {
+        $caption = trim((string) ($message['caption'] ?? ''));
+        $file = $this->extractTelegramFile($message);
+
+        if ($file === null) {
+            $this->client->sendMessage($chatId, 'Send a receipt photo (JPEG, PNG, WebP, HEIC) or a file: PDF, Word (.docx), CSV, Excel (.xlsx), .ods, JSON, OFX / QFX, QIF or HTML.');
+
+            return;
+        }
+
+        // "statement" / "виписка" with a screenshot: a transaction list, not a receipt.
+        if (!isset($message['document']) && DocumentImport::isListCaption($caption)) {
+            $this->readScreenshots($user, $chatId, $this->identity($message, $chatId), [$file], $caption);
+
+            return;
+        }
+
+        // The caption (amount, date, words) goes to the receipt AI with the image; no text parsing here.
+        $this->handleReceiptWithoutAmount($user, $chatId, $file, $caption !== '' ? $caption : null);
+    }
+
+    /**
+     * @param array<string, mixed> $message
+     */
+    private function bufferAlbumItem(User $user, int|string $chatId, array $message): void
+    {
+        $groupId = (string) $message['media_group_id'];
+        $file = $this->extractTelegramFile($message);
+        $caption = trim((string) ($message['caption'] ?? ''));
+
+        if ($file === null) {
+            return;
+        }
+
+        $bufferKey = $this->albumBufferKey($chatId, $groupId);
+        $debounceKey = $this->albumDebounceKey($chatId, $groupId);
+
+        $this->withCacheLock('tg-album:' . $chatId . ':' . $groupId, function () use ($bufferKey, $groupId, $chatId, $user, $file, $caption) {
+            $buffer = Cache::get($bufferKey);
+
+            if (!is_array($buffer)) {
+                $buffer = [
+                    'group_id' => $groupId,
+                    'chat_id' => $chatId,
+                    'user_id' => $user->id,
+                    'files' => [],
+                    'caption_hint' => null,
+                ];
+            }
+
+            $seen = [];
+
+            foreach ($buffer['files'] as $existing) {
+                if (is_array($existing) && isset($existing['file_id'])) {
+                    $seen[(string) $existing['file_id']] = true;
+                }
+            }
+
+            if (!isset($seen[$file['file_id']])) {
+                $buffer['files'][] = $file;
+            }
+
+            if ($caption !== '' && $buffer['caption_hint'] === null) {
+                $buffer['caption_hint'] = $caption;
+            }
+
+            Cache::put($bufferKey, $buffer, now()->addSeconds((int) config('telegram.album.collect_ttl_seconds')));
+        });
+
+        // First item in the group waits briefly so siblings can arrive, then asks 1-vs-several.
+        // The debounce outlives the wait by a little, not the whole collect TTL, so a photo that
+        // arrives after this album was already handled starts a new one instead of vanishing.
+        $debounceFor = (int) config('telegram.album.debounce_seconds') + 2;
+
+        if (!Cache::add($debounceKey, true, now()->addSeconds($debounceFor))) {
+            return;
+        }
+
+        sleep((int) config('telegram.album.debounce_seconds'));
+
+        $this->promptAlbumChoice($user, $chatId, $groupId, $this->identity($message, $chatId));
+    }
+
+    private function promptAlbumChoice(User $user, int|string $chatId, string $groupId, int|string|null $identity = null): void
+    {
+        $bufferKey = $this->albumBufferKey($chatId, $groupId);
+        $buffer = Cache::get($bufferKey);
+
+        if (!is_array($buffer) || !isset($buffer['files']) || !is_array($buffer['files']) || $buffer['files'] === []) {
+            return;
+        }
+
+        $files = array_values(array_filter($buffer['files'], 'is_array'));
+        $n = count($files);
+
+        if ($n === 0) {
+            return;
+        }
+
+        $caption = is_string($buffer['caption_hint'] ?? null) ? $buffer['caption_hint'] : '';
+        $this->history->input($chatId, $user, "Sent {$n} receipt photo" . ($n === 1 ? '' : 's') . ($caption !== '' ? ": {$caption}" : ''));
+
+        if ($n === 1) {
+            Cache::forget($bufferKey);
+            $file = $files[0];
+            $hint = isset($buffer['caption_hint']) && is_string($buffer['caption_hint'])
+                ? $buffer['caption_hint']
+                : null;
+
+            $this->handleReceiptWithoutAmount($user, $chatId, $file, $hint);
+
+            return;
+        }
+
+        // "statement" / "виписка" in the caption: screenshots of a transaction list, no question.
+        if (DocumentImport::isListCaption($caption)) {
+            Cache::forget($bufferKey);
+            $this->readScreenshots($user, $chatId, $identity ?? $chatId, $files, $caption);
+
+            return;
+        }
+
+        // Keep buffer for the choice callbacks (extend TTL).
+        Cache::put($bufferKey, $buffer, now()->addMinutes((int) config('telegram.pending_ttl_minutes')));
+
+        $this->client->sendMessage(
+            $chatId,
+            "Got {$n} photos. Is this one receipt, separate receipts, or screenshots of a transaction list (bank app history)?",
+            $this->support->albumChoiceKeyboard($groupId),
+        );
+    }
+
+    /**
+     * @param list<array{file_id: string, name: string, mime: string, file_size?: int}> $files
+     */
+    private function readScreenshots(User $user, int|string $chatId, int|string $identity, array $files, string $caption): void
+    {
+        $max = max(1, (int) config('agent.documents.max_screenshots', DocumentImport::MAX_SCREENSHOTS));
+        $images = [];
+        $skipped = 0;
+
+        foreach (array_slice($files, 0, $max) as $file) {
+            $downloaded = $this->analyzeReceipt->isVisionMime($file['mime']) ? $this->downloadTelegramFile($chatId, $file, notify: false) : null;
+
+            if ($downloaded === null) {
+                $skipped++;
+
+                continue;
+            }
+            $images[] = ['bytes' => $downloaded[0], 'mime' => $file['mime']];
+        }
+        $skipped += max(0, count($files) - $max);
+
+        if ($images === [] || (string) config('services.xai.api_key') === '') {
+            $this->client->sendMessage($chatId, $images === []
+                ? "Couldn't download the screenshots. Send them again (JPEG or PNG)."
+                : "Screenshots can't be read right now. Export the statement as CSV or PDF from the bank app instead.");
+
+            return;
+        }
+
+        $this->client->sendMessage($chatId, 'Reading ' . count($images) . ' screenshot' . (count($images) === 1 ? '' : 's') . '…');
+        $result = $this->documents->fromScreenshots(
+            $user,
+            $images,
+            $caption !== '' ? $caption : null,
+            'Until then, export the statement as CSV, Excel, OFX or QIF from the bank app: those need no AI.',
+        );
+
+        if ($skipped > 0 && in_array($result['type'], ['confirm', 'ask'], true)) {
+            $this->client->sendMessage($chatId, "{$skipped} image" . ($skipped === 1 ? " wasn't" : "s weren't") . " read (only the first {$max} JPEG / PNG screenshots are).");
+        }
+
+        $this->presentImport($user, $chatId, $identity, $result, 'screenshots');
+    }
+
+    /**
+     * @param array{file_id: string, name: string, mime: string, file_size: int} $file
+     * @param null|list<array{file_id: string, name: string, mime: string, file_size?: int}> $allFiles
+     * @param null|int $albumPhoto 1-based number of this photo in a "Separate" album: a photo that can't be
+     *                             downloaded is then skipped with a message naming it, and the next one is processed
+     */
+    private function handleReceiptWithoutAmount(
+        User $user,
+        int|string $chatId,
+        array $file,
+        ?string $captionHint,
+        ?array $allFiles = null,
+        ?int $albumPhoto = null,
+    ): void {
+        $attachmentFiles = $allFiles ?? [$file];
+
+        $canUseVision = $this->analyzeReceipt->isVisionMime($file['mime'])
+            && $this->analyzeReceipt->hasQuota($user)
+            && (string) config('services.xai.api_key') !== '';
+
+        if (!$canUseVision) {
+            $this->fallbackToAmountKeyboard(
+                $user,
+                $chatId,
+                $file,
+                overLimit: !$this->analyzeReceipt->hasQuota($user),
+                allFiles: $attachmentFiles,
+            );
+
+            return;
+        }
+
+        $status = $this->client->sendMessageResult($chatId, 'Reading receipt…');
+        $this->statusMessageId = is_int($status['result']['message_id'] ?? null) ? $status['result']['message_id'] : null;
+
+        try {
+            $this->readReceipt($user, $chatId, $file, $captionHint, $attachmentFiles, $albumPhoto);
+        } finally {
+            // Whatever came out (an import preview, a download error) is its own message.
+            if ($this->statusMessageId !== null) {
+                $this->client->deleteMessage($chatId, $this->statusMessageId);
+                $this->statusMessageId = null;
+            }
+        }
+    }
+
+    /**
+     * @param array{file_id: string, name: string, mime: string, file_size: int} $file
+     * @param list<array{file_id: string, name: string, mime: string, file_size?: int}> $attachmentFiles
+     */
+    private function readReceipt(User $user, int|string $chatId, array $file, ?string $captionHint, array $attachmentFiles, ?int $albumPhoto): void
+    {
+        $downloaded = $this->downloadTelegramFile($chatId, $file, notify: $albumPhoto === null);
+
+        if ($downloaded === null) {
+            if ($albumPhoto !== null) {
+                // Otherwise the rest of the album would wait for a Confirm that never comes.
+                $this->client->sendMessage($chatId, "Photo {$albumPhoto} couldn't be read and was skipped. Send it again, or tap ➕ Add");
+                $this->history->outcome($chatId, $user, "Receipt photo {$albumPhoto} skipped (couldn't be read).");
+                $this->continueAlbumQueue($user, $chatId);
+            }
+
+            return;
+        }
+
+        [$contents] = $downloaded;
+        $analysis = $this->analyzeReceipt->execute($user, $contents, $file['mime'], $captionHint);
+
+        if ($analysis === null) {
+            $this->fallbackToAmountKeyboard($user, $chatId, $file, overLimit: false, aiFailed: true, allFiles: $attachmentFiles);
+
+            return;
+        }
+
+        $this->analyzeReceipt->consumeQuota($user);
+
+        // One screenshot of a whole transaction list: its rows become an import (no extra assist).
+        if ($albumPhoto === null && count($attachmentFiles) === 1 && is_array($analysis['transaction_list'] ?? null)) {
+            Cache::forget($this->pendingKey($chatId));
+            $this->presentImport($user, $chatId, $this->currentIdentity ?? $chatId, $this->documents->fromScreenshotRows($user, [$analysis['transaction_list']], $captionHint), 'a screenshot');
+
+            return;
+        }
+
+        $this->presentAnalysis($user, $chatId, $file, $analysis, $attachmentFiles);
+    }
+
+    /**
+     * Receipt draft card from an analysis (photo vision or a document), or the price question.
+     *
+     * @param array{file_id: string, name: string, mime: string, file_size: int} $file
+     * @param array<string, mixed> $analysis
+     * @param list<array{file_id: string, name: string, mime: string, file_size?: int}> $attachmentFiles [] = save without a file
+     */
+    private function presentAnalysis(User $user, int|string $chatId, array $file, array $analysis, array $attachmentFiles): void
+    {
+        $draft = $this->buildDraftFromAnalysis($file, $analysis, $user, $attachmentFiles);
+
+        if ($attachmentFiles === []) {
+            $draft['no_attachment'] = true;
+        }
+
+        if ($analysis['needs_price'] || $analysis['amount'] === null) {
+            $draft['amount'] = null;
+            $draft['awaiting_price'] = true;
+            $this->putDraft($chatId, $draft);
+            Cache::forget($this->pendingKey($chatId));
+            Cache::forget($this->awaitTextKey($chatId));
+
+            $this->replaceStatus(
+                $chatId,
+                "Couldn't read a clear total (e.g. food photo). Send the amount, like 350, or pick a button",
+                $this->support->mediaAmountKeyboard(),
+            );
+
+            return;
+        }
+
+        Cache::forget($this->pendingKey($chatId));
+        Cache::forget($this->awaitTextKey($chatId));
+
+        $this->showDraft($user, $chatId, $draft);
+    }
+
+    /**
+     * @param array{file_id: string, name: string, mime: string, file_size: int} $file
+     * @param array<string, mixed> $analysis
+     * @param list<array{file_id: string, name: string, mime: string, file_size?: int}> $allFiles
+     * @return array<string, mixed>
+     */
+    private function buildDraftFromAnalysis(array $file, array $analysis, User $user, array $allFiles): array
+    {
+        return [
+            'file_id' => $file['file_id'],
+            'name' => $file['name'],
+            'mime' => $file['mime'],
+            'file_size' => $file['file_size'],
+            'files' => array_values($allFiles),
+            'amount' => $analysis['amount'],
+            'at' => $analysis['at'] ?? $user->todayDateString(),
+            'note' => $analysis['note'],
+            'suggested_tag_titles' => $analysis['suggested_tag_titles'],
+            'category' => $analysis['category'],
+            'needs_price' => $analysis['needs_price'],
+            'confidence' => $analysis['confidence'],
+            'awaiting_price' => false,
+            'awaiting_edit_amount' => false,
+        ];
+    }
+
+    /**
+     * @param array{file_id: string, name: string, mime: string, file_size: int} $file
+     * @param null|list<array{file_id: string, name: string, mime: string, file_size?: int}> $allFiles
+     */
+    private function fallbackToAmountKeyboard(
+        User $user,
+        int|string $chatId,
+        array $file,
+        bool $overLimit = false,
+        bool $aiFailed = false,
+        ?array $allFiles = null,
+    ): void {
+        $files = $allFiles ?? [$file];
+        $this->cachePendingMedia($chatId, $file, $files);
+        $this->forgetDraft($chatId);
+
+        if ($overLimit) {
+            $this->client->sendMessage(
+                $chatId,
+                $this->analyzeReceipt->quota()->exhaustedMessage(
+                    $user,
+                    'Until then, pick an amount below or send it, like 350',
+                ),
+                $this->support->mediaAmountKeyboard(),
+            );
+
+            return;
+        }
+
+        if ($aiFailed) {
+            $this->replaceStatus(
+                $chatId,
+                "Couldn't read that receipt automatically. Pick an amount or send it, like 350",
+                $this->support->mediaAmountKeyboard(),
+            );
+
+            return;
+        }
+
+        $this->client->sendMessage(
+            $chatId,
+            'Receipt received. Pick an amount or send it, like 350',
+            $this->support->mediaAmountKeyboard(),
+        );
+    }
 
     /**
      * @param list<array{file_id: string, name: string, mime: string, file_size?: int}> $files
@@ -941,6 +1081,7 @@ class MediaHandler
 
         if ($attached === 0) {
             $this->support->sendSavedTransaction($chatId, $user, $transaction, '✅ Saved without file', editMessageId: $cardMessageId, undo: true);
+
             if ($lastError !== null) {
                 $this->client->sendMessage($chatId, $lastError);
             }
@@ -1058,6 +1199,7 @@ class MediaHandler
 
         // Let the other photos of the album arrive and finish (each is its own webhook request).
         sleep((int) config('telegram.album.debounce_seconds', 3));
+
         for ($i = 0; $i < 15 && (int) Cache::get($this->attachAlbumKey($chatId, $group, 'done')) < (int) Cache::get($this->attachAlbumKey($chatId, $group, 'seen')); $i++) {
             sleep(1);
         }
@@ -1162,7 +1304,7 @@ class MediaHandler
 
     /**
      * @param array{file_id: string, name: string, mime: string, file_size?: int} $file
-     * @return array{0: string, 1: array{name: string, mime: string}}|null
+     * @return null|array{0: string, 1: array{name: string, mime: string}}
      */
     private function downloadTelegramFile(int|string $chatId, array $file, bool $notify = true): ?array
     {
@@ -1256,7 +1398,7 @@ class MediaHandler
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return null|array<string, mixed>
      */
     private function pullAlbumBuffer(int|string $chatId, string $groupId): ?array
     {
@@ -1311,7 +1453,7 @@ class MediaHandler
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return null|array<string, mixed>
      */
     private function draftForCard(int|string $chatId, string $nonce): ?array
     {
@@ -1329,7 +1471,7 @@ class MediaHandler
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return null|array<string, mixed>
      */
     private function getDraft(int|string $chatId): ?array
     {
@@ -1385,6 +1527,7 @@ class MediaHandler
             return false;
         }
         $mime = (string) ($message['document']['mime_type'] ?? '');
+
         if (str_starts_with($mime, 'image/')) {
             return false;
         }
@@ -1408,6 +1551,7 @@ class MediaHandler
         $this->history->input($chatId, $user, "Sent a file {$name}" . ($caption !== '' ? ": {$caption}" : ''));
 
         $loaded = $this->loadDocument($chatId, $document, true);
+
         if (is_string($loaded)) {
             if ($loaded !== '') {
                 $this->client->sendMessage($chatId, $loaded);
@@ -1475,22 +1619,26 @@ class MediaHandler
 
         // Legacy formats (.xls, .doc…) get their hint without a download.
         $legacy = DocumentFile::legacyHint($name);
+
         if ($legacy !== null) {
             return $legacy;
         }
 
         $kind = $isPdf ? DocumentFile::PDF : (DocumentFile::EXTENSIONS[$ext] ?? DocumentFile::CSV);
+
         if ($file['file_size'] > DocumentFile::maxBytes($kind)) {
             return 'The file is larger than ' . DocumentFile::formatBytes(DocumentFile::maxBytes($kind)) . '. Split it or send a shorter period.';
         }
 
         $downloaded = $this->downloadTelegramFile($chatId, $file, $notify);
+
         if ($downloaded === null) {
             return $notify ? '' : "couldn't download it from Telegram";
         }
         [$contents] = $downloaded;
 
         $detected = DocumentFile::detect($contents, $name);
+
         if (isset($detected['error'])) {
             return (string) $detected['error'];
         }
@@ -1510,30 +1658,39 @@ class MediaHandler
         $key = "telegram_doc_group:{$chatId}:{$groupId}";
         $ttl = now()->addSeconds((int) config('telegram.album.collect_ttl_seconds'));
 
-        $buffer = Cache::get($key);
-        $buffer = is_array($buffer) ? $buffer : ['messages' => [], 'caption' => ''];
-        $ids = array_map(static fn (array $m) => (string) ($m['document']['file_id'] ?? ''), $buffer['messages']);
-        if (!in_array((string) ($message['document']['file_id'] ?? ''), $ids, true)) {
-            $buffer['messages'][] = $message;
-        }
-        $caption = trim((string) ($message['caption'] ?? ''));
-        if ($caption !== '' && $buffer['caption'] === '') {
-            $buffer['caption'] = $caption;
-        }
-        Cache::put($key, $buffer, $ttl);
+        $this->withCacheLock('tg-docs:' . $chatId . ':' . $groupId, function () use ($key, $ttl, $message) {
+            $buffer = Cache::get($key);
+            $buffer = is_array($buffer) ? $buffer : ['messages' => [], 'caption' => ''];
+            $ids = array_map(static fn (array $m) => (string) ($m['document']['file_id'] ?? ''), $buffer['messages']);
 
-        if (!Cache::add("{$key}:debounce", true, $ttl)) {
+            if (!in_array((string) ($message['document']['file_id'] ?? ''), $ids, true)) {
+                $buffer['messages'][] = $message;
+            }
+            $caption = trim((string) ($message['caption'] ?? ''));
+
+            if ($caption !== '' && $buffer['caption'] === '') {
+                $buffer['caption'] = $caption;
+            }
+            Cache::put($key, $buffer, $ttl);
+        });
+
+        $debounceFor = (int) config('telegram.album.debounce_seconds') + 2;
+
+        if (!Cache::add("{$key}:debounce", true, now()->addSeconds($debounceFor))) {
             return;
         }
         sleep((int) config('telegram.album.debounce_seconds'));
 
         $buffer = Cache::pull($key);
         $messages = is_array($buffer) ? array_values($buffer['messages'] ?? []) : [];
+
         if ($messages === []) {
             return;
         }
+
         if (count($messages) === 1) {
             $single = $messages[0];
+
             if (($single['caption'] ?? '') === '' && ($buffer['caption'] ?? '') !== '') {
                 $single['caption'] = $buffer['caption'];
             }
@@ -1555,11 +1712,13 @@ class MediaHandler
         $this->history->input($chatId, $user, 'Sent ' . count($messages) . ' files: ' . implode(', ', $names) . ($caption !== '' ? ": {$caption}" : ''));
 
         $notes = [];
+
         if (count($messages) > $max) {
             $notes[] = 'Only the first ' . $max . ' files are read at once; skipped: ' . implode(', ', array_slice($names, $max)) . '.';
             $messages = array_slice($messages, 0, $max);
         }
         $total = array_sum(array_map(static fn (array $m) => (int) ($m['document']['file_size'] ?? 0), $messages));
+
         if ($total > DocumentFile::maxTotalBytes()) {
             $this->client->sendMessage($chatId, 'These files are ' . DocumentFile::formatBytes($total) . ' together; up to '
                 . DocumentFile::formatBytes(DocumentFile::maxTotalBytes()) . ' at once. Send fewer files or shorter periods.');
@@ -1569,8 +1728,10 @@ class MediaHandler
 
         $this->client->sendMessage($chatId, 'Reading ' . count($messages) . ' files…');
         $files = [];
+
         foreach ($messages as $i => $m) {
             $loaded = $this->loadDocument($chatId, is_array($m['document'] ?? null) ? $m['document'] : [], false);
+
             if (is_string($loaded)) {
                 $notes[] = "⚠️ {$names[$i]}: {$loaded}";
 
@@ -1578,6 +1739,7 @@ class MediaHandler
             }
             $files[] = ['name' => $loaded['name'], 'kind' => $loaded['kind'], 'bytes' => $loaded['bytes']];
         }
+
         if ($files === []) {
             $message = "Nothing to import:\n" . implode("\n", $notes);
             $this->client->sendMessage($chatId, $message);
@@ -1592,6 +1754,7 @@ class MediaHandler
             $caption !== '' ? $caption : null,
             'Until then, send CSV / Excel / OFX / QIF files with date and amount columns: those need no AI.',
         );
+
         if ($notes !== [] && in_array($result['type'], ['confirm', 'ask'], true)) {
             $this->client->sendMessage($chatId, implode("\n", $notes));
         }
@@ -1610,11 +1773,13 @@ class MediaHandler
 
             return;
         }
+
         if ($result['type'] === 'confirm') {
             $this->stageImport($user, $chatId, $identity, $result);
 
             return;
         }
+
         if ($result['type'] === 'ask') {
             $nonce = $this->support->newNonce();
             // One pending slot per chat (shared with assistant previews): this replaces an older one.
@@ -1628,6 +1793,7 @@ class MediaHandler
 
             return;
         }
+
         if ($result['type'] === 'single') {
             $this->client->sendMessage($chatId, 'That file looks like one receipt. Send it on its own to save it as one transaction.');
 
@@ -1635,79 +1801,6 @@ class MediaHandler
         }
         $this->client->sendMessage($chatId, (string) ($result['message'] ?? 'Nothing to import.'));
         $this->history->outcome($chatId, $user, "Import of {$what} not done: " . ($result['message'] ?? ''));
-    }
-
-    /**
-     * A text reply while the tags question is open: create / map / without, or another edit of
-     * the import ("only October", "skip Rent"). False when it isn't about the import (the
-     * question is dropped and the message is handled as usual).
-     */
-    public function handleImportReply(User $user, int|string $chatId, int|string $identity, string $text): bool
-    {
-        $pending = $this->session->get($identity, $chatId)['pending'] ?? null;
-        if (is_array($pending) && ($pending['type'] ?? null) === 'import_preview' && is_string($pending['batch_id'] ?? null)) {
-            $batch = $user->importBatches()->where('uuid', $pending['batch_id'])->first();
-            if (!$batch) {
-                $this->session->clearPending($identity, $chatId);
-                $this->client->sendMessage($chatId, 'That import preview is no longer available. Send the file again.');
-
-                return true;
-            }
-            $this->history->input($chatId, $user, $text);
-            app(\App\Actions\Imports\ApplyImportRulesAction::class)->execute($user, $batch, ['instruction' => $text]);
-            $batch = $batch->fresh();
-            $summary = app(\App\Actions\Imports\CreateImportBatchAction::class)->summaryLine($user, $batch);
-            $this->client->sendMessage(
-                $chatId,
-                "Updated preview:\n{$summary}\n\nReview and import: {$batch->previewUrl()}\nNothing will be saved until you press Import on that page.",
-            );
-            $this->session->setPending($identity, $chatId, ['type' => 'import_preview', 'batch_id' => $batch->uuid]);
-            $this->session->setSummary($identity, $chatId, mb_substr('Import preview updated: ' . $summary, 0, 500));
-
-            return true;
-        }
-        if (!is_array($pending) || ($pending['type'] ?? null) !== 'import_tags' || !is_array($pending['draft'] ?? null)) {
-            return false;
-        }
-        $this->session->clearPending($identity, $chatId);
-
-        $result = $this->documents->reply($user, $pending['draft'], $text);
-        if ($result !== null) {
-            $this->history->input($chatId, $user, $text);
-        }
-        if ($result === null) {
-            $this->client->sendMessage($chatId, 'The import was dropped. Send the files again to import them.');
-
-            return false;
-        }
-        if ($result['type'] === 'cancelled') {
-            $this->client->sendMessage($chatId, 'Import cancelled.');
-            $this->history->outcome($chatId, $user, 'Import cancelled.');
-
-            return true;
-        }
-        $this->presentImport($user, $chatId, $identity, $result, 'files');
-
-        return true;
-    }
-
-    /**
-     * The buttons under the tags question: imp:create|none|cancel:{nonce}.
-     */
-    public function handleImportButton(User $user, int|string $chatId, int|string $identity, string $choice, string $nonce): string
-    {
-        $pending = $this->session->get($identity, $chatId)['pending'] ?? null;
-        if (!is_array($pending) || ($pending['type'] ?? null) !== 'import_tags' || ($pending['nonce'] ?? null) !== $nonce) {
-            return 'This question is outdated. Send the files again.';
-        }
-        $text = match ($choice) {
-            'create' => DocumentImport::SUGGESTIONS[0],
-            'none' => DocumentImport::SUGGESTIONS[1],
-            default => DocumentImport::SUGGESTIONS[2],
-        };
-        $this->handleImportReply($user, $chatId, $identity, $text);
-
-        return $choice === 'cancel' ? 'Cancelled' : 'OK';
     }
 
     /**
@@ -1766,43 +1859,24 @@ class MediaHandler
     }
 
     /**
-     * @param array<string, mixed> $message
-     * @return array{file_id: string, name: string, mime: string, file_size: int}|null
+     * Serialize a read-modify-write of an album buffer. Without a lock store, or if the lock
+     * is busy, still append so a photo is not dropped.
      */
-    public function extractTelegramFile(array $message): ?array
+    private function withCacheLock(string $name, callable $callback): void
     {
-        if (isset($message['document']) && is_array($message['document'])) {
-            $document = $message['document'];
-            $mime = (string) ($document['mime_type'] ?? '');
+        try {
+            Cache::lock($name, 10)->block(3, $callback);
+        } catch (Throwable $e) {
+            $unsupported = $e instanceof LockTimeoutException
+                || str_contains($e->getMessage(), 'does not support atomic locks');
 
-            if (!TransactionAttachmentRules::isAccepted($mime)) {
-                // iPhone HEIC sent "as file" often arrives as application/octet-stream.
-                $mime = (string) TransactionAttachmentRules::mimeForExtension((string) ($document['file_name'] ?? ''));
+            if ($unsupported) {
+                $callback();
+
+                return;
             }
 
-            if (!TransactionAttachmentRules::isAccepted($mime)) {
-                return null;
-            }
-
-            return [
-                'file_id' => (string) $document['file_id'],
-                'name' => (string) ($document['file_name'] ?? ('receipt.' . (TransactionAttachmentRules::IMAGE_MIMES[$mime] ?? 'pdf'))),
-                'mime' => $mime,
-                'file_size' => (int) ($document['file_size'] ?? 0),
-            ];
+            throw $e;
         }
-
-        if (isset($message['photo']) && is_array($message['photo']) && $message['photo'] !== []) {
-            $photo = $message['photo'][array_key_last($message['photo'])];
-
-            return [
-                'file_id' => (string) $photo['file_id'],
-                'name' => 'receipt.jpg',
-                'mime' => 'image/jpeg',
-                'file_size' => (int) ($photo['file_size'] ?? 0),
-            ];
-        }
-
-        return null;
     }
 }

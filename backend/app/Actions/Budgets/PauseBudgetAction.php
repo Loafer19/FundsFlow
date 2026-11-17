@@ -14,7 +14,6 @@ class PauseBudgetAction
 
         $budget->currentPeriod?->update(['ends_at' => $user->todayDateString()]);
 
-
         return $budget->load('periods.tags');
     }
 }

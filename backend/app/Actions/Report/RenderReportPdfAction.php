@@ -33,10 +33,11 @@ class RenderReportPdfAction
 
     /**
      * @param array<string, mixed> $args period | from/to, tag_ids, untagged (BuildUserReportAction args)
-     * @param array{sections?: array<string, mixed>|null, theme?: string|null, period_type?: string|null} $options
-     * @return array{pdf: string, filename: string, caption: string, summary: array<string, mixed>, renderer: string}
+     * @param array{sections?: null|array<string, mixed>, theme?: null|string, period_type?: null|string} $options
      *
      * @throws RuntimeException when both renderers fail
+     *
+     * @return array{pdf: string, filename: string, caption: string, summary: array<string, mixed>, renderer: string}
      */
     public function execute(User $user, array $args, array $options = []): array
     {
@@ -44,6 +45,7 @@ class RenderReportPdfAction
         $meta = ['filename' => $report['filename'], 'caption' => $report['caption'], 'summary' => $report['summary']];
 
         $base = rtrim((string) config('services.report.render_url'), '/');
+
         if ($base !== '') {
             try {
                 return ['pdf' => $this->renderSpa($user, $base, $this->printPayload($user, $args, $options)), 'renderer' => 'spa'] + $meta;
@@ -70,7 +72,8 @@ class RenderReportPdfAction
         ['range' => $range, 'tag_ids' => $tagIds, 'untagged' => $untagged] = $this->buildReport->resolve($user, $args);
 
         $type = $options['period_type'] ?? null;
-        if (! is_string($type) || ! in_array($type, self::PERIOD_TYPES, true)) {
+
+        if (!is_string($type) || !in_array($type, self::PERIOD_TYPES, true)) {
             $type = $this->detectPeriodType($range);
         }
 
@@ -94,11 +97,13 @@ class RenderReportPdfAction
     public static function normalizeSections(mixed $sections): array
     {
         $out = array_fill_keys(self::SECTIONS, true);
-        if (! is_array($sections)) {
+
+        if (!is_array($sections)) {
             return $out;
         }
 
         $picked = [];
+
         foreach (self::SECTIONS as $key) {
             $picked[$key] = filter_var($sections[$key] ?? false, FILTER_VALIDATE_BOOL);
         }
@@ -141,9 +146,11 @@ class RenderReportPdfAction
         if ($from->isSameDay($from->startOfYear()) && $to->isSameDay($from->endOfYear())) {
             return 'year';
         }
+
         if ($from->isSameDay($from->startOfMonth()) && $to->isSameDay($from->endOfMonth())) {
             return 'month';
         }
+
         if ((int) $from->diffInDays($to) === 6) {
             return 'week';
         }

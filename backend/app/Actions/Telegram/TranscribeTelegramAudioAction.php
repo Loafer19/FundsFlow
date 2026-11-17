@@ -31,7 +31,7 @@ class TranscribeTelegramAudioAction
     /**
      * Transcribe audio bytes. Does not consume quota — caller consumes on non-empty text.
      *
-     * @return string|null Transcript text, empty string when STT returned no speech, null on hard failure.
+     * @return null|string Transcript text, empty string when STT returned no speech, null on hard failure.
      */
     public function execute(User $user, string $audioBytes, string $filename, string $mime): ?string
     {
@@ -111,7 +111,6 @@ class TranscribeTelegramAudioAction
     {
         $this->quota->consume($user);
     }
-
 
     public function quota(): TelegramAiQuota
     {

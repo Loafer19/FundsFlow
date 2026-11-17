@@ -82,7 +82,7 @@ class MonobankClient
     }
 
     /**
-     * @param array<string, mixed>|null $payload
+     * @param null|array<string, mixed> $payload
      */
     private function request(string $token, string $method, string $path, ?array $payload = null): Response
     {

@@ -44,7 +44,7 @@ final class ReportPrintToken
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return null|array<string, mixed>
      */
     public static function payload(PersonalAccessToken $token): ?array
     {
@@ -77,7 +77,7 @@ final class ReportPrintToken
             return true;
         }
 
-        if (! self::isReportToken($token) || $request === null) {
+        if (!self::isReportToken($token) || $request === null) {
             return false;
         }
 

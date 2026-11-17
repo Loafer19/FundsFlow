@@ -4,6 +4,7 @@ namespace App\Actions\Telegram;
 
 use App\Models\User;
 use App\Support\ImageConverter;
+use App\Support\PeriodRange;
 use App\Support\TelegramAiQuota;
 use App\Support\TransactionAttachmentRules;
 use Illuminate\Support\Facades\Http;
@@ -19,7 +20,7 @@ class AnalyzeReceiptAction
     /**
      * Analyze a receipt image via xAI Grok vision (OpenAI-compatible chat completions).
      *
-     * @return array{
+     * @return null|array{
      *     amount: ?float,
      *     at: ?string,
      *     note: ?string,
@@ -27,7 +28,7 @@ class AnalyzeReceiptAction
      *     category: ?string,
      *     needs_price: bool,
      *     confidence: ?float
-     * }|null Null when the call fails or is not configured (does not burn quota).
+     * } Null when the call fails or is not configured (does not burn quota).
      */
     public function execute(User $user, string $imageBytes, string $mime, ?string $captionHint = null): ?array
     {
@@ -145,8 +146,6 @@ PROMPT;
         }
     }
 
-
-
     public function hasQuota(User $user): bool
     {
         return $this->quota->hasQuota($user);
@@ -160,7 +159,6 @@ PROMPT;
         $this->quota->consume($user);
     }
 
-
     public function quota(): TelegramAiQuota
     {
         return $this->quota;
@@ -172,7 +170,7 @@ PROMPT;
     }
 
     /**
-     * @return array{
+     * @return null|array{
      *     amount: ?float,
      *     at: ?string,
      *     note: ?string,
@@ -180,8 +178,8 @@ PROMPT;
      *     category: ?string,
      *     needs_price: bool,
      *     confidence: ?float,
-     *     transaction_list: list<array{amount: float, at: ?string, note: ?string, suggested_tag_titles: list<string>}>|null
-     * }|null
+     *     transaction_list: null|list<array{amount: float, at: ?string, note: ?string, suggested_tag_titles: list<string>}>
+     * }
      */
     private function parseModelJson(string $content, string $fallbackDate): ?array
     {
@@ -210,10 +208,11 @@ PROMPT;
         }
 
         $at = $decoded['at'] ?? null;
-        $at = is_string($at) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $at) ? $at : null;
+        $at = PeriodRange::isStorableDate($at) ? $at : null;
 
         $note = $decoded['note'] ?? null;
         $note = is_string($note) ? trim($note) : null;
+
         if ($note === '') {
             $note = null;
         } elseif (mb_strlen($note) > 255) {
@@ -221,6 +220,7 @@ PROMPT;
         }
 
         $titles = $decoded['suggested_tag_titles'] ?? [];
+
         if (!is_array($titles)) {
             $titles = [];
         }
@@ -239,11 +239,13 @@ PROMPT;
 
         $category = $decoded['category'] ?? null;
         $category = is_string($category) ? trim($category) : null;
+
         if ($category === '') {
             $category = null;
         }
 
         $needsPrice = (bool) ($decoded['needs_price'] ?? false);
+
         if ($amount === null) {
             $needsPrice = true;
         }
@@ -253,6 +255,7 @@ PROMPT;
 
         // A screenshot of a whole transaction list: its rows go to the bulk import instead.
         $list = [];
+
         if (($decoded['is_transaction_list'] ?? false) === true && is_array($decoded['transactions'] ?? null)) {
             foreach (array_slice($decoded['transactions'], 0, 200) as $item) {
                 if (!is_array($item) || !is_numeric($item['amount'] ?? null) || (float) $item['amount'] == 0.0) {
@@ -261,7 +264,7 @@ PROMPT;
                 $itemNote = is_string($item['note'] ?? null) ? trim(mb_substr($item['note'], 0, 255)) : '';
                 $list[] = [
                     'amount' => round((float) $item['amount'], 2),
-                    'at' => is_string($item['at'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $item['at']) ? $item['at'] : null,
+                    'at' => PeriodRange::isStorableDate($item['at'] ?? null) ? $item['at'] : null,
                     'note' => $itemNote !== '' ? $itemNote : null,
                     'suggested_tag_titles' => array_slice(array_values(array_filter(
                         array_map(static fn ($t) => is_string($t) ? trim(mb_substr($t, 0, 60)) : '', is_array($item['suggested_tag_titles'] ?? null) ? $item['suggested_tag_titles'] : []),

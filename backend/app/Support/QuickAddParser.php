@@ -30,7 +30,7 @@ final class QuickAddParser
     }
 
     /**
-     * @return array{at: string, amount: float, note: ?string}|array{error: string}|null
+     * @return null|array{at: string, amount: float, note: ?string}|array{error: string}
      */
     public function parseQuickAdd(string $text, ?User $user = null): ?array
     {

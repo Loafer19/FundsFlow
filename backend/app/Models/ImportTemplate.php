@@ -9,11 +9,6 @@ class ImportTemplate extends Model
 {
     protected $fillable = ['user_id', 'name', 'header_signature', 'mapping', 'category_map'];
 
-    protected function casts(): array
-    {
-        return ['mapping' => 'array', 'category_map' => 'array'];
-    }
-
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -26,5 +21,10 @@ class ImportTemplate extends Model
         }, $headerRow);
 
         return hash('sha256', implode('|', $normalized));
+    }
+
+    protected function casts(): array
+    {
+        return ['mapping' => 'array', 'category_map' => 'array'];
     }
 }

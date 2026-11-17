@@ -54,9 +54,15 @@ class AccountController extends Controller
     {
         $user = $request->user();
 
-        // Browsers/ICU still expose Europe/Kiev; PHP DateTimeZone expects Europe/Kyiv.
-        if ($request->input('timezone') === 'Europe/Kiev') {
-            $request->merge(['timezone' => 'Europe/Kyiv']);
+        // ICU still sends BC names (Europe/Kiev, Asia/Calcutta, Asia/Saigon). Store the canonical id.
+        $timezone = $request->input('timezone');
+
+        if (is_string($timezone) && $timezone !== '') {
+            try {
+                $request->merge(['timezone' => (new \DateTimeZone($timezone))->getName()]);
+            } catch (\Exception) {
+                // validate() below rejects a name PHP does not know.
+            }
         }
 
         // PATCH semantics: callers (e.g. MCP) may send only the keys they change.
@@ -64,7 +70,7 @@ class AccountController extends Controller
             'moneyFormat' => 'sometimes|string|max:32',
             'dateFormat' => 'sometimes|string|max:64',
             'decimals' => 'sometimes|boolean',
-            'timezone' => 'sometimes|string|timezone:all',
+            'timezone' => 'sometimes|string|timezone:all_with_bc',
             // App theme (DaisyUI name); used by server-rendered report PDFs (Telegram send_report).
             'theme' => ['sometimes', 'string', 'regex:/^[a-z0-9-]{1,32}$/'],
             // Last app version whose "What's new" the user has seen (web footer dot + popup).

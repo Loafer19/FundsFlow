@@ -38,6 +38,7 @@ class SupportNotifier
     public function adminReplied(SupportTicket $ticket, string $body): bool
     {
         $chatId = $this->userChatId($ticket->user);
+
         if ($chatId === null) {
             return false;
         }

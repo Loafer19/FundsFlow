@@ -52,6 +52,7 @@ class CreateImportBatchAction
     public function seedCategoryMap(User $user, ImportBatch $batch): void
     {
         $counts = $this->categoryCounts($batch->draft ?? []);
+
         if ($counts === []) {
             $batch->category_map = [];
             $batch->save();
@@ -61,18 +62,21 @@ class CreateImportBatchAction
 
         $tagsByTitle = [];
         $owned = [];
+
         foreach ($this->listTags->execute($user) as $tag) {
             $tagsByTitle[mb_strtolower(trim((string) $tag->title))] ??= (int) $tag->id;
             $owned[(int) $tag->id] = true;
         }
 
         $saved = [];
+
         if ($batch->header_signature) {
             $template = $user->importTemplates()->where('header_signature', $batch->header_signature)->first();
             $saved = is_array($template?->category_map) ? $template->category_map : [];
         }
 
         $map = is_array($batch->category_map) ? $batch->category_map : [];
+
         foreach (array_keys($counts) as $name) {
             if ($this->categories->findDecision($map, $name) !== null) {
                 continue;
@@ -89,15 +93,17 @@ class CreateImportBatchAction
     }
 
     /**
-     * @param  array<string, mixed>  $decision
+     * @param array<string, mixed> $decision
      */
     public function applyCategoryDecision(User $user, ImportBatch $batch, string $name, array $decision): void
     {
         $owned = [];
+
         foreach ($this->listTags->execute($user) as $tag) {
             $owned[(int) $tag->id] = true;
         }
         $normalized = $this->categories->normalizeDecision($decision, $owned, $name);
+
         if ($normalized === null) {
             return;
         }
@@ -129,6 +135,7 @@ class CreateImportBatchAction
         $ops = is_array($draft['ops'] ?? null) ? $draft['ops'] : [];
         $titles = [];
         $tagsByTitle = [];
+
         foreach ($this->listTags->execute($user) as $tag) {
             $lower = mb_strtolower(trim((string) $tag->title));
             $titles[$lower] ??= trim((string) $tag->title);
@@ -136,8 +143,10 @@ class CreateImportBatchAction
         }
 
         $originalCategory = [];
+
         foreach ($draft['rows'] ?? [] as $row) {
             $line = (int) ($row['line'] ?? 0);
+
             if ($line > 0) {
                 $originalCategory[$line] = $this->rowCategory($row);
             }
@@ -154,6 +163,7 @@ class CreateImportBatchAction
         $ownIbans = [];
         $jarTitles = [];
         $connection = $user->monobankConnection?->load('accounts');
+
         if ($connection) {
             $ownIbans = $connection->accounts->pluck('iban')->filter()
                 ->map(fn ($iban) => strtoupper(preg_replace('/\s+/', '', (string) $iban) ?? ''))
@@ -166,6 +176,7 @@ class CreateImportBatchAction
         $categoryMap = is_array($batch->category_map) ? $batch->category_map : [];
 
         $manuals = [];
+
         foreach ($batch->rows as $saved) {
             if ($saved->manual) {
                 $manuals[(int) $saved->line] = [
@@ -179,6 +190,7 @@ class CreateImportBatchAction
         $batch->rows()->delete();
         $now = now();
         $insert = [];
+
         foreach ($rows as $i => $row) {
             $classified = $this->classifyRow(
                 $row,
@@ -199,11 +211,13 @@ class CreateImportBatchAction
                 $now,
             );
             $line = $classified['line'];
+
             if (isset($manuals[$line])) {
                 $manual = $manuals[$line];
                 $classified['manual'] = true;
                 $classified['tag_ids'] = json_encode(array_values($manual['tag_ids']));
                 $classified['new_tag_titles'] = json_encode([]);
+
                 if ($classified['status'] !== ImportRow::STATUS_ERROR) {
                     $classified['status'] = $manual['status'];
                     $classified['skip_reason'] = $manual['skip_reason'];
@@ -211,11 +225,13 @@ class CreateImportBatchAction
             }
             $insert[] = $classified;
         }
+
         foreach (array_chunk($insert, 250) as $chunk) {
             ImportRow::query()->insert($chunk);
         }
 
         $notes = array_values(array_filter($draft['notes'] ?? [], 'is_string'));
+
         foreach ($edited['applied'] ?? [] as $line) {
             $notes[] = $line;
         }
@@ -231,12 +247,15 @@ class CreateImportBatchAction
         $expense = 0.0;
         $dates = [];
         $counts = ['new' => 0, 'duplicate' => 0, 'transfer' => 0, 'skipped' => 0, 'needs_tag' => 0, 'error' => 0];
+
         foreach ($rows as $row) {
             $counts[$row->status] = ($counts[$row->status] ?? 0) + 1;
+
             if ($row->isImportable()) {
                 $amount = (float) $row->amount;
                 $amount > 0 ? $income += $amount : $expense += $amount;
             }
+
             if ($row->at) {
                 $dates[] = $row->at->toDateString();
             }
@@ -260,6 +279,7 @@ class CreateImportBatchAction
     public function summaryLine(User $user, ImportBatch $batch): string
     {
         $range = '';
+
         if ($batch->period_from && $batch->period_to) {
             $from = UserFormatter::formatDate($user, $batch->period_from->toDateString());
             $to = UserFormatter::formatDate($user, $batch->period_to->toDateString());
@@ -274,15 +294,17 @@ class CreateImportBatchAction
     }
 
     /**
-     * @param  array<string, mixed>  $draft
+     * @param array<string, mixed> $draft
      * @return array<string, int>
      */
     public function categoryCounts(array $draft): array
     {
         $counts = [];
+
         foreach ($draft['rows'] ?? [] as $row) {
             foreach ($row['tags'] ?? [] as $title) {
                 $name = trim((string) $title);
+
                 if ($name === '') {
                     continue;
                 }
@@ -316,6 +338,7 @@ class CreateImportBatchAction
         $at = is_string($row['at'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $row['at']) ? $row['at'] : null;
         $currency = $row['currency'] ?? $row['cur'] ?? null;
         $currency = $currency !== null ? strtoupper(trim((string) $currency)) : null;
+
         if ($currency === '') {
             $currency = null;
         }
@@ -329,14 +352,17 @@ class CreateImportBatchAction
         $merchantKey = MerchantNormalizer::normalize($note);
         $hay = $merchantKey ? mb_strtolower($merchantKey) : '';
         $mappedTitle = null;
+
         if ($hay !== '') {
             foreach ($merchantMaps as $needle => $title) {
                 if ($needle !== '' && str_contains($hay, (string) $needle)) {
                     $mappedTitle = $title;
+
                     break;
                 }
             }
         }
+
         if ($mappedTitle && isset($tagsByTitle[mb_strtolower((string) $mappedTitle)])) {
             $id = $tagsByTitle[mb_strtolower((string) $mappedTitle)];
             $tagIds[$id] = $id;
@@ -348,6 +374,7 @@ class CreateImportBatchAction
                 if ($key !== '' && str_contains($hay, (string) $key)) {
                     $id = (int) $rule->tag_id;
                     $tagIds[$id] = $id;
+
                     break;
                 }
             }
@@ -356,13 +383,16 @@ class CreateImportBatchAction
         if ($tagIds === [] && $category) {
             $decision = $this->categories->findDecision($categoryMap, $category);
             $action = is_array($decision) ? ($decision['action'] ?? null) : null;
+
             if ($action === BankCategoryResolver::ACTION_MAP && isset($decision['tag_id'])) {
                 $id = (int) $decision['tag_id'];
+
                 if ($id > 0) {
                     $tagIds[$id] = $id;
                 }
             } elseif ($action === BankCategoryResolver::ACTION_CREATE) {
                 $title = trim((string) ($decision['title'] ?? $category));
+
                 if ($title !== '') {
                     $newTitles[mb_strtolower($title)] = mb_substr($title, 0, 60);
                 }
@@ -380,7 +410,7 @@ class CreateImportBatchAction
         } elseif ($skipBefore && $at < $skipBefore) {
             $status = ImportRow::STATUS_SKIPPED;
             $skipReason = 'Before ' . $skipBefore;
-        } elseif ($currency && ! in_array($currency, ['UAH', '980', '₴', 'GRN', 'ГРН'], true) && ! $includeForeign) {
+        } elseif ($currency && !in_array($currency, ['UAH', '980', '₴', 'GRN', 'ГРН'], true) && !$includeForeign) {
             $status = ImportRow::STATUS_SKIPPED;
             $skipReason = 'Non-UAH (' . $currency . ')';
         } elseif ($skipNames !== [] && $note && $this->noteMentions($note, $skipNames)) {
@@ -395,6 +425,7 @@ class CreateImportBatchAction
         } elseif ($at && $amount !== null) {
             $key = ImportPlan::key($at, $amount, $note);
             $fuzzy = $at . '|' . number_format($amount, 2, '.', '') . '|' . ($merchantKey ?? '');
+
             if (isset($existing[$key]) || isset($existing[$fuzzy])) {
                 $hit = $existing[$key] ?? $existing[$fuzzy];
                 $status = ImportRow::STATUS_DUPLICATE;
@@ -429,6 +460,7 @@ class CreateImportBatchAction
     {
         foreach ($row['tags'] ?? [] as $title) {
             $name = trim((string) $title);
+
             if ($name !== '') {
                 return mb_substr($name, 0, 80);
             }
@@ -443,6 +475,7 @@ class CreateImportBatchAction
             return [];
         }
         $dates = array_values(array_filter(array_column($rows, 'at'), fn ($d) => is_string($d) && $d !== ''));
+
         if ($dates === []) {
             return [];
         }
@@ -462,6 +495,7 @@ class CreateImportBatchAction
     private function noteMentions(string $note, array $names): bool
     {
         $hay = mb_strtolower($note);
+
         foreach ($names as $name) {
             if ($name !== '' && str_contains($hay, $name)) {
                 return true;

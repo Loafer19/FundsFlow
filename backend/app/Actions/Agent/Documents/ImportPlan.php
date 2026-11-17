@@ -30,14 +30,15 @@ final class ImportPlan
     /**
      * @param array<string, mixed> $draft
      * @return array{payload: array<string, mixed>, preview: string, count: int, summary: string}
-     *     |array{ask: string, unknown: list<string>, head: string}
-     *     |array{error: string}
+     *                                                                                            |array{ask: string, unknown: list<string>, head: string}
+     *                                                                                            |array{error: string}
      */
     public function build(User $user, array $draft): array
     {
         $tagsByTitle = [];
         $titles = [];
         $labels = [];
+
         /** @var Tag $tag */
         foreach ($this->listTags->execute($user) as $tag) {
             $lower = mb_strtolower(trim((string) $tag->title));
@@ -50,6 +51,7 @@ final class ImportPlan
         $ops = is_array($draft['ops'] ?? null) ? $draft['ops'] : [];
         $edited = ImportInstructions::apply($user, $draft['rows'] ?? [], $ops, $titles, count($draft['files'] ?? []));
         $rows = $edited['rows'];
+
         if ($rows === []) {
             return ['error' => ($draft['rows'] ?? []) !== []
                 ? "Nothing left to import from {$source} after your instructions."
@@ -59,6 +61,7 @@ final class ImportPlan
         $existing = $this->existingKeys($user, $rows);
         $duplicates = 0;
         $fresh = [];
+
         foreach ($rows as $row) {
             if (isset($existing[self::key($row['at'], $row['amount'], $row['note'] ?? null)])) {
                 $duplicates++;
@@ -67,6 +70,7 @@ final class ImportPlan
             }
             $fresh[] = $row;
         }
+
         if ($fresh === []) {
             return ['error' => "Every transaction in {$source} is already saved (same date, amount and note), so there is nothing to import."];
         }
@@ -79,19 +83,24 @@ final class ImportPlan
         $dropped = [];
         $create = [];
         $items = [];
+
         foreach ($fresh as $row) {
             $ids = [];
             $new = [];
             $missing = false;
+
             foreach ($row['tags'] ?? [] as $title) {
                 $lower = mb_strtolower(trim((string) $title));
+
                 if ($lower === '') {
                     continue;
                 }
+
                 if (isset($tagsByTitle[$lower])) {
                     $ids[$tagsByTitle[$lower]] = $tagsByTitle[$lower];
                 } elseif (array_key_exists($lower, $map)) {
                     $target = mb_strtolower(trim((string) $map[$lower]));
+
                     if ($target === '') {
                         $dropped[$lower] = $title;
                     } elseif (isset($tagsByTitle[$target])) {
@@ -111,8 +120,10 @@ final class ImportPlan
                     $missing = true;
                 }
             }
+
             foreach ($row['add'] ?? [] as $title) {
                 $lower = mb_strtolower(trim((string) $title));
+
                 if (isset($tagsByTitle[$lower])) {
                     $ids[$tagsByTitle[$lower]] = $tagsByTitle[$lower];
                 } elseif ($lower !== '') {
@@ -120,6 +131,7 @@ final class ImportPlan
                 }
             }
             $unresolvedRows += $missing ? 1 : 0;
+
             foreach ($new as $lower => $title) {
                 $create[$lower] ??= mb_substr($title, 0, 60);
             }
@@ -153,21 +165,25 @@ final class ImportPlan
         }
 
         $suggested = 0;
+
         if (($ops['suggest_tags'] ?? true) !== false) {
             $suggested = $this->suggestFromHistory($user, $items);
         }
 
         $income = 0.0;
         $expense = 0.0;
+
         foreach ($items as $item) {
             $item['amount'] > 0 ? $income += $item['amount'] : $expense += $item['amount'];
         }
 
         $preview = [$head];
         $totals = [];
+
         if ($income > 0) {
             $totals[] = 'Income: ' . UserFormatter::formatMoney($user, $income);
         }
+
         if ($expense < 0) {
             $totals[] = 'Expenses: ' . UserFormatter::formatMoney($user, $expense);
         }
@@ -176,6 +192,7 @@ final class ImportPlan
 
         foreach (array_slice($items, 0, self::PREVIEW_ROWS) as $item) {
             $tags = array_values(array_filter(array_map(static fn (int $id) => $labels[$id] ?? null, $item['tag_ids'])));
+
             foreach ($item['new_tags'] as $title) {
                 $tags[] = '🆕 ' . $title;
             }
@@ -183,6 +200,7 @@ final class ImportPlan
             $preview[] = '• ' . UserFormatter::formatDate($user, $item['at']) . '  ' . UserFormatter::formatMoney($user, $item['amount'])
                 . ($item['note'] ? '  ' . mb_strimwidth($item['note'], 0, 48, '…') : '') . $tagText;
         }
+
         if ($count > self::PREVIEW_ROWS) {
             $preview[] = '…and ' . ($count - self::PREVIEW_ROWS) . ' more';
         }
@@ -190,11 +208,13 @@ final class ImportPlan
         if ($edited['applied'] !== []) {
             $preview[] = '';
             $preview[] = '📝 From your message:';
+
             foreach ($edited['applied'] as $line) {
                 $preview[] = '– ' . $line;
             }
         }
         $mapped = array_filter($map, static fn ($to) => $to !== '');
+
         if ($mapped !== []) {
             $preview[] = '– Tags mapped: ' . implode(', ', array_slice(array_map(
                 static fn (string $from, string $to) => "{$from} → {$to}",
@@ -204,13 +224,16 @@ final class ImportPlan
         }
 
         $info = [];
+
         if ($create !== []) {
             $info[] = '🆕 Will create tags: ' . implode(', ', array_slice(array_values($create), 0, 20)) . (count($create) > 20 ? '…' : '');
         }
+
         if ($suggested > 0) {
             $info[] = "~ Tags suggested for {$suggested} untagged row" . ($suggested === 1 ? '' : 's') . ' from your past transactions with the same note.';
         }
         $info = array_merge($info, $this->warnings($user, $draft, $rows, $duplicates, $dropped, $ops));
+
         if ($info !== []) {
             $preview[] = '';
             array_push($preview, ...$info);
@@ -254,16 +277,19 @@ final class ImportPlan
     private function suggestFromHistory(User $user, array &$items): int
     {
         $notes = [];
+
         foreach ($items as $item) {
             if ($item['tag_ids'] === [] && $item['new_tags'] === [] && is_string($item['note']) && trim($item['note']) !== '') {
                 $notes[self::normalizeNote($item['note'])] = true;
             }
         }
+
         if ($notes === []) {
             return 0;
         }
 
         $sets = [];
+
         foreach (array_chunk(array_keys($notes), 300) as $chunk) {
             $user->transactions()
                 ->whereNotNull('note')
@@ -275,6 +301,7 @@ final class ImportPlan
                 ->get(['id', 'note', 'at'])
                 ->each(static function ($tx) use (&$sets): void {
                     $ids = $tx->tags->pluck('id')->map(static fn ($id) => (int) $id)->sort()->values()->all();
+
                     if ($ids === []) {
                         return;
                     }
@@ -285,11 +312,13 @@ final class ImportPlan
         }
 
         $count = 0;
+
         foreach ($items as &$item) {
             if ($item['tag_ids'] !== [] || $item['new_tags'] !== [] || !is_string($item['note'])) {
                 continue;
             }
             $options = $sets[self::normalizeNote($item['note'])] ?? null;
+
             if ($options === null) {
                 continue;
             }
@@ -324,17 +353,21 @@ final class ImportPlan
         foreach ($draft['notes'] ?? [] as $note) {
             $warnings[] = (string) $note;
         }
+
         if ($draft['capped'] ?? false) {
             $warnings[] = '⚠️ Only the first ' . DocumentFile::maxRows() . ' rows are imported. Split the file to import the rest.';
         }
         $skipped = $draft['skipped'] ?? [];
+
         if ($skipped !== []) {
             $byReason = [];
+
             foreach ($skipped as $row) {
                 $where = $multi ? (($files[$row['f']]['name'] ?? 'file') . ' ') : '';
                 $byReason[$row['reason']][] = $where . $row['line'];
             }
             $parts = [];
+
             foreach ($byReason as $reason => $lineNumbers) {
                 $shown = array_slice($lineNumbers, 0, self::LIST_LINES);
                 $parts[] = $reason . ': line' . (count($lineNumbers) > 1 ? 's ' : ' ') . implode(', ', $shown)
@@ -343,19 +376,23 @@ final class ImportPlan
             $n = count($skipped);
             $warnings[] = "⚠️ {$n} row" . ($n === 1 ? '' : 's') . ' skipped (' . implode('; ', $parts) . ')';
         }
+
         if (($draft['overlap'] ?? 0) > 0) {
             $n = (int) $draft['overlap'];
             $warnings[] = "ℹ️ {$n} row" . ($n === 1 ? '' : 's') . ' appeared in more than one ' . (($draft['screenshots'] ?? false) ? 'screenshot' : 'file') . ' and ' . ($n === 1 ? 'is' : 'are') . ' imported once';
         }
+
         if ($duplicates > 0) {
             $warnings[] = "⚠️ {$duplicates} possible duplicate" . ($duplicates === 1 ? '' : 's')
                 . ' skipped: already saved with the same date, amount and note';
         }
+
         if ($dropped !== []) {
             $names = array_values($dropped);
             $warnings[] = '⚠️ Saved without these tags (they don\'t exist): '
                 . implode(', ', array_slice($names, 0, self::LIST_LINES)) . (count($names) > self::LIST_LINES ? '…' : '');
         }
+
         if (!isset($ops['date_order'])) {
             foreach ($files as $file) {
                 if (($file['ambiguous'] ?? false) && ($file['samples'] ?? []) !== []) {
@@ -369,11 +406,13 @@ final class ImportPlan
         }
 
         $currencies = array_values(array_unique(array_filter(array_map(static fn (array $row) => $row['cur'] ?? null, $rows))));
+
         if (count($currencies) > 1) {
             $warnings[] = '⚠️ Several currencies (' . implode(', ', array_slice($currencies, 0, 5)) . '): amounts are saved as they are, without conversion. Write e.g. “only USD” to keep one.';
         }
 
         $amounts = array_column($rows, 'amount');
+
         if (count($amounts) >= 3 && min($amounts) > 0) {
             $warnings[] = '⚠️ Every amount is positive, so all rows are saved as income. If they are expenses, cancel and send the file again with “flip the signs”.';
         }

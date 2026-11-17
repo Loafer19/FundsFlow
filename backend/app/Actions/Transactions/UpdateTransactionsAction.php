@@ -15,7 +15,7 @@ class UpdateTransactionsAction
     ) {}
 
     /**
-     * @param  list<array<string, mixed>>  $items
+     * @param list<array<string, mixed>> $items
      * @return Collection<int, Transaction>
      */
     public function execute(User $user, array $items): Collection

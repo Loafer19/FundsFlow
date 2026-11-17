@@ -23,6 +23,7 @@ final class TelegramHtml
     public static function split(string $markdown, int $limit = self::LIMIT): array
     {
         $chunks = [];
+
         foreach (self::blocks($markdown) as $block) {
             foreach (self::fit($block, $limit) as $html) {
                 $chunks[] = $html;
@@ -32,18 +33,22 @@ final class TelegramHtml
         // Pack blocks into messages at paragraph boundaries.
         $parts = [];
         $current = '';
+
         foreach ($chunks as $html) {
             $candidate = $current === '' ? $html : $current . "\n\n" . $html;
+
             if (mb_strlen($candidate) <= $limit) {
                 $current = $candidate;
 
                 continue;
             }
+
             if ($current !== '') {
                 $parts[] = $current;
             }
             $current = $html;
         }
+
         if ($current !== '') {
             $parts[] = $current;
         }
@@ -91,6 +96,7 @@ final class TelegramHtml
 
         $flush = static function () use (&$buffer, &$blocks, &$inCode): void {
             $text = implode("\n", $buffer);
+
             if (trim($text) !== '') {
                 $blocks[] = ['code' => $inCode, 'text' => $inCode ? $text : trim($text)];
             }
@@ -104,6 +110,7 @@ final class TelegramHtml
 
                 continue;
             }
+
             if (!$inCode && trim($line) === '') {
                 $flush();
 
@@ -138,6 +145,7 @@ final class TelegramHtml
     private static function fit(array $block, int $limit): array
     {
         $html = self::convertBlock($block);
+
         if (mb_strlen($html) <= $limit) {
             return [$html];
         }
@@ -146,14 +154,17 @@ final class TelegramHtml
         $room = $limit - mb_strlen($wrap[0] . $wrap[1]);
         $pieces = [];
         $current = '';
+
         foreach (explode("\n", $block['text']) as $line) {
             $lineHtml = $block['code'] ? self::escape($line) : self::convertLine($line);
+
             if (mb_strlen($lineHtml) > $room) {
                 // A single huge line: no formatting, cut between characters (never inside an entity).
                 if ($current !== '') {
                     $pieces[] = $current;
                     $current = '';
                 }
+
                 foreach (self::cutPlain($line, $room) as $cut) {
                     $pieces[] = $cut;
                 }
@@ -161,12 +172,14 @@ final class TelegramHtml
                 continue;
             }
             $candidate = $current === '' ? $lineHtml : $current . "\n" . $lineHtml;
+
             if (mb_strlen($candidate) > $room) {
                 $pieces[] = $current;
                 $candidate = $lineHtml;
             }
             $current = $candidate;
         }
+
         if ($current !== '') {
             $pieces[] = $current;
         }
@@ -181,14 +194,17 @@ final class TelegramHtml
     {
         $out = [];
         $current = '';
+
         foreach (mb_str_split($text) as $char) {
             $escaped = self::escape($char);
+
             if (mb_strlen($current) + mb_strlen($escaped) > $room) {
                 $out[] = $current;
                 $current = '';
             }
             $current .= $escaped;
         }
+
         if ($current !== '') {
             $out[] = $current;
         }
@@ -199,8 +215,9 @@ final class TelegramHtml
     private static function convertLine(string $line): string
     {
         if (preg_match('/^\s{0,3}#{1,6}\s+(.+)$/u', $line, $m)) {
-            return '<b>' . self::inline(rtrim($m[1], " #")) . '</b>';
+            return '<b>' . self::inline(rtrim($m[1], ' #')) . '</b>';
         }
+
         if (preg_match('/^(\s*)[-*+]\s+(.+)$/u', $line, $m)) {
             return $m[1] . '• ' . self::inline($m[2]);
         }

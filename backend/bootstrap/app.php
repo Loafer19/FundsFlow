@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AlwaysJson;
+use App\Providers\AppServiceProvider;
 use App\Providers\Filament\AdminPanelProvider;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -12,7 +13,7 @@ use Laravel\Socialite\SocialiteServiceProvider;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withProviders([
-        App\Providers\AppServiceProvider::class,
+        AppServiceProvider::class,
         SanctumServiceProvider::class,
         SocialiteServiceProvider::class,
         AdminPanelProvider::class,

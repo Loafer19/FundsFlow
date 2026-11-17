@@ -10,7 +10,7 @@ class SyncMonobankAccountsAction
     public function __construct(private readonly UnlinkMonobankJarGoalAction $unlink) {}
 
     /**
-     * @param  array<string, mixed>  $clientInfo
+     * @param array<string, mixed> $clientInfo
      * @return list<MonobankAccount>
      */
     public function execute(MonobankConnection $connection, array $clientInfo): array

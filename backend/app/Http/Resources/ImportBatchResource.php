@@ -19,9 +19,11 @@ class ImportBatchResource extends JsonResource
         $perPage = min(100, max(10, (int) $request->query('per_page', 50)));
 
         $query = $this->rows()->orderBy('line');
+
         if (is_string($status) && $status !== '' && $status !== 'all') {
             $query->where('status', $status);
         }
+
         if ($search !== '') {
             $query->where(function ($inner) use ($search) {
                 $inner->where('note', 'like', '%' . $search . '%')
@@ -36,11 +38,13 @@ class ImportBatchResource extends JsonResource
             : Tag::query()->whereIn('id', $tagIds)->get()->keyBy('id');
 
         $byTag = [];
+
         foreach ($this->rows as $row) {
             if (!$row->isImportable()) {
                 continue;
             }
             $ids = $row->tag_ids ?: [null];
+
             foreach ($ids as $id) {
                 $key = $id === null ? 0 : (int) $id;
                 $byTag[$key]['id'] = $id;
@@ -50,6 +54,7 @@ class ImportBatchResource extends JsonResource
         }
         $named = Tag::query()->whereIn('id', array_values(array_filter(array_keys($byTag))))->get()->keyBy('id');
         $byTagOut = [];
+
         foreach ($byTag as $item) {
             $tag = isset($item['id']) ? $named->get((int) $item['id']) : null;
             $byTagOut[] = [
@@ -63,6 +68,7 @@ class ImportBatchResource extends JsonResource
         usort($byTagOut, fn ($a, $b) => $b['count'] <=> $a['count']);
 
         $categoryCounts = [];
+
         foreach ($this->rows as $row) {
             if (is_string($row->category) && $row->category !== '') {
                 $categoryCounts[$row->category] = ($categoryCounts[$row->category] ?? 0) + 1;
@@ -70,6 +76,7 @@ class ImportBatchResource extends JsonResource
         }
         $map = is_array($this->category_map) ? $this->category_map : [];
         $mapTagIds = [];
+
         foreach ($map as $decision) {
             if (is_array($decision) && ($decision['action'] ?? '') === 'map' && isset($decision['tag_id'])) {
                 $mapTagIds[] = (int) $decision['tag_id'];
@@ -80,6 +87,7 @@ class ImportBatchResource extends JsonResource
             : Tag::query()->whereIn('id', array_unique($mapTagIds))->get()->keyBy('id');
         $categories = [];
         $seen = [];
+
         foreach ($map as $name => $decision) {
             if (!is_string($name) || !is_array($decision)) {
                 continue;
@@ -96,6 +104,7 @@ class ImportBatchResource extends JsonResource
                 'tag' => $tag ? ['id' => $tag->id, 'title' => $tag->title, 'emoji' => $tag->emoji] : null,
             ];
         }
+
         foreach ($categoryCounts as $name => $count) {
             if (isset($seen[mb_strtolower($name)])) {
                 continue;
@@ -158,6 +167,7 @@ class ImportBatchResource extends JsonResource
                 'type_source' => $row->type_source,
                 'tags' => collect($row->tag_ids ?? [])->map(function ($id) use ($tags) {
                     $tag = $tags->get((int) $id);
+
                     return $tag ? ['id' => $tag->id, 'title' => $tag->title, 'emoji' => $tag->emoji] : null;
                 })->filter()->values()->all(),
                 'new_tag_titles' => $row->new_tag_titles ?? [],

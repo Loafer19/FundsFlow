@@ -90,7 +90,7 @@ class ImportAgentTools
     }
 
     /**
-     * @param  array<string, mixed>  $args
+     * @param array<string, mixed> $args
      * @return array<string, mixed>
      */
     public function execute(User $user, string $name, array $args, string $channel = 'web'): array
@@ -108,12 +108,13 @@ class ImportAgentTools
     }
 
     /**
-     * @param  array<string, mixed>  $args
+     * @param array<string, mixed> $args
      * @return array<string, mixed>
      */
     private function summarize(User $user, array $args): array
     {
         $batch = $this->find($user, $args);
+
         if (!$batch) {
             return ['error' => 'No import preview found. Ask the user to send or upload a statement first.'];
         }
@@ -138,12 +139,13 @@ class ImportAgentTools
     }
 
     /**
-     * @param  array<string, mixed>  $args
+     * @param array<string, mixed> $args
      * @return array<string, mixed>
      */
     private function listCategories(User $user, array $args): array
     {
         $batch = $this->find($user, $args);
+
         if (!$batch) {
             return ['error' => 'No import preview found.'];
         }
@@ -163,6 +165,7 @@ class ImportAgentTools
         $counts = $this->batches->categoryCounts($batch->draft ?? []);
         $tags = $user->tags()->get(['id', 'title', 'emoji'])->keyBy('id');
         $out = [];
+
         foreach ($batch->category_map ?? [] as $name => $decision) {
             if (!is_string($name) || !is_array($decision)) {
                 continue;
@@ -183,17 +186,19 @@ class ImportAgentTools
     }
 
     /**
-     * @param  array<string, mixed>  $args
+     * @param array<string, mixed> $args
      * @return array<string, mixed>
      */
     private function setCategory(User $user, array $args): array
     {
         $batch = $this->find($user, $args);
+
         if (!$batch) {
             return ['error' => 'No import preview found.'];
         }
         $name = trim((string) ($args['category'] ?? ''));
         $action = $args['action'] ?? $args['category_action'] ?? null;
+
         if ($name === '' || !in_array($action, ['map', 'create', 'ignore'], true)) {
             return ['error' => 'Provide a category name and an action of map, create, or ignore.'];
         }
@@ -203,8 +208,10 @@ class ImportAgentTools
             'tag_id' => $args['tag_id'] ?? null,
             'title' => $args['title'] ?? $args['tag_title'] ?? null,
         ];
+
         if ($action === 'map' && empty($payload['tag_id']) && is_string($args['tag_title'] ?? null)) {
             $tag = $user->tags()->get()->first(fn ($item) => mb_strtolower(trim((string) $item->title)) === mb_strtolower(trim((string) $args['tag_title'])));
+
             if (!$tag) {
                 return ['error' => 'No tag named ' . $args['tag_title'] . '.'];
             }
@@ -216,12 +223,13 @@ class ImportAgentTools
     }
 
     /**
-     * @param  array<string, mixed>  $args
+     * @param array<string, mixed> $args
      * @return array<string, mixed>
      */
     private function applyRules(User $user, array $args): array
     {
         $batch = $this->find($user, $args);
+
         if (!$batch) {
             return ['error' => 'No import preview found.'];
         }
@@ -231,33 +239,39 @@ class ImportAgentTools
     }
 
     /**
-     * @param  array<string, mixed>  $args
+     * @param array<string, mixed> $args
      * @return array<string, mixed>
      */
     private function updateRow(User $user, array $args): array
     {
         $batch = $this->find($user, $args);
+
         if (!$batch) {
             return ['error' => 'No import preview found.'];
         }
         $line = (int) ($args['line'] ?? 0);
         $row = $batch->rows()->where('line', $line)->first();
+
         if (!$row instanceof ImportRow) {
             return ['error' => 'No preview row at line ' . $line . '.'];
         }
         $data = [];
+
         if (isset($args['status'])) {
             $data['status'] = $args['status'];
         }
+
         if (isset($args['tag_ids']) && is_array($args['tag_ids'])) {
             $data['tag_ids'] = $args['tag_ids'];
         } elseif (is_string($args['tag_title'] ?? null) && trim((string) $args['tag_title']) !== '') {
             $tag = $user->tags()->get()->first(fn ($item) => mb_strtolower(trim((string) $item->title)) === mb_strtolower(trim((string) $args['tag_title'])));
+
             if (!$tag) {
                 return ['error' => 'No tag named ' . $args['tag_title'] . '.'];
             }
             $data['tag_ids'] = [(int) $tag->id];
         }
+
         if ($data === []) {
             return ['error' => 'Provide tag_ids, tag_title, or status.'];
         }
@@ -267,7 +281,7 @@ class ImportAgentTools
     }
 
     /**
-     * @param  array<string, mixed>  $args
+     * @param array<string, mixed> $args
      * @return array<string, mixed>
      */
     private function commitBatch(User $user, array $args, string $channel): array
@@ -281,9 +295,11 @@ class ImportAgentTools
             ];
         }
         $batch = $this->find($user, $args);
+
         if (!$batch) {
             return ['error' => 'No import preview found.'];
         }
+
         if ($batch->total_rows >= 200) {
             $batch->update(['status' => ImportBatch::STATUS_COMMITTING, 'progress' => 1]);
             CommitImportBatchJob::dispatch($batch->id)->afterResponse();
@@ -297,12 +313,13 @@ class ImportAgentTools
     }
 
     /**
-     * @param  array<string, mixed>  $args
+     * @param array<string, mixed> $args
      * @return array<string, mixed>
      */
     private function undoBatch(User $user, array $args): array
     {
         $batch = $this->find($user, $args);
+
         if (!$batch) {
             return ['error' => 'No import found.'];
         }
@@ -312,11 +329,12 @@ class ImportAgentTools
     }
 
     /**
-     * @param  array<string, mixed>  $args
+     * @param array<string, mixed> $args
      */
     private function find(User $user, array $args): ?ImportBatch
     {
         $uuid = is_string($args['import_id'] ?? null) ? $args['import_id'] : null;
+
         if ($uuid) {
             return $user->importBatches()->where('uuid', $uuid)->first();
         }

@@ -36,12 +36,12 @@ final class WebAgentSession implements AgentSession
      *
      * @return array{
      *     conversation_id: string,
-     *     domain: 'tags'|'budgets'|'transactions'|null,
+     *     domain: null|'budgets'|'tags'|'transactions',
      *     last_list: list<array{id: int, title: string, emoji?: string}>,
-     *     pending: array<string, mixed>|null,
+     *     pending: null|array<string, mixed>,
      *     last_bot_summary: string,
      *     transcript: list<array<string, mixed>>,
-     *     expires_at: string|null
+     *     expires_at: null|string
      * }
      */
     public function state(): array
@@ -66,6 +66,7 @@ final class WebAgentSession implements AgentSession
     public function conversationId(): string
     {
         $state = $this->state();
+
         if (Cache::has($this->key())) {
             return $state['conversation_id'];
         }
@@ -114,6 +115,7 @@ final class WebAgentSession implements AgentSession
             }
             $s['transcript'][] = $item;
             $max = max(1, (int) config('agent.web_transcript_max'));
+
             if (count($s['transcript']) > $max) {
                 $s['transcript'] = array_slice($s['transcript'], -$max);
             }
@@ -122,43 +124,6 @@ final class WebAgentSession implements AgentSession
         });
 
         $this->mirror($item, is_string($turnId) ? $turnId : null);
-    }
-
-    /**
-     * The item as text in the shared memory, tagged with its turn (the user item's id) so an
-     * edit / regenerate drops it there too.
-     *
-     * @param array<string, mixed> $item
-     */
-    private function mirror(array $item, ?string $turnId): void
-    {
-        $photos = (int) ($item['photos'] ?? 0);
-        $kind = (string) ($item['kind'] ?? 'text');
-        $text = trim(match ($kind) {
-            'text' => (string) ($item['text'] ?? '') . ($photos > 0 ? " [sent {$photos} receipt photo(s)]" : ''),
-            'notice' => (string) ($item['text'] ?? ''),
-            'ask' => (string) ($item['question'] ?? ''),
-            'confirm' => (string) ($item['preview'] ?? ''),
-            'chart' => 'Chart shown: ' . (string) ($item['caption'] ?? ''),
-            'show' => 'Card shown: ' . (string) ($item['title'] ?? ''),
-            default => '',
-        });
-        if ($text === '') {
-            return;
-        }
-
-        $meta = ['turn_id' => $turnId];
-        if ($kind === 'ask') {
-            $meta['kind'] = 'ask';
-        } elseif ($kind === 'confirm') {
-            $meta += [
-                'kind' => 'proposal',
-                'ref' => is_string($item['pending_id'] ?? null) ? $item['pending_id'] : null,
-                'status' => (string) ($item['status'] ?? 'pending'),
-            ];
-        }
-
-        app(AgentHistory::class)->add($this->user, AgentHistory::WEB, (string) ($item['role'] ?? 'assistant'), $text, $meta);
     }
 
     /**
@@ -174,6 +139,7 @@ final class WebAgentSession implements AgentSession
             foreach ($s['transcript'] as $i => $item) {
                 if ($match($item)) {
                     $s['transcript'][$i] = array_replace($item, $patch);
+
                     if (($item['kind'] ?? null) === 'confirm' && is_string($item['pending_id'] ?? null)) {
                         $resolved[] = $item['pending_id'];
                     }
@@ -186,6 +152,7 @@ final class WebAgentSession implements AgentSession
         // Confirm card resolved (confirmed / cancelled / failed / outdated): same status in the shared memory.
         if ($resolved !== [] && is_string($patch['status'] ?? null)) {
             $history = app(AgentHistory::class);
+
             foreach ($resolved as $ref) {
                 $history->setStatus($this->user, $ref, $patch['status'], AgentHistory::WEB);
             }
@@ -206,7 +173,7 @@ final class WebAgentSession implements AgentSession
      * `outdated` instead of dropping one more turn. The pending slot is cleared only when it belongs
      * to the dropped turn (its question or Confirm card), and returned so its photos can be deleted.
      *
-     * @return array{ok: true, text: string, ask_context: array{prior_question: string}|null, dropped_pending: array<string, mixed>|null}|array{ok: false, reason: 'outdated'|'not_allowed', message: string}
+     * @return array{ok: false, reason: 'not_allowed'|'outdated', message: string}|array{ok: true, text: string, ask_context: null|array{prior_question: string}, dropped_pending: null|array<string, mixed>}
      */
     public function rewindLastTurn(string $turnId, string $mode): array
     {
@@ -224,6 +191,7 @@ final class WebAgentSession implements AgentSession
 
         $turn = array_slice($items, $index);
         $blocker = self::turnBlocker($turn, $mode);
+
         if ($blocker !== null) {
             return ['ok' => false, 'reason' => 'not_allowed', 'message' => $blocker];
         }
@@ -233,6 +201,7 @@ final class WebAgentSession implements AgentSession
         $user = $items[$index];
 
         $state['transcript'] = array_slice($items, 0, $index);
+
         if ($dropPending) {
             $state['pending'] = null;
         }
@@ -271,6 +240,7 @@ final class WebAgentSession implements AgentSession
     public static function turnBlocker(array $turn, string $mode): ?string
     {
         $user = $turn[0] ?? [];
+
         if (($user['reply_to'] ?? null) === 'receipt') {
             return "That message answered a receipt question, so it can't be replaced. Send a new message instead.";
         }
@@ -279,6 +249,7 @@ final class WebAgentSession implements AgentSession
             $kind = $item['kind'] ?? null;
             $applied = ($kind === 'confirm' && ($item['status'] ?? null) === 'confirmed')
                 || ($kind === 'notice' && (($item['applied'] ?? false) === true || ($item['tone'] ?? null) === 'success'));
+
             if ($applied) {
                 return "A change from that turn was already saved, so it can't be replaced. Send a new message instead.";
             }
@@ -288,17 +259,63 @@ final class WebAgentSession implements AgentSession
             if ((int) ($user['photos'] ?? 0) > 0) {
                 return "Receipt photo messages can't be regenerated. Send the photos again instead.";
             }
+
             foreach ($turn as $item) {
                 if (($item['kind'] ?? null) === 'confirm') {
                     return "That answer proposed a change, so it can't be regenerated. Ask again instead.";
                 }
             }
+
             if (trim((string) ($user['text'] ?? '')) === '') {
                 return 'There is no message to regenerate.';
             }
         }
 
         return null;
+    }
+
+    public function clear(): void
+    {
+        Cache::forget($this->key());
+    }
+
+    /**
+     * The item as text in the shared memory, tagged with its turn (the user item's id) so an
+     * edit / regenerate drops it there too.
+     *
+     * @param array<string, mixed> $item
+     */
+    private function mirror(array $item, ?string $turnId): void
+    {
+        $photos = (int) ($item['photos'] ?? 0);
+        $kind = (string) ($item['kind'] ?? 'text');
+        $text = trim(match ($kind) {
+            'text' => (string) ($item['text'] ?? '') . ($photos > 0 ? " [sent {$photos} receipt photo(s)]" : ''),
+            'notice' => (string) ($item['text'] ?? ''),
+            'ask' => (string) ($item['question'] ?? ''),
+            'confirm' => (string) ($item['preview'] ?? ''),
+            'chart' => 'Chart shown: ' . (string) ($item['caption'] ?? ''),
+            'show' => 'Card shown: ' . (string) ($item['title'] ?? ''),
+            default => '',
+        });
+
+        if ($text === '') {
+            return;
+        }
+
+        $meta = ['turn_id' => $turnId];
+
+        if ($kind === 'ask') {
+            $meta['kind'] = 'ask';
+        } elseif ($kind === 'confirm') {
+            $meta += [
+                'kind' => 'proposal',
+                'ref' => is_string($item['pending_id'] ?? null) ? $item['pending_id'] : null,
+                'status' => (string) ($item['status'] ?? 'pending'),
+            ];
+        }
+
+        app(AgentHistory::class)->add($this->user, AgentHistory::WEB, (string) ($item['role'] ?? 'assistant'), $text, $meta);
     }
 
     /**
@@ -310,9 +327,11 @@ final class WebAgentSession implements AgentSession
         foreach ($turn as $item) {
             $kind = $item['kind'] ?? null;
             $status = $item['status'] ?? null;
+
             if ($kind === 'ask' && $status === 'pending') {
                 return true;
             }
+
             if (
                 $kind === 'confirm' && $status === 'pending'
                 && is_string($pending['nonce'] ?? null) && ($item['pending_id'] ?? null) === $pending['nonce']
@@ -322,11 +341,6 @@ final class WebAgentSession implements AgentSession
         }
 
         return false;
-    }
-
-    public function clear(): void
-    {
-        Cache::forget($this->key());
     }
 
     /**
@@ -359,16 +373,19 @@ final class WebAgentSession implements AgentSession
     {
         $domain = $data['domain'] ?? null;
         $lastList = [];
+
         foreach (is_array($data['last_list'] ?? null) ? $data['last_list'] : [] as $item) {
             if (!is_array($item) || !isset($item['id'], $item['title'])) {
                 continue;
             }
             $id = filter_var($item['id'], FILTER_VALIDATE_INT);
             $title = trim((string) $item['title']);
+
             if ($id === false || $id < 1 || $title === '') {
                 continue;
             }
             $row = ['id' => (int) $id, 'title' => mb_substr($title, 0, 255)];
+
             if (isset($item['emoji']) && is_string($item['emoji']) && trim($item['emoji']) !== '') {
                 $row['emoji'] = mb_substr(trim($item['emoji']), 0, 255);
             }

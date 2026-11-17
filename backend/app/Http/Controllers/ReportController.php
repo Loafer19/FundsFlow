@@ -40,14 +40,16 @@ class ReportController extends Controller
         $user = $request->user();
         $toTelegram = ($data['delivery'] ?? 'download') === 'telegram';
 
-        if ($toTelegram && ! $user->identities()->where('provider', 'telegram')->exists()) {
+        if ($toTelegram && !$user->identities()->where('provider', 'telegram')->exists()) {
             return response()->json(['message' => 'Link Telegram in Settings first.', 'needs_link' => true], 422);
         }
 
         $args = ['from' => $data['from'], 'to' => $data['to'], 'tag_ids' => $data['tag_ids'] ?? [], 'untagged' => (bool) ($data['untagged'] ?? false)];
+
         // Keep the preset label ("This month (…)") only while it still means the same dates.
         if (isset($data['period'])) {
             $preset = PeriodRange::resolve($user, ['period' => $data['period']]);
+
             if ($preset->from->toDateString() === $data['from'] && $preset->fullTo->toDateString() === $data['to']) {
                 $args = ['period' => $data['period']] + array_diff_key($args, ['from' => 1, 'to' => 1]);
             }
@@ -89,7 +91,7 @@ class ReportController extends Controller
         $user = $request->user();
         $token = $user->currentAccessToken();
 
-        if (! ReportPrintToken::isReportToken($token)) {
+        if (!ReportPrintToken::isReportToken($token)) {
             abort(403, 'Report print token required.');
         }
 

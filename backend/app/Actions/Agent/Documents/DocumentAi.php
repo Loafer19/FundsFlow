@@ -4,6 +4,7 @@ namespace App\Actions\Agent\Documents;
 
 use App\Models\User;
 use App\Support\ImageConverter;
+use App\Support\PeriodRange;
 use DateTimeInterface;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -39,7 +40,7 @@ class DocumentAi
 
     /**
      * @param list<list<mixed>> $rows header candidate + sample rows (already capped)
-     * @return array<string, mixed>|null
+     * @return null|array<string, mixed>
      */
     public function mapColumns(array $rows, array $moreDates = []): ?array
     {
@@ -52,7 +53,7 @@ class DocumentAi
             array_keys($rows),
         ));
 
-        $system = <<<PROMPT
+        $system = <<<'PROMPT'
 You map the columns of a spreadsheet of money transactions for a personal finance app.
 Reply with ONLY a JSON object (no markdown):
 {"header_row": int|null, "date": int|null, "amount": int|null, "debit": int|null, "credit": int|null,
@@ -73,7 +74,7 @@ PROMPT;
     }
 
     /**
-     * @return array{kind: 'receipt'|'statement'|'none', transactions: list<array{amount: float, at: ?string, note: ?string, suggested_tag_titles: list<string>}>, needs_price: bool}|null
+     * @return null|array{kind: 'none'|'receipt'|'statement', transactions: list<array{amount: float, at: ?string, note: ?string, suggested_tag_titles: list<string>}>, needs_price: bool}
      */
     public function extractTransactions(User $user, string $text, string $fileName, ?string $hint = null): ?array
     {
@@ -104,17 +105,19 @@ PROMPT;
             . "\n<document>\n" . $this->fence($text) . "\n</document>";
 
         $json = $this->call($system . "\n" . self::UNTRUSTED, $prompt, 16000, (int) config('agent.documents.ai_timeout', 120));
+
         if (!is_array($json)) {
             return null;
         }
 
         $kind = in_array($json['kind'] ?? null, ['receipt', 'statement', 'none'], true) ? $json['kind'] : 'none';
         $items = [];
+
         foreach (array_slice(is_array($json['transactions'] ?? null) ? $json['transactions'] : [], 0, $rows) as $item) {
             if (!is_array($item) || !is_numeric($item['amount'] ?? null) || (float) $item['amount'] == 0.0) {
                 continue;
             }
-            $at = is_string($item['at'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $item['at']) ? $item['at'] : null;
+            $at = PeriodRange::isStorableDate($item['at'] ?? null) ? $item['at'] : null;
             $note = is_string($item['note'] ?? null) ? trim(mb_substr($item['note'], 0, 255)) : null;
             $titles = array_values(array_filter(
                 array_map(static fn ($t) => is_string($t) ? trim(mb_substr($t, 0, 60)) : '', is_array($item['suggested_tag_titles'] ?? null) ? $item['suggested_tag_titles'] : []),
@@ -144,7 +147,7 @@ PROMPT;
      *     tags: list<string>, unknown: list<string>, files: list<array{name: string, rows: int, lines: string}>,
      *     notes: list<string>, date_samples: list<string>, reply: bool
      * } $context
-     * @return array<string, mixed>|null
+     * @return null|array<string, mixed>
      */
     public function instructions(User $user, string $text, array $context): ?array
     {
@@ -200,7 +203,7 @@ PROMPT;
      * is reported separately so overlapping scrolls can be merged by code.
      *
      * @param list<array{bytes: string, mime: string}> $images
-     * @return list<list<array{amount: float, at: ?string, note: ?string, suggested_tag_titles: list<string>}>>|null per image
+     * @return null|list<list<array{amount: float, at: ?string, note: ?string, suggested_tag_titles: list<string>}>> per image
      */
     public function readScreenshots(User $user, array $images, ?string $caption): ?array
     {
@@ -223,9 +226,11 @@ There are {$count} image(s), in the order given. Reply with ONLY a JSON object (
 PROMPT;
 
         $content = [['type' => 'text', 'text' => 'Screenshots follow.' . ($caption !== null && trim($caption) !== '' ? ' User caption: ' . mb_substr(trim($caption), 0, 300) : '')]];
+
         foreach ($images as $image) {
             // WebP / HEIC screenshots are converted to JPEG for the model.
             $image = ImageConverter::forVision($image['bytes'], $image['mime']);
+
             if ($image === null) {
                 continue;
             }
@@ -239,13 +244,16 @@ PROMPT;
             (int) config('agent.documents.ai_timeout', 120),
             (string) config('services.xai.vision_model', 'grok-4'),
         );
+
         if (!is_array($json) || !is_array($json['images'] ?? null)) {
             return null;
         }
 
         $out = [];
+
         foreach (array_slice(array_values($json['images']), 0, $count) as $image) {
             $rows = [];
+
             foreach (is_array($image['transactions'] ?? null) ? $image['transactions'] : [] as $item) {
                 if (!is_array($item) || !is_numeric($item['amount'] ?? null) || (float) $item['amount'] == 0.0) {
                     continue;
@@ -253,7 +261,7 @@ PROMPT;
                 $note = is_string($item['note'] ?? null) ? trim(mb_substr($item['note'], 0, 255)) : null;
                 $rows[] = [
                     'amount' => round((float) $item['amount'], 2),
-                    'at' => is_string($item['at'] ?? null) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $item['at']) ? $item['at'] : null,
+                    'at' => PeriodRange::isStorableDate($item['at'] ?? null) ? $item['at'] : null,
                     'note' => $note !== '' ? $note : null,
                     'suggested_tag_titles' => array_slice(array_values(array_filter(
                         array_map(static fn ($t) => is_string($t) ? trim(mb_substr($t, 0, 60)) : '', is_array($item['suggested_tag_titles'] ?? null) ? $item['suggested_tag_titles'] : []),
@@ -265,14 +273,6 @@ PROMPT;
         }
 
         return array_pad($out, $count, []);
-    }
-
-    /**
-     * A closing tag inside the file must not end the fence early.
-     */
-    private function fence(string $text): string
-    {
-        return str_ireplace(['<document>', '</document>'], ['<document_>', '</document_>'], $text);
     }
 
     /**
@@ -301,18 +301,27 @@ PROMPT;
     }
 
     /**
+     * A closing tag inside the file must not end the fence early.
+     */
+    private function fence(string $text): string
+    {
+        return str_ireplace(['<document>', '</document>'], ['<document_>', '</document_>'], $text);
+    }
+
+    /**
      * One chat/completions call that must return a JSON object. Transient failures are retried
      * once (429 / 5xx / timeout, an empty or cut answer, non-JSON), within the same overall time
      * budget, so a web request never runs much longer than $timeout. Failures are logged with the
      * HTTP status, finish_reason and token usage (never the key or the document).
      *
-     * @param string|list<array<string, mixed>> $user text, or vision content parts
-     * @return array<string, mixed>|null
+     * @param list<array<string, mixed>>|string $user text, or vision content parts
+     * @return null|array<string, mixed>
      */
     private function call(string $system, string|array $user, int $maxTokens, int $timeout, ?string $model = null): ?array
     {
         $this->lastFailure = null;
         $apiKey = (string) config('services.xai.api_key');
+
         if ($apiKey === '') {
             Log::warning('DocumentAi: XAI_API_KEY is empty');
             $this->lastFailure = 'not_configured';
@@ -326,6 +335,7 @@ PROMPT;
 
         for ($attempt = 1; $attempt <= self::ATTEMPTS; $attempt++) {
             $left = (int) floor($deadline - microtime(true));
+
             if ($attempt > 1 && $left < self::MIN_RETRY_SECONDS) {
                 Log::warning('DocumentAi: no time left to retry', ['failure' => $this->lastFailure, 'seconds_left' => $left]);
 
@@ -358,6 +368,7 @@ PROMPT;
                         'model' => $model,
                         'body' => mb_substr($response->body(), 0, 300),
                     ]);
+
                     if ($this->lastFailure === 'rejected') {
                         return null;
                     }
@@ -373,6 +384,7 @@ PROMPT;
                 $usage = data_get($body, 'usage');
                 $content = data_get($body, 'choices.0.message.content');
                 $decoded = is_string($content) ? $this->decodeJson($content) : null;
+
                 if ($decoded !== null) {
                     return $decoded;
                 }
@@ -387,6 +399,7 @@ PROMPT;
                     'content_type' => get_debug_type($content),
                     'content_head' => is_string($content) ? mb_substr($content, 0, 200) : null,
                 ]);
+
                 if ($finish === 'length') {
                     // Reasoning + answer ran out of room: give the retry twice the budget.
                     $maxTokens = min(self::MAX_TOKENS_CAP, $maxTokens * 2);
@@ -411,6 +424,7 @@ PROMPT;
             return;
         }
         $wait = max(0, min(self::MAX_RETRY_WAIT, $seconds, (int) floor($deadline - microtime(true)) - self::MIN_RETRY_SECONDS));
+
         if ($wait > 0) {
             sleep($wait);
         }
@@ -419,16 +433,18 @@ PROMPT;
     /**
      * The JSON object in a model answer (bare, fenced in ```json, or with text around it).
      *
-     * @return array<string, mixed>|null
+     * @return null|array<string, mixed>
      */
     private function decodeJson(string $content): ?array
     {
         $content = trim($content);
+
         if (preg_match('/```(?:json)?\s*(.*?)```/s', $content, $m)) {
             $content = trim($m[1]);
         }
         $start = strpos($content, '{');
         $end = strrpos($content, '}');
+
         if ($start === false || $end === false || $end < $start) {
             return null;
         }

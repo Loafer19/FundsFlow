@@ -542,6 +542,32 @@ class TelegramWidgetData
     }
 
     /**
+     * Field values of a typed transaction for the /recent detail (y:<id> answer):
+     * [[label, value], …], computed totals included, trimmed to fit a widget answer.
+     *
+     * @return list<array{0: string, 1: string}>
+     */
+    public function typeRows(User $user, Transaction $transaction): array
+    {
+        $type = $transaction->transactionType;
+
+        if (!$type instanceof TransactionType) {
+            return [];
+        }
+
+        $rows = array_map(
+            fn (array $row): array => [$this->clip($row[0], 24), $this->clip($row[1], 40)],
+            TransactionFields::rows($type, is_array($transaction->data) ? $transaction->data : [], $user),
+        );
+
+        while ($rows !== [] && strlen($this->json(['ok' => 1, 'r' => $rows])) > 900) {
+            array_pop($rows);
+        }
+
+        return $rows;
+    }
+
+    /**
      * @return array{0: Carbon, 1: Carbon}
      */
     private function monthRange(User $user): array
@@ -752,32 +778,6 @@ class TelegramWidgetData
         }
 
         return $payload;
-    }
-
-    /**
-     * Field values of a typed transaction for the /recent detail (y:<id> answer):
-     * [[label, value], …], computed totals included, trimmed to fit a widget answer.
-     *
-     * @return list<array{0: string, 1: string}>
-     */
-    public function typeRows(User $user, Transaction $transaction): array
-    {
-        $type = $transaction->transactionType;
-
-        if (!$type instanceof TransactionType) {
-            return [];
-        }
-
-        $rows = array_map(
-            fn (array $row): array => [$this->clip($row[0], 24), $this->clip($row[1], 40)],
-            TransactionFields::rows($type, is_array($transaction->data) ? $transaction->data : [], $user),
-        );
-
-        while ($rows !== [] && strlen($this->json(['ok' => 1, 'r' => $rows])) > 900) {
-            array_pop($rows);
-        }
-
-        return $rows;
     }
 
     /**

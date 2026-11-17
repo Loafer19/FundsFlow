@@ -39,10 +39,16 @@ class NotifyBudgetThresholdsAction
         /** @var array<int|string, list<array<int, mixed>>> $itemsByChat widget rows, same order as the text */
         $itemsByChat = [];
 
+        /** @var array<int|string, list<string>> $alertKeys claimed dedupe keys, dropped if the send fails */
+        $alertKeys = [];
+
+        /** @var array<int|string, list<string>> $goalKeys */
+        $goalKeys = [];
+
         foreach ($budgets as $budget) {
             // Goals are not spending caps: no 80%/100% alerts, one note when reached.
             if ($budget->type === BudgetType::Goal) {
-                $this->collectReachedGoal($budget, $goalsByChat, $goalItemsByChat);
+                $this->collectReachedGoal($budget, $goalsByChat, $goalItemsByChat, $goalKeys);
 
                 continue;
             }
@@ -70,7 +76,11 @@ class NotifyBudgetThresholdsAction
                 continue;
             }
 
-            Cache::put(self::cacheKey($budget, $status['start'], $threshold), true, now()->addDays(400));
+            $cacheKey = self::cacheKey($budget, $status['start'], $threshold);
+
+            if (!Cache::add($cacheKey, true, now()->addDays(400))) {
+                continue;
+            }
 
             $identity = $user->identities->firstWhere('provider', 'telegram');
 
@@ -78,6 +88,7 @@ class NotifyBudgetThresholdsAction
                 continue;
             }
 
+            $alertKeys[$identity->external_id][] = $cacheKey;
             $itemsByChat[$identity->external_id][] = [
                 $budget->label($period),
                 (int) $status['percent'],
@@ -100,26 +111,27 @@ class NotifyBudgetThresholdsAction
         }
 
         foreach ($messagesByChat as $chatId => $lines) {
-            // A widget with bars in the private chat; the same text as before if it can't be sent.
-            $sent = $this->widgets->sendReport($chatId, [
-                'h' => '💰 Budget alert',
-                'g' => [['', $itemsByChat[$chatId] ?? []]],
-            ], self::budgetsKeyboard());
-
-            if (!$sent) {
-                $this->client->sendMessage($chatId, "💰 Budget alert\n" . implode("\n", $lines), self::budgetsKeyboard());
-            }
+            $this->deliver(
+                $chatId,
+                "💰 Budget alert\n" . implode("\n", $lines),
+                [
+                    'h' => '💰 Budget alert',
+                    'g' => [['', $itemsByChat[$chatId] ?? []]],
+                ],
+                $alertKeys[$chatId] ?? [],
+            );
         }
 
         foreach ($goalsByChat as $chatId => $lines) {
-            $sent = $this->widgets->sendReport($chatId, [
-                'h' => '🎯 Savings goal reached',
-                'g' => [['', $goalItemsByChat[$chatId] ?? []]],
-            ], self::budgetsKeyboard());
-
-            if (!$sent) {
-                $this->client->sendMessage($chatId, "🎯 Savings goal reached\n" . implode("\n", $lines), self::budgetsKeyboard());
-            }
+            $this->deliver(
+                $chatId,
+                "🎯 Savings goal reached\n" . implode("\n", $lines),
+                [
+                    'h' => '🎯 Savings goal reached',
+                    'g' => [['', $goalItemsByChat[$chatId] ?? []]],
+                ],
+                $goalKeys[$chatId] ?? [],
+            );
         }
     }
 
@@ -151,12 +163,36 @@ class NotifyBudgetThresholdsAction
     }
 
     /**
+     * Widget first, the same text if the widget cannot be sent. A failed send drops the
+     * dedupe keys so the next run can try again.
+     *
+     * @param array<string, mixed> $widget
+     * @param list<string> $keys
+     */
+    private function deliver(int|string $chatId, string $text, array $widget, array $keys): void
+    {
+        $sent = $this->widgets->sendReport($chatId, $widget, self::budgetsKeyboard());
+
+        if (!$sent) {
+            $result = $this->client->sendMessageResult($chatId, $text, self::budgetsKeyboard());
+            $sent = ($result['ok'] ?? false) === true;
+        }
+
+        if (!$sent) {
+            foreach ($keys as $key) {
+                Cache::forget($key);
+            }
+        }
+    }
+
+    /**
      * Once per goal and target amount (raising the target can notify again).
      *
      * @param array<int|string, list<string>> $goalsByChat
      * @param array<int|string, list<array<int, mixed>>> $goalItemsByChat widget rows, same order as the text
+     * @param array<int|string, list<string>> $goalKeys
      */
-    private function collectReachedGoal(Budget $budget, array &$goalsByChat, array &$goalItemsByChat): void
+    private function collectReachedGoal(Budget $budget, array &$goalsByChat, array &$goalItemsByChat, array &$goalKeys): void
     {
         $user = $budget->user;
         $period = $budget->currentPeriod;
@@ -173,11 +209,9 @@ class NotifyBudgetThresholdsAction
 
         $cacheKey = 'goal_reached:' . $budget->id . ':' . number_format((float) $period->amount, 2, '.', '');
 
-        if (Cache::has($cacheKey)) {
+        if (Cache::has($cacheKey) || !Cache::add($cacheKey, true, now()->addDays(400))) {
             return;
         }
-
-        Cache::put($cacheKey, true, now()->addDays(400));
 
         $identity = $user->identities->firstWhere('provider', 'telegram');
 
@@ -187,6 +221,7 @@ class NotifyBudgetThresholdsAction
 
         $label = $budget->label($period);
 
+        $goalKeys[$identity->external_id][] = $cacheKey;
         $goalItemsByChat[$identity->external_id][] = [
             $label,
             (int) $progress['percent'],

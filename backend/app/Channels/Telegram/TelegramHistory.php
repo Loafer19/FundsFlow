@@ -60,6 +60,7 @@ final class TelegramHistory
     public static function transactionLine(User $user, Transaction $transaction): string
     {
         $line = UserFormatter::formatMoney($user, $transaction->amount);
+
         if ($transaction->note) {
             $line .= ' ' . $transaction->note;
         }
@@ -77,9 +78,11 @@ final class TelegramHistory
             return;
         }
         $line = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
+
         if ($line === '') {
             return;
         }
+
         if (mb_strlen($line) > self::MAX_LINE) {
             $line = mb_substr($line, 0, self::MAX_LINE) . '…';
         }

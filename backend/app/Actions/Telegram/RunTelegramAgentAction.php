@@ -26,10 +26,10 @@ class RunTelegramAgentAction
     ) {}
 
     /**
-     * @param array{prior_question?: string}|null $askContext When continuing after ask_user.
-     * @param int|null $replyTo The user's message id; the answer replies to it.
-     * @param string|null $quoted Text of the bot message the user replied to (context for the AI).
-     * @return array{ok: bool, status: 'answered'|'ui_sent'|'ask_user'|'confirm_staged'|'unavailable'|'error', summary?: string}
+     * @param null|array{prior_question?: string} $askContext When continuing after ask_user.
+     * @param null|int $replyTo The user's message id; the answer replies to it.
+     * @param null|string $quoted Text of the bot message the user replied to (context for the AI).
+     * @return array{ok: bool, status: 'answered'|'ask_user'|'confirm_staged'|'error'|'ui_sent'|'unavailable', summary?: string}
      */
     public function execute(
         User $user,
@@ -43,11 +43,13 @@ class RunTelegramAgentAction
         // Memory shared with the web assistant: private chats only (a group chat is not the user's own conversation).
         $shared = self::isPrivate($chatId, $identity);
         $prior = $shared ? $this->history->messages($user, AgentHistory::TELEGRAM, dropTrailingAsk: $askContext !== null) : [];
+
         if ($shared) {
             $this->history->add($user, AgentHistory::TELEGRAM, 'user', $text);
         }
 
         $quoted = $quoted !== null ? trim(preg_replace('/\s+/u', ' ', $quoted) ?? '') : '';
+
         if ($quoted !== '') {
             $cut = mb_strlen($quoted) > 500 ? mb_substr($quoted, 0, 500) . '…' : $quoted;
             $text = "(Replying to your earlier message: \"{$cut}\")\n" . $text;
@@ -69,8 +71,13 @@ class RunTelegramAgentAction
         return (string) $chatId === (string) $identity;
     }
 
+    public function quota(): TelegramAiQuota
+    {
+        return $this->quota;
+    }
+
     /**
-     * @param list<array{role: 'user'|'assistant', content: string}> $prior
+     * @param list<array{role: 'assistant'|'user', content: string}> $prior
      */
     private function channel(
         int|string $chatId,
@@ -91,10 +98,5 @@ class RunTelegramAgentAction
             $prior,
             $replyTo,
         );
-    }
-
-    public function quota(): TelegramAiQuota
-    {
-        return $this->quota;
     }
 }

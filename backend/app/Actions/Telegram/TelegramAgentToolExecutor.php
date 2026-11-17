@@ -3,12 +3,12 @@
 namespace App\Actions\Telegram;
 
 use App\Actions\Agent\AgentPlanningTools;
-use App\Actions\Imports\ImportAgentTools;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Agent\AgentTypeFields;
 use App\Actions\Agent\Documents\ImportTransactionsAction;
 use App\Actions\Charts\BuildUserChartAction;
 use App\Actions\Charts\ScreenshotHtmlViaGotenbergAction;
+use App\Actions\Imports\ImportAgentTools;
 use App\Actions\Report\RenderReportPdfAction;
 use App\Actions\Tags\MatchTagTitlesAction;
 use App\Channels\Telegram\Handlers\MenuHandler;
@@ -131,19 +131,6 @@ class TelegramAgentToolExecutor
     }
 
     /**
-     * Shared planning tools (budget status/edits, recurring, comparison): reads or staging ones.
-     *
-     * @return list<array<string, mixed>>
-     */
-    private function planningDefinitions(bool $read): array
-    {
-        return array_values(array_filter(
-            $this->tools->planning->definitions(),
-            fn (array $def): bool => AgentPlanningTools::isRead($def['function']['name']) === $read,
-        ));
-    }
-
-    /**
      * send_chart parameters (shared with the web agent).
      *
      * @return array<string, mixed>
@@ -182,6 +169,7 @@ class TelegramAgentToolExecutor
             if (AgentPlanningTools::isRead($name)) {
                 return AgentToolExecutor::ok($this->tools->planning->read($user, $session, $name, $arguments));
             }
+
             if (AgentPlanningTools::isStaging($name)) {
                 if ($name === 'create_support_ticket') {
                     $arguments['source'] = 'telegram';
@@ -226,22 +214,8 @@ class TelegramAgentToolExecutor
                 'message' => $e->getMessage(),
             ]);
 
-            return AgentToolExecutor::fail('Tool failed: ' . $e->getMessage());
+            return AgentToolExecutor::fail(AgentToolExecutor::safeToolError($e));
         }
-    }
-
-    /**
-     * @param  array<string, mixed>  $arguments
-     * @return array<string, mixed>
-     */
-    private function runImportTool(User $user, string $name, array $arguments): array
-    {
-        $result = app(ImportAgentTools::class)->execute($user, $name, $arguments, 'telegram');
-        if (isset($result['error'])) {
-            return AgentToolExecutor::fail((string) $result['error']);
-        }
-
-        return AgentToolExecutor::ok($result);
     }
 
     /**
@@ -278,6 +252,34 @@ class TelegramAgentToolExecutor
         }
 
         return true;
+    }
+
+    /**
+     * Shared planning tools (budget status/edits, recurring, comparison): reads or staging ones.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function planningDefinitions(bool $read): array
+    {
+        return array_values(array_filter(
+            $this->tools->planning->definitions(),
+            fn (array $def): bool => AgentPlanningTools::isRead($def['function']['name']) === $read,
+        ));
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     * @return array<string, mixed>
+     */
+    private function runImportTool(User $user, string $name, array $arguments): array
+    {
+        $result = app(ImportAgentTools::class)->execute($user, $name, $arguments, 'telegram');
+
+        if (isset($result['error'])) {
+            return AgentToolExecutor::fail((string) $result['error']);
+        }
+
+        return AgentToolExecutor::ok($result);
     }
 
     /**
@@ -603,6 +605,7 @@ class TelegramAgentToolExecutor
     private function applyUpdateTransaction(User $user, int|string $chatId, int|string $identity, array $payload, ?int $messageId = null): void
     {
         $tx = $this->tools->applyUpdateTransaction($user, $payload);
+
         if (!$tx) {
             $this->client->sendMessage($chatId, 'That transaction no longer exists.');
 
@@ -642,6 +645,7 @@ class TelegramAgentToolExecutor
     private function applyCreateBudget(User $user, int|string $chatId, int|string $identity, array $payload): void
     {
         $budget = $this->tools->applyCreateBudget($user, $payload);
+
         if (!$budget) {
             $this->client->sendMessage($chatId, 'Those tags are no longer valid; budget was not created.');
 

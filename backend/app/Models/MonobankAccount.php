@@ -21,18 +21,6 @@ class MonobankAccount extends Model
         'last_item_time',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'currency_code' => 'integer',
-            'balance' => 'decimal:2',
-            'goal_amount' => 'decimal:2',
-            'enabled' => 'boolean',
-            'tag_id' => 'integer',
-            'last_item_time' => 'integer',
-        ];
-    }
-
     /**
      * @return BelongsTo<MonobankConnection, $this>
      */
@@ -110,5 +98,17 @@ class MonobankAccount extends Model
         }
 
         return $type;
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'currency_code' => 'integer',
+            'balance' => 'decimal:2',
+            'goal_amount' => 'decimal:2',
+            'enabled' => 'boolean',
+            'tag_id' => 'integer',
+            'last_item_time' => 'integer',
+        ];
     }
 }

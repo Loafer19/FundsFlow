@@ -33,8 +33,8 @@ class NaturalLanguageHandler
      * Try AI agent handling. Returns true when the message was consumed
      * (including unavailable / quota exhausted responses).
      *
-     * @param int|null $replyTo The user's message id (the answer replies to it).
-     * @param string|null $quoted The bot message the user replied to, if any.
+     * @param null|int $replyTo The user's message id (the answer replies to it).
+     * @param null|string $quoted The bot message the user replied to, if any.
      */
     public function tryHandle(
         User $user,
@@ -158,6 +158,7 @@ class NaturalLanguageHandler
         }
 
         $suggestions = is_array($pending['suggestions'] ?? null) ? $pending['suggestions'] : [];
+
         if (!isset($suggestions[$choiceIndex]) || !is_string($suggestions[$choiceIndex])) {
             $this->client->answerCallbackQuery($callbackId, 'Invalid choice.');
 
@@ -167,14 +168,6 @@ class NaturalLanguageHandler
         $answer = $suggestions[$choiceIndex];
         $this->client->answerCallbackQuery($callbackId, $answer);
         $this->handlePendingAskAnswer($user, $chatId, $answer, $telegramUserId);
-    }
-
-    private function maybeHintLowRemaining(User $user, int|string $chatId): void
-    {
-        $hint = $this->quota->lowRemainingHint($user);
-        if ($hint !== null) {
-            $this->client->sendMessage($chatId, $hint);
-        }
     }
 
     public function confirmCreateTags(
@@ -302,20 +295,6 @@ class NaturalLanguageHandler
         $this->markProposal($user, $chatId, $identity, $nonce, $applied ? 'confirmed' : 'failed');
     }
 
-    /**
-     * Update the proposal's status in the memory shared with the web assistant (private chats only).
-     */
-    private function markProposal(?User $user, int|string $chatId, int|string $identity, string $nonce, string $status): void
-    {
-        if (!RunTelegramAgentAction::isPrivate($chatId, $identity)) {
-            return;
-        }
-        $user ??= $this->support->resolveUser($chatId);
-        if ($user !== null) {
-            $this->history->setStatus($user, $nonce, $status, AgentHistory::TELEGRAM);
-        }
-    }
-
     public function cancelAgentMutation(
         int|string $chatId,
         string $nonce,
@@ -355,12 +334,36 @@ class NaturalLanguageHandler
         $this->markProposal($user, $chatId, $identity, $nonce, 'cancelled');
     }
 
+    private function maybeHintLowRemaining(User $user, int|string $chatId): void
+    {
+        $hint = $this->quota->lowRemainingHint($user);
+
+        if ($hint !== null) {
+            $this->client->sendMessage($chatId, $hint);
+        }
+    }
+
+    /**
+     * Update the proposal's status in the memory shared with the web assistant (private chats only).
+     */
+    private function markProposal(?User $user, int|string $chatId, int|string $identity, string $nonce, string $status): void
+    {
+        if (!RunTelegramAgentAction::isPrivate($chatId, $identity)) {
+            return;
+        }
+        $user ??= $this->support->resolveUser($chatId);
+
+        if ($user !== null) {
+            $this->history->setStatus($user, $nonce, $status, AgentHistory::TELEGRAM);
+        }
+    }
+
     /**
      * The pending change behind a confirm/cancel button, removed from the
      * session. Null when the button belongs to an older preview, the type
      * doesn't match, or the button was already used.
      *
-     * @return array<string, mixed>|null
+     * @return null|array<string, mixed>
      */
     private function takePending(int|string $identity, int|string $chatId, string $type, string $nonce): ?array
     {

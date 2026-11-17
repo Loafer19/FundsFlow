@@ -18,6 +18,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Sanctum\Sanctum;
@@ -30,12 +31,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(TagTreeCache::class);
     }
 
-
     public function boot(): void
     {
         // TLS terminates at the proxy; generate https asset/route URLs when APP_URL is https.
         if (str_starts_with((string) config('app.url'), 'https://')) {
-            \Illuminate\Support\Facades\URL::forceScheme('https');
+            URL::forceScheme('https');
         }
 
         JsonResource::withoutWrapping();

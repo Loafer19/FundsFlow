@@ -24,22 +24,6 @@ final class TelegramAgentChannel implements AgentChannel
     /** What still works in the bot without AI (quota exhausted). */
     public const WITHOUT_AI = 'Until then, tap ➕ Add (or send /add) to log transactions without AI; the menu buttons still work.';
 
-    public function __construct(
-        private readonly TelegramAiQuota $quota,
-        private readonly TelegramClient $client,
-        private readonly TelegramChatSession $session,
-        private readonly TelegramAgentToolExecutor $tools,
-        private readonly int|string $chatId,
-        private readonly int|string $identity,
-        private readonly ?AgentHistory $history = null,
-        private readonly ?int $userId = null,
-        /** @var list<array{role: 'user'|'assistant', content: string}> */
-        private readonly array $priorTurns = [],
-        private readonly ?int $replyTo = null,
-    ) {
-        $this->draftId = random_int(1, 2_000_000_000);
-    }
-
     private float $lastTyping = 0.0;
 
     private int $draftId;
@@ -50,6 +34,22 @@ final class TelegramAgentChannel implements AgentChannel
 
     private bool $draftsFailed = false;
 
+    public function __construct(
+        private readonly TelegramAiQuota $quota,
+        private readonly TelegramClient $client,
+        private readonly TelegramChatSession $session,
+        private readonly TelegramAgentToolExecutor $tools,
+        private readonly int|string $chatId,
+        private readonly int|string $identity,
+        private readonly ?AgentHistory $history = null,
+        private readonly ?int $userId = null,
+        /** @var list<array{role: 'assistant'|'user', content: string}> */
+        private readonly array $priorTurns = [],
+        private readonly ?int $replyTo = null,
+    ) {
+        $this->draftId = random_int(1, 2_000_000_000);
+    }
+
     /**
      * "typing…" in the chat header. Telegram shows it for ~5 s, so it is refreshed
      * at most every 4 s: at the start and before each tool call.
@@ -57,6 +57,7 @@ final class TelegramAgentChannel implements AgentChannel
     public function typing(bool $force = false): void
     {
         $now = microtime(true);
+
         if (!$force && $now - $this->lastTyping < 4.0) {
             return;
         }
@@ -173,6 +174,7 @@ PROMPT;
         $this->draft .= $text;
 
         $now = microtime(true);
+
         if ($now - $this->lastDraft < 1.0) {
             return;
         }
@@ -218,7 +220,7 @@ PROMPT;
     }
 
     /**
-     * @param array{kind?: string, ref?: string|null} $meta
+     * @param array{kind?: string, ref?: null|string} $meta
      */
     private function remember(string $text, array $meta = []): void
     {
@@ -242,10 +244,12 @@ PROMPT;
         switch ($executed['control']) {
             case 'ask_user':
                 $this->remember((string) ($result['question'] ?? ''), ['kind' => 'ask']);
+
                 break;
 
             case 'confirm_staged':
                 $pending = $this->session->get($this->identity, $this->chatId)['pending'] ?? null;
+
                 if (($result['staged'] ?? false) !== true || !is_array($pending) || !is_string($pending['nonce'] ?? null)) {
                     break;
                 }
@@ -258,14 +262,17 @@ PROMPT;
                     default => (string) ($pending['preview'] ?? ''),
                 };
                 $this->history->addProposal($this->userId, AgentHistory::TELEGRAM, $preview, $pending['nonce']);
+
                 break;
 
             case 'ui_sent':
                 $ui = (string) ($result['ui'] ?? 'card');
                 $summary = is_string($result['summary'] ?? null) ? ': ' . $result['summary'] : '';
+
                 if (($result['sent'] ?? true) !== false) {
                     $this->remember("Shown in Telegram: {$ui}{$summary}");
                 }
+
                 break;
         }
     }

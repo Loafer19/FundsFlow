@@ -19,7 +19,7 @@ final class DocumentText
     private const RASTER_SIDE = 1600;
 
     /**
-     * @return array{text: string}|array{scanned: true}|array{error: string}
+     * @return array{error: string}|array{scanned: true}|array{text: string}
      */
     public function pdf(string $bytes): array
     {
@@ -33,6 +33,7 @@ final class DocumentText
         }
 
         $text = $this->clean($out);
+
         if (preg_match_all('/[\p{L}\p{N}]/u', $text) < self::MIN_TEXT_CHARS) {
             return ['scanned' => true];
         }
@@ -46,6 +47,7 @@ final class DocumentText
     public function pdfFirstPageJpeg(string $bytes): ?string
     {
         $dir = sys_get_temp_dir() . '/ffdoc-' . bin2hex(random_bytes(6));
+
         if (!@mkdir($dir, 0700)) {
             return null;
         }
@@ -58,6 +60,7 @@ final class DocumentText
                 'pdftoppm', '-q', '-jpeg', '-jpegopt', 'quality=85', '-r', '150',
                 '-scale-to', (string) self::RASTER_SIDE, '-f', '1', '-l', '1', '-singlefile', $in, $outBase,
             ]);
+
             if (!$result->successful() || !is_file($outBase . '.jpg')) {
                 return null;
             }
@@ -83,6 +86,7 @@ final class DocumentText
     {
         $limit = (int) config('agent.documents.max_unzipped_bytes', 60 * 1024 * 1024);
         $xml = DocumentFile::zipEntry($bytes, 'word/document.xml', $limit);
+
         if ($xml === null) {
             return null;
         }
@@ -125,6 +129,7 @@ final class DocumentText
     private function runOnTempFile(string $bytes, string $suffix, callable $command): ?string
     {
         $path = tempnam(sys_get_temp_dir(), 'ffdoc');
+
         if ($path === false) {
             return null;
         }
@@ -133,6 +138,7 @@ final class DocumentText
         try {
             file_put_contents($in, $bytes);
             $result = Process::timeout($this->timeout())->run($command($in));
+
             if (!$result->successful()) {
                 Log::info('DocumentText: tool exit', ['code' => $result->exitCode(), 'error' => mb_substr($result->errorOutput(), 0, 300)]);
 

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Support\ImageConverter;
 use App\Support\TransactionAttachmentRules;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -16,19 +17,36 @@ use Illuminate\Validation\ValidationException;
 class StoreTransactionAttachmentAction
 {
     /**
-     * @param  array{name: string, mime?: string, contents: string}|UploadedFile  $file
+     * @param array{name: string, mime?: string, contents: string}|UploadedFile $file
      */
     public function execute(User $user, Transaction $transaction, UploadedFile|array $file): TransactionAttachment
     {
         Gate::forUser($user)->authorize('update', $transaction);
 
-        if ($transaction->attachments()->count() >= TransactionAttachmentRules::MAX_PER_TRANSACTION) {
-            throw ValidationException::withMessages([
-                'file' => 'A transaction can have at most '
-                    . TransactionAttachmentRules::MAX_PER_TRANSACTION
-                    . ' attachments!',
-            ]);
-        }
+        return DB::transaction(function () use ($user, $transaction, $file) {
+            $locked = Transaction::query()->whereKey($transaction->id)->lockForUpdate()->first();
+
+            if (!$locked) {
+                abort(404);
+            }
+
+            if ($locked->attachments()->count() >= TransactionAttachmentRules::MAX_PER_TRANSACTION) {
+                throw ValidationException::withMessages([
+                    'file' => 'A transaction can have at most '
+                        . TransactionAttachmentRules::MAX_PER_TRANSACTION
+                        . ' attachments!',
+                ]);
+            }
+
+            return $this->store($user, $locked, $file);
+        });
+    }
+
+    /**
+     * @param array{name: string, mime?: string, contents: string}|UploadedFile $file
+     */
+    private function store(User $user, Transaction $transaction, UploadedFile|array $file): TransactionAttachment
+    {
 
         if ($file instanceof UploadedFile) {
             $claimedMime = (string) ($file->getMimeType() ?: $file->getClientMimeType());
@@ -41,7 +59,6 @@ class StoreTransactionAttachmentAction
             $contents = $file['contents'];
             $size = strlen($contents);
         }
-
 
         if (!is_string($contents) || $contents === '') {
             throw ValidationException::withMessages([
@@ -90,15 +107,25 @@ class StoreTransactionAttachmentAction
             $extension,
         );
 
-        Storage::disk($disk)->put($path, $contents);
+        if (Storage::disk($disk)->put($path, $contents) === false) {
+            throw ValidationException::withMessages([
+                'file' => 'Could not store the attachment!',
+            ]);
+        }
 
-        return $transaction->attachments()->create([
-            'user_id' => $user->id,
-            'disk' => $disk,
-            'path' => $path,
-            'original_name' => TransactionAttachmentRules::sanitizeOriginalName($name),
-            'mime' => $mime,
-            'size' => $size,
-        ]);
+        try {
+            return $transaction->attachments()->create([
+                'user_id' => $user->id,
+                'disk' => $disk,
+                'path' => $path,
+                'original_name' => TransactionAttachmentRules::sanitizeOriginalName($name),
+                'mime' => $mime,
+                'size' => $size,
+            ]);
+        } catch (\Throwable $e) {
+            Storage::disk($disk)->delete($path);
+
+            throw $e;
+        }
     }
 }

@@ -3,8 +3,8 @@
 namespace App\Actions\Agent\Web;
 
 use App\Actions\Agent\AgentPlanningTools;
-use App\Actions\Agent\Documents\ImportTransactionsAction;
 use App\Actions\Agent\AgentToolExecutor;
+use App\Actions\Agent\Documents\ImportTransactionsAction;
 use App\Actions\Transactions\StoreTransactionAttachmentAction;
 use App\Enums\TransactionSource;
 use App\Models\Transaction;
@@ -33,7 +33,7 @@ final class ConfirmWebAgentPendingAction
     ) {}
 
     /**
-     * @return array{ok: bool, status: 'applied'|'cancelled'|'outdated'|'failed', message: string, item: array<string, mixed>|null, refresh: bool}
+     * @return array{ok: bool, status: 'applied'|'cancelled'|'failed'|'outdated', message: string, item: null|array<string, mixed>, refresh: bool}
      */
     public function execute(User $user, string $pendingId, string $action): array
     {
@@ -105,6 +105,7 @@ final class ConfirmWebAgentPendingAction
     {
         $titles = is_array($payload['titles'] ?? null) ? array_values(array_filter($payload['titles'], 'is_string')) : [];
         $titles = $this->tools->filterNewTagTitles($user, $titles);
+
         if ($titles === []) {
             return [false, 'Those tags already exist (or none were left to create).', 'No new tags were created.'];
         }
@@ -123,6 +124,7 @@ final class ConfirmWebAgentPendingAction
     private function renameTags(User $user, WebAgentSession $session, array $payload): array
     {
         $proposals = $this->tools->normalizeRenameProposals($payload['proposals'] ?? null);
+
         if ($proposals === []) {
             return [false, 'The rename preview is stale or has no valid changes.', 'Rename preview had no valid changes.'];
         }
@@ -167,12 +169,14 @@ final class ConfirmWebAgentPendingAction
     private function createTransactions(User $user, array $payload): array
     {
         $rows = array_values(array_filter(is_array($payload['transactions'] ?? null) ? $payload['transactions'] : [], 'is_array'));
+
         if ($rows === []) {
             return [false, 'Nothing to confirm.', 'Nothing to confirm.'];
         }
 
         $created = DB::transaction(function () use ($user, $rows): array {
             $out = [];
+
             foreach ($rows as $row) {
                 $tx = $this->tools->applyCreateTransaction($user, $row, TransactionSource::Web);
                 $this->attachPhotos($user, $tx, $row['files'] ?? []);
@@ -196,6 +200,7 @@ final class ConfirmWebAgentPendingAction
     private function importTransactions(User $user, array $payload): array
     {
         $created = $this->import->apply($user, $payload, TransactionSource::Web);
+
         if ($created->isEmpty()) {
             return [false, 'Nothing to import.', 'Import had no valid rows.'];
         }
@@ -215,6 +220,7 @@ final class ConfirmWebAgentPendingAction
                 continue;
             }
             $contents = $this->uploads->read($user, $ref);
+
             if ($contents === null) {
                 continue; // expired / pruned: save the transaction without it
             }
@@ -240,6 +246,7 @@ final class ConfirmWebAgentPendingAction
     private function updateTransaction(User $user, array $payload): array
     {
         $tx = $this->tools->applyUpdateTransaction($user, $payload);
+
         if (!$tx) {
             return [false, 'That transaction no longer exists.', 'Transaction to update no longer exists.'];
         }
@@ -267,6 +274,7 @@ final class ConfirmWebAgentPendingAction
     private function createBudget(User $user, array $payload): array
     {
         $budget = $this->tools->applyCreateBudget($user, $payload);
+
         if (!$budget) {
             return [false, 'Those tags are no longer valid; budget was not created.', 'Budget tags no longer valid.'];
         }
@@ -290,7 +298,7 @@ final class ConfirmWebAgentPendingAction
         return [(bool) $result['ok'], (string) $result['message'], (string) $result['summary']];
     }
 
-    private function txLine(User $user, string $prefix, \App\Models\Transaction $tx): string
+    private function txLine(User $user, string $prefix, Transaction $tx): string
     {
         $tx->loadMissing('tags');
         $row = $this->tools->serializeTransaction($user, $tx);

@@ -18,6 +18,7 @@ class CommitImportBatchJob implements ShouldQueue
     public function handle(CommitImportBatchAction $commit): void
     {
         $batch = ImportBatch::query()->find($this->batchId);
+
         if (!$batch || $batch->status === ImportBatch::STATUS_COMMITTED) {
             return;
         }

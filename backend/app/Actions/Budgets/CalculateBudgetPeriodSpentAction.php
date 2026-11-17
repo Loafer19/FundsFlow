@@ -53,4 +53,3 @@ class CalculateBudgetPeriodSpentAction
         return $next->copy()->subDay();
     }
 }
-

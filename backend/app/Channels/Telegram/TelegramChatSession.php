@@ -14,11 +14,11 @@ final class TelegramChatSession
 {
     /**
      * @return array{
-     *     domain: 'tags'|'budgets'|'transactions'|null,
+     *     domain: null|'budgets'|'tags'|'transactions',
      *     last_list: list<array{id: int, title: string, emoji?: string}>,
-     *     pending: array<string, mixed>|null,
+     *     pending: null|array<string, mixed>,
      *     last_bot_summary: string,
-     *     expires_at: string|null
+     *     expires_at: null|string
      * }
      */
     public function get(int|string $telegramUserId, int|string|null $chatId = null): array
@@ -92,6 +92,7 @@ final class TelegramChatSession
 
                 $id = filter_var($item['id'], FILTER_VALIDATE_INT);
                 $title = trim((string) $item['title']);
+
                 if ($id === false || $id < 1 || $title === '') {
                     return null;
                 }
@@ -114,7 +115,7 @@ final class TelegramChatSession
     }
 
     /**
-     * @param array<string, mixed>|null $pending
+     * @param null|array<string, mixed> $pending
      * @return array<string, mixed>
      */
     public function setPending(
@@ -149,11 +150,11 @@ final class TelegramChatSession
 
     /**
      * @return array{
-     *     domain: 'tags'|'budgets'|'transactions'|null,
+     *     domain: null|'budgets'|'tags'|'transactions',
      *     last_list: list<array{id: int, title: string, emoji?: string}>,
-     *     pending: array<string, mixed>|null,
+     *     pending: null|array<string, mixed>,
      *     last_bot_summary: string,
-     *     expires_at: string|null
+     *     expires_at: null|string
      * }
      */
     private function defaults(): array
@@ -195,6 +196,7 @@ final class TelegramChatSession
 
             $id = filter_var($item['id'], FILTER_VALIDATE_INT);
             $title = trim((string) $item['title']);
+
             if ($id === false || $id < 1 || $title === '') {
                 continue;
             }
@@ -203,6 +205,7 @@ final class TelegramChatSession
                 'id' => (int) $id,
                 'title' => mb_substr($title, 0, 255),
             ];
+
             if (isset($item['emoji']) && is_string($item['emoji']) && trim($item['emoji']) !== '') {
                 $normalized['emoji'] = mb_substr(trim($item['emoji']), 0, 255);
             }

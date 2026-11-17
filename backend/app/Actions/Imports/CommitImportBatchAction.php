@@ -24,6 +24,7 @@ class CommitImportBatchAction
         if ($batch->status === ImportBatch::STATUS_COMMITTED) {
             return $batch;
         }
+
         if (!in_array($batch->status, [ImportBatch::STATUS_PREVIEWING, ImportBatch::STATUS_FAILED, ImportBatch::STATUS_COMMITTING], true)) {
             throw ValidationException::withMessages(['batch' => 'This import cannot be committed.']);
         }
@@ -35,6 +36,7 @@ class CommitImportBatchAction
                 $createdIds = [];
                 $categoryToId = [];
                 $ownedTitles = [];
+
                 foreach ($user->tags()->get(['id', 'title']) as $tag) {
                     $ownedTitles[mb_strtolower(trim((string) $tag->title))] = (int) $tag->id;
                 }
@@ -44,10 +46,12 @@ class CommitImportBatchAction
                         continue;
                     }
                     $title = trim((string) ($decision['title'] ?? $name));
+
                     if ($title === '') {
                         continue;
                     }
                     $lower = mb_strtolower($title);
+
                     if (isset($ownedTitles[$lower])) {
                         $id = $ownedTitles[$lower];
                     } else {
@@ -66,19 +70,24 @@ class CommitImportBatchAction
                 $owned = array_fill_keys($user->tags()->pluck('id')->map(fn ($id) => (int) $id)->all(), true);
                 $activeTypes = array_fill_keys($user->transactionTypes()->pluck('id')->map(fn ($id) => (int) $id)->all(), true);
                 $items = [];
+
                 foreach ($rows as $row) {
                     if (!$row->at || $row->amount === null || (float) $row->amount == 0.0) {
                         continue;
                     }
                     $tags = [];
+
                     foreach ($row->tag_ids ?? [] as $id) {
                         $id = (int) $id;
+
                         if (isset($owned[$id])) {
                             $tags[] = $id;
                         }
                     }
+
                     if (!$row->manual && $tags === [] && $row->category) {
                         $id = $categoryToId[mb_strtolower($row->category)] ?? null;
+
                         if ($id && !in_array($id, $tags, true)) {
                             $tags[] = $id;
                         }
@@ -90,6 +99,7 @@ class CommitImportBatchAction
                         'tags' => $tags,
                         'import_batch_id' => $batch->id,
                     ];
+
                     // A type archived since the preview is left off rather than failing the import.
                     if ($row->transaction_type_id && isset($activeTypes[(int) $row->transaction_type_id])) {
                         $item['transaction_type_id'] = (int) $row->transaction_type_id;
@@ -121,6 +131,7 @@ class CommitImportBatchAction
                 'progress' => 0,
                 'error_message' => mb_substr($e->getMessage(), 0, 500),
             ])->save();
+
             throw $e;
         }
     }

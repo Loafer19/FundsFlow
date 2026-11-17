@@ -23,8 +23,8 @@ class RunAgentAction
     ) {}
 
     /**
-     * @param array{prior_question?: string}|null $askContext When continuing after ask_user.
-     * @return array{ok: bool, status: 'answered'|'ui_sent'|'ask_user'|'confirm_staged'|'unavailable'|'error', summary?: string}
+     * @param null|array{prior_question?: string} $askContext When continuing after ask_user.
+     * @return array{ok: bool, status: 'answered'|'ask_user'|'confirm_staged'|'error'|'ui_sent'|'unavailable', summary?: string}
      */
     public function execute(User $user, AgentChannel $channel, string $text, ?array $askContext = null): array
     {
@@ -63,6 +63,7 @@ class RunAgentAction
 
         $nudged = false;
         $maxRounds = (int) config('telegram.agent_max_rounds');
+
         for ($round = 0; $round < $maxRounds; $round++) {
             $payload = [
                 'model' => $model,
@@ -87,6 +88,7 @@ class RunAgentAction
             }
 
             $message = $reply['message'];
+
             if (!is_array($message)) {
                 return ['ok' => false, 'status' => 'error', 'summary' => 'Empty AI response.'];
             }
@@ -96,6 +98,7 @@ class RunAgentAction
 
             // Append assistant turn (with tool_calls when present).
             $assistantMessage = ['role' => 'assistant', 'content' => $message['content'] ?? null];
+
             if (is_array($toolCalls) && $toolCalls !== []) {
                 $assistantMessage['tool_calls'] = $toolCalls;
             }
@@ -144,6 +147,7 @@ class RunAgentAction
                         'tool_call_id' => $callId,
                         'content' => json_encode(['error' => 'Missing tool name'], JSON_UNESCAPED_UNICODE),
                     ];
+
                     continue;
                 }
 
@@ -159,6 +163,7 @@ class RunAgentAction
                             'result' => ['error' => 'Not staged: only one change can wait for confirmation at a time. Ask the user to confirm the first one, then propose the next.'],
                         ], JSON_UNESCAPED_UNICODE),
                     ];
+
                     continue;
                 }
 
@@ -173,6 +178,7 @@ class RunAgentAction
                     'tool' => $name,
                     'result' => $executed['result'],
                 ];
+
                 if ($executed['control'] !== null) {
                     $toolPayload['control'] = $executed['control'];
                     $toolPayload['note'] = $channel->controlNote($executed['control']);
@@ -278,6 +284,7 @@ class RunAgentAction
 
             while (!$body->eof()) {
                 $chunk = $body->read(2048);
+
                 if ($chunk === '') {
                     continue;
                 }
@@ -291,17 +298,20 @@ class RunAgentAction
                         continue;
                     }
                     $data = trim(substr($line, 5));
+
                     if ($data === '[DONE]') {
                         break 2;
                     }
 
                     $json = json_decode($data, true);
+
                     if (!is_array($json)) {
                         continue;
                     }
                     $sawData = true;
 
                     $delta = data_get($json, 'choices.0.delta');
+
                     if (!is_array($delta)) {
                         continue;
                     }
@@ -321,13 +331,16 @@ class RunAgentAction
                             'type' => 'function',
                             'function' => ['name' => '', 'arguments' => ''],
                         ];
+
                         if (is_string($fragment['id'] ?? null) && $fragment['id'] !== '') {
                             $toolCalls[$index]['id'] = $fragment['id'];
                         }
+
                         if (is_string(data_get($fragment, 'function.name'))) {
                             $toolCalls[$index]['function']['name'] .= data_get($fragment, 'function.name');
                         }
                         $args = data_get($fragment, 'function.arguments');
+
                         if (is_string($args)) {
                             $toolCalls[$index]['function']['arguments'] .= $args;
                         } elseif (is_array($args)) {
@@ -356,6 +369,7 @@ class RunAgentAction
         }, $toolCalls));
 
         $message = ['role' => 'assistant', 'content' => $content !== '' ? $content : null];
+
         if ($toolCalls !== []) {
             $message['tool_calls'] = $toolCalls;
         }
@@ -371,6 +385,7 @@ class RunAgentAction
         if (is_array($rawArgs)) {
             return $rawArgs;
         }
+
         if (!is_string($rawArgs) || trim($rawArgs) === '') {
             return [];
         }

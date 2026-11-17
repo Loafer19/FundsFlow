@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Jobs\RefreshMonobankJarsJob;
 use App\Models\MonobankAccount;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 
 class RefreshMonobankJarsCommand extends Command
 {
@@ -20,13 +21,13 @@ class RefreshMonobankJarsCommand extends Command
             ->pluck('monobank_connection_id');
 
         foreach ($ids as $id) {
-            $key = 'monobank:jar-refresh:'.$id;
+            $key = 'monobank:jar-refresh:' . $id;
 
-            if ($this->option('pending') && ! \Illuminate\Support\Facades\Cache::has($key)) {
+            if ($this->option('pending') && !Cache::has($key)) {
                 continue;
             }
 
-            \Illuminate\Support\Facades\Cache::forget($key);
+            Cache::forget($key);
             RefreshMonobankJarsJob::dispatchSync((int) $id);
         }
 

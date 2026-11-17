@@ -68,11 +68,13 @@ class ImportController extends Controller
         $uploaded = $data['file'];
         $name = (string) $uploaded->getClientOriginalName();
         $bytes = (string) file_get_contents($uploaded->getRealPath());
+
         if ($bytes === '') {
             throw ValidationException::withMessages(['file' => 'The file is empty.']);
         }
         $ext = strtolower((string) $uploaded->getClientOriginalExtension());
         $kind = DocumentFile::EXTENSIONS[$ext] ?? DocumentFile::kindOfMime((string) $uploaded->getMimeType()) ?? DocumentFile::sniffTextKind($bytes);
+
         if ($kind === null) {
             throw ValidationException::withMessages(['file' => DocumentFile::UNSUPPORTED]);
         }
@@ -86,6 +88,7 @@ class ImportController extends Controller
 
         if (($result['type'] ?? null) !== 'preview') {
             $status = ($result['type'] ?? '') === 'quota' ? 429 : 422;
+
             return response()->json(['message' => $result['message'] ?? 'Nothing to import.', 'type' => $result['type'] ?? 'error'], $status);
         }
 
@@ -131,6 +134,7 @@ class ImportController extends Controller
     public function updateRow(Request $request, string $import, ImportRow $row, UpdateImportRowAction $update): ImportBatchResource
     {
         $batch = $this->batch($request, $import);
+
         if ((int) $row->import_batch_id !== (int) $batch->id) {
             abort(404);
         }
@@ -148,9 +152,11 @@ class ImportController extends Controller
     public function commit(Request $request, string $import, CommitImportBatchAction $commit): ImportBatchResource|JsonResponse
     {
         $batch = $this->batch($request, $import);
+
         if ($batch->total_rows >= 200) {
             $batch->update(['status' => ImportBatch::STATUS_COMMITTING, 'progress' => 1]);
             CommitImportBatchJob::dispatch($batch->id)->afterResponse();
+
             return (new ImportBatchResource($batch->fresh()))->response();
         }
         $commit->execute($request->user(), $batch);

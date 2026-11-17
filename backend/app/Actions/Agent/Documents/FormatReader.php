@@ -3,6 +3,7 @@
 namespace App\Actions\Agent\Documents;
 
 use App\Models\User;
+use App\Support\PeriodRange;
 use Carbon\Carbon;
 use DOMDocument;
 use DOMElement;
@@ -29,8 +30,8 @@ final class FormatReader
 
     /**
      * @return array{rows: list<array<string, mixed>>, skipped: list<array{line: int, reason: string}>, capped: bool, ambiguous?: bool, order?: string, samples?: list<string>}
-     *     |array{table: list<list<mixed>>}
-     *     |array{error: string}
+     *                                                                                                                                                                          |array{table: list<list<mixed>>}
+     *                                                                                                                                                                          |array{error: string}
      */
     public function json(User $user, string $bytes, string $fileName): array
     {
@@ -39,6 +40,7 @@ final class FormatReader
         } catch (Throwable) {
             return ['error' => "{$fileName} is not valid JSON."];
         }
+
         if (!is_array($data)) {
             return ['error' => "{$fileName} has no list of transactions."];
         }
@@ -46,21 +48,25 @@ final class FormatReader
         // A FundsFlow export (Settings → Export): {"version": 1, "transactions": [{at, amount, note, tags: [{title}]}]}.
         if (isset($data['version'], $data['transactions']) && is_array($data['transactions']) && array_is_list($data['transactions'])) {
             $first = $data['transactions'][0] ?? null;
+
             if ($first === null || (is_array($first) && array_key_exists('amount', $first) && array_key_exists('at', $first))) {
                 return $this->fundsFlowExport($user, $data['transactions']);
             }
         }
 
         $list = $this->findList($data);
+
         if ($list === null) {
             return ['error' => "Couldn't find a list of transactions in {$fileName}. It should be an array of objects with a date and an amount."];
         }
 
         // Keys of the objects become the header row: TableImport then maps them like CSV columns.
         $keys = [];
+
         foreach (array_slice($list, 0, 200) as $item) {
             foreach (array_keys($item) as $key) {
                 $keys[(string) $key] = true;
+
                 if (count($keys) >= 40) {
                     break 2;
                 }
@@ -68,6 +74,7 @@ final class FormatReader
         }
         $keys = array_keys($keys);
         $table = [array_map(static fn ($k) => str_replace('_', ' ', (string) $k), $keys)];
+
         foreach (array_slice($list, 0, DocumentFile::maxRows() + 1) as $item) {
             $table[] = array_map(fn ($key) => $this->scalar($item[$key] ?? null), $keys);
         }
@@ -76,11 +83,12 @@ final class FormatReader
     }
 
     /**
-     * @return array{rows: list<array<string, mixed>>, skipped: list<array{line: int, reason: string}>, capped: bool}|array{error: string}
+     * @return array{error: string}|array{rows: list<array<string, mixed>>, skipped: list<array{line: int, reason: string}>, capped: bool}
      */
     public function ofx(string $bytes, string $fileName): array
     {
         $text = $this->utf8($bytes);
+
         if (!preg_match_all('/<STMTTRN>(.*?)(?:<\/STMTTRN>|(?=<STMTTRN>)|(?=<\/BANKTRANLIST>))/is', $text, $blocks)) {
             return ['error' => "No transactions found in {$fileName} (no STMTTRN records)."];
         }
@@ -90,13 +98,16 @@ final class FormatReader
         $skipped = [];
         $seen = [];
         $capped = false;
+
         foreach ($blocks[1] as $i => $block) {
             $line = $i + 1;
             $field = fn (string $tag): ?string => $this->ofxField($block, $tag);
             $fitId = $field('FITID');
+
             if ($fitId !== null && isset($seen[$fitId])) {
                 continue;
             }
+
             if ($fitId !== null) {
                 $seen[$fitId] = true;
             }
@@ -105,18 +116,22 @@ final class FormatReader
                 ? "{$d[1]}-{$d[2]}-{$d[3]}" : null;
             $amountRaw = $field('TRNAMT');
             $amount = $amountRaw !== null ? $this->import->parseAmount(str_replace(',', '.', $amountRaw), 'dot') : null;
+
             if ($at === null) {
                 $skipped[] = ['line' => $line, 'reason' => 'no valid date'];
 
                 continue;
             }
+
             if ($amount === null || round($amount, 2) == 0.0) {
                 $skipped[] = ['line' => $line, 'reason' => $amount === null ? 'no valid amount' : 'zero amount'];
 
                 continue;
             }
+
             if (count($rows) >= DocumentFile::maxRows()) {
                 $capped = true;
+
                 break;
             }
             $name = $field('NAME') ?? $this->ofxField((string) preg_replace('/.*<PAYEE>/is', '', $block), 'NAME');
@@ -142,7 +157,7 @@ final class FormatReader
      * "[Account]" = a transfer, no tag). Dates are month-first by the QIF convention unless a day > 12
      * shows otherwise; then the 'swap' reading is kept so the user can flip it.
      *
-     * @return array{rows: list<array<string, mixed>>, skipped: list<array{line: int, reason: string}>, capped: bool, ambiguous: bool, order: string, samples: list<string>}|array{error: string}
+     * @return array{error: string}|array{rows: list<array<string, mixed>>, skipped: list<array{line: int, reason: string}>, capped: bool, ambiguous: bool, order: string, samples: list<string>}
      */
     public function qif(string $bytes, string $fileName): array
     {
@@ -152,11 +167,14 @@ final class FormatReader
         $current = [];
         $inTransactions = false;
         $start = 0;
+
         foreach ($lines as $n => $raw) {
             $line = trim($raw);
+
             if ($line === '') {
                 continue;
             }
+
             if ($line[0] === '!') {
                 $header = strtolower($line);
                 $inTransactions = (bool) preg_match('/^!type:(bank|cash|ccard|oth a|oth l|invst)/', $header);
@@ -164,9 +182,11 @@ final class FormatReader
 
                 continue;
             }
+
             if (!$inTransactions) {
                 continue;
             }
+
             if ($line === '^') {
                 if ($current !== []) {
                     $records[] = ['line' => $start + 1] + $current;
@@ -175,19 +195,23 @@ final class FormatReader
 
                 continue;
             }
+
             if ($current === []) {
                 $start = $n;
             }
             $code = $line[0];
             $value = trim(substr($line, 1));
+
             // Split lines (S, E, $) repeat the codes: the record total (T) is what is imported.
             if (in_array($code, ['D', 'T', 'U', 'P', 'M', 'L'], true) && !isset($current[$code])) {
                 $current[$code] = $value;
             }
         }
+
         if ($current !== []) {
             $records[] = ['line' => $start + 1] + $current;
         }
+
         if ($records === []) {
             return ['error' => "No transactions found in {$fileName} (no !Type:Bank / Cash / CCard records)."];
         }
@@ -201,21 +225,26 @@ final class FormatReader
         $rows = [];
         $skipped = [];
         $capped = false;
+
         foreach ($records as $i => $record) {
             $at = $this->import->parseDate($dates[$i][0], $order);
             $amount = $this->import->parseAmount((string) ($record['T'] ?? $record['U'] ?? ''), $this->qifStyle((string) ($record['T'] ?? $record['U'] ?? '')));
+
             if ($at === null) {
                 $skipped[] = ['line' => $record['line'], 'reason' => 'no valid date'];
 
                 continue;
             }
+
             if ($amount === null || round($amount, 2) == 0.0) {
                 $skipped[] = ['line' => $record['line'], 'reason' => $amount === null ? 'no valid amount' : 'zero amount'];
 
                 continue;
             }
+
             if (count($rows) >= DocumentFile::maxRows()) {
                 $capped = true;
+
                 break;
             }
             $payee = isset($record['P']) && $record['P'] !== '' ? $record['P'] : null;
@@ -232,8 +261,10 @@ final class FormatReader
                 'note' => $note !== null ? mb_substr($note, 0, self::NOTE_MAX) : null,
                 'tags' => $tag !== '' ? [mb_substr($tag, 0, 60)] : [],
             ];
+
             if ($samples !== []) {
                 $swap = $this->import->parseDate($dates[$i][0], $other);
+
                 if ($swap !== null && $swap !== $at) {
                     $row['swap'] = $swap;
                 }
@@ -247,51 +278,62 @@ final class FormatReader
     /**
      * The largest table whose header TableImport recognises, else the page text (for the AI).
      *
-     * @return array{table: list<list<string>>}|array{text: string}|array{error: string}
+     * @return array{error: string}|array{table: list<list<string>>}|array{text: string}
      */
     public function html(string $bytes, string $fileName): array
     {
         $html = $this->utf8($bytes);
         $dom = new DOMDocument;
         $previous = libxml_use_internal_errors(true);
+
         try {
             $loaded = $dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_COMPACT);
         } finally {
             libxml_clear_errors();
             libxml_use_internal_errors($previous);
         }
+
         if (!$loaded) {
             return ['error' => "Couldn't open {$fileName}."];
         }
 
         $xpath = new DOMXPath($dom);
+
         foreach ($xpath->query('//script|//style|//noscript|//template') ?: [] as $node) {
             $node->parentNode?->removeChild($node);
         }
 
         $best = null;
+
         foreach ($dom->getElementsByTagName('table') as $table) {
             $rows = [];
+
             foreach ($xpath->query('./tr|./thead/tr|./tbody/tr|./tfoot/tr', $table) ?: [] as $tr) {
                 $cells = [];
+
                 foreach ($xpath->query('./th|./td', $tr) ?: [] as $cell) {
                     $cells[] = $this->cellText($cell);
                     $span = $cell instanceof DOMElement ? (int) $cell->getAttribute('colspan') : 1;
+
                     for ($k = 1; $k < min($span, 10); $k++) {
                         $cells[] = '';
                     }
                 }
+
                 if (array_filter($cells, static fn ($c) => $c !== '') !== []) {
                     $rows[] = $cells;
                 }
+
                 if (count($rows) > DocumentFile::maxRows() + 31) {
                     break;
                 }
             }
+
             if (count($rows) >= 2 && $this->import->guessMapping($rows) !== null && ($best === null || count($rows) > count($best))) {
                 $best = $rows;
             }
         }
+
         if ($best !== null) {
             return ['table' => $best];
         }
@@ -299,6 +341,7 @@ final class FormatReader
         $body = $dom->getElementsByTagName('body')->item(0) ?? $dom->documentElement;
         $text = $body !== null ? $this->blockText($body) : '';
         $text = trim((string) preg_replace("/\n{3,}/", "\n\n", (string) preg_replace('/[ \t]+/u', ' ', $text)));
+
         if (preg_match_all('/[\p{L}\p{N}]/u', $text) < 5) {
             return ['error' => "{$fileName} has no text to read."];
         }
@@ -316,37 +359,52 @@ final class FormatReader
         $rows = [];
         $skipped = [];
         $capped = false;
+
         foreach ($transactions as $i => $tx) {
             $line = $i + 1;
+
             if (!is_array($tx)) {
                 continue;
             }
             $at = null;
+
             if (is_string($tx['at'] ?? null)) {
                 try {
-                    $at = preg_match('/^\d{4}-\d{2}-\d{2}$/', $tx['at']) ? $tx['at'] : Carbon::parse($tx['at'])->setTimezone($timezone)->toDateString();
+                    $at = preg_match('/^\d{4}-\d{2}-\d{2}$/', $tx['at']) === 1
+                        ? $tx['at']
+                        : Carbon::parse($tx['at'])->setTimezone($timezone)->toDateString();
+
+                    if (!PeriodRange::isStorableDate($at)) {
+                        $at = null;
+                    }
                 } catch (Throwable) {
                     $at = null;
                 }
             }
             $amount = is_numeric($tx['amount'] ?? null) ? (float) $tx['amount'] : null;
+
             if ($at === null) {
                 $skipped[] = ['line' => $line, 'reason' => 'no valid date'];
 
                 continue;
             }
+
             if ($amount === null || round($amount, 2) == 0.0) {
                 $skipped[] = ['line' => $line, 'reason' => $amount === null ? 'no valid amount' : 'zero amount'];
 
                 continue;
             }
+
             if (count($rows) >= DocumentFile::maxRows()) {
                 $capped = true;
+
                 break;
             }
             $tags = [];
+
             foreach (is_array($tx['tags'] ?? null) ? $tx['tags'] : [] as $tag) {
                 $title = is_array($tag) ? ($tag['title'] ?? null) : $tag;
+
                 if (is_string($title) && trim($title) !== '') {
                     $tags[] = mb_substr(trim($title), 0, 60);
                 }
@@ -362,23 +420,27 @@ final class FormatReader
      * The list of objects: the top level, or the first suitable value under a known key (or any key).
      *
      * @param array<mixed> $data
-     * @return list<array<string, mixed>>|null
+     * @return null|list<array<string, mixed>>
      */
     private function findList(array $data, int $depth = 0): ?array
     {
         $isObjects = static fn (mixed $v): bool => is_array($v) && $v !== [] && array_is_list($v)
             && count(array_filter(array_slice($v, 0, 20), static fn ($i) => is_array($i) && !array_is_list($i))) === count(array_slice($v, 0, 20));
+
         if ($isObjects($data)) {
             return array_values(array_filter($data, 'is_array'));
         }
+
         if ($depth >= 2 || array_is_list($data)) {
             return null;
         }
         $keys = array_keys($data);
         usort($keys, static fn ($a, $b) => (int) !in_array(strtolower((string) $a), self::LIST_KEYS, true) <=> (int) !in_array(strtolower((string) $b), self::LIST_KEYS, true));
+
         foreach ($keys as $key) {
             if (is_array($data[$key])) {
                 $found = $this->findList($data[$key], $depth + 1);
+
                 if ($found !== null) {
                     return $found;
                 }
@@ -393,9 +455,11 @@ final class FormatReader
         if (is_string($value) || is_int($value) || is_float($value) || $value === null) {
             return is_string($value) ? mb_substr($value, 0, 500) : $value;
         }
+
         if (is_bool($value)) {
             return $value ? 'true' : 'false';
         }
+
         if (is_array($value)) {
             // {"amount": {"value": -12.5, "currency": "EUR"}} or ["Food", "Cafe"].
             if (array_is_list($value)) {
@@ -403,6 +467,7 @@ final class FormatReader
 
                 return implode(', ', array_filter(array_map('strval', array_filter($parts, 'is_scalar'))));
             }
+
             foreach (['value', 'amount', 'title', 'name', 'date'] as $key) {
                 if (isset($value[$key]) && is_scalar($value[$key])) {
                     return $this->scalar($value[$key]);
@@ -429,6 +494,7 @@ final class FormatReader
     private function qifDate(string $value): string
     {
         $value = str_replace(' ', '', $value);
+
         if (preg_match("/^(\\d{1,2})[\\/.-](\\d{1,2})'(\\d{1,4})$/", $value, $m)) {
             $year = (int) $m[3];
             $year = $year < 100 ? 2000 + $year : $year;
@@ -455,12 +521,14 @@ final class FormatReader
     private function blockText(\DOMNode $node): string
     {
         $out = '';
+
         foreach ($node->childNodes as $child) {
             if ($child->nodeType === XML_TEXT_NODE) {
                 $out .= str_replace("\u{00A0}", ' ', (string) $child->textContent);
 
                 continue;
             }
+
             if ($child->nodeType !== XML_ELEMENT_NODE) {
                 continue;
             }
@@ -480,6 +548,7 @@ final class FormatReader
     private function utf8(string $bytes): string
     {
         $bytes = DocumentFile::stripBom($bytes);
+
         if (mb_check_encoding($bytes, 'UTF-8')) {
             return $bytes;
         }

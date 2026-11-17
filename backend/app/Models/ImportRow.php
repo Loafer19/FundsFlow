@@ -8,10 +8,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ImportRow extends Model
 {
     public const STATUS_NEW = 'new';
+
     public const STATUS_DUPLICATE = 'duplicate';
+
     public const STATUS_TRANSFER = 'transfer';
+
     public const STATUS_SKIPPED = 'skipped';
+
     public const STATUS_NEEDS_TAG = 'needs_tag';
+
     public const STATUS_ERROR = 'error';
 
     protected $fillable = [
@@ -19,6 +24,17 @@ class ImportRow extends Model
         'raw', 'category', 'tag_ids', 'transaction_type_id', 'type_source', 'suggested_tag_ids', 'new_tag_titles', 'manual', 'skip_reason',
         'error', 'matched_transaction_id',
     ];
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(ImportBatch::class, 'import_batch_id');
+    }
+
+    public function isImportable(): bool
+    {
+        return in_array($this->status, [self::STATUS_NEW, self::STATUS_NEEDS_TAG], true)
+            && $this->at && $this->amount !== null && (float) $this->amount != 0.0;
+    }
 
     protected function casts(): array
     {
@@ -31,16 +47,5 @@ class ImportRow extends Model
             'new_tag_titles' => 'array',
             'manual' => 'boolean',
         ];
-    }
-
-    public function batch(): BelongsTo
-    {
-        return $this->belongsTo(ImportBatch::class, 'import_batch_id');
-    }
-
-    public function isImportable(): bool
-    {
-        return in_array($this->status, [self::STATUS_NEW, self::STATUS_NEEDS_TAG], true)
-            && $this->at && $this->amount !== null && (float) $this->amount != 0.0;
     }
 }

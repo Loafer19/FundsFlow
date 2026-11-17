@@ -46,6 +46,7 @@ class SupportHandler
 
         if (preg_match('/^#(\d+)\s+(.+)$/su', $message, $m)) {
             $ticket = $user->supportTickets()->find((int) $m[1]);
+
             if (!$ticket) {
                 $this->client->sendMessage($chatId, "Request #{$m[1]} wasn't found. Send /support with your message to open a new one.");
 

@@ -46,7 +46,7 @@ class ConvertUrlToPdfViaGotenbergAction
                 ['name' => 'failOnConsoleExceptions', 'contents' => 'true'],
             ]);
 
-        if (! $response->successful()) {
+        if (!$response->successful()) {
             $body = trim($response->body());
             $hint = $body !== '' ? mb_substr($body, 0, 300) : 'no body';
 
@@ -55,7 +55,7 @@ class ConvertUrlToPdfViaGotenbergAction
 
         $pdf = $response->body();
 
-        if ($pdf === '' || ! str_starts_with($pdf, '%PDF')) {
+        if ($pdf === '' || !str_starts_with($pdf, '%PDF')) {
             throw new RuntimeException('Gotenberg returned an empty or invalid PDF.');
         }
 
