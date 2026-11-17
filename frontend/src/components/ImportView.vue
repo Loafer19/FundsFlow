@@ -441,7 +441,18 @@ import {
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAuthStore } from '../services/auth.js'
 import { apiErrorMessage, formatDate, formatMoney, parseLocalDate } from '../services/formatters.js'
-import { applyImportRules, commitImport, fetchImport, fetchImports, goToImport, IMPORT_FILE_ACCEPT, IMPORT_FORMATS, startWebImport, undoImport, updateImportRow } from '../services/imports.js'
+import {
+    applyImportRules,
+    commitImport,
+    fetchImport,
+    fetchImports,
+    goToImport,
+    IMPORT_FILE_ACCEPT,
+    IMPORT_FORMATS,
+    startWebImport,
+    undoImport,
+    updateImportRow,
+} from '../services/imports.js'
 import { showModal } from '../services/modal.js'
 import { useTagsStore } from '../services/tags.js'
 import toasts from '../services/toasts.js'
@@ -502,14 +513,16 @@ let saveSeq = 0
 const periodLabel = computed(() => {
     const s = batch.value?.summary
     if (!s?.period_from) return batch.value?.filename || ''
-    return s.period_from === s.period_to ? formatRowDate(s.period_from) : `${formatRowDate(s.period_from)} – ${formatRowDate(s.period_to)}`
+    return s.period_from === s.period_to
+        ? formatRowDate(s.period_from)
+        : `${formatRowDate(s.period_from)} – ${formatRowDate(s.period_to)}`
 })
 const importableCount = computed(() => {
     const s = batch.value?.summary
     return s ? s.new + s.needs_tag : 0
 })
 const editable = computed(() => ['previewing', 'failed'].includes(batch.value?.status))
-const pageTitle = computed(() => props.uuid ? (batch.value?.filename || 'Import preview') : 'Import')
+const pageTitle = computed(() => (props.uuid ? batch.value?.filename || 'Import preview' : 'Import'))
 const batchStatusLabel = computed(() => {
     switch (batch.value?.status) {
         case 'committing':
@@ -524,24 +537,70 @@ const batchStatusLabel = computed(() => {
             return 'Draft'
     }
 })
-const batchStatusBadge = computed(() => ({
-    'Importing…': 'badge-info',
-    Imported: 'badge-success',
-    Undone: '',
-    Failed: 'badge-error',
-    Draft: 'badge-warning',
-}[batchStatusLabel.value] || ''))
+const batchStatusBadge = computed(
+    () =>
+        ({
+            'Importing…': 'badge-info',
+            Imported: 'badge-success',
+            Undone: '',
+            Failed: 'badge-error',
+            Draft: 'badge-warning',
+        })[batchStatusLabel.value] || '',
+)
 const summaryCards = computed(() => {
     const s = batch.value?.summary || {}
     const needs = s.needs_tag ? `${s.needs_tag} need a tag` : ''
     return [
-        { key: 'rows', label: 'Rows', current: s.total_rows ?? 0, format: 'count', iconComponent: List, iconClass: 'bg-base-content/10 text-base-content/70' },
-        { key: 'new', label: 'New', current: s.new ?? 0, format: 'count', note: needs, iconComponent: Sparkles, iconClass: 'bg-success/15 text-success', valueClass: 'text-success' },
+        {
+            key: 'rows',
+            label: 'Rows',
+            current: s.total_rows ?? 0,
+            format: 'count',
+            iconComponent: List,
+            iconClass: 'bg-base-content/10 text-base-content/70',
+        },
+        {
+            key: 'new',
+            label: 'New',
+            current: s.new ?? 0,
+            format: 'count',
+            note: needs,
+            iconComponent: Sparkles,
+            iconClass: 'bg-success/15 text-success',
+            valueClass: 'text-success',
+        },
         { key: 'income', label: 'Income', current: s.income_total || 0, icon: 'income', valueClass: 'text-success' },
-        { key: 'expenses', label: 'Expenses', current: Math.abs(s.expense_total || 0), icon: 'expenses', valueClass: 'text-error' },
-        { key: 'duplicate', label: 'Duplicates', current: s.duplicate ?? 0, format: 'count', iconComponent: Copy, iconClass: 'bg-base-content/10 text-base-content/70' },
-        { key: 'transfer', label: 'Transfers', current: s.transfer ?? 0, format: 'count', iconComponent: ArrowLeftRight, iconClass: 'bg-info/15 text-info' },
-        { key: 'skipped', label: 'Skipped', current: s.skipped ?? 0, format: 'count', iconComponent: Ban, iconClass: 'bg-base-content/10 text-base-content/70' },
+        {
+            key: 'expenses',
+            label: 'Expenses',
+            current: Math.abs(s.expense_total || 0),
+            icon: 'expenses',
+            valueClass: 'text-error',
+        },
+        {
+            key: 'duplicate',
+            label: 'Duplicates',
+            current: s.duplicate ?? 0,
+            format: 'count',
+            iconComponent: Copy,
+            iconClass: 'bg-base-content/10 text-base-content/70',
+        },
+        {
+            key: 'transfer',
+            label: 'Transfers',
+            current: s.transfer ?? 0,
+            format: 'count',
+            iconComponent: ArrowLeftRight,
+            iconClass: 'bg-info/15 text-info',
+        },
+        {
+            key: 'skipped',
+            label: 'Skipped',
+            current: s.skipped ?? 0,
+            format: 'count',
+            iconComponent: Ban,
+            iconClass: 'bg-base-content/10 text-base-content/70',
+        },
         { key: 'period', label: 'Period', value: periodLabel.value || '—', icon: 'daily' },
     ]
 })
@@ -557,12 +616,16 @@ const filters = computed(() => {
         { id: 'error', label: 'Errors', count: s.error || 0 },
     ]
 })
-const ruleTag = computed(() => (ruleTagId.value == null ? null : tagsStore.tags.find((tag) => Number(tag.id) === Number(ruleTagId.value)) || null))
+const ruleTag = computed(() =>
+    ruleTagId.value == null ? null : tagsStore.tags.find((tag) => Number(tag.id) === Number(ruleTagId.value)) || null,
+)
 const canApplyMerchant = computed(() => Boolean(ruleMerchant.value.trim() && ruleTag.value))
 const canSkip = computed(() => Boolean(ruleBefore.value || ruleSkipName.value.trim()))
 const isIncluded = (row) => ['new', 'needs_tag'].includes(row.status)
 const visibleToggleable = computed(() => (batch.value?.rows || []).filter((row) => row.status !== 'error'))
-const allVisibleIncluded = computed(() => visibleToggleable.value.length > 0 && visibleToggleable.value.every(isIncluded))
+const allVisibleIncluded = computed(
+    () => visibleToggleable.value.length > 0 && visibleToggleable.value.every(isIncluded),
+)
 const someVisibleIncluded = computed(() => visibleToggleable.value.some(isIncluded))
 
 const goHome = () => {
@@ -660,21 +723,23 @@ const loadHistory = async () => {
     }
 }
 
-const historyStatusLabel = (status) => ({
-    committing: 'Importing…',
-    committed: 'Imported',
-    undone: 'Undone',
-    failed: 'Failed',
-    previewing: 'Draft',
-}[status] || 'Draft')
+const historyStatusLabel = (status) =>
+    ({
+        committing: 'Importing…',
+        committed: 'Imported',
+        undone: 'Undone',
+        failed: 'Failed',
+        previewing: 'Draft',
+    })[status] || 'Draft'
 
-const historyStatusBadge = (status) => ({
-    committing: 'badge-info',
-    committed: 'badge-success',
-    undone: 'badge-ghost',
-    failed: 'badge-error',
-    previewing: 'badge-warning',
-}[status] || 'badge-ghost')
+const historyStatusBadge = (status) =>
+    ({
+        committing: 'badge-info',
+        committed: 'badge-success',
+        undone: 'badge-ghost',
+        failed: 'badge-error',
+        previewing: 'badge-warning',
+    })[status] || 'badge-ghost'
 
 const historyDate = (item) => {
     const raw = item.committed_at || item.created_at
@@ -825,7 +890,13 @@ const openRowPicker = (row, event) => {
 
 const openCategoryPicker = (cat, event) => {
     const ids = cat.tag_id ? [Number(cat.tag_id)] : []
-    const menu = { kind: 'category', name: cat.name, tagId: cat.tag_id ? Number(cat.tag_id) : null, ids, ...placeMenu(event) }
+    const menu = {
+        kind: 'category',
+        name: cat.name,
+        tagId: cat.tag_id ? Number(cat.tag_id) : null,
+        ids,
+        ...placeMenu(event),
+    }
     savedMenuKey.value = menuKey(menu)
     tagMenu.value = menu
 }
@@ -951,25 +1022,27 @@ const rowClass = (row) => ({
     'bg-warning/10': row.status === 'needs_tag',
     'bg-error/10': row.status === 'error',
 })
-const statusLabel = (status) => ({
-    new: 'New',
-    duplicate: 'Duplicate',
-    transfer: 'Transfer',
-    skipped: 'Skipped',
-    needs_tag: 'Needs tag',
-    error: 'Error',
-}[status] || status)
-const statusBadge = (status) => ({
-    new: 'badge-success',
-    duplicate: 'badge-ghost',
-    transfer: 'badge-info',
-    skipped: 'badge-ghost',
-    needs_tag: 'badge-warning',
-    error: 'badge-error',
-}[status] || 'badge-ghost')
+const statusLabel = (status) =>
+    ({
+        new: 'New',
+        duplicate: 'Duplicate',
+        transfer: 'Transfer',
+        skipped: 'Skipped',
+        needs_tag: 'Needs tag',
+        error: 'Error',
+    })[status] || status
+const statusBadge = (status) =>
+    ({
+        new: 'badge-success',
+        duplicate: 'badge-ghost',
+        transfer: 'badge-info',
+        skipped: 'badge-ghost',
+        needs_tag: 'badge-warning',
+        error: 'badge-error',
+    })[status] || 'badge-ghost'
 const statusTip = (row) => {
     if (row.status === 'duplicate') {
-        return row.at ? `Matches a saved transaction on ${formatRowDate(row.at)}` : (row.skip_reason || 'Already saved')
+        return row.at ? `Matches a saved transaction on ${formatRowDate(row.at)}` : row.skip_reason || 'Already saved'
     }
     if (row.status === 'transfer') return row.skip_reason || 'Transfer to own card'
     if (row.status === 'skipped') return row.skip_reason || 'Skipped by you'
@@ -979,13 +1052,16 @@ const statusTip = (row) => {
     return row.skip_reason || row.error || ''
 }
 
-watch(() => props.uuid, () => {
-    batch.value = null
-    page.value = 1
-    closeTagMenu()
-    if (props.uuid) reload()
-    else loadHistory()
-})
+watch(
+    () => props.uuid,
+    () => {
+        batch.value = null
+        page.value = 1
+        closeTagMenu()
+        if (props.uuid) reload()
+        else loadHistory()
+    },
+)
 
 onMounted(() => {
     if (!typesStore.types.length) typesStore.fetch()

@@ -153,6 +153,7 @@ const go = (delta) => {
 }
 
 const onDialogClose = () => {
+    loadId += 1
     revoke()
     error.value = ''
     if (transactionsStore.attachmentPreview) {

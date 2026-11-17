@@ -6,6 +6,7 @@
 import { ArcElement, Chart as ChartJS, Legend, Tooltip } from 'chart.js'
 import { computed, inject } from 'vue'
 import { Doughnut as DoughnutChart } from 'vue-chartjs'
+import { themeColor, useChartTheme } from '../../services/chartTheme.js'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
@@ -24,6 +25,7 @@ const props = defineProps({
 const emit = defineEmits(['select'])
 
 const formatMoney = inject('formatMoney')
+const { colors } = useChartTheme()
 
 const colorCache = new Map()
 const generateRandomColor = (id) => {
@@ -48,33 +50,37 @@ const chartData = computed(() => {
     }
 })
 
-const chartOptions = {
-    responsive: true,
-    onClick: (_event, elements) => {
-        const tag = props.tagsWithAmount[elements[0]?.index]
-        if (props.clickable && tag?.clickable) emit('select', tag)
-    },
-    onHover: (event, elements) => {
-        if (!props.clickable || !event.native?.target) return
-        event.native.target.style.cursor = elements.length ? 'pointer' : 'default'
-    },
-    plugins: {
-        legend: {
-            position: 'bottom',
-            labels: {
-                color: window.getComputedStyle(document.documentElement).getPropertyValue('--color-base-content'),
-                usePointStyle: true,
+const chartOptions = computed(() => {
+    colors.value
+
+    return {
+        responsive: true,
+        onClick: (_event, elements) => {
+            const tag = props.tagsWithAmount[elements[0]?.index]
+            if (props.clickable && tag?.clickable) emit('select', tag)
+        },
+        onHover: (event, elements) => {
+            if (!props.clickable || !event.native?.target) return
+            event.native.target.style.cursor = elements.length ? 'pointer' : 'default'
+        },
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    color: themeColor('--color-base-content'),
+                    usePointStyle: true,
+                },
+            },
+            tooltip: {
+                displayColors: false,
+                callbacks: {
+                    label: (context) =>
+                        `${props.tagsWithAmount[context.dataIndex]?.count} txns: ${formatMoney(chartData.value.datasets[0].data[context.dataIndex])}`,
+                },
             },
         },
-        tooltip: {
-            displayColors: false,
-            callbacks: {
-                label: (context) =>
-                    `${props.tagsWithAmount[context.dataIndex]?.count} txns: ${formatMoney(chartData.value.datasets[0].data[context.dataIndex])}`,
-            },
-        },
-    },
-}
+    }
+})
 </script>
 
 <style scoped></style>

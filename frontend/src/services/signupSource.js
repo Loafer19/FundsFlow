@@ -9,8 +9,7 @@ export const signupSource = () => {
             })
             .join('&')
         const referrer = document.referrer
-        const external =
-            referrer && !referrer.includes(window.location.host) ? `referrer=${referrer}` : ''
+        const external = referrer && !referrer.includes(window.location.host) ? `referrer=${referrer}` : ''
         const source = [utm, external].filter(Boolean).join(' | ')
 
         return source.slice(0, 255) || null

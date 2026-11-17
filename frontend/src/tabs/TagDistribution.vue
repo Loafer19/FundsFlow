@@ -135,7 +135,9 @@ const detailModal = ref(null)
 const openDetail = (tag, side) => detailModal.value?.open(tag.id, side)
 
 const hasPeriodData = computed(
-    () => transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd).length > 0,
+    () =>
+        transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd).length >
+        0,
 )
 const viewModeOptions = [
     { value: 'donuts', label: 'Donuts' },

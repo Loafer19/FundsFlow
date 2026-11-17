@@ -167,15 +167,9 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { apiErrorMessage, formatDateTime, formatMoney } from '../services/formatters'
 import { useBudgetsStore } from '../services/budgets'
-import {
-    connectMonobank,
-    disconnectMonobank,
-    getMonobank,
-    syncMonobank,
-    updateMonobank,
-} from '../services/monobank'
+import { apiErrorMessage, formatDateTime, formatMoney } from '../services/formatters'
+import { connectMonobank, disconnectMonobank, getMonobank, syncMonobank, updateMonobank } from '../services/monobank'
 import { useTagsStore } from '../services/tags'
 import toasts from '../services/toasts'
 import PopoverMenu from './PopoverMenu.vue'
@@ -347,7 +341,11 @@ const syncNow = async () => {
 }
 
 const disconnect = async () => {
-    if (!confirm('Disconnect monobank? New transactions will stop syncing. Existing ones stay in your list. Jar goals are kept and marked as unlinked.')) {
+    if (
+        !confirm(
+            'Disconnect monobank? New transactions will stop syncing. Existing ones stay in your list. Jar goals are kept and marked as unlinked.',
+        )
+    ) {
         return
     }
     busy.value = true

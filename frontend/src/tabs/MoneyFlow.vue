@@ -66,13 +66,19 @@ const groupBy = ref('day')
 const compare = ref(true)
 const openAdd = () => transactions_add_modal.showModal()
 const hasPeriodData = computed(
-    () => transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd).length > 0,
+    () =>
+        transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd).length >
+        0,
 )
 
 const groupByOptions = computed(() => [
     { value: 'day', label: 'Day' },
     { value: 'week', label: 'Week', hidden: props.dateSelectionType === 'week' },
-    { value: 'month', label: 'Month', hidden: props.dateSelectionType === 'week' || props.dateSelectionType === 'month' },
+    {
+        value: 'month',
+        label: 'Month',
+        hidden: props.dateSelectionType === 'week' || props.dateSelectionType === 'month',
+    },
 ])
 
 watch(
@@ -210,7 +216,14 @@ const comparison = computed(() => {
 
     return [
         { key: 'income', icon: 'income', label: 'Income', current: cur.income, previous: prev.income },
-        { key: 'expenses', icon: 'expenses', label: 'Expenses', current: cur.expenses, previous: prev.expenses, lowerIsBetter: true },
+        {
+            key: 'expenses',
+            icon: 'expenses',
+            label: 'Expenses',
+            current: cur.expenses,
+            previous: prev.expenses,
+            lowerIsBetter: true,
+        },
         {
             key: 'net',
             icon: 'net',

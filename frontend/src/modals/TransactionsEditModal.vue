@@ -25,7 +25,7 @@
                 <TagPicker v-model="transaction.tags" />
 
                 <AttachmentField :transaction-id="transaction.id" :attachments="liveAttachments"
-                    :busy="Boolean(transactionsStore.isLoading)" @changed="syncAttachments" />
+                    :busy="Boolean(transactionsStore.isLoading)" />
 
                 <div class="modal-action">
                     <DeleteHold v-if="transaction.id" :id="transaction.id" :disabled="transactionsStore.isLoading"
@@ -107,14 +107,6 @@ watch(
         typed.load({ amount: for_edit.amount })
     },
 )
-
-const syncAttachments = () => {
-    const current = transactionsStore.transactions.find((t) => t.id === transaction.value.id)
-
-    if (current && transactionsStore.transactionForEdit?.id === current.id) {
-        transactionsStore.transactionForEdit = current
-    }
-}
 
 const handleSubmit = async () => {
     const payload = typed.payload(transaction.value)

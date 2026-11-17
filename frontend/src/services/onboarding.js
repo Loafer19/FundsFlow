@@ -9,13 +9,11 @@ export const markOnboardingDone = () => {
     localStorage.setItem(STORAGE_KEY, 'done')
 }
 
-export const isOnboardingDoneOnServer = (user) =>
-    Boolean(user?.onboarding_completed_at || user?.first_transaction_at)
+export const isOnboardingDoneOnServer = (user) => Boolean(user?.onboarding_completed_at || user?.first_transaction_at)
 
 export const isOnboardingDone = (user) => isOnboardingDoneOnServer(user) || isOnboardingDoneLocally()
 
-export const shouldShowOnboarding = (transactionCount, user) =>
-    !isOnboardingDone(user) && transactionCount === 0
+export const shouldShowOnboarding = (transactionCount, user) => !isOnboardingDone(user) && transactionCount === 0
 
 export const reportOnboarding = (step) => {
     if (step === 'completed' || step === 'dismissed') {
@@ -34,14 +32,17 @@ export const reportOnboarding = (step) => {
         }
     }
 
-    return api.patch('/account/onboarding', { step }).then(({ data }) => {
-        if (data?.user) {
-            auth.user = data.user
-        }
-        return data
-    }).catch(() => {
-        // localStorage is the fallback when the request fails
-    })
+    return api
+        .patch('/account/onboarding', { step })
+        .then(({ data }) => {
+            if (data?.user) {
+                auth.user = data.user
+            }
+            return data
+        })
+        .catch(() => {
+            // localStorage is the fallback when the request fails
+        })
 }
 
 export const syncOnboardingFromUser = (user) => {

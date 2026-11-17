@@ -1,9 +1,12 @@
 import axios from 'axios'
 import toasts from './toasts.js'
 
+const DEFAULT_TIMEOUT = 5000
+const MUTATION_TIMEOUT = 20000
+
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
-    timeout: 5000,
+    timeout: DEFAULT_TIMEOUT,
 })
 
 const IDEMPOTENT = new Set(['get', 'head', 'options'])
@@ -32,6 +35,16 @@ api.interceptors.request.use(
             config.headers.Authorization = `Bearer ${token}`
         } else {
             delete config.headers.Authorization
+        }
+
+        const method = (config.method || 'get').toLowerCase()
+        if (
+            method !== 'get' &&
+            method !== 'head' &&
+            method !== 'options' &&
+            (config.timeout == null || config.timeout === DEFAULT_TIMEOUT)
+        ) {
+            config.timeout = MUTATION_TIMEOUT
         }
 
         return config

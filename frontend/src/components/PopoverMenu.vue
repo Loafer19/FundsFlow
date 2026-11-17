@@ -81,10 +81,14 @@ const onKey = (event) => {
     }
 }
 
-watch(open, (isOpen) => {
-    if (isOpen) bindHost()
-    else unbindHost()
-}, { flush: 'sync' })
+watch(
+    open,
+    (isOpen) => {
+        if (isOpen) bindHost()
+        else unbindHost()
+    },
+    { flush: 'sync' },
+)
 
 watch(open, async (isOpen) => {
     if (!isOpen) return

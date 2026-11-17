@@ -24,10 +24,27 @@ export const dateFormatMap = {
     'DD.MM': { day: '2-digit', month: '2-digit', locale: 'uk-UA' },
 }
 
+// Date-only values and midnight timestamps are calendar days. new Date('YYYY-MM-DD') and
+// new Date('…T00:00:00Z') are UTC midnight, which is the previous local day west of UTC.
+const asCalendarOrInstant = (date) => {
+    if (typeof date === 'string') {
+        const match = /^(\d{4}-\d{2}-\d{2})(?:[ T]00:00:00(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?$/.exec(date)
+        if (match) {
+            const [year, month, day] = match[1].split('-').map(Number)
+            return new Date(year, month - 1, day)
+        }
+    }
+
+    return date instanceof Date ? date : new Date(date)
+}
+
 export const formatDate = (date) => {
     const config = dateFormatMap[settings.dateFormat]
+    const value = asCalendarOrInstant(date)
 
-    return new Intl.DateTimeFormat(config.locale, config).format(new Date(date))
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) return ''
+
+    return new Intl.DateTimeFormat(config.locale, config).format(value)
 }
 
 export const formatDateTime = (value) => {
@@ -52,13 +69,16 @@ export const formatMoneyOptions = {
 }
 
 export const formatMoney = (amount) => {
+    const numeric = Number(amount)
+    const value = Object.is(numeric, -0) ? 0 : numeric
     const options = {
         style: 'decimal',
         minimumFractionDigits: 0,
         maximumFractionDigits: settings.decimals ? 2 : 0,
+        signDisplay: 'negative',
     }
 
-    return new Intl.NumberFormat(settings.moneyFormat, options).format(amount)
+    return new Intl.NumberFormat(settings.moneyFormat, options).format(value)
 }
 
 export const formatPercentage = (value) => {

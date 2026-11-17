@@ -120,9 +120,9 @@ import { LogIn, Send, User, UserPlus } from '@lucide/vue'
 import { ref } from 'vue'
 import ModalHeader from '../components/ModalHeader.vue'
 import { useAuthStore } from './../services/auth.js'
+import { withSignupSource } from './../services/signupSource.js'
 import { formatTelegramCode, normalizeTelegramCode, TELEGRAM_CODE_LENGTH } from './../services/telegramCode.js'
 import { takeStashedInitData } from './../services/telegramWebApp.js'
-import { withSignupSource } from './../services/signupSource.js'
 import toasts from './../services/toasts.js'
 
 const googleAuthUrl = withSignupSource(import.meta.env.VITE_API_URL + '/auth/google')

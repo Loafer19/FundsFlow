@@ -63,11 +63,24 @@ export const useBudgetsStore = defineStore('budgets', {
                 this.budgets[index] = response.data
                 this.persist()
 
-                toasts.success(`${Noun(this.budgets.find((b) => b.id === id), payload)} updated!`)
+                toasts.success(
+                    `${Noun(
+                        this.budgets.find((b) => b.id === id),
+                        payload,
+                    )} updated!`,
+                )
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, `Could not update ${noun(this.budgets.find((b) => b.id === id), payload)}: `))
+                toasts.error(
+                    apiErrorMessage(
+                        error,
+                        `Could not update ${noun(
+                            this.budgets.find((b) => b.id === id),
+                            payload,
+                        )}: `,
+                    ),
+                )
 
                 return false
             } finally {

@@ -4,7 +4,7 @@
       Official workaround: render toast inside the open dialog, outside modal-box.
     -->
     <Teleport :disabled="!openDialog" :to="openDialog || 'body'">
-        <div class="toast toast-top toast-center">
+        <div class="toast toast-top toast-center" role="status" aria-live="polite">
             <div v-for="toast in toasts" :key="toast.id" class="alert flex items-center gap-2" :class="{
                 'alert-success': toast.type === 'success',
                 'alert-error': toast.type === 'error',
@@ -52,7 +52,7 @@ onMounted(() => {
 onBeforeUnmount(() => observer?.disconnect())
 
 watch(
-    () => toasts.length,
+    () => toasts.map((toast) => toast.id).join(','),
     () => {
         syncOpenDialog()
 

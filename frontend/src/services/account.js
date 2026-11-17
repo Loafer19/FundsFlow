@@ -1,4 +1,5 @@
 import api from './api.js'
+import { nowDateStr } from './formatters.js'
 
 export const updateCredentials = (data) => api.put('/account/credentials', data)
 
@@ -18,12 +19,12 @@ export const downloadAccountExport = async () => {
         responseType: 'blob',
         timeout: 60000,
     })
-    const filename = `fundsflow-export-${new Date().toISOString().slice(0, 10)}.json`
+    const filename = `fundsflow-export-${nowDateStr()}.json`
     const url = URL.createObjectURL(response.data)
     const link = document.createElement('a')
 
     link.href = url
     link.download = filename
     link.click()
-    URL.revokeObjectURL(url)
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
 }

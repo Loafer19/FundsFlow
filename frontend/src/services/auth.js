@@ -155,8 +155,11 @@ export const useAuthStore = defineStore('auth', {
                 applyUserPreferences(this.user?.preferences)
 
                 return true
-            } catch {
-                this.clearSession()
+            } catch (error) {
+                const status = error?.response?.status
+
+                // A timeout, offline, or 5xx is not a logged-out session.
+                if (status === 401 || status === 403) this.clearSession()
 
                 return false
             }

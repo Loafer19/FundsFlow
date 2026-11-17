@@ -323,7 +323,6 @@ window.addEventListener('popstate', () => {
     importRoute.value = parseImportRoute()
 })
 
-
 const viewItems = {
     analytics: { key: 'analytics', label: 'Analytics', icon: markRaw(Presentation), tab: Analytics },
     calendar: { key: 'calendar', label: 'Calendar', icon: markRaw(CalendarDays), tab: CalendarTab },
@@ -334,7 +333,12 @@ const viewItems = {
     trend: { key: 'trend', label: 'Trend', icon: markRaw(TrendingUp), tab: BalanceTrend },
 }
 const viewGroups = [
-    { id: 'overview', label: 'Overview', icon: markRaw(LayoutDashboard), items: [viewItems.analytics, viewItems.calendar, viewItems.list] },
+    {
+        id: 'overview',
+        label: 'Overview',
+        icon: markRaw(LayoutDashboard),
+        items: [viewItems.analytics, viewItems.calendar, viewItems.list],
+    },
     { id: 'plan', label: 'Plan', icon: markRaw(PiggyBank), items: [viewItems.budgets, viewItems.tags] },
     { id: 'charts', label: 'Charts', icon: markRaw(TrendingUp), items: [viewItems.flow, viewItems.trend] },
 ]
@@ -405,8 +409,6 @@ watch(currentKey, (key) => {
     const group = viewGroups.find((g) => g.items.some((item) => item.key === key))
     if (group) lastByGroup.value[group.id] = key
 })
-
-
 
 watch(selectedTab, () => haptic.select())
 

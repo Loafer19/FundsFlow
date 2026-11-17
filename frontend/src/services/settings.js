@@ -1,7 +1,13 @@
 import { reactive } from 'vue'
 
-/** ICU lists Europe/Kiev; PHP/IANA use Europe/Kyiv. */
-export const normalizeTimezone = (timezone) => (timezone === 'Europe/Kiev' ? 'Europe/Kyiv' : timezone)
+/** ICU still exposes these; PHP DateTimeZone::getName() stores the canonical id. */
+const TZ_ALIASES = {
+    'Europe/Kiev': 'Europe/Kyiv',
+    'Asia/Calcutta': 'Asia/Kolkata',
+    'Asia/Saigon': 'Asia/Ho_Chi_Minh',
+}
+
+export const normalizeTimezone = (timezone) => TZ_ALIASES[timezone] ?? timezone
 
 const defaults = {
     dateFormat: 'short Month with Day',

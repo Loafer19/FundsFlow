@@ -362,7 +362,26 @@ transaction_types</pre>
 </template>
 
 <script setup>
-import { Bot, Cable, ChevronLeft, ChevronRight, Database, Download, FileUp, Info, KeyRound, LifeBuoy, Palette, Save, Send, Settings as SettingsIcon, Shapes, Tags, UserRound, X } from '@lucide/vue'
+import {
+    Bot,
+    Cable,
+    ChevronLeft,
+    ChevronRight,
+    Database,
+    Download,
+    FileUp,
+    Info,
+    KeyRound,
+    LifeBuoy,
+    Palette,
+    Save,
+    Send,
+    Settings as SettingsIcon,
+    Shapes,
+    Tags,
+    UserRound,
+    X,
+} from '@lucide/vue'
 import { computed, inject, markRaw, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
     createMcpToken,
@@ -405,9 +424,19 @@ const authStore = useAuthStore()
 
 const sections = [
     { id: 'appearance', title: 'Appearance', hint: 'Date, money, timezone and theme', icon: markRaw(Palette) },
-    { id: 'account', title: 'Account', hint: 'Login, email, password, social logins and AI quota', icon: markRaw(UserRound) },
+    {
+        id: 'account',
+        title: 'Account',
+        hint: 'Login, email, password, social logins and AI quota',
+        icon: markRaw(UserRound),
+    },
     { id: 'connections', title: 'Connections', hint: 'Telegram, MCP and Monobank', icon: markRaw(Cable) },
-    { id: 'data', title: 'Data & reports', hint: 'Tags and types, import a statement, export a backup, or download a report', icon: markRaw(Database) },
+    {
+        id: 'data',
+        title: 'Data & reports',
+        hint: 'Tags and types, import a statement, export a backup, or download a report',
+        icon: markRaw(Database),
+    },
     { id: 'support', title: 'Support', hint: 'Feedback and requests', icon: markRaw(LifeBuoy) },
 ]
 const TAB_ALIASES = {
@@ -696,7 +725,9 @@ watch(settingsOpen, (open) => {
         openDrawer()
     } else {
         onModalClose()
-        unmountTimer = setTimeout(() => { rendered.value = false }, 260)
+        unmountTimer = setTimeout(() => {
+            rendered.value = false
+        }, 260)
     }
 })
 

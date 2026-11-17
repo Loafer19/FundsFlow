@@ -191,7 +191,9 @@ export const useAgentStore = defineStore('agent', {
                             try {
                                 const path = new URL(url, window.location.origin).pathname
                                 if (window.location.pathname !== path) window.location.assign(path)
-                            } catch { /* ignore bad url */ }
+                            } catch {
+                                /* ignore bad url */
+                            }
                         }
                     }
                     break

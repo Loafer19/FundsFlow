@@ -85,6 +85,7 @@ export const useTagsStore = defineStore('tags', {
                 const index = this.tags.findIndex((t) => t.id === raw.id)
                 this.tags[index] = response.data
                 this.persist()
+                await patchTagCopies(response.data)
 
                 toasts.success('Tag updated!')
 
@@ -148,3 +149,65 @@ export const useTagsStore = defineStore('tags', {
         },
     },
 })
+
+const copiedTag = (tag, fresh) =>
+    tag?.id === fresh.id
+        ? {
+              ...tag,
+              title: fresh.title,
+              emoji: fresh.emoji,
+              parent_id: fresh.parent_id,
+              calc_balance: fresh.calc_balance,
+          }
+        : tag
+
+const copiedTagList = (tags, fresh) => {
+    if (!Array.isArray(tags) || !tags.some((tag) => tag?.id === fresh.id)) return tags
+    return tags.map((tag) => copiedTag(tag, fresh))
+}
+
+// List rows, budgets and recurring keep their own tag objects. A rename has to
+// reach those copies or the old title stays on screen until the next full load.
+const patchTagCopies = async (fresh) => {
+    const [{ useTransactionsStore }, { useBudgetsStore }, { useRecurringTransactionsStore }] = await Promise.all([
+        import('./transactions.js'),
+        import('./budgets.js'),
+        import('./recurringTransactions.js'),
+    ])
+
+    const transactions = useTransactionsStore()
+    let transactionsChanged = false
+    transactions.transactions = transactions.transactions.map((item) => {
+        const tags = copiedTagList(item.tags, fresh)
+        if (tags === item.tags) return item
+        transactionsChanged = true
+        return { ...item, tags }
+    })
+    if (transactionsChanged) transactions.persist()
+
+    const budgets = useBudgetsStore()
+    let budgetsChanged = false
+    budgets.budgets = budgets.budgets.map((budget) => {
+        if (!Array.isArray(budget.periods)) return budget
+        let changed = false
+        const periods = budget.periods.map((period) => {
+            const tags = copiedTagList(period.tags, fresh)
+            if (tags === period.tags) return period
+            changed = true
+            budgetsChanged = true
+            return { ...period, tags }
+        })
+        return changed ? { ...budget, periods } : budget
+    })
+    if (budgetsChanged) budgets.persist()
+
+    const recurring = useRecurringTransactionsStore()
+    let rulesChanged = false
+    recurring.rules = recurring.rules.map((rule) => {
+        const tags = copiedTagList(rule.tags, fresh)
+        if (tags === rule.tags) return rule
+        rulesChanged = true
+        return { ...rule, tags }
+    })
+    if (rulesChanged) recurring.persist()
+}

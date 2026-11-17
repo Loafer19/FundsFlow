@@ -30,9 +30,7 @@ const formatMoney = inject('formatMoney')
 
 const { colors, narrow } = useChartTheme()
 
-const hasForecast = computed(() =>
-    Object.values(props.balances.forecastBalances || {}).some((value) => value != null),
-)
+const hasForecast = computed(() => Object.values(props.balances.forecastBalances || {}).some((value) => value != null))
 
 const chartData = computed(() => {
     const { currentBalances, previousBalances, forecastBalances = {} } = props.balances
@@ -59,8 +57,7 @@ const chartData = computed(() => {
             tension: 0.1,
             tooltip: {
                 callbacks: {
-                    label: (context) =>
-                        `${formatDate(currentLabels[context.dataIndex])}: ${formatMoney(context.raw)}`,
+                    label: (context) => `${formatDate(currentLabels[context.dataIndex])}: ${formatMoney(context.raw)}`,
                 },
             },
         },
