@@ -74,7 +74,12 @@ export default defineConfig({
                 },
                 {
                     label: 'Self-hosting',
-                    items: [{ slug: 'self-hosting/report-pdf' }, { slug: 'self-hosting/admin-panel' }, { slug: 'self-hosting/queue-worker' }],
+                    items: [
+                        { slug: 'self-hosting/storage' },
+                        { slug: 'self-hosting/report-pdf' },
+                        { slug: 'self-hosting/admin-panel' },
+                        { slug: 'self-hosting/queue-worker' },
+                    ],
                 },
                 {
                     label: 'Help',

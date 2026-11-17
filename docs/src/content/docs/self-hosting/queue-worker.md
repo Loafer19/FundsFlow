@@ -19,8 +19,9 @@ php artisan queue:work --tries=3 --max-time=3600
 - `--max-time=3600` makes the worker exit after an hour so it starts fresh; the container's restart policy
   starts it again. Keep the default restart policy (*any*).
 - Migrations don't run in this container: the entrypoint runs them only for the web server command.
-- The image's health check probes the web server, which isn't running here. Replace it with one that checks the
-  worker process, or turn it off, or the orchestrator will keep restarting the worker:
+- The image does not define a Docker `HEALTHCHECK`. If Dokploy (or the orchestrator) adds one that requests
+  the web port, turn it off for this service or the worker will be restarted for failing a check it cannot pass.
+  A process check, if you want one:
 
   ```json
   { "Test": ["CMD-SHELL", "pgrep -f queue:work > /dev/null || exit 1"], "Interval": 30000000000, "Timeout": 10000000000, "StartPeriod": 30000000000, "Retries": 3 }
