@@ -296,43 +296,52 @@
                     </button>
                 </div>
 
+                <!-- Photos and files go together in one message (read as one on the server). -->
                 <Transition name="agent-chip">
-                <div v-if="attachedDocuments.length" class="border-t border-base-300 px-3 pt-3 flex flex-col gap-1.5" role="list"
-                    :aria-label="attachedDocuments.length > 1 ? 'Files to send' : 'File to send'">
-                    <div v-for="(doc, i) in attachedDocuments" :key="`${doc.name}-${doc.size}-${i}`"
-                        class="flex items-center gap-2 rounded-lg border border-base-300 bg-base-200 px-2 py-1.5 max-w-full"
-                        role="listitem">
-                        <FileText :size="18" class="shrink-0 text-primary" aria-hidden="true" />
-                        <span class="text-sm truncate min-w-0 flex-1" :title="doc.name">{{ doc.name }}</span>
-                        <span class="text-xs text-base-content/60 shrink-0">{{ formatSize(doc.size) }}</span>
-                        <button type="button" class="btn btn-xs btn-circle btn-ghost shrink-0"
-                            :aria-label="`Remove ${doc.name}`" @click="removeDocument(i)">
-                            <X :size="12" aria-hidden="true" />
-                        </button>
-                    </div>
+                <div v-if="attachments.length || preparing || attachedDocuments.length"
+                    class="border-t border-base-300 px-3 pt-3 flex flex-col gap-2">
+                    <TransitionGroup v-if="attachments.length || preparing" tag="div" name="agent-chip"
+                        class="agent-chip-group flex flex-wrap gap-2" role="list" aria-label="Photos to send">
+                        <div v-for="(image, index) in attachments" :key="image.url" class="relative" role="listitem">
+                            <div v-if="image.heic" class="tooltip tooltip-top" :data-tip="image.name">
+                                <div class="size-16 rounded-lg border border-base-300 bg-base-200 grid place-items-center text-xs font-semibold text-base-content/60">
+                                    HEIC</div>
+                            </div>
+                            <img v-else :src="image.url" :alt="`Photo ${index + 1} to send`"
+                                class="size-16 rounded-lg object-cover border border-base-300" />
+                            <button type="button" class="btn btn-xs btn-circle btn-neutral absolute -top-2 -right-2"
+                                :aria-label="`Remove photo ${index + 1}`" @click="removeAttachment(index)">
+                                <X :size="12" aria-hidden="true" />
+                            </button>
+                        </div>
+                        <div v-for="n in preparing" :key="`preparing-${n}`" class="size-16 rounded-lg skeleton" role="listitem"
+                            aria-label="Preparing photo" />
+                    </TransitionGroup>
+
+                    <TransitionGroup v-if="attachedDocuments.length" tag="div" name="agent-chip"
+                        class="agent-chip-group flex flex-col gap-1.5" role="list"
+                        :aria-label="attachedDocuments.length > 1 ? 'Files to send' : 'File to send'">
+                        <div v-for="(doc, i) in attachedDocuments" :key="docKey(doc)"
+                            class="flex items-center gap-2 rounded-lg border border-base-300 bg-base-200 px-2 py-1.5 max-w-full"
+                            role="listitem">
+                            <component :is="docIcon(doc)" :size="18" class="shrink-0 text-primary" aria-hidden="true" />
+                            <span class="tooltip tooltip-top min-w-0 flex-1 text-left" :data-tip="doc.name">
+                                <span class="block text-sm truncate">{{ doc.name }}</span>
+                            </span>
+                            <span class="text-xs text-base-content/60 shrink-0 tabular-nums">{{ formatSize(doc.size) }}</span>
+                            <button type="button" class="btn btn-xs btn-circle btn-ghost shrink-0"
+                                :aria-label="`Remove ${doc.name}`" @click="removeDocument(i)">
+                                <X :size="12" aria-hidden="true" />
+                            </button>
+                        </div>
+                    </TransitionGroup>
+
+                    <p v-if="mixedSummary" class="text-xs text-base-content/60" aria-live="polite">{{ mixedSummary }}</p>
                 </div>
                 </Transition>
 
-                <TransitionGroup v-if="attachments.length || preparing" tag="div" name="agent-chip"
-                    class="agent-chip-group border-t border-base-300 px-3 pt-3 flex flex-wrap gap-2"
-                    role="list" aria-label="Photos to send">
-                    <div v-for="(image, index) in attachments" :key="image.url" class="relative" role="listitem">
-                        <div v-if="image.heic" :title="image.name"
-                            class="size-16 rounded-lg border border-base-300 bg-base-200 grid place-items-center text-xs font-semibold text-base-content/60">
-                            HEIC</div>
-                        <img v-else :src="image.url" :alt="`Photo ${index + 1} to send`"
-                            class="size-16 rounded-lg object-cover border border-base-300" />
-                        <button type="button" class="btn btn-xs btn-circle btn-neutral absolute -top-2 -right-2"
-                            :aria-label="`Remove photo ${index + 1}`" @click="removeAttachment(index)">
-                            <X :size="12" aria-hidden="true" />
-                        </button>
-                    </div>
-                    <div v-for="n in preparing" :key="`preparing-${n}`" class="size-16 rounded-lg skeleton" role="listitem"
-                        aria-label="Preparing photo" />
-                </TransitionGroup>
-
                 <form class="p-3 flex gap-2 items-end"
-                    :class="{ 'border-t border-base-300': !attachments.length && !preparing && !editing && !attachedDocument }"
+                    :class="{ 'border-t border-base-300': !attachments.length && !preparing && !editing && !attachedDocuments.length }"
                     @submit.prevent="send(input)">
                     <input ref="fileInput" type="file" class="hidden" multiple :accept="FILE_ACCEPT" tabindex="-1"
                         aria-hidden="true" @change="onFilePicked" />
@@ -358,9 +367,10 @@
                 <div v-if="dragging" class="agent-fade absolute inset-0 z-10 m-2 rounded-box border-2 border-dashed border-primary
                     bg-base-100/90 flex flex-col items-center justify-center gap-2 pointer-events-none" aria-hidden="true">
                     <ImagePlus :size="32" class="text-primary" />
-                    <p class="font-medium">Drop receipt photos or a file</p>
+                    <p class="font-medium">Drop receipt photos or files</p>
                     <p class="text-xs text-base-content/60">Photos: JPEG, PNG, WebP or HEIC · up to {{ MAX_IMAGES }}</p>
                     <p class="text-xs text-base-content/60">Files: PDF, Word, CSV, Excel, JSON, OFX, QIF, HTML · up to {{ MAX_DOCUMENTS }} at once</p>
+                    <p class="text-xs text-base-content/60">Photos and files can go in one message</p>
                 </div>
             </aside>
         </div>
@@ -666,8 +676,9 @@ const inputPlaceholder = computed(() => {
     if (agent.quotaExhausted) {
         return countdown.value ? `AI assists reset in ${countdown.value}` : 'No AI assists left today'
     }
+    if (attachments.value.length) return 'Note or amount (optional), e.g. -350'
     if (attachedDocument.value) return 'Note (optional), e.g. card statement'
-    return attachments.value.length ? 'Note or amount (optional), e.g. -350' : 'Ask anything about your finances…'
+    return 'Ask anything about your finances…'
 })
 
 // Once midnight passes, pull the fresh counter instead of showing a stale "0 left".
@@ -690,37 +701,49 @@ const autoGrow = () => {
 
 const attachments = ref([])
 const preparing = ref(0)
-// Documents (PDF, Word, CSV, Excel, JSON, OFX, QIF, HTML; up to MAX_DOCUMENTS) instead of photos;
-// several files become one import on the server.
+// Documents (PDF, Word, CSV, Excel, JSON, OFX, QIF, HTML; up to MAX_DOCUMENTS). They can go with
+// photos in the same message (limits counted separately); several files become one import on the server.
 const attachedDocuments = ref([])
 const attachedDocument = computed(() => attachedDocuments.value[0] ?? null)
 const FILE_ACCEPT = `${ACCEPT},${DOCUMENT_ACCEPT}`
 
-const attachDisabled = computed(
-    () =>
-        agent.quotaExhausted ||
-        attachedDocuments.value.length >= MAX_DOCUMENTS ||
-        attachments.value.length + preparing.value >= MAX_IMAGES,
-)
+const photosFull = computed(() => attachments.value.length + preparing.value >= MAX_IMAGES)
+const documentsFull = computed(() => attachedDocuments.value.length >= MAX_DOCUMENTS)
+
+const attachDisabled = computed(() => agent.quotaExhausted || (photosFull.value && documentsFull.value))
 
 const attachTip = computed(() => {
     if (agent.quotaExhausted) return 'No AI assists left today'
-    if (attachedDocuments.value.length >= MAX_DOCUMENTS) return `Up to ${MAX_DOCUMENTS} files per message`
-    if (attachments.value.length + preparing.value >= MAX_IMAGES) return `Up to ${MAX_IMAGES} photos per message`
+    if (photosFull.value && documentsFull.value)
+        return `Up to ${MAX_IMAGES} photos and ${MAX_DOCUMENTS} files per message`
+    if (documentsFull.value) return `Add photos (up to ${MAX_DOCUMENTS} files per message)`
+    if (photosFull.value) return `Add files (up to ${MAX_IMAGES} photos per message)`
     return 'Attach receipt photos or files (PDF, Word, CSV, Excel, OFX, QIF…)'
 })
 
-// Documents go without photos: returns true when they were taken (or refused with a toast).
-const addDocument = (files) => {
-    const docs = files.filter(
-        (file) => !isSupportedImage(file) && (isSupportedDocument(file) || legacyDocumentHint(file)),
-    )
-    if (!docs.length) return false
-    if (attachments.value.length || preparing.value) {
-        toasts.error('Send files on their own, without photos')
-        return true
-    }
-    if (files.length > docs.length) toasts.info('Files and photos go in separate messages: only the files were added')
+// "1 photo + 2 files are read together": only when both kinds are attached.
+const mixedSummary = computed(() => {
+    const photos = attachments.value.length + preparing.value
+    const files = attachedDocuments.value.length
+    if (!photos || !files) return ''
+    return `${photoLabel(photos)} + ${files} file${files === 1 ? '' : 's'} are read together`
+})
+
+const SHEET_EXTENSIONS = /\.(csv|xlsx|xls|ods|tsv)$/i
+const docIcon = (doc) => (SHEET_EXTENSIONS.test(doc.name || '') ? FileSpreadsheet : FileText)
+
+// Stable keys for the chip transitions (a File has no id).
+const docKeys = new WeakMap()
+let docSeq = 0
+const docKey = (doc) => {
+    if (!docKeys.has(doc)) docKeys.set(doc, `doc-${++docSeq}`)
+    return docKeys.get(doc)
+}
+
+const isDocumentFile = (file) => !isSupportedImage(file) && (isSupportedDocument(file) || legacyDocumentHint(file))
+
+// Takes the documents of a pick / drop / paste (photos already attached are fine).
+const addDocuments = (docs) => {
     for (const file of docs) {
         const name = file.name || 'The file'
         const hint = legacyDocumentHint(file)
@@ -747,8 +770,6 @@ const addDocument = (files) => {
         }
         attachedDocuments.value = [...attachedDocuments.value, file]
     }
-    nextTick(() => textarea.value?.focus())
-    return true
 }
 
 const removeDocument = (index) => {
@@ -762,20 +783,21 @@ const addFiles = async (list) => {
     const files = [...(list ?? [])]
     if (!files.length) return
     if (agent.quotaExhausted) {
-        toasts.info('No AI assists left today: photos can be sent again after the reset')
+        toasts.info('No AI assists left today: photos and files can be sent again after the reset')
         return
     }
 
-    if (addDocument(files)) return
-    if (attachedDocument.value) {
-        toasts.error('Send photos separately from the file')
-        return
-    }
-
+    // Photos and files in any mix: files are taken at once, photos are downscaled below.
+    const docs = files.filter(isDocumentFile)
     const images = files.filter(isSupportedImage)
-    if (images.length < files.length) {
+    if (images.length + docs.length < files.length) {
         toasts.error('Attach JPEG, PNG, WebP or HEIC photos, or PDF, Word, CSV, Excel, JSON, OFX, QIF or HTML files')
     }
+    if (docs.length) {
+        addDocuments(docs)
+        nextTick(() => textarea.value?.focus())
+    }
+    if (!images.length) return
 
     const room = MAX_IMAGES - attachments.value.length - preparing.value
     if (images.length > room) toasts.error(`Up to ${MAX_IMAGES} photos per message`)
@@ -814,7 +836,9 @@ const onFilePicked = (event) => {
 }
 
 const onPaste = (event) => {
-    const files = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith('image/'))
+    const files = [...(event.clipboardData?.files ?? [])].filter(
+        (file) => file.type.startsWith('image/') || isDocumentFile(file),
+    )
     if (!files.length) return
     event.preventDefault()
     addFiles(files)
@@ -990,7 +1014,7 @@ const send = async (text) => {
     const ok = await agent.send(message, images, rewind, docs)
     // Rejected before streaming (422 / 409 / 429): give the photos / edited text back instead of losing them.
     if (ok === false && images.length && !attachments.value.length) attachments.value = images
-    if (ok === false && file && !attachedDocuments.value.length && !attachments.value.length) {
+    if (ok === false && file && !attachedDocuments.value.length) {
         attachedDocuments.value = docs
         if (!input.value) input.value = message
     }

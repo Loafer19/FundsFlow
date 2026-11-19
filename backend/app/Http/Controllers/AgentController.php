@@ -53,7 +53,10 @@ class AgentController extends Controller
      * Or documents: `document` (one) and/or `documents[]` (up to DocumentFile::maxFiles() in all; PDF,
      * DOCX, CSV, XLSX, ODS, JSON, OFX/QFX, QIF, HTML; kind sniffed from the bytes + extension, see
      * DocumentFile; DocumentFile::maxTotalBytes() together): one receipt, or ONE bulk import of all
-     * files behind one Confirm card. Not with photos or a rewind.
+     * files behind one Confirm card. Not with a rewind.
+     *
+     * Photos and documents may come together (limits counted separately): they are read as one,
+     * see RunWebReceiptAction::startMixed.
      */
     public function chat(Request $request): StreamedResponse|JsonResponse
     {
@@ -127,10 +130,6 @@ class AgentController extends Controller
 
         if ($rewind !== null && ($images !== [] || $document !== null)) {
             return response()->json(['message' => "Files can't be attached when editing or regenerating a message."], 422);
-        }
-
-        if ($document !== null && $images !== []) {
-            return response()->json(['message' => 'Send a document on its own, without photos.'], 422);
         }
 
         if ($message === '' && $images === [] && $document === null && $rewind !== WebAgentSession::REWIND_REGENERATE) {

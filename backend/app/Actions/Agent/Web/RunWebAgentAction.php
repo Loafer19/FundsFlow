@@ -34,7 +34,7 @@ final class RunWebAgentAction
     /**
      * @param Closure(string, array<string, mixed>): void $emit
      * @param array<string, mixed> $context validated screen context (tab, period, tag filter)
-     * @param list<array{id: string, name: string, mime: string, file_size: int}> $files receipt photos, or one document (WebAgentUploads refs)
+     * @param list<array{id: string, name: string, mime: string, file_size: int}> $files receipt photos and / or documents (WebAgentUploads refs)
      * @param null|array{prior_question: string} $rewoundAsk the question an edited / regenerated turn answered
      *                                                       (WebAgentSession::rewindLastTurn already dropped that turn)
      */
@@ -93,13 +93,23 @@ final class RunWebAgentAction
             ? ['reply_to' => 'agent_ask', 'prior_question' => $askContext['prior_question']]
             : [];
         $documents = array_values(array_filter($files, static fn (array $file): bool => WebAgentUploads::isDocumentRef($file)));
+        $photos = array_values(array_filter($files, static fn (array $file): bool => !WebAgentUploads::isDocumentRef($file)));
         $document = $documents[0] ?? null;
         $userItem = $channel->push('user', ['role' => 'user', 'kind' => 'text', 'text' => $message]
+            + ($photos !== [] ? ['photos' => count($photos)] : [])
             + ($document !== null
                 ? ['document' => ['name' => (string) $document['name'], 'size' => (int) $document['file_size']]]
                     + (count($documents) > 1 ? ['documents' => array_map(static fn (array $doc) => ['name' => (string) $doc['name'], 'size' => (int) $doc['file_size']], $documents)] : [])
-                : ($files !== [] ? ['photos' => count($files)] : []))
+                : [])
             + $replyTo);
+
+        // Photos and documents together: read as one (one receipt with them attached, or ONE import).
+        if ($document !== null && $photos !== []) {
+            $status = $this->receipt->startMixed($user, $channel, $session, $photos, $documents, $message);
+            $this->finish($user, $session, $emit, $status);
+
+            return;
+        }
 
         // Documents: one receipt or ONE bulk import of all files (shared with Telegram, see DocumentImport).
         if ($document !== null) {

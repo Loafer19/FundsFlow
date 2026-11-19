@@ -228,7 +228,8 @@ export const useAgentStore = defineStore('agent', {
 
         // images: [{ file: Blob (downscaled JPEG), name, url (object URL for the bubble thumbnail) }]
         // document: a File or an array of Files (PDF, Word, CSV, Excel, JSON, OFX, QIF, HTML; up to
-        // MAX_DOCUMENTS), sent instead of photos; several files become one import on the server
+        // MAX_DOCUMENTS), alone or with photos (the server reads them together: one receipt with the
+        // photos and PDFs attached, or one import)
         // rewind: { mode: 'replace_last' | 'regenerate', turnId } drops the last turn (here and on the
         // server) before sending; photos are never re-sent with it.
         async send(text, images = [], rewind = null, document = null) {
@@ -237,7 +238,7 @@ export const useAgentStore = defineStore('agent', {
                 ? []
                 : (Array.isArray(document) ? document : [document]).filter((doc) => doc instanceof Blob)
             const file = docs[0] ?? null
-            const photos = rewind || file ? [] : Array.isArray(images) ? images.filter((image) => image?.file) : []
+            const photos = rewind ? [] : Array.isArray(images) ? images.filter((image) => image?.file) : []
             if ((!message && !photos.length && !file) || this.isStreaming) return
 
             let dropped = null
@@ -316,9 +317,10 @@ export const useAgentStore = defineStore('agent', {
 
                     if (response.status === 429) detail = 'Too many messages. Wait a minute and try again.'
                     if (response.status === 413) {
-                        detail = file
-                            ? 'That file is too large. Send a shorter period or split it.'
-                            : 'Those photos are too large. Try fewer or smaller ones.'
+                        if (file && photos.length)
+                            detail = 'Those photos and files are too large together. Send fewer at once.'
+                        else if (file) detail = 'That file is too large. Send a shorter period or split it.'
+                        else detail = 'Those photos are too large. Try fewer or smaller ones.'
                     }
 
                     this.items = this.items.filter((item) => item.id !== localUserId)

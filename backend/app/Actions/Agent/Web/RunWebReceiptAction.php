@@ -92,11 +92,117 @@ final class RunWebReceiptAction
             'Until then, send CSV / Excel / OFX / QIF files with date and amount columns: those need no AI.',
         );
 
-        if ($failed !== [] && in_array($result['type'], ['confirm', 'ask'], true)) {
+        if ($failed !== [] && in_array($result['type'], ['preview', 'confirm', 'ask'], true)) {
             $this->notice($channel, $session, "Couldn't open: " . implode(', ', $failed) . '. The other files were read.', 'warning', 'ok');
         }
 
         return $this->presentImport($user, $channel, $session, $result);
+    }
+
+    /**
+     * A message with photos AND documents (in any order). A caption with an amount ("-350 groceries")
+     * skips AI like a photo caption does. Otherwise the photos and the documents are read together
+     * (DocumentImport::fromMixed, one assist for the vision call): one purchase becomes the usual
+     * receipt Confirm card with the photos and PDFs attached, anything else ONE import.
+     *
+     * @param non-empty-list<array{id: string, name: string, mime: string, file_size: int}> $photos
+     * @param non-empty-list<array{id: string, name: string, mime: string, file_size: int}> $documents
+     */
+    public function startMixed(User $user, WebAgentChannel $channel, WebAgentSession $session, array $photos, array $documents, string $caption): string
+    {
+        $caption = trim($caption);
+        $all = array_merge($photos, $documents);
+        // What can sit on one transaction: the photos and PDFs (not Word / spreadsheets), up to the attachment limit.
+        $attachable = array_slice(array_values(array_filter(
+            $all,
+            static fn (array $ref): bool => TransactionAttachmentRules::isAccepted((string) $ref['mime']),
+        )), 0, TransactionAttachmentRules::MAX_PER_TRANSACTION);
+        $keepIds = array_column($attachable, 'id');
+        $dropOthers = function () use ($user, $all, $keepIds): void {
+            $this->uploads->delete($user, array_values(array_filter($all, static fn (array $ref): bool => !in_array($ref['id'], $keepIds, true))));
+        };
+
+        $parsed = $caption !== '' && !DocumentImport::isListCaption($caption) ? $this->quickAdd->parseQuickAdd($caption, $user) : null;
+
+        if (is_array($parsed) && !isset($parsed['error'])) {
+            $dropOthers();
+
+            return $this->stageOne($user, $channel, (float) $parsed['amount'], (string) $parsed['at'], $parsed['note'], [], $attachable);
+        }
+
+        $images = [];
+        $read = [];
+        $failed = [];
+
+        foreach ($photos as $photo) {
+            $contents = $this->uploads->read($user, $photo);
+
+            if ($contents === null) {
+                $failed[] = (string) $photo['name'];
+
+                continue;
+            }
+            $images[] = ['bytes' => $contents, 'mime' => (string) $photo['mime'], 'name' => (string) $photo['name']];
+        }
+
+        foreach (array_slice($documents, 0, DocumentFile::maxFiles()) as $file) {
+            $kind = DocumentFile::kindOfMime((string) $file['mime']);
+            $contents = $kind !== null ? $this->uploads->read($user, $file) : null;
+
+            if ($contents === null) {
+                $failed[] = (string) $file['name'];
+
+                continue;
+            }
+            $read[] = ['name' => (string) $file['name'], 'kind' => $kind, 'bytes' => $contents];
+        }
+
+        if ($images === [] && $read === []) {
+            $this->uploads->delete($user, $all);
+
+            return $this->notice($channel, $session, "Couldn't open the photos or files. Send them again.", 'error');
+        }
+
+        $count = count($images) + count($read);
+        $channel->status('read_document', 'Reading ' . $this->mixedLabel(count($images), count($read)));
+        $result = $this->documents->fromMixed(
+            $user,
+            $read,
+            $images,
+            $caption !== '' ? $caption : null,
+            'Until then, send the amount like -350 groceries, or a CSV with date and amount columns.',
+        );
+
+        if ($result['type'] !== 'single') {
+            $this->uploads->delete($user, $all);
+        }
+
+        if ($failed !== [] && in_array($result['type'], ['single', 'preview', 'confirm', 'ask'], true)) {
+            $this->notice($channel, $session, "Couldn't open: " . implode(', ', $failed) . '. The rest was read.', 'warning', 'ok');
+        }
+
+        if ($result['type'] === 'single') {
+            $dropOthers();
+
+            foreach ($result['notes'] ?? [] as $note) {
+                $this->notice($channel, $session, (string) $note, 'warning', 'ok');
+            }
+            $analysis = $result['analysis'];
+            $at = is_string($analysis['at'] ?? null) ? $analysis['at'] : $user->todayDateString();
+            $tagIds = $this->matchTags->ids($user, $analysis['suggested_tag_titles'] ?? []);
+
+            return $this->stageOne($user, $channel, (float) $analysis['amount'], $at, $analysis['note'], $tagIds, $attachable);
+        }
+
+        if ($result['type'] === 'quota') {
+            return $this->notice($channel, $session, (string) $result['message'], 'error', 'quota_exhausted');
+        }
+
+        if (in_array($result['type'], ['preview', 'confirm', 'ask'], true)) {
+            return $this->presentImport($user, $channel, $session, $result);
+        }
+
+        return $this->notice($channel, $session, (string) ($result['message'] ?? "Couldn't read the photos and files ({$count})."), 'error');
     }
 
     /**
@@ -141,7 +247,7 @@ final class RunWebReceiptAction
             $this->uploads->delete($user, [$file]);
         }
 
-        if (in_array($result['type'], ['confirm', 'ask'], true)) {
+        if (in_array($result['type'], ['preview', 'confirm', 'ask'], true)) {
             return $this->presentImport($user, $channel, $session, $result);
         }
 
@@ -296,6 +402,19 @@ final class RunWebReceiptAction
     }
 
     /**
+     * "2 photos and 1 file".
+     */
+    private function mixedLabel(int $photos, int $files): string
+    {
+        $parts = array_filter([
+            $photos > 0 ? $photos . ' photo' . ($photos === 1 ? '' : 's') : '',
+            $files > 0 ? $files . ' file' . ($files === 1 ? '' : 's') : '',
+        ]);
+
+        return implode(' and ', $parts);
+    }
+
+    /**
      * Reply to "these tags don't exist": create / map / without, or any other edit of the import.
      *
      * @param array<string, mixed> $pending
@@ -392,7 +511,7 @@ final class RunWebReceiptAction
             'Until then, export the statement as CSV, Excel, OFX or QIF from the bank app: those need no AI.',
         );
 
-        if ($skipped > 0 && in_array($result['type'], ['confirm', 'ask'], true)) {
+        if ($skipped > 0 && in_array($result['type'], ['preview', 'confirm', 'ask'], true)) {
             $this->notice($channel, $session, "{$skipped} image" . ($skipped === 1 ? ' was' : 's were') . ' not JPEG / PNG and ' . ($skipped === 1 ? 'was' : 'were') . ' skipped.', 'warning', 'ok');
         }
 
@@ -753,6 +872,12 @@ final class RunWebReceiptAction
 
         if ($n === 1 && WebAgentUploads::isDocumentRef($files[0])) {
             return '1 file: ' . (string) ($files[0]['name'] ?? 'document');
+        }
+
+        $docs = count(array_filter($files, static fn ($ref): bool => WebAgentUploads::isDocumentRef($ref)));
+
+        if ($docs > 0 && $docs < $n) {
+            return $this->mixedLabel($n - $docs, $docs);
         }
 
         return $n . ' photo' . ($n === 1 ? '' : 's');

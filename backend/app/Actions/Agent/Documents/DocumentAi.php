@@ -276,6 +276,103 @@ PROMPT;
     }
 
     /**
+     * Photos and documents sent together in one message: ONE vision call that sees the photos and the
+     * text of every document, so a receipt photo and the invoice PDF of the same purchase count once,
+     * and a statement plus screenshots of recent operations become one list.
+     *
+     * @param list<array{bytes: string, mime: string, name?: string}> $images
+     * @param list<array{name: string, text: string}> $documents text already read out of the files
+     * @return null|array{kind: 'list'|'none'|'receipt', transactions: list<array{amount: float, at: ?string, note: ?string, suggested_tag_titles: list<string>}>}
+     */
+    public function readMixed(User $user, array $images, array $documents, ?string $caption): ?array
+    {
+        $today = $user->todayDateString();
+        $tags = $user->tags()->orderBy('title')->limit(80)->pluck('title')->implode(', ');
+        $rows = DocumentFile::maxRows();
+        $photoCount = count($images);
+        $docCount = count($documents);
+        // The text budget of one document read, shared by all documents of the message.
+        $perDoc = max(2000, intdiv((int) config('agent.documents.max_text_chars', 40000), max(1, $docCount)));
+
+        $system = <<<PROMPT
+You read what a user sent to a personal finance app in ONE message: {$photoCount} photo(s) and {$docCount} document(s).
+Photos may be receipts, invoices or screenshots of a banking app's operations list. Documents are given as text.
+FundsFlow convention: expenses are negative amounts, income / refunds / incoming transfers are positive.
+Reply with ONLY a JSON object (no markdown):
+{"kind": "receipt"|"list"|"none", "transactions": [{"amount": number, "at": "YYYY-MM-DD"|null, "note": string|null, "suggested_tag_titles": string[]}]}
+- receipt: everything shows ONE purchase or bill (e.g. a photo of a receipt and the invoice PDF of the same order, or
+  several photos of one long receipt). Return exactly ONE transaction: the final total paid, not the line items.
+- list: several operations (a statement, screenshots of an operations list, several different receipts). Return every
+  operation at most once (at most {$rows}): when the same operation appears in a photo and in a document, or on two
+  overlapping screenshots, list it once. A separate receipt is one operation with its total.
+- none: no money transactions anywhere (transactions: []).
+- at: resolve "Today" / "Yesterday" / "24 October"; today is {$today}. A date without a year is in the past 12 months.
+  null if no date is visible for that operation. Ignore balances, daily totals and subtotals. Never invent amounts.
+- note: short merchant / description, max ~80 chars.
+- suggested_tag_titles: 0-2 names, preferably from the user's tags: {$tags}
+PROMPT;
+
+        $intro = "Today (user timezone) is {$today}."
+            . ($caption !== null && trim($caption) !== '' ? "\nUser caption: " . mb_substr(trim($caption), 0, 300) : '');
+
+        foreach ($documents as $i => $doc) {
+            $text = (string) $doc['text'];
+            $cut = mb_strlen($text) > $perDoc;
+            $intro .= "\n\nDocument " . ($i + 1) . ': ' . mb_substr((string) $doc['name'], 0, 120)
+                . ($cut ? " (cut to its first {$perDoc} characters)" : '')
+                . "\n<document>\n" . $this->fence(mb_substr($text, 0, $perDoc)) . "\n</document>";
+        }
+
+        $content = [['type' => 'text', 'text' => $intro . ($photoCount > 0 ? "\n\nPhotos follow, in order." : '')]];
+
+        foreach ($images as $image) {
+            $converted = ImageConverter::forVision($image['bytes'], $image['mime']);
+
+            if ($converted === null) {
+                continue;
+            }
+            $content[] = ['type' => 'image_url', 'image_url' => ['url' => 'data:' . $converted['mime'] . ';base64,' . base64_encode($converted['bytes']), 'detail' => 'high']];
+        }
+
+        $json = $this->call(
+            $system . "\n" . str_replace('<document> ... </document>', '<document> ... </document> and in the photos', self::UNTRUSTED),
+            $content,
+            16000,
+            (int) config('agent.documents.ai_timeout', 120),
+            (string) config('services.xai.vision_model', 'grok-4'),
+        );
+
+        if (!is_array($json)) {
+            return null;
+        }
+
+        $kind = in_array($json['kind'] ?? null, ['receipt', 'list', 'none'], true) ? $json['kind'] : 'list';
+        $items = [];
+
+        foreach (array_slice(is_array($json['transactions'] ?? null) ? $json['transactions'] : [], 0, $rows) as $item) {
+            if (!is_array($item) || !is_numeric($item['amount'] ?? null) || (float) $item['amount'] == 0.0) {
+                continue;
+            }
+            $note = is_string($item['note'] ?? null) ? trim(mb_substr($item['note'], 0, 255)) : null;
+            $items[] = [
+                'amount' => round((float) $item['amount'], 2),
+                'at' => PeriodRange::isStorableDate($item['at'] ?? null) ? $item['at'] : null,
+                'note' => $note !== '' ? $note : null,
+                'suggested_tag_titles' => array_slice(array_values(array_filter(
+                    array_map(static fn ($t) => is_string($t) ? trim(mb_substr($t, 0, 60)) : '', is_array($item['suggested_tag_titles'] ?? null) ? $item['suggested_tag_titles'] : []),
+                    static fn (string $t) => $t !== '',
+                )), 0, 3),
+            ];
+        }
+
+        if ($kind === 'receipt' && count($items) > 1) {
+            $kind = 'list';
+        }
+
+        return ['kind' => $items === [] ? 'none' : $kind, 'transactions' => $items];
+    }
+
+    /**
      * Why the last call() returned null: 'busy' (xAI rate limit / at capacity), 'unavailable'
      * (5xx, timeout, network), 'rejected' (other 4xx), 'bad_reply' (empty, cut or non-JSON answer),
      * 'not_configured' (no API key). Null after a successful call.

@@ -39,6 +39,8 @@ final class DocumentImport
         private readonly TelegramAiQuota $quota,
         private readonly ListTagsAction $listTags,
         private readonly CreateImportBatchAction $createBatch,
+        private readonly DocumentText $text,
+        private readonly FormatReader $formats,
     ) {}
 
     public static function isListCaption(?string $caption): bool
@@ -114,6 +116,163 @@ final class DocumentImport
             return $quotaMessage !== null && count($errors) === 1
                 ? ['type' => 'quota', 'message' => $quotaMessage]
                 : ['type' => 'error', 'message' => "Nothing to import:\n" . implode("\n", array_map(static fn ($e) => '• ' . $e, $errors))];
+        }
+
+        foreach ($errors as $error) {
+            $notes[] = '⚠️ Not imported: ' . $error;
+        }
+
+        $draft = $this->merge($parts, $notes, false);
+        $draft['ai_used'] = $aiUsed;
+
+        return $this->withCaption($user, $draft, $caption);
+    }
+
+    /**
+     * Photos and documents sent together in one message. Files with their own rows (CSV, Excel,
+     * ODS, JSON, OFX, QIF, an HTML table) are read like any import, without AI; the photos and the
+     * text of every other document (PDF, Word, HTML text; a scanned PDF as its first page) go to
+     * ONE vision call together (1 assist), so the same purchase on a photo and in a PDF counts once.
+     *
+     * Result: like fromFiles(), plus `single` with `analysis` when all of it is one receipt (the
+     * caller attaches the photos and PDFs to that transaction).
+     *
+     * @param list<array{name: string, kind: string, bytes: string}> $files
+     * @param list<array{bytes: string, mime: string, name: string}> $images
+     * @return array<string, mixed>
+     */
+    public function fromMixed(User $user, array $files, array $images, ?string $caption, string $withoutAi): array
+    {
+        $files = array_slice($files, 0, DocumentFile::maxFiles());
+        $images = array_slice($images, 0, max(1, (int) config('agent.documents.max_screenshots', self::MAX_SCREENSHOTS)));
+        $parts = [];
+        $notes = [];
+        $errors = [];
+        $texts = [];
+        $aiUsed = false;
+        $quotaMessage = null;
+
+        foreach ($files as $file) {
+            $name = (string) $file['name'];
+            $kind = (string) $file['kind'];
+            $text = null;
+
+            if ($kind === DocumentFile::PDF) {
+                $read = $this->text->pdf($file['bytes']);
+
+                if (isset($read['error'])) {
+                    $errors[] = "{$name}: " . $read['error'];
+
+                    continue;
+                }
+
+                if (isset($read['scanned'])) {
+                    $jpeg = $this->text->pdfFirstPageJpeg($file['bytes']);
+
+                    if ($jpeg === null) {
+                        $errors[] = "{$name}: a scan without text that couldn't be read";
+                    } else {
+                        $images[] = ['bytes' => $jpeg, 'mime' => 'image/jpeg', 'name' => $name];
+                    }
+
+                    continue;
+                }
+                $text = $read['text'];
+            } elseif ($kind === DocumentFile::DOCX) {
+                $text = $this->text->docx($file['bytes']);
+
+                if ($text === null || preg_match_all('/[\p{L}\p{N}]/u', $text) < 5) {
+                    $errors[] = "{$name}: no text to read";
+
+                    continue;
+                }
+            } elseif ($kind === DocumentFile::HTML) {
+                $read = $this->formats->html($file['bytes'], $name);
+                $text = isset($read['text']) && !isset($read['table']) ? (string) $read['text'] : null;
+            }
+
+            if ($text !== null) {
+                $texts[] = ['name' => $name, 'text' => $text];
+
+                continue;
+            }
+
+            // Rows of their own (spreadsheets, OFX / QIF / JSON, HTML tables): the usual reader.
+            $result = $this->read->execute($user, $kind, $file['bytes'], $name, $caption, $withoutAi);
+
+            if ($result['type'] === 'rows') {
+                $parts[] = $result;
+                $aiUsed = $aiUsed || $result['ai_used'];
+            } elseif ($result['type'] === 'quota') {
+                $quotaMessage = (string) $result['message'];
+                $errors[] = "{$name}: needs an AI assist and none are left today";
+            } elseif ($result['type'] === 'error') {
+                $errors[] = "{$name}: " . $result['message'];
+            }
+        }
+
+        $single = null;
+
+        if ($images !== [] || $texts !== []) {
+            if (!$this->quota->hasQuota($user)) {
+                $quotaMessage = $this->quota->exhaustedMessage($user, $withoutAi);
+                $errors[] = 'the photos' . ($texts !== [] ? ' and ' . implode(', ', array_column($texts, 'name')) : '') . ': need an AI assist and none are left today';
+            } else {
+                $read = $this->ai->readMixed($user, $images, $texts, $caption);
+
+                if ($read === null) {
+                    $errors[] = 'the photos' . ($texts !== [] ? ' and ' . implode(', ', array_column($texts, 'name')) : '')
+                        . ": couldn't be read (" . $this->ai->failureReason() . ')';
+                } else {
+                    $this->quota->consume($user);
+                    $aiUsed = true;
+                    $items = $read['transactions'];
+
+                    if ($read['kind'] === 'receipt' && $parts === []) {
+                        $first = $items[0];
+                        $single = ['type' => 'single', 'analysis' => [
+                            'amount' => $first['amount'],
+                            'at' => $first['at'],
+                            'note' => $first['note'],
+                            'suggested_tag_titles' => $first['suggested_tag_titles'],
+                            'needs_price' => false,
+                        ]];
+                    } elseif ($items !== []) {
+                        $rows = [];
+                        $skipped = [];
+
+                        foreach ($items as $j => $item) {
+                            if ($item['at'] === null) {
+                                $skipped[] = ['line' => $j + 1, 'reason' => 'no date visible'];
+
+                                continue;
+                            }
+                            $rows[] = ['line' => $j + 1, 'at' => $item['at'], 'amount' => $item['amount'], 'note' => $item['note'], 'tags' => $item['suggested_tag_titles'], 'soft' => true];
+                        }
+                        $label = trim(($images !== [] ? count($images) . ' photo' . (count($images) === 1 ? '' : 's') : '')
+                            . ($images !== [] && $texts !== [] ? ' + ' : '')
+                            . implode(', ', array_map(static fn (array $t) => mb_strimwidth($t['name'], 0, 40, '…'), $texts)));
+                        $parts[] = [
+                            'file' => ['name' => mb_substr($label, 0, 120), 'kind' => 'image', 'ambiguous' => false, 'order' => null, 'samples' => []],
+                            'rows' => $rows,
+                            'skipped' => $skipped,
+                            'capped' => count($items) >= DocumentFile::maxRows(),
+                        ];
+                    } else {
+                        $errors[] = 'the photos' . ($texts !== [] ? ' and ' . implode(', ', array_column($texts, 'name')) : '') . ': no transactions found';
+                    }
+                }
+            }
+        }
+
+        if ($single !== null) {
+            return $single + ($errors !== [] ? ['notes' => array_map(static fn ($e) => '⚠️ Not read: ' . $e, $errors)] : []);
+        }
+
+        if ($parts === [] || array_sum(array_map(static fn (array $p) => count($p['rows']), $parts)) === 0) {
+            return $quotaMessage !== null && count($errors) === 1
+                ? ['type' => 'quota', 'message' => $quotaMessage]
+                : ['type' => 'error', 'message' => "Nothing to import:\n" . implode("\n", array_map(static fn ($e) => '• ' . $e, $errors ?: ['no dated transactions found']))];
         }
 
         foreach ($errors as $error) {

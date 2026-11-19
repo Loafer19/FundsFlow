@@ -288,9 +288,12 @@ final class WebAgentSession implements AgentSession
     private function mirror(array $item, ?string $turnId): void
     {
         $photos = (int) ($item['photos'] ?? 0);
+        $docs = is_array($item['documents'] ?? null) ? $item['documents'] : (is_array($item['document'] ?? null) ? [$item['document']] : []);
+        $files = array_values(array_filter(array_map(static fn ($doc) => is_array($doc) ? mb_substr((string) ($doc['name'] ?? ''), 0, 80) : '', $docs)));
         $kind = (string) ($item['kind'] ?? 'text');
         $text = trim(match ($kind) {
-            'text' => (string) ($item['text'] ?? '') . ($photos > 0 ? " [sent {$photos} receipt photo(s)]" : ''),
+            'text' => (string) ($item['text'] ?? '') . ($photos > 0 ? " [sent {$photos} receipt photo(s)]" : '')
+                . ($files !== [] ? ' [sent file(s): ' . implode(', ', $files) . ']' : ''),
             'notice' => (string) ($item['text'] ?? ''),
             'ask' => (string) ($item['question'] ?? ''),
             'confirm' => (string) ($item['preview'] ?? ''),
