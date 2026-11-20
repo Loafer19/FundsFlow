@@ -13,6 +13,7 @@ use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
 use App\Channels\Telegram\Widgets\TelegramWidgetSender;
+use App\Channels\Telegram\Widgets\WidgetAvailability;
 use App\Models\Budget;
 use App\Models\BudgetPeriod;
 use App\Models\RecurringTransaction;
@@ -388,9 +389,35 @@ class MenuHandler
         $this->client->sendMessage(
             $chatId,
             $muted
-                ? '🔕 Notifications are muted in this chat. Send /unmute to turn them back on'
-                : '🔔 Notifications are on in this chat. Send /mute to turn them off',
+                ? '🔕 Notifications are muted in this chat'
+                : '🔔 Notifications are on in this chat',
+            $this->muteKeyboard($muted),
         );
+    }
+
+    public function handleMuteButton(User $user, int|string $chatId, ?int $messageId, string $callbackId, bool $muted): void
+    {
+        $identity = $this->support->resolveIdentity($chatId);
+
+        if (!$identity) {
+            $this->client->answerCallbackQuery($callbackId, "Account isn't linked.");
+
+            return;
+        }
+
+        $identity->update(['meta' => [...($identity->meta ?? []), 'muted' => $muted]]);
+        $this->client->answerCallbackQuery($callbackId, $muted ? 'Notifications muted!' : 'Notifications unmuted!');
+
+        if ($messageId) {
+            $this->client->editMessageText(
+                $chatId,
+                $messageId,
+                $muted
+                    ? '🔕 Notifications are muted in this chat'
+                    : '🔔 Notifications are on in this chat',
+                $this->muteKeyboard($muted),
+            );
+        }
     }
 
     public function sendAddWidget(User $user, int|string $chatId): void
@@ -401,8 +428,10 @@ class MenuHandler
 
         $this->client->sendMessage(
             $chatId,
-            'Quick add works as an interactive widget in a private chat with the bot. '
-            . 'Here, just write it, like 350 groceries or +15000 salary.',
+            TelegramSupport::isPrivateChat($chatId) && WidgetAvailability::blocked()
+                ? "The keypad isn't available right now — Telegram is refusing widgets. Send the amount like 350 groceries or +15000 salary."
+                : 'Quick add works as an interactive widget in a private chat with the bot. '
+                    . 'Here, just write it, like 350 groceries or +15000 salary.',
         );
     }
 
@@ -435,6 +464,18 @@ class MenuHandler
         return '<b>' . $this->support->escapeHtml($label) . "</b>\n"
             . $this->support->progressBar($ratio) . ' ' . $progress['percent'] . "%\n"
             . implode("\n", array_map(fn (string $line) => $this->support->escapeHtml($line), $lines));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function muteKeyboard(bool $muted): array
+    {
+        return ['inline_keyboard' => [[
+            $muted
+                ? ['text' => '🔔 Unmute', 'callback_data' => 'notify:unmute']
+                : ['text' => '🔕 Mute', 'callback_data' => 'notify:mute'],
+        ]]];
     }
 
     /**

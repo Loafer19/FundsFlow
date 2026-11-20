@@ -29,6 +29,7 @@ class CallbackHandler
         private readonly TelegramHistory $history,
         private readonly TelegramEditor $editor,
         private readonly RecurringReminders $reminders,
+        private readonly TextEditorHandler $textEditor,
     ) {}
 
     /**
@@ -171,6 +172,10 @@ class CallbackHandler
             return;
         }
 
+        if ($this->textEditor->handleCallback($user, $chatId, $messageId, $callbackId, $data, $this->messageText)) {
+            return;
+        }
+
         if (preg_match('/^draft:open:(' . TelegramSupport::NONCE_PATTERN . ')$/', $data, $matches)) {
             // The draft card keeps its buttons: Confirm still works next to the editor.
             $this->client->answerCallbackQuery($callbackId);
@@ -180,14 +185,14 @@ class CallbackHandler
         }
 
         if (preg_match('/^editamt:(\d+)$/', $data, $matches)) {
-            $this->handleEditAmountPrompt($user, $chatId, $callbackId, (int) $matches[1]);
+            $this->textEditor->beginAmountEdit($user, $chatId, $messageId, $callbackId, (int) $matches[1], $this->messageText);
 
             return;
         }
 
         // Confirm-style buttons carry a nonce for the exact card they were sent
         // with. Each one is single-use, so its keyboard is removed once tapped.
-        if (preg_match('/^draft:(ok|edit|cancel)(?::(' . TelegramSupport::NONCE_PATTERN . '))?$/', $data, $matches)) {
+        if (preg_match('/^draft:(ok|cancel)(?::(' . TelegramSupport::NONCE_PATTERN . '))?$/', $data, $matches)) {
             $this->removeKeyboard($chatId, $messageId);
             $this->handleDraftButton($user, $chatId, $callbackId, $matches[1], $matches[2] ?? '', $messageId);
 
@@ -262,6 +267,12 @@ class CallbackHandler
             $this->client->answerCallbackQuery($callbackId, 'Cancelled');
             $this->client->sendMessage($chatId, '↩️ Cancelled');
             $this->mediaHandler->continueAlbumQueue($user, $chatId);
+
+            return;
+        }
+
+        if (preg_match('/^notify:(mute|unmute)$/', $data, $matches)) {
+            $this->menuHandler->handleMuteButton($user, $chatId, $messageId, $callbackId, $matches[1] === 'mute');
 
             return;
         }
@@ -664,22 +675,6 @@ class CallbackHandler
 
         $this->client->answerCallbackQuery($callbackId);
         $this->renderTagPicker($user, $chatId, $messageId, $transaction, 0);
-    }
-
-    private function handleEditAmountPrompt(User $user, int|string $chatId, string $callbackId, int $transactionId): void
-    {
-        $transaction = $this->support->findOwnTransaction($user, $transactionId);
-
-        if (!$transaction) {
-            $this->client->answerCallbackQuery($callbackId, 'Transaction not found');
-
-            return;
-        }
-
-        Cache::put("telegram_edit_amount:{$chatId}", $transaction->id, now()->addMinutes(10));
-
-        $this->client->answerCallbackQuery($callbackId);
-        $this->client->sendMessage($chatId, 'Send the new amount like +120 or -50.5');
     }
 
     private function renderTagPicker(User $user, int|string $chatId, ?int $messageId, Transaction $transaction, int $page): void

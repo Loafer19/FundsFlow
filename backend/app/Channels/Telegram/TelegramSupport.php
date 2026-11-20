@@ -86,7 +86,7 @@ class TelegramSupport
     private const TAGS_PER_PAGE = 8;
 
     /** Inline-button prefixes whose callback data carries a transaction id (cards, prompts). */
-    private const TX_CALLBACK = '/^(?:edit|delask|delyes|delno|retag|editamt|files|attach|attx|undo|open):(\d{1,10})$/';
+    private const TX_CALLBACK = '/^(?:edit|delask|delyes|delno|retag|editamt|files|attach|attx|undo|open|edate|enote|esign|etype|etypep|eback):(\d{1,10})(?::|$)/';
 
     public function __construct(
         private readonly TelegramClient $client,
@@ -417,19 +417,29 @@ class TelegramSupport
      *
      * @return array<string, mixed>
      */
-    public function textEditKeyboard(Transaction $transaction, bool $undo = false): array
+    public function textEditKeyboard(Transaction $transaction, bool $undo = false, ?User $user = null): array
     {
         $id = $transaction->id;
+        $user ??= $transaction->user;
         $undo = $undo && $this->canUndo($transaction);
-        $undoButton = ['text' => '↩️ Undo', 'callback_data' => "undo:{$id}"];
-        $delete = ['text' => '🗑 Delete', 'callback_data' => "delask:{$id}"];
-        $rows = [[
-            ['text' => '🏷 Tags', 'callback_data' => "retag:{$id}"],
-            ['text' => '✏️ Amount', 'callback_data' => "editamt:{$id}"],
-            $delete,
-        ]];
+        $amount = (float) $transaction->amount;
+        $rows = [
+            [
+                ['text' => '🏷 Tags', 'callback_data' => "retag:{$id}"],
+                ['text' => '✏️ Amount', 'callback_data' => "editamt:{$id}"],
+            ],
+            [
+                ['text' => '📅 Date', 'callback_data' => "edate:{$id}"],
+                ['text' => '📝 Note', 'callback_data' => "enote:{$id}"],
+            ],
+            $this->signButtons('tx', $id, $amount),
+        ];
+
+        if ($user && $this->liveTypes($user)->isNotEmpty()) {
+            $rows[] = [$this->typeButton('tx', $id, $transaction->transactionType)];
+        }
+
         $files = $transaction->relationLoaded('attachments') ? $transaction->attachments->count() : 0;
-        // Same as 📎 Attach and 📎 Files in the private-chat /recent widget.
         $fileRow = [];
 
         if ($files < TransactionAttachmentRules::MAX_PER_TRANSACTION) {
@@ -439,10 +449,15 @@ class TelegramSupport
         if ($files > 0) {
             $fileRow[] = ['text' => self::filesLabel($files), 'callback_data' => "files:{$id}"];
         }
-        $rows[] = $fileRow;
+
+        if ($fileRow !== []) {
+            $rows[] = $fileRow;
+        }
+
+        $rows[] = [['text' => '🗑 Delete', 'callback_data' => "delask:{$id}"]];
 
         if ($undo) {
-            array_unshift($rows, [$undoButton]);
+            array_unshift($rows, [['text' => '↩️ Undo', 'callback_data' => "undo:{$id}"]]);
         }
 
         return ['inline_keyboard' => $rows];
@@ -598,20 +613,192 @@ class TelegramSupport
     /**
      * @return array<string, mixed>
      */
-    public function receiptDraftKeyboard(string $nonce, int|string|null $chatId = null): array
+    public function receiptDraftKeyboard(string $nonce, int|string|null $chatId = null, ?User $user = null, ?array $draft = null): array
     {
-        // Private chat: ✏️ Edit opens the widget editor; groups (or no widgets) type a new amount.
-        $private = self::widgetEditorAvailable($chatId);
+        // Private chat: ✏️ Edit opens the widget editor; groups (or no widgets) use the text editor.
+        if (self::widgetEditorAvailable($chatId)) {
+            return [
+                'inline_keyboard' => [[
+                    ['text' => '✅ Confirm', 'callback_data' => "draft:ok:{$nonce}"],
+                    ['text' => '✏️ Edit', 'callback_data' => "draft:open:{$nonce}"],
+                    ['text' => '↩️ Cancel', 'callback_data' => "draft:cancel:{$nonce}"],
+                ]],
+            ];
+        }
+
+        $amount = is_array($draft) && isset($draft['amount']) && is_numeric($draft['amount'])
+            ? (float) $draft['amount']
+            : null;
+        $rows = [
+            [['text' => '✅ Confirm', 'callback_data' => "draft:ok:{$nonce}"]],
+            [
+                ['text' => '🏷 Tags', 'callback_data' => "draft:tags:{$nonce}"],
+                ['text' => '✏️ Amount', 'callback_data' => "draft:amt:{$nonce}"],
+            ],
+            [
+                ['text' => '📅 Date', 'callback_data' => "draft:date:{$nonce}"],
+                ['text' => '📝 Note', 'callback_data' => "draft:note:{$nonce}"],
+            ],
+        ];
+
+        if ($amount !== null) {
+            $rows[] = $this->signButtons('draft', $nonce, $amount);
+        }
+
+        if ($user && $this->liveTypes($user)->isNotEmpty()) {
+            $typeId = is_array($draft) && isset($draft['transaction_type_id']) ? (int) $draft['transaction_type_id'] : null;
+            $type = $typeId ? $this->liveTypes($user)->firstWhere('id', $typeId) : null;
+            $rows[] = [$this->typeButton('draft', $nonce, $type instanceof TransactionType ? $type : null)];
+        }
+
+        $rows[] = [['text' => '↩️ Cancel', 'callback_data' => "draft:cancel:{$nonce}"]];
+
+        return ['inline_keyboard' => $rows];
+    }
+
+    /**
+     * Today / Yesterday / 2 days ago, plus a typed DD.MM.YYYY.
+     *
+     * @return array<string, mixed>
+     */
+    public function dateEditKeyboard(string $scope, int|string $id, string $currentAt, string $today): array
+    {
+        $prefix = $scope === 'draft' ? "draft:date:{$id}" : "edate:{$id}";
+        $back = $scope === 'draft' ? "draft:back:{$id}" : "eback:{$id}";
+        $mark = function (string $at, string $label) use ($currentAt): string {
+            return $at === $currentAt ? "{$label} ✓" : $label;
+        };
+
+        $todayLabel = $mark($today, 'Today');
+        $yesterday = date('Y-m-d', strtotime($today . ' -1 day'));
+        $twoDays = date('Y-m-d', strtotime($today . ' -2 days'));
+
+        return ['inline_keyboard' => [
+            [
+                ['text' => $todayLabel, 'callback_data' => "{$prefix}:0"],
+                ['text' => $mark($yesterday, 'Yesterday'), 'callback_data' => "{$prefix}:1"],
+                ['text' => $mark($twoDays, '2 days ago'), 'callback_data' => "{$prefix}:2"],
+            ],
+            [['text' => 'Type DD.MM.YYYY', 'callback_data' => "{$prefix}:t"]],
+            [['text' => '⬅️ Back', 'callback_data' => $back]],
+        ]];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function dateTypeKeyboard(string $scope, int|string $id): array
+    {
+        $back = $scope === 'draft' ? "draft:back:{$id}" : "eback:{$id}";
+
+        return ['inline_keyboard' => [[['text' => '⬅️ Back', 'callback_data' => $back]]]];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function noteEditKeyboard(string $scope, int|string $id): array
+    {
+        $prefix = $scope === 'draft' ? "draft:note:{$id}" : "enote:{$id}";
+
+        return ['inline_keyboard' => [[
+            ['text' => '🚫 Clear', 'callback_data' => "{$prefix}:x"],
+            ['text' => '↩️ Cancel', 'callback_data' => "{$prefix}:c"],
+        ]]];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function amountEditKeyboard(string $scope, int|string $id): array
+    {
+        $back = $scope === 'draft' ? "draft:back:{$id}" : "eback:{$id}";
+
+        return ['inline_keyboard' => [[['text' => '↩️ Cancel', 'callback_data' => $back]]]];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function typeEditKeyboard(User $user, string $scope, int|string $id, ?int $currentId, int $page = 0): array
+    {
+        $types = $this->liveTypes($user);
+        $pages = $types->isEmpty() ? [collect()] : $types->chunk(self::TAGS_PER_PAGE)->values();
+        $page = max(0, min($page, $pages->count() - 1));
+        $prefix = $scope === 'draft' ? "draft:type:{$id}" : "etype:{$id}";
+        $pagePrefix = $scope === 'draft' ? "draft:typep:{$id}" : "etypep:{$id}";
+        $back = $scope === 'draft' ? "draft:back:{$id}" : "eback:{$id}";
+        $rows = [];
+
+        foreach ($pages[$page] as $type) {
+            $label = $type->label();
+            $rows[] = [[
+                'text' => (int) $type->id === $currentId ? $label . ' ✓' : $label,
+                'callback_data' => "{$prefix}:{$type->id}",
+            ]];
+        }
+
+        $rows[] = [[
+            'text' => $currentId === null ? 'No type ✓' : 'No type',
+            'callback_data' => "{$prefix}:0",
+        ]];
+
+        if ($pages->count() > 1) {
+            $nav = [];
+
+            if ($page > 0) {
+                $nav[] = ['text' => '◀️', 'callback_data' => $pagePrefix . ':' . ($page - 1)];
+            }
+
+            $nav[] = ['text' => ($page + 1) . '/' . $pages->count(), 'callback_data' => 'noop'];
+
+            if ($page < $pages->count() - 1) {
+                $nav[] = ['text' => '▶️', 'callback_data' => $pagePrefix . ':' . ($page + 1)];
+            }
+
+            $rows[] = $nav;
+        }
+
+        $rows[] = [['text' => '⬅️ Back', 'callback_data' => $back]];
+
+        return ['inline_keyboard' => $rows];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function signButtons(string $scope, int|string $id, float $amount): array
+    {
+        $prefix = $scope === 'draft' ? "draft:sign:{$id}" : "esign:{$id}";
+        $income = $amount > 0;
 
         return [
-            'inline_keyboard' => [[
-                ['text' => '✅ Confirm', 'callback_data' => "draft:ok:{$nonce}"],
-                $private
-                    ? ['text' => '✏️ Edit', 'callback_data' => "draft:open:{$nonce}"]
-                    : ['text' => '✏️ Amount', 'callback_data' => "draft:edit:{$nonce}"],
-                ['text' => '↩️ Cancel', 'callback_data' => "draft:cancel:{$nonce}"],
-            ]],
+            ['text' => $income ? 'Expense' : 'Expense ✓', 'callback_data' => "{$prefix}:e"],
+            ['text' => $income ? 'Income ✓' : 'Income', 'callback_data' => "{$prefix}:i"],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function typeButton(string $scope, int|string $id, ?TransactionType $type): array
+    {
+        $data = $scope === 'draft' ? "draft:type:{$id}" : "etype:{$id}";
+        $label = $type instanceof TransactionType ? $type->label() : '📂 Type';
+
+        if (mb_strlen($label) > 32) {
+            $label = mb_substr($label, 0, 31) . '…';
+        }
+
+        return ['text' => $label, 'callback_data' => $data];
+    }
+
+    /**
+     * @return Collection<int, TransactionType>
+     */
+    public function liveTypes(User $user): Collection
+    {
+        return $user->transactionTypes()->orderBy('name')->get();
     }
 
     /**
@@ -729,7 +916,7 @@ class TelegramSupport
     public function sendReceiptDraft(int|string $chatId, User $user, array $draft, ?int $editMessageId = null): ?int
     {
         $text = $this->formatReceiptDraftCard($user, $draft);
-        $keyboard = $this->receiptDraftKeyboard((string) ($draft['nonce'] ?? ''), $chatId);
+        $keyboard = $this->receiptDraftKeyboard((string) ($draft['nonce'] ?? ''), $chatId, $user, $draft);
 
         if ($editMessageId !== null) {
             $this->client->editMessageText($chatId, $editMessageId, $text, $keyboard, self::PARSE_HTML);
@@ -767,6 +954,14 @@ class TelegramSupport
 
         if (is_string($note) && $note !== '') {
             $lines[] = '📝 ' . $this->escapeHtml($note);
+        }
+
+        if (isset($draft['transaction_type_id'])) {
+            $type = $user->transactionTypes()->find($draft['transaction_type_id']);
+
+            if ($type instanceof TransactionType) {
+                $lines[] = $this->escapeHtml($type->label());
+            }
         }
 
         $titles = $draft['suggested_tag_titles'] ?? [];
@@ -824,35 +1019,49 @@ class TelegramSupport
      */
     public function tagKeyboard(User $user, Transaction $transaction, int $page = 0): array
     {
+        return $this->tagPickerKeyboard($user, $transaction->tags->pluck('id')->all(), $page, (string) $transaction->id);
+    }
+
+    /**
+     * Tag picker for a saved transaction or a receipt draft. Selected chips use a trailing ✓.
+     *
+     * @param list<int> $selectedIds
+     * @return array<string, mixed>
+     */
+    public function tagPickerKeyboard(User $user, array $selectedIds, int $page, string $target, bool $draft = false): array
+    {
         $tree = $this->buildTagTree($this->listTags->execute($user));
         $pages = array_chunk($tree, self::TAGS_PER_PAGE) ?: [[]];
         $page = max(0, min($page, count($pages) - 1));
-        $selectedIds = $transaction->tags->pluck('id')->all();
+        $selectedIds = array_map('intval', $selectedIds);
 
         $rows = array_map(fn (array $node) => [[
-            'text' => $this->formatTagLabel($node['tag'], $node['depth'], in_array($node['tag']->id, $selectedIds, true)),
-            'callback_data' => "tagx:{$transaction->id}:{$node['tag']->id}:{$page}",
+            'text' => $this->formatTagLabel($node['tag'], $node['depth'], in_array((int) $node['tag']->id, $selectedIds, true)),
+            'callback_data' => $draft
+                ? "dtagx:{$target}:{$node['tag']->id}:{$page}"
+                : "tagx:{$target}:{$node['tag']->id}:{$page}",
         ]], $pages[$page]);
 
         if (count($pages) > 1) {
             $navRow = [];
+            $pageCb = $draft ? "dtagp:{$target}:" : "tagpage:{$target}:";
 
             if ($page > 0) {
-                $navRow[] = ['text' => '◀️', 'callback_data' => "tagpage:{$transaction->id}:" . ($page - 1)];
+                $navRow[] = ['text' => '◀️', 'callback_data' => $pageCb . ($page - 1)];
             }
 
             $navRow[] = ['text' => ($page + 1) . '/' . count($pages), 'callback_data' => 'noop'];
 
             if ($page < count($pages) - 1) {
-                $navRow[] = ['text' => '▶️', 'callback_data' => "tagpage:{$transaction->id}:" . ($page + 1)];
+                $navRow[] = ['text' => '▶️', 'callback_data' => $pageCb . ($page + 1)];
             }
 
             $rows[] = $navRow;
         }
 
         $rows[] = [
-            ['text' => '🚫 Clear all', 'callback_data' => "tagclear:{$transaction->id}:{$page}"],
-            ['text' => '✅ Done', 'callback_data' => "tagdone:{$transaction->id}"],
+            ['text' => '🚫 Clear all', 'callback_data' => $draft ? "dtagc:{$target}:{$page}" : "tagclear:{$target}:{$page}"],
+            ['text' => '✅ Done', 'callback_data' => $draft ? "dtagd:{$target}" : "tagdone:{$target}"],
         ];
 
         return ['inline_keyboard' => $rows];
@@ -882,9 +1091,9 @@ class TelegramSupport
     public function formatTagLabel(Tag $tag, int $depth, bool $selected = false): string
     {
         $prefix = $depth > 0 ? str_repeat('  ', $depth) . '↳ ' : '';
-        $mark = $selected ? '✅ ' : '';
+        $label = $prefix . trim($tag->emoji . ' ' . $tag->title);
 
-        return $prefix . $mark . trim($tag->emoji . ' ' . $tag->title);
+        return $selected ? $label . ' ✓' : $label;
     }
 
     /**
@@ -1080,7 +1289,7 @@ class TelegramSupport
 
     public function findOwnTransaction(User $user, int $transactionId): ?Transaction
     {
-        $transaction = Transaction::with(['tags', 'attachments'])->find($transactionId);
+        $transaction = Transaction::with(['tags', 'attachments', 'transactionType'])->find($transactionId);
 
         if (!$transaction || $transaction->user_id !== $user->id) {
             return null;

@@ -33,6 +33,7 @@ class MessageHandler
         private readonly TelegramHistory $notes,
         private readonly SupportHandler $supportHandler,
         private readonly TelegramEditor $editor,
+        private readonly TextEditorHandler $textEditor,
     ) {}
 
     /**
@@ -316,6 +317,13 @@ class MessageHandler
 
         // Reply to an import's "these tags don't exist" question (or another edit of that import).
         if ($this->mediaHandler->handleImportReply($user, $chatId, $telegramUserId, $text)) {
+            return;
+        }
+
+        if ($this->textEditor->awaiting($chatId)) {
+            $this->notes->input($chatId, $user, $text);
+            $this->textEditor->handleTypedReply($user, $chatId, $text);
+
             return;
         }
 

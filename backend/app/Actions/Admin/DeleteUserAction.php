@@ -215,6 +215,7 @@ final class DeleteUserAction
                 "telegram_album_queue:{$chatId}",
                 "telegram_edit_amount:{$chatId}",
                 "telegram_edit_note:{$chatId}",
+                "telegram_text_pending:{$chatId}",
                 "telegram_editor_for:{$chatId}:draft",
             );
         }

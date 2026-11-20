@@ -414,6 +414,7 @@ class MediaHandler
         $files = $this->filesFromPendingOrDraft($draft);
         $this->editor->closeDraft($chatId, 'Receipt saved');
 
+        $typeId = isset($draft['transaction_type_id']) ? (int) $draft['transaction_type_id'] : null;
         $this->createTransactionWithAttachments(
             $user,
             $chatId,
@@ -424,6 +425,7 @@ class MediaHandler
             forgetPending: true,
             tags: $tagIds,
             cardMessageId: $messageId,
+            typeId: $typeId && $typeId > 0 ? $typeId : null,
         );
 
         $this->continueAlbumQueue($user, $chatId);
@@ -443,7 +445,8 @@ class MediaHandler
         }
 
         if (!$this->editor->openForDraft($user, $chatId, $draft, $cardMessageId)) {
-            $this->beginDraftAmountEdit($user, $chatId, $nonce);
+            // Widget refused: the card itself is the text editor (tags, date, note, amount).
+            $this->support->sendReceiptDraft($chatId, $user, $draft, $cardMessageId);
         }
     }
 
@@ -1027,6 +1030,7 @@ class MediaHandler
         bool $forgetPending = false,
         array $tags = [],
         ?int $cardMessageId = null,
+        ?int $typeId = null,
     ): void {
         $files = array_slice(array_values($files), 0, TransactionAttachmentRules::MAX_PER_TRANSACTION);
 
@@ -1040,7 +1044,16 @@ class MediaHandler
             $payload['tags'] = $tags;
         }
 
-        $transaction = $this->createTransaction->execute($user, $payload, TransactionSource::Telegram);
+        if ($typeId) {
+            $payload['transaction_type_id'] = $typeId;
+        }
+
+        $transaction = $this->createTransaction->execute(
+            $user,
+            $payload,
+            TransactionSource::Telegram,
+            requireAllFields: $typeId ? false : true,
+        );
 
         if ($forgetPending) {
             $this->cancelPendingMedia($chatId);
