@@ -4,6 +4,8 @@
         <h3 v-if="!bare" class="text-xs font-semibold uppercase tracking-wide text-base-content/60">{{ type.name }} fields</h3>
         <FieldInput v-for="field in fields" :key="field.key" :field="field" :model-value="data[field.key] ?? null"
             :computed-text="field.type === 'computed' ? computedText(field) : ''"
+            :locked="!!autoFields[field.key]" :hint="autoFields[field.key]?.hint ?? ''"
+            :locked-text="autoFields[field.key]?.display ?? ''"
             @update:model-value="(value) => set(field.key, value)" />
     </section>
 </template>
@@ -17,6 +19,8 @@ const props = defineProps({
     type: { type: Object, default: null },
     /** No frame or title (the Manage Types preview). */
     bare: { type: Boolean, default: false },
+    /** field key → { hint, display? } for auto-filled, read-only fields. */
+    autoFields: { type: Object, default: () => ({}) },
 })
 
 const data = defineModel('data', { type: Object, default: () => ({}) })

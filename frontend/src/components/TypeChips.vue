@@ -5,9 +5,10 @@
             <button type="button" role="radio" class="btn btn-sm" :aria-checked="model == null"
                 :class="model == null ? 'btn-primary' : 'btn-soft'" @click="pick(null)">None</button>
             <button v-for="type in choices" :key="type.id" type="button" role="radio" class="btn btn-sm"
-                :aria-checked="model === type.id" :class="model === type.id ? 'btn-primary' : 'btn-soft'"
+                :aria-checked="model === type.id"
+                :class="[model === type.id ? 'btn-primary' : 'btn-soft', type.archived_at ? 'tooltip' : '']"
                 :style="model === type.id && type.color ? { backgroundColor: type.color, borderColor: type.color, color: '#fff' } : null"
-                :title="type.archived_at ? 'Archived type' : null" @click="pick(type.id)">
+                :data-tip="type.archived_at ? 'Archived type' : undefined" @click="pick(type.id)">
                 <span v-if="type.emoji">{{ type.emoji }}</span>
                 {{ type.name }}
             </button>

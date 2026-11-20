@@ -75,6 +75,6 @@ Amounts are **signed**: negative for expenses, positive for income. Dates use `Y
 | Tool | Description |
 | --- | --- |
 | `list_recurring` | All recurring rules |
-| `create_recurring` | Create a rule: `daily`, `weekly`, `monthly`, or `yearly` |
-| `update_recurring` | Update a rule |
+| `create_recurring` | Create a rule: `daily`, `weekly`, `monthly`, or `yearly`. Optional `transaction_type_id` and `data` (Period and Next charge are filled from the schedule when the type has those fields) |
+| `update_recurring` | Update a rule; optional `transaction_type_id` and `data` (`transaction_type_id` null clears the type) |
 | `delete_recurring` | Delete a rule |

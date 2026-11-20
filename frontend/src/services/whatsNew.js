@@ -10,6 +10,14 @@ import { useAuthStore } from './auth.js'
  */
 export const RELEASES = [
     {
+        version: '2.5.0',
+        items: [
+            'Recurring rules can have a type and its fields, the same as a regular transaction. Period and Next charge follow the schedule and stay read-only.',
+            'A Recurring card on Analytics shows your monthly and yearly totals for active expense rules, the next charge, and a bar per type. View all opens Recurring; click a type to filter the list.',
+            'The Recurring list shows type segments. /recurring in Telegram names the type and service. The assistant can set a type when it creates or updates a rule.',
+        ],
+    },
+    {
         version: '2.4.0',
         items: [
             'Transaction types with your own fields: start with Fuel, Groceries, Subscription and Restaurant, or make your own. Manage them from Types in the header.',

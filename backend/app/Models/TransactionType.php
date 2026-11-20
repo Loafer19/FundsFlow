@@ -84,4 +84,23 @@ class TransactionType extends Model
     {
         return array_values(array_map('intval', is_array($this->default_tag_ids) ? $this->default_tag_ids : []));
     }
+
+    public function hasFieldKey(string $key): bool
+    {
+        foreach ($this->visibleFields() as $field) {
+            if (($field['key'] ?? null) === $key) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return HasMany<RecurringTransaction, TransactionType>
+     */
+    public function recurringTransactions(): HasMany
+    {
+        return $this->hasMany(RecurringTransaction::class);
+    }
 }

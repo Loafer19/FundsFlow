@@ -33,7 +33,7 @@ about an hour.
 | `/month` | This month's income, expenses, net, a daily chart, and top tags (a parent tag includes its child tags) |
 | `/budgets` | Spending limits for the current period (spent / limit, left or over, period dates, days left) and savings goals (saved vs target, deadline, pace) |
 | `/tags` | Your top-level tags with this month's expenses (−) and income (+); tap a tag to split it by subtags. Tags with no transactions this month are folded |
-| `/recurring` | Recurring payments with their next dates; tap one to pause or resume it |
+| `/recurring` | Recurring payments with their next dates; tap one to pause or resume it. The text list also shows the type and service when a rule has them |
 | `/notifications` | Alerts, digest, reminders and pinned month: three switches for **Alerts and digest** (limit alerts, goal messages, the weekly digest, recurring and bank sync notifications), **Recurring reminders** (a day before each payment) and **Pinned month summary** (a live `/month` pinned at the top of the chat). See [Notifications](/docs/telegram/notifications/) |
 | `/website` | One-time code to [log in on the website](/docs/getting-started/sign-in/#telegram-code) |
 | `/reset` | Start a new AI conversation (alias `/new`); see [AI assistant](/docs/telegram/ai-assistant/) |

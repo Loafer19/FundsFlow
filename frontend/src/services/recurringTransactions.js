@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import api from './api.js'
 import { persistCache } from './cache.js'
 import { apiErrorMessage } from './formatters.js'
+import { showModal } from './modal.js'
 import toasts from './toasts.js'
 
 const CACHE = 'recurring'
@@ -11,9 +12,31 @@ export const useRecurringTransactionsStore = defineStore('recurringTransactions'
         rules: [],
         ruleForEdit: null,
         isLoading: false,
+        filterTypeId: null,
     }),
 
+    getters: {
+        visibleRules: (state) => {
+            if (state.filterTypeId == null) return state.rules
+            if (state.filterTypeId === 'none') return state.rules.filter((rule) => rule.transaction_type_id == null)
+            return state.rules.filter((rule) => Number(rule.transaction_type_id) === Number(state.filterTypeId))
+        },
+    },
+
     actions: {
+        openAll() {
+            this.filterTypeId = null
+            showModal('recurring_modal')
+        },
+
+        openFiltered(typeId) {
+            this.filterTypeId = typeId == null ? 'none' : typeId
+            showModal('recurring_modal')
+        },
+
+        clearFilter() {
+            this.filterTypeId = null
+        },
         persist() {
             persistCache(CACHE, this.rules)
         },
@@ -66,13 +89,7 @@ export const useRecurringTransactionsStore = defineStore('recurringTransactions'
 
             try {
                 const response = await api.patch('/recurring-transactions/' + rule.id, {
-                    amount: rule.amount,
-                    note: rule.note,
-                    frequency: rule.frequency,
-                    starts_at: rule.starts_at,
-                    ends_at: rule.ends_at,
                     active: !rule.active,
-                    tags: rule.tags.map((tag) => tag.id),
                 })
 
                 const index = this.rules.findIndex((r) => r.id === rule.id)

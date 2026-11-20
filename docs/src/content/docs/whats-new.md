@@ -7,6 +7,25 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
 **1.13** update that put an AI assistant in the Telegram bot. Self-hosting and technical changes are listed in the
 [GitHub releases](https://github.com/Loafer19/FundsFlow/releases).
 
+## Upcoming — 2.5.0
+
+### Web app
+
+- **Types on recurring rules.** Add Recurring and Edit Recurring let you pick a type and fill its fields, just
+  like a regular transaction. Period and Next charge on a Subscription (or any type with those fields) follow the
+  rule's frequency and next date, and stay read-only. Each generated transaction copies the type and values, with
+  Next charge set to that occurrence's date.
+- **Recurring card on Analytics.** Next to Top spending tags: an approximate monthly and yearly total of
+  active expense recurring rules, how many are active, the next charge, and a bar per type (typeless rules
+  under **No type**). **View all** opens Recurring; click a type to filter the list. The card is hidden when
+  there are none.
+- **Recurring list** shows type segments for typed rules.
+
+### Telegram bot and assistants
+
+- `/recurring` (text list) shows the type and service when a rule has them. The command itself is unchanged.
+- The assistant and MCP `create_recurring` / `update_recurring` tools accept `transaction_type_id` and `data`.
+
 ## 2.4.0 — 20 November 2026
 
 ### Web app

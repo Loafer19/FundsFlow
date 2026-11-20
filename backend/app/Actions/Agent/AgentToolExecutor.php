@@ -457,6 +457,10 @@ class AgentToolExecutor
                 'frequency' => $rule->frequency->value,
                 'active' => (bool) $rule->active,
                 'next_run_at' => $rule->next_run_at?->format('Y-m-d'),
+                'transaction_type_id' => $rule->transaction_type_id !== null ? (int) $rule->transaction_type_id : null,
+                'data' => $rule->data ?: (object) [],
+                'type' => $rule->transactionType?->label(),
+                'service' => trim((string) (($rule->data ?? [])['service'] ?? '')) ?: null,
                 'tag_ids' => $rule->tags->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
             ];
         })->values()->all();

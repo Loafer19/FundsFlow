@@ -28,7 +28,9 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Support\LimitBuckets;
 use App\Support\PeriodRange;
+use App\Support\RecurringTypeData;
 use App\Support\TagTree;
+use App\Support\TransactionTypeData;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -170,10 +172,12 @@ class AgentPlanningTools
                     'ends_at' => $date,
                     'note' => ['type' => 'string'],
                     'tag_ids' => $tagIds,
+                    'transaction_type_id' => ['type' => 'integer', 'description' => 'Type id from list_transaction_types. Period and Next charge are filled from the schedule when the type has those fields.'],
+                    'data' => ['type' => 'object', 'description' => 'Field values by key (e.g. service). Period and next_charge are auto-set from frequency and the next charge date.'],
                 ],
                 'required' => ['amount', 'frequency'],
             ]),
-            $fn('update_recurring', 'Propose editing a recurring rule by id. Stages Confirm/Cancel. Omitted fields stay unchanged; clear_ends_at removes the end date.', [
+            $fn('update_recurring', 'Propose editing a recurring rule by id. Stages Confirm/Cancel. Omitted fields stay unchanged; clear_ends_at removes the end date. Pass transaction_type_id and data to set or change the type; transaction_type_id null clears it.', [
                 'type' => 'object',
                 'properties' => [
                     'id' => $id,
@@ -184,6 +188,8 @@ class AgentPlanningTools
                     'clear_ends_at' => ['type' => 'boolean'],
                     'note' => ['type' => 'string'],
                     'tag_ids' => $tagIds,
+                    'transaction_type_id' => ['type' => 'integer', 'description' => 'Type id from list_transaction_types; null clears the type.'],
+                    'data' => ['type' => 'object', 'description' => 'Field values by key. Period and next_charge are auto-set from the schedule.'],
                 ],
                 'required' => ['id'],
             ]),
@@ -525,6 +531,8 @@ class AgentPlanningTools
                     'amount_formatted' => UserFormatter::formatMoney($user, (float) $rule->amount),
                     'note' => (string) ($rule->note ?? ''),
                     'frequency' => $rule->frequency->value,
+                    'transaction_type_id' => $rule->transaction_type_id !== null ? (int) $rule->transaction_type_id : null,
+                    'data' => $rule->data ?: (object) [],
                     'tags' => $rule->tags->map(fn (Tag $t) => trim($t->emoji . ' ' . $t->title))->filter()->values()->all(),
                 ];
                 $date = $rule->frequency->firstOnOrAfter($rule->starts_at, $date->addDay());
@@ -1091,12 +1099,16 @@ class AgentPlanningTools
         }
         $note = is_string($args['note'] ?? null) ? mb_substr(trim($args['note']), 0, 255) : '';
         $tagIds = $this->ownedTagIds($user, $args['tag_ids'] ?? []);
+        $typed = $this->recurringTypeFromArgs($user, $args);
 
         $lines = [
             'Create recurring rule:',
             UserFormatter::formatMoney($user, $amount) . ' · ' . $frequency . ' · from ' . $startsAt . ($endsAt ? ' until ' . $endsAt : ''),
         ];
 
+        if ($typed['line'] !== null) {
+            $lines[] = 'Type: ' . $typed['line'];
+        }
         if ($note !== '') {
             $lines[] = 'Note: ' . $note;
         }
@@ -1117,6 +1129,7 @@ class AgentPlanningTools
                 'ends_at' => $endsAt,
                 'note' => $note !== '' ? $note : null,
                 'tag_ids' => $tagIds,
+                ...($typed['payload'] ?? []),
             ],
             'preview' => implode("\n", $lines),
         ];
@@ -1198,6 +1211,14 @@ class AgentPlanningTools
             }
         }
 
+        if (array_key_exists('transaction_type_id', $args) || array_key_exists('data', $args)) {
+            $typed = $this->recurringTypeFromArgs($user, $args, $rule);
+            if ($typed['changed']) {
+                $changes = [...$changes, ...$typed['payload']];
+                $lines[] = 'Type: ' . ($typed['from'] ?? '—') . ' → ' . ($typed['line'] ?? '—');
+            }
+        }
+
         if ($changes === []) {
             throw new InvalidArgumentException('nothing to change: values equal the current rule');
         }
@@ -1246,14 +1267,19 @@ class AgentPlanningTools
     {
         if ($action === 'create_recurring') {
             $endsAt = $payload['ends_at'] ?? null;
-            $rule = $this->createRecurring->execute($user, array_filter([
+            $create = array_filter([
                 'amount' => (float) $payload['amount'],
                 'frequency' => RecurringFrequency::from((string) $payload['frequency'])->value,
                 'starts_at' => (string) $payload['starts_at'],
                 'ends_at' => is_string($endsAt) ? $endsAt : null,
                 'note' => $payload['note'] ?? null,
                 'tags' => $this->ownedTagIds($user, $payload['tag_ids'] ?? []),
-            ], fn ($v, $k) => $k !== 'ends_at' || $v !== null, ARRAY_FILTER_USE_BOTH));
+            ], fn ($v, $k) => $k !== 'ends_at' || $v !== null, ARRAY_FILTER_USE_BOTH);
+            if (array_key_exists('transaction_type_id', $payload)) {
+                $create['transaction_type_id'] = $payload['transaction_type_id'];
+                $create['data'] = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+            }
+            $rule = $this->createRecurring->execute($user, $create);
 
             return ['ok' => true, 'message' => '✅ Recurring rule created: ' . $this->ruleLabel($user, $rule), 'summary' => 'Recurring rule created via agent confirm.'];
         }
@@ -1268,7 +1294,7 @@ class AgentPlanningTools
         switch ($action) {
             case 'update_recurring':
                 $changes = is_array($payload['changes'] ?? null) ? $payload['changes'] : [];
-                $allowed = array_intersect_key($changes, array_flip(['amount', 'frequency', 'starts_at', 'ends_at', 'note', 'tags']));
+                $allowed = array_intersect_key($changes, array_flip(['amount', 'frequency', 'starts_at', 'ends_at', 'note', 'tags', 'transaction_type_id', 'data']));
 
                 if (isset($allowed['frequency'])) {
                     $allowed['frequency'] = RecurringFrequency::from((string) $allowed['frequency'])->value;
@@ -1373,9 +1399,62 @@ class AgentPlanningTools
         return $budget;
     }
 
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array{payload: array<string, mixed>, line: ?string, from: ?string, changed: bool, transaction_type_id?: ?int, data?: ?array}
+     */
+    private function recurringTypeFromArgs(User $user, array $args, ?RecurringTransaction $current = null): array
+    {
+        $from = RecurringTypeData::typeLine($current);
+
+        if (!array_key_exists('transaction_type_id', $args) && !array_key_exists('data', $args)) {
+            return ['payload' => [], 'line' => null, 'from' => $from, 'changed' => false];
+        }
+
+        $id = $args['transaction_type_id'] ?? ($current?->transaction_type_id);
+
+        if ($id === null || $id === '') {
+            $changed = $current !== null && $current->transaction_type_id !== null;
+
+            return [
+                'payload' => ['transaction_type_id' => null, 'data' => null],
+                'line' => null,
+                'from' => $from,
+                'changed' => $changed,
+                'transaction_type_id' => null,
+                'data' => null,
+            ];
+        }
+
+        $type = TransactionTypeData::ownType($user, (int) $id);
+        $data = is_array($args['data'] ?? null) ? $args['data'] : ($current?->data ?? []);
+        $lineParts = [trim($type->emoji . ' ' . $type->name)];
+        $service = trim((string) ($data['service'] ?? ''));
+        if ($service !== '') {
+            $lineParts[] = $service;
+        }
+        $line = implode(' · ', array_filter($lineParts));
+        $sameId = $current && (int) $current->transaction_type_id === (int) $type->id;
+        $sameData = $current && ($current->data ?? []) == $data;
+        $changed = !$sameId || !$sameData || $current === null;
+
+        return [
+            'payload' => [
+                'transaction_type_id' => (int) $type->id,
+                'data' => $data,
+            ],
+            'line' => $line,
+            'from' => $from,
+            'changed' => $current === null ? true : ($changed),
+            'transaction_type_id' => (int) $type->id,
+            'data' => $data,
+        ];
+    }
+
     private function findRule(User $user, mixed $id): RecurringTransaction
     {
-        $rule = is_numeric($id) ? $user->recurringTransactions()->with('tags')->find((int) $id) : null;
+        $rule = is_numeric($id) ? $user->recurringTransactions()->with(['tags', 'transactionType'])->find((int) $id) : null;
 
         if (!$rule) {
             throw new InvalidArgumentException('recurring rule not found (use list_recurring for ids)');
@@ -1391,8 +1470,10 @@ class AgentPlanningTools
 
     private function ruleLabel(User $user, RecurringTransaction $rule): string
     {
-        $rule->loadMissing('tags');
-        $name = trim((string) ($rule->note ?? ''))
+        $rule->loadMissing(['tags', 'transactionType']);
+        $service = trim((string) (($rule->data ?? [])['service'] ?? ''));
+        $name = $service
+            ?: trim((string) ($rule->note ?? ''))
             ?: $rule->tags->map(fn (Tag $t) => trim($t->emoji . ' ' . $t->title))->filter()->implode(', ')
             ?: 'Rule #' . $rule->id;
 

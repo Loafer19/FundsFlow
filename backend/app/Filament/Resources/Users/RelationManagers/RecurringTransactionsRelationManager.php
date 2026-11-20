@@ -18,6 +18,7 @@ class RecurringTransactionsRelationManager extends ReadOnlyRelationManager
             ->columns([
                 TextColumn::make('amount')->numeric(2),
                 TextColumn::make('note')->limit(40)->placeholder('—'),
+                TextColumn::make('transactionType.name')->label('Type')->placeholder('—'),
                 TextColumn::make('frequency')->badge(),
                 TextColumn::make('next_run_at')->date(),
                 TextColumn::make('ends_at')->date()->placeholder('—'),

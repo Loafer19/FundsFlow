@@ -802,7 +802,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         'create_recurring',
         {
             title: 'Create recurring',
-            description: 'Create a recurring rule. frequency: daily|weekly|monthly|yearly.',
+            description: 'Create a recurring rule. frequency: daily|weekly|monthly|yearly. Optional transaction_type_id and data (Period and Next charge are filled from the schedule when the type has those fields).',
             inputSchema: {
                 amount: signedAmount(RULE_AMOUNT_MAX),
                 frequency: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
@@ -811,6 +811,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
                 ends_at: isoDate().nullable().optional(),
                 active: z.boolean().optional(),
                 tags: z.array(z.number().int()).optional(),
+                ...transactionTypeInput,
             },
         },
         async (args) =>
@@ -833,7 +834,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         'update_recurring',
         {
             title: 'Update recurring',
-            description: 'Update a recurring rule by id.',
+            description: 'Update a recurring rule by id. Optional transaction_type_id and data (null type clears it). Period and Next charge are filled from the schedule when the type has those fields.',
             inputSchema: {
                 id: z.number().int(),
                 amount: signedAmount(RULE_AMOUNT_MAX),
@@ -843,6 +844,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
                 ends_at: isoDate().nullable().optional(),
                 active: z.boolean().optional(),
                 tags: z.array(z.number().int()).optional(),
+                ...transactionTypeInput,
             },
         },
         async ({ id, ...args }) =>

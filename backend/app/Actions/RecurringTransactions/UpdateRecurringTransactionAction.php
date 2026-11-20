@@ -5,6 +5,7 @@ namespace App\Actions\RecurringTransactions;
 use App\Enums\RecurringFrequency;
 use App\Models\RecurringTransaction;
 use App\Models\User;
+use App\Support\RecurringTypeData;
 use App\Support\TagIds;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
@@ -47,12 +48,49 @@ class UpdateRecurringTransactionAction
                 ->toDateString();
         }
 
+        $frequencyValue = $frequency->value;
+        $nextRun = $data['next_run_at'] ?? $recurringTransaction->next_run_at->toDateString();
+        $typeTouched = array_key_exists('transaction_type_id', $data) || array_key_exists('data', $data);
+
+        if ($typeTouched) {
+            $typed = RecurringTypeData::forWrite(
+                $user,
+                [
+                    'transaction_type_id' => array_key_exists('transaction_type_id', $data)
+                        ? $data['transaction_type_id']
+                        : $recurringTransaction->transaction_type_id,
+                    'data' => array_key_exists('data', $data)
+                        ? ($data['data'] ?? [])
+                        : ($recurringTransaction->data ?? []),
+                    'add_options' => $data['add_options'] ?? false,
+                ],
+                $frequencyValue,
+                $nextRun,
+                allowArchived: true,
+            );
+            $data['transaction_type_id'] = $typed['transaction_type_id'];
+            $data['data'] = $typed['data'];
+        } else {
+            unset($data['transaction_type_id'], $data['data']);
+            $recurringTransaction->loadMissing('transactionType');
+            $type = $recurringTransaction->transactionType;
+            if ($type) {
+                $data['data'] = RecurringTypeData::applyScheduleFields(
+                    $type,
+                    $recurringTransaction->data ?? [],
+                    $frequencyValue,
+                    $nextRun,
+                );
+            }
+        }
+        unset($data['add_options'], $data['default_tags']);
+
         $recurringTransaction->update($data);
 
         if ($syncTags) {
             $recurringTransaction->tags()->sync($tagIds);
         }
 
-        return $recurringTransaction->load('tags');
+        return $recurringTransaction->load(['tags', 'transactionType']);
     }
 }

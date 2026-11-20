@@ -24,7 +24,7 @@ final class TransactionTypeData
      * @param array<string, mixed> $input
      * @return array{type: ?TransactionType, transaction_type_id: ?int, data: ?array<string, mixed>, amount: ?float, tag_ids: list<int>}
      */
-    public static function forCreate(User $user, array $input, bool $requireAll = true): array
+    public static function forCreate(User $user, array $input, bool $requireAll = true, bool $allowArchived = false): array
     {
         $amount = self::givenAmount($input);
         $typeId = self::typeId($input);
@@ -37,7 +37,7 @@ final class TransactionTypeData
             return ['type' => null, 'transaction_type_id' => null, 'data' => null, 'amount' => $amount, 'tag_ids' => []];
         }
 
-        $type = self::ownType($user, $typeId);
+        $type = self::ownType($user, $typeId, $allowArchived);
         $raw = self::rawData($input);
 
         if (!empty($input['add_options'])) {
@@ -199,7 +199,7 @@ final class TransactionTypeData
     /**
      * @param array<string, mixed> $input
      */
-    private static function typeId(array $input): ?int
+    public static function typeId(array $input): ?int
     {
         $id = $input['transaction_type_id'] ?? null;
 

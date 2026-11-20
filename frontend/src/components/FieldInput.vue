@@ -1,42 +1,54 @@
 <template>
     <div class="flex flex-col gap-1">
         <label :for="inputId" class="text-sm text-base-content/80" :id="labelId">
-            {{ field.label }}<span v-if="field.required" class="text-error"> *</span>
+            {{ field.label }}<span v-if="field.required && !locked" class="text-error"> *</span>
         </label>
 
+        <!-- Auto-filled schedule fields (Period, Next charge, …): a plain read-only value. -->
+        <input v-if="locked && field.type !== 'date' && field.type !== 'computed' && field.type !== 'number' && field.type !== 'duration' && field.type !== 'text'"
+            :id="inputId" type="text" readonly tabindex="-1"
+            class="input input-sm w-full bg-base-200" :value="lockedText || lockedDisplay" />
+
         <!-- Number: free text so "58,90" and "1 500" work; the unit sits inside the field. -->
-        <label v-if="field.type === 'number'" class="input input-sm w-full">
+        <label v-else-if="field.type === 'number'" class="input input-sm w-full" :class="{ 'bg-base-200': locked }">
             <input :id="inputId" type="text" inputmode="decimal" autocomplete="off" :value="model ?? ''"
-                :required="field.required" :placeholder="numberHint" @input="model = $event.target.value" />
+                :required="field.required" :placeholder="numberHint" :readonly="locked" :tabindex="locked ? -1 : undefined"
+                @input="locked ? null : (model = $event.target.value)" />
             <span v-if="field.unit" class="text-base-content/60">{{ field.unit }}</span>
         </label>
 
         <input v-else-if="field.type === 'duration'" :id="inputId" type="text" autocomplete="off"
-            class="input input-sm w-full" :value="durationText" :required="field.required" placeholder="45m or 1h 20m"
-            @input="model = $event.target.value" />
+            class="input input-sm w-full" :class="{ 'bg-base-200': locked }" :value="durationText" :required="field.required"
+            placeholder="45m or 1h 20m" :readonly="locked" :tabindex="locked ? -1 : undefined"
+            @input="locked ? null : (model = $event.target.value)" />
 
         <div v-else-if="field.type === 'rating'" class="join" role="radiogroup" :aria-labelledby="labelId">
             <button v-for="n in Number(field.max ?? 5)" :key="n" type="button" role="radio" :aria-checked="model === n"
                 class="btn btn-sm join-item px-2.5" :class="model === n ? 'btn-primary' : 'btn-soft'"
-                @click="model = model === n ? null : n">{{ n }}</button>
+                :disabled="locked" @click="locked ? null : (model = model === n ? null : n)">{{ n }}</button>
         </div>
 
         <div v-else-if="field.type === 'boolean'" class="join" role="radiogroup" :aria-labelledby="labelId">
             <button type="button" role="radio" :aria-checked="model === true" class="btn btn-sm join-item"
-                :class="model === true ? 'btn-primary' : 'btn-soft'" @click="model = model === true ? null : true">Yes</button>
+                :class="model === true ? 'btn-primary' : 'btn-soft'" :disabled="locked"
+                @click="locked ? null : (model = model === true ? null : true)">Yes</button>
             <button type="button" role="radio" :aria-checked="model === false" class="btn btn-sm join-item"
-                :class="model === false ? 'btn-primary' : 'btn-soft'" @click="model = model === false ? null : false">No</button>
+                :class="model === false ? 'btn-primary' : 'btn-soft'" :disabled="locked"
+                @click="locked ? null : (model = model === false ? null : false)">No</button>
         </div>
 
         <div v-else-if="field.type === 'select' || field.type === 'multiselect'" class="flex flex-wrap items-center gap-1"
             :aria-labelledby="labelId" role="group">
             <button v-for="option in options" :key="option" type="button" class="btn btn-xs"
                 :class="isPicked(option) ? 'btn-primary' : 'btn-soft'" :aria-pressed="isPicked(option)"
-                @click="pick(option)">{{ option }}</button>
-            <input v-if="allowNew" v-model="draft" type="text" class="input input-xs w-28" maxlength="48"
+                :disabled="locked" @click="locked ? null : pick(option)">{{ option }}</button>
+            <input v-if="allowNew && !locked" v-model="draft" type="text" class="input input-xs w-28" maxlength="48"
                 placeholder="Add option +" :aria-label="`New ${field.label} option`" @keydown.enter.prevent="addOption"
                 @blur="addOption" />
         </div>
+
+        <input v-else-if="field.type === 'date' && locked" :id="inputId" type="text" readonly tabindex="-1"
+            class="input input-sm w-full bg-base-200" :value="lockedText || formatDate(model) || ''" />
 
         <input v-else-if="field.type === 'date'" :id="inputId" type="date" class="input input-sm w-full"
             :value="model ?? ''" :required="field.required" @input="model = $event.target.value || null" />
@@ -44,15 +56,18 @@
         <input v-else-if="field.type === 'computed'" :id="inputId" type="text" readonly tabindex="-1"
             class="input input-sm w-full bg-base-200 font-semibold" :value="computedText" />
 
-        <input v-else :id="inputId" type="text" class="input input-sm w-full" maxlength="500" :value="model ?? ''"
-            :required="field.required" @input="model = $event.target.value" />
+        <input v-else :id="inputId" type="text" class="input input-sm w-full" :class="{ 'bg-base-200': locked }"
+            maxlength="500" :value="model ?? ''" :required="field.required" :readonly="locked"
+            :tabindex="locked ? -1 : undefined" @input="locked ? null : (model = $event.target.value)" />
 
-        <p v-if="field.type === 'computed' && field.fill_amount" class="text-xs text-base-content/60">Fills amount</p>
+        <p v-if="hint" class="text-xs text-base-content/60">{{ hint }}</p>
+        <p v-else-if="field.type === 'computed' && field.fill_amount" class="text-xs text-base-content/60">Fills amount</p>
     </div>
 </template>
 
 <script setup>
 import { computed, ref, useId } from 'vue'
+import { formatDate } from '../services/formatters.js'
 import { formatMinutes } from '../services/typeFields.js'
 
 const props = defineProps({
@@ -61,6 +76,10 @@ const props = defineProps({
     computedText: { type: String, default: '' },
     /** Let the user type a new select option (saved to the type with the transaction). */
     allowNew: { type: Boolean, default: true },
+    /** Schedule-driven fields (Period, Next charge) stay visible but cannot be edited. */
+    locked: { type: Boolean, default: false },
+    lockedText: { type: String, default: '' },
+    hint: { type: String, default: '' },
 })
 
 const model = defineModel({ default: null })

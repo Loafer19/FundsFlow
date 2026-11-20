@@ -16,6 +16,7 @@ use App\Models\TransactionType;
 use App\Models\User;
 use App\Support\TagTree;
 use App\Support\TransactionFields;
+use App\Support\RecurringTypeData;
 use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -417,19 +418,24 @@ class TelegramWidgetData
     public function recurringItem(User $user, RecurringTransaction $rule): array
     {
         $note = trim((string) ($rule->note ?? ''));
+        $service = trim((string) (($rule->data ?? [])['service'] ?? ''));
+        $typeLine = RecurringTypeData::typeLine($rule);
         $tags = $rule->relationLoaded('tags') ? $rule->tags : $rule->tags()->get();
         $tag = $tags->first();
         $tagLabel = $tag ? $this->clip(trim($tag->emoji . ' ' . $tag->title), 22) : '';
+        $title = $service !== '' ? $service : ($note !== '' ? $note : ($tagLabel !== '' ? $tagLabel : 'No note'));
         $item = [
             'id' => (int) $rule->id,
             'a' => $this->signedMoney($user, (float) $rule->amount),
-            'n' => $this->clip($note !== '' ? $note : ($tagLabel !== '' ? $tagLabel : 'No note'), 26),
+            'n' => $this->clip($title, 26),
             'fq' => ucfirst($rule->frequency->value),
             'nx' => $this->date($rule->next_run_at),
             'on' => $rule->active ? 1 : 0,
         ];
 
-        if ($note !== '' && $tagLabel !== '') {
+        if ($typeLine) {
+            $item['ty'] = $this->clip($typeLine, 28);
+        } elseif ($note !== '' && $tagLabel !== '') {
             $item['g'] = $tagLabel;
         }
 

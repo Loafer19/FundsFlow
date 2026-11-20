@@ -15,6 +15,8 @@ class RecurringTransaction extends Model
     protected $fillable = [
         'amount',
         'note',
+        'transaction_type_id',
+        'data',
         'frequency',
         'starts_at',
         'next_run_at',
@@ -29,6 +31,7 @@ class RecurringTransaction extends Model
         'next_run_at' => 'date',
         'ends_at' => 'date',
         'active' => 'boolean',
+        'data' => 'array',
     ];
 
     /**
@@ -45,5 +48,13 @@ class RecurringTransaction extends Model
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class)->withTrashed();
+    }
+
+    /**
+     * @return BelongsTo<TransactionType, $this>
+     */
+    public function transactionType(): BelongsTo
+    {
+        return $this->belongsTo(TransactionType::class)->withTrashed();
     }
 }

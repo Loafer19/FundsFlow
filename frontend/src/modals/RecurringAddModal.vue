@@ -41,6 +41,10 @@
                     </div>
                 </template>
 
+                <TypeChips :model-value="form.transaction_type_id" @pick="pickType" />
+                <TypeFieldsCard v-if="typedType" v-model:data="form.data" :type="typedType" :auto-fields="autoFields" />
+                <p v-if="defaultTagNote" class="text-xs text-base-content/60 -mt-3 mb-4">{{ defaultTagNote }}</p>
+
                 <div class="text-sm text-base-content/60 mb-1">Tags</div>
                 <TagPicker v-model="form.tags" />
 
@@ -61,18 +65,23 @@
 
 <script setup>
 import { Repeat, Save } from '@lucide/vue'
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import AmountField from '../components/AmountField.vue'
 import DateChips from '../components/DateChips.vue'
 import DateField from '../components/DateField.vue'
 import ModalHeader from '../components/ModalHeader.vue'
 import SegmentedControl from '../components/SegmentedControl.vue'
 import TagPicker from '../components/TagPicker.vue'
+import TypeChips from '../components/TypeChips.vue'
+import TypeFieldsCard from '../components/TypeFieldsCard.vue'
 import { today } from '../services/clock.js'
 import { formatDate, nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { advanceDateStr } from '../services/recurringSchedule.js'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
+import { applyScheduleData, scheduleAutoFields } from '../services/recurringTotals.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
+import { useTransactionTypesStore } from '../services/transactionTypes.js'
+import { useTypedTransaction } from '../services/typedTransaction.js'
 
 const frequencyOptions = [
     { value: 'daily', label: 'Daily' },
@@ -104,9 +113,35 @@ const createDefault = () => ({
 
     ends_at: '',
     tags: [],
+    transaction_type_id: null,
+    data: {},
 })
 
 const form = ref(createDefault())
+const typesStore = useTransactionTypesStore()
+const amountField = ref(null)
+const typed = useTypedTransaction(form, amountField)
+const typedType = computed(() => typed.type.value)
+const autoFields = computed(() => scheduleAutoFields(typedType.value, form.value.frequency, form.value.starts_at))
+const defaultTagNote = computed(() => {
+    const type = typedType.value
+    const ids = (type?.default_tag_ids ?? []).filter((id) => form.value.tags.includes(id))
+    if (!ids.length) return ''
+    return `Default tag${ids.length > 1 ? 's' : ''} from ${type.name}`
+})
+const pickType = (id) => {
+    typed.pickType(id)
+    nextTick(() => {
+        form.value.data = applyScheduleData(typedType.value, form.value.data, form.value.frequency, form.value.starts_at)
+    })
+}
+watch(
+    () => [form.value.frequency, form.value.starts_at, form.value.transaction_type_id],
+    () => {
+        if (!typedType.value) return
+        form.value.data = applyScheduleData(typedType.value, form.value.data, form.value.frequency, form.value.starts_at)
+    },
+)
 
 // Quick starts: today, or the 1st of next month (a past 1st would make the next run
 // back-fill an occurrence that may already have been logged by hand).
@@ -151,7 +186,10 @@ const handleSubmit = async () => {
     const endsAt =
         endMode.value === 'count' ? computedEndsAt.value : endMode.value === 'date' ? form.value.ends_at || null : null
 
-    const ok = await recurringStore.create({ ...form.value, ends_at: endsAt })
+    const payload = typed.payload({ ...form.value, ends_at: endsAt })
+    if (payload.transaction_type_id) payload.default_tags = false
+    const ok = await recurringStore.create(payload)
+    if (ok && payload.add_options) typesStore.fetch()
 
     if (!ok) return
 

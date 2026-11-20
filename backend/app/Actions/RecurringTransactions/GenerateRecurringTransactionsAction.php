@@ -7,6 +7,7 @@ use App\Channels\Telegram\TelegramClient;
 use App\Enums\TransactionSource;
 use App\Models\RecurringTransaction;
 use App\Models\Transaction;
+use App\Support\RecurringTypeData;
 use App\Support\UserFormatter;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +55,7 @@ class GenerateRecurringTransactionsAction
         RecurringTransaction::query()
             ->where('active', true)
             ->where('next_run_at', '<=', $latestPossibleToday)
-            ->with(['user.identities', 'tags'])
+            ->with(['user.identities', 'tags', 'transactionType'])
             ->chunkById(50, function ($rules) {
                 foreach ($rules as $rule) {
                     $today = $rule->user->todayDateString();
@@ -97,17 +98,47 @@ class GenerateRecurringTransactionsAction
             // Insert and advance together, so a crash between them can't
             // replay the same occurrence on the next run.
             $transaction = DB::transaction(function () use ($rule) {
-                $transaction = $this->createTransaction->execute($rule->user, [
-                    'at' => $rule->next_run_at->toDateString(),
+                $chargeDate = $rule->next_run_at->toDateString();
+                $payload = [
+                    'at' => $chargeDate,
                     'amount' => $rule->amount,
                     'note' => $rule->note,
                     'tags' => $rule->tags->pluck('id')->all(),
-                ], TransactionSource::Recurring);
+                    'default_tags' => false,
+                ];
+
+                $type = $rule->transactionType;
+                if ($rule->transaction_type_id && $type) {
+                    // Copy the template; stamp next_charge on the transaction to this occurrence.
+                    $payload['transaction_type_id'] = $rule->transaction_type_id;
+                    $payload['data'] = RecurringTypeData::applyScheduleFields(
+                        $type,
+                        $rule->data ?? [],
+                        $rule->frequency->value,
+                        $chargeDate,
+                    );
+                }
+
+                $transaction = $this->createTransaction->execute(
+                    $rule->user,
+                    $payload,
+                    TransactionSource::Recurring,
+                    requireAllFields: false,
+                    allowArchivedType: true,
+                );
 
                 $rule->next_run_at = $rule->frequency->firstOnOrAfter(
                     $rule->starts_at,
                     $rule->next_run_at->copy()->addDay(),
                 );
+                if ($type) {
+                    $rule->data = RecurringTypeData::applyScheduleFields(
+                        $type,
+                        $rule->data ?? [],
+                        $rule->frequency->value,
+                        $rule->next_run_at->toDateString(),
+                    );
+                }
                 $rule->save();
 
                 return $transaction;

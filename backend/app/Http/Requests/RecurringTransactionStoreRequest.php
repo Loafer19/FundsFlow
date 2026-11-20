@@ -44,6 +44,10 @@ class RecurringTransactionStoreRequest extends FormRequest
                 'integer',
                 Rule::exists('tags', 'id')->where('user_id', $this->user()->id),
             ],
+            'default_tags' => 'sometimes|boolean',
+            'transaction_type_id' => 'sometimes|nullable|integer',
+            'data' => 'sometimes|nullable|array',
+            'add_options' => 'sometimes|boolean',
         ];
     }
 }

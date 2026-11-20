@@ -1,6 +1,6 @@
 <template>
-    <dialog id="recurring_modal" class="modal" aria-labelledby="recurring_modal_title">
-        <div class="modal-box max-w-lg">
+    <dialog id="recurring_modal" class="modal" aria-labelledby="recurring_modal_title" @close="recurringStore.clearFilter()">
+        <div class="modal-box max-w-xl">
             <ModalHeader title-id="recurring_modal_title" :icon="Repeat">
                 Recurring
                 <template #actions>
@@ -11,14 +11,26 @@
                 </template>
             </ModalHeader>
 
+            <div v-if="filterType" class="mb-3">
+                <button type="button" class="btn btn-sm btn-soft gap-1" :aria-label="`Clear ${filterType.name} filter`"
+                    @click="recurringStore.clearFilter()">
+                    <span v-if="filterType.emoji">{{ filterType.emoji }}</span>
+                    {{ filterType.name }}
+                    <span aria-hidden="true">×</span>
+                </button>
+            </div>
+
             <EmptyState v-if="!recurringStore.rules.length" :icon="Repeat" title="No recurring transactions yet"
                 description="Add rent, salary, or a subscription" action-label="Add Recurring"
                 @action="showModal('recurring_add_modal')" />
 
+            <EmptyState v-else-if="!recurringStore.visibleRules.length" :icon="Repeat"
+                title="No matching recurring" :description="filterType ? `No ${filterType.name} rules` : 'Nothing to show'" />
+
             <div v-else class="recurring-list">
                 <table class="table">
                     <tbody>
-                        <tr v-for="rule in recurringStore.rules" :key="rule.id">
+                        <tr v-for="rule in recurringStore.visibleRules" :key="rule.id">
                             <td>
                                 <div class="flex items-center gap-2 flex-wrap">
                                     <div class="badge badge-outline badge-neutral text-xs">{{ rule.frequency }}</div>
@@ -28,8 +40,9 @@
                                     <span v-for="tag in rule.tags" :key="tag.id" class="tooltip"
                                         :data-tip="tag.title">{{ tag.emoji }}</span>
                                 </div>
-                                <div class="text-sm mt-1">
-                                    {{ formatDate(rule.next_run_at) }}<template v-if="rule.note"> · {{ rule.note }}</template>
+                                <div class="text-sm mt-1 flex flex-wrap items-center gap-1.5 min-w-0">
+                                    <span class="shrink-0">{{ formatDate(rule.next_run_at) }}<template v-if="rule.note"> · {{ rule.note }}</template></span>
+                                    <TypeSegments :transaction="rule" size="xs" />
                                 </div>
                             </td>
                             <td class="text-right">
@@ -70,14 +83,22 @@
 
 <script setup>
 import { Pause, Pencil, Play, Plus, Repeat } from '@lucide/vue'
+import { computed } from 'vue'
 import DeleteHold from './../components/buttons/DeleteHold.vue'
 import EmptyState from './../components/EmptyState.vue'
 import ModalHeader from '../components/ModalHeader.vue'
+import TypeSegments from '../components/TypeSegments.vue'
 import { formatDate, formatMoney } from './../services/formatters.js'
 import { showModal } from './../services/modal.js'
 import { useRecurringTransactionsStore } from './../services/recurringTransactions.js'
+import { useTransactionTypesStore } from './../services/transactionTypes.js'
 
 const recurringStore = useRecurringTransactionsStore()
+const typesStore = useTransactionTypesStore()
+const filterType = computed(() => {
+    if (recurringStore.filterTypeId === 'none') return { name: 'No type', emoji: '' }
+    return typesStore.byId(recurringStore.filterTypeId)
+})
 
 const openEdit = (rule) => {
     recurringStore.ruleForEdit = rule

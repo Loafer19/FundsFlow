@@ -34,7 +34,7 @@ function showList(){
   list.forEach(function(it){
     const b=el('button','item'+(it.on?'':' off'));b.type='button';
     const t=el('div','top');t.appendChild(el('span',cls(it.a),it.a));t.appendChild(el('span','n',it.n));b.appendChild(t);
-    b.appendChild(el('div','meta',it.fq+' · '+when(it)));
+    b.appendChild(el('div','meta',(it.ty?it.ty+' · ':'')+it.fq+' · '+when(it)));
     b.addEventListener('click',function(){sel=it;err='';showDetail()});
     r.appendChild(b);
   });
@@ -48,6 +48,7 @@ function showDetail(){
   r.appendChild(el('h3',cls(it.a),it.a));
   const box=el('div','lines');
   box.appendChild(el('p','',it.n));
+  if(it.ty)box.appendChild(el('p','',it.ty));
   if(it.g)box.appendChild(el('p','',it.g));
   box.appendChild(el('p','',it.fq+(it.end?' until '+it.end:'')));
   box.appendChild(el('p','',it.on?'Next payment '+it.nx:'⏸ Paused'));

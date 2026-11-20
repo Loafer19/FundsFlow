@@ -16,6 +16,6 @@ class ListRecurringTransactionsAction
     {
         Gate::forUser($user)->authorize('viewAny', RecurringTransaction::class);
 
-        return $user->recurringTransactions()->with('tags')->get();
+        return $user->recurringTransactions()->with(['tags', 'transactionType'])->get();
     }
 }

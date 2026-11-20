@@ -18,6 +18,11 @@ Stat cards for the selected period, each compared with the previous period: **In
 - **Insights** — short notes such as the biggest change in a tag, the priciest weekday, and no-spend days.
 - **Top spending tags** (top-level tags, each including its child tags) with their share and change; click one to
   filter by it.
+- **Recurring** — next to Top spending tags when you have active expense recurring rules: an approximate
+  monthly total (daily × 365/12, weekly × 52/12, yearly ÷ 12) and the yearly equivalent, how many are active,
+  the next charge, and a bar per type (typeless rules under **No type**). The card is hidden when there are
+  none, and is not included in printed reports. **View all** opens [Recurring](/docs/web/recurring/); click a
+  type to open the list filtered to it.
 - **Largest expenses** of the period; **See all** opens the List.
 
 **Balances Per Tag** shows the balance of every tag marked **Show in Balances** (including its child tags), for

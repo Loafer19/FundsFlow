@@ -87,8 +87,60 @@
                 </div>
             </div>
 
+            <div v-if="!inReport && recurring" class="card card-border border-base-300 bg-base-100 min-w-0 h-full">
+                <div class="card-body p-4 gap-3 min-w-0 h-full">
+                    <h2 class="card-title text-base sm:text-lg min-w-0">
+                        <Repeat :size="22" class="text-primary shrink-0" />
+                        <span class="truncate">Recurring</span>
+                        <span class="tooltip tooltip-bottom before:max-w-52 sm:before:max-w-64 font-normal text-sm"
+                            data-tip="Active expense recurring rules, normalized to a month. Daily × 365/12, weekly × 52/12, yearly ÷ 12. Bars are grouped by type. View all opens Recurring; click a type to filter."
+                            @click.stop>
+                            <Info :size="16" class="opacity-60" />
+                        </span>
+                        <button type="button" class="btn btn-ghost btn-xs ml-auto font-normal"
+                            @click="recurringStore.openAll()">
+                            View all
+                            <ChevronRight :size="14" />
+                        </button>
+                    </h2>
+                    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
+                        <span class="text-lg font-semibold tabular-nums">≈ {{ formatMoney(recurring.monthly) }}</span>
+                        <span class="text-sm text-base-content/60">/ month</span>
+                        <span class="text-base-content/30">·</span>
+                        <span class="text-base font-semibold tabular-nums">{{ formatMoney(recurring.yearly) }}</span>
+                        <span class="text-sm text-base-content/60">/ year</span>
+                    </div>
+                    <div class="text-xs text-base-content/60 -mt-1">
+                        {{ recurring.count }} active · next {{ formatDate(recurring.nextDate) }} · {{ recurring.nextName }}
+                    </div>
+                    <ul class="flex flex-col gap-2 min-w-0">
+                        <li v-for="group in recurring.groups" :key="group.id" class="min-w-0">
+                            <button type="button" class="w-full text-left min-w-0 rounded-field hover:bg-base-200/60 px-1 -mx-1 cursor-pointer"
+                                :aria-label="`Open Recurring, filtered to ${group.name}`"
+                                @click="recurringStore.openFiltered(group.typeId)">
+                                <div class="flex items-center justify-between gap-2 min-w-0">
+                                    <span class="flex items-center gap-2 min-w-0">
+                                        <span v-if="group.emoji" class="shrink-0 text-lg leading-none">{{ group.emoji }}</span>
+                                        <span class="truncate">{{ group.name }}</span>
+                                        <span class="text-xs text-base-content/50 tabular-nums shrink-0">{{ group.count }}</span>
+                                    </span>
+                                    <span class="font-semibold tabular-nums shrink-0">{{ formatMoney(group.monthly) }}</span>
+                                </div>
+                                <p v-if="group.preview" class="text-xs text-base-content/50 truncate mt-0.5">{{ group.preview }}</p>
+                                <div class="flex items-center gap-2 min-w-0 mt-1">
+                                    <span class="h-1.5 flex-1 rounded-full bg-base-300 overflow-hidden">
+                                        <span class="block h-full rounded-full" :style="{ width: group.share + '%', backgroundColor: group.color || 'var(--color-primary)' }"></span>
+                                    </span>
+                                    <span class="text-xs text-base-content/60 tabular-nums w-12 text-right">{{ formatPercentage(group.share) }}</span>
+                                </div>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
             <div v-if="largestExpenses.length" class="card card-border border-base-300 bg-base-100 min-w-0"
-                :class="{ 'md:col-span-2': !topTags.length }">
+                :class="{ 'md:col-span-2': !topTags.length || (!!recurring && !inReport) }">
                 <div class="card-body p-4 gap-2 min-w-0">
                     <h2 class="card-title text-base sm:text-lg min-w-0">
                         <Flame :size="22" class="text-error shrink-0" />
@@ -174,7 +226,7 @@
 </template>
 
 <script setup>
-import { ChartPie, ChevronDown, ChevronRight, Flame, Info, Lightbulb, Presentation, Telescope } from '@lucide/vue'
+import { ChartPie, ChevronDown, ChevronRight, Flame, Info, Lightbulb, Presentation, Repeat, Telescope } from '@lucide/vue'
 import { computed, inject, ref } from 'vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatCard from '../components/StatCard.vue'
@@ -184,7 +236,9 @@ import { tagChange } from '../services/comparison.js'
 import { parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { projectOccurrences } from '../services/recurringSchedule.js'
 import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
+import { recurringSummary } from '../services/recurringTotals.js'
 import { useTagsStore } from '../services/tags.js'
+import { useTransactionTypesStore } from '../services/transactionTypes.js'
 import { useTransactionsStore } from '../services/transactions.js'
 
 const emit = defineEmits(['jump-to-list'])
@@ -192,6 +246,7 @@ const emit = defineEmits(['jump-to-list'])
 const tagsStore = useTagsStore()
 const transactionsStore = useTransactionsStore()
 const recurringStore = useRecurringTransactionsStore()
+const typesStore = useTransactionTypesStore()
 const formatMoney = inject('formatMoney')
 const formatPercentage = inject('formatPercentage')
 const formatDate = inject('formatDate')
@@ -199,6 +254,8 @@ const formatDate = inject('formatDate')
 // lists only the filtered tags with a non-zero balance (the app tab is unchanged).
 const inReport = inject('inReport', false)
 const openAdd = () => transactions_add_modal.showModal()
+
+const recurring = computed(() => recurringSummary(recurringStore.rules, typesStore.types))
 
 const props = defineProps({
     dateRange: {

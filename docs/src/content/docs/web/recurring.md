@@ -11,9 +11,20 @@ Open **Recurring** (🔁) from the header, then **Add Recurring**:
 - **Frequency** — **Daily**, **Weekly**, **Monthly**, or **Yearly**.
 - **Starts** — the first date.
 - **Ends** — never, after a **number of times** (FundsFlow shows the estimated end date), or on a **date**.
+- **Type** — optional, the same types as a regular transaction (Fuel, Groceries, **Subscription**, or one of yours).
+  The type's default tags are pre-selected and you can remove them. When the type has **Period** and **Next charge**
+  fields (the starter Subscription type does), Period is filled from frequency (**Monthly** or **Yearly**; weekly and
+  daily are left for you to pick) and Next charge follows the rule's next date — both are read-only.
 
-The list shows each rule's frequency, amount, tags, and next run date. You can edit or delete rules
-(hold-to-delete).
+The list shows each rule's frequency, amount, tags, next run date, and type segments when a type is set. You can
+pause, edit, or delete rules (hold-to-delete).
+
+Each generated transaction copies the type and field values. **Next charge** on that transaction is the date of
+that occurrence; the rule's Next charge then moves to the following date.
+
+Active expense rules also appear as a **Recurring** card on the
+[Analytics](/docs/web/tabs/#analytics) dashboard (hidden when there are none): a monthly and yearly total,
+the next charge, and a bar per type. **View all** opens this list; click a type on the card to filter it.
 
 ## When transactions are created
 

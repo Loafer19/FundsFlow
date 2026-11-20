@@ -22,6 +22,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Support\GoalSummary;
 use App\Support\TagTree;
+use App\Support\RecurringTypeData;
 use App\Support\UserFormatter;
 
 class MenuHandler
@@ -307,6 +308,11 @@ class MenuHandler
                 "{$status} <b>{$money}</b> · {$freq}",
                 "next {$next}",
             ];
+
+            $typeLine = RecurringTypeData::typeLine($rule);
+            if ($typeLine) {
+                $lines[] = $this->support->escapeHtml($typeLine);
+            }
 
             if ($rule->note) {
                 $lines[] = '📝 ' . $this->support->escapeHtml($rule->note);

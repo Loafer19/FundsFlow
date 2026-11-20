@@ -16,13 +16,13 @@ class CreateTransactionAction
     /**
      * @param array<string, mixed> $data
      */
-    public function execute(User $user, array $data, TransactionSource $source, bool $requireAllFields = true): Transaction
+    public function execute(User $user, array $data, TransactionSource $source, bool $requireAllFields = true, bool $allowArchivedType = false): Transaction
     {
         Gate::forUser($user)->authorize('create', Transaction::class);
 
         // Type, field values and the amount a computed field fills; the type's default tags join in
         // unless the client already showed them as editable picks (default_tags=false, the web form).
-        $typed = TransactionTypeData::forCreate($user, $data, $requireAllFields);
+        $typed = TransactionTypeData::forCreate($user, $data, $requireAllFields, $allowArchivedType);
         $defaultTags = (bool) ($data['default_tags'] ?? true) ? $typed['tag_ids'] : [];
         unset($data['transaction_type_id'], $data['data'], $data['add_options'], $data['default_tags']);
         $data['amount'] = $typed['amount'];
