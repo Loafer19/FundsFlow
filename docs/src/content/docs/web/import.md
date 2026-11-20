@@ -57,9 +57,10 @@ Old or macro formats are refused with a hint: save `.xls`, `.xlsm`, or `.xlsb` a
 `.docm`, or `.rtf` as `.docx` or PDF. Macros are never run; files with macros are refused. A `.txt` file that is
 really OFX, QIF, JSON, or HTML is recognised by its contents.
 
-**On the web**, attach files with the 📎 button or drag them onto the panel. Each file shows as a chip with its name
-and size above the message box; remove one with **✕**. Up to **5 files** per message, **20 MB** together, and not
-together with photos. **In Telegram**, send them as files (documents). Up to 5 files sent together (one album) become
+**On the web**, attach files with the 📎 button, drag them onto the panel, or paste them. Each file shows as a chip
+with its name and size above the message box; remove one with **✕**. Up to **5 files** per message, **20 MB**
+together, on their own or together with photos (photos and files in one message are read together; a text amount
+skips the AI). **In Telegram**, send them as files (documents). Up to 5 files sent together (one album) become
 one import; files sent separately are read one by one.
 
 A PDF receipt with an amount in the text (`-350 groceries`) is saved right away with the PDF attached, as before, and

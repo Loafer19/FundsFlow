@@ -20,14 +20,16 @@ The Web UI opens from the menu button next to the message field.
 
 ## Commands
 
-The bot's command menu lists the commands in this order. In a private chat most of them open a live
-widget that updates by itself after every transaction; in a group they reply with text.
+The bot's command menu lists the commands in this order. In a private chat, when Telegram allows widgets, most of
+them open a live widget that updates by itself after every transaction. In a group, and when Telegram refuses
+widgets (since 13 November 2026, even in a private chat), they reply with text. The bot tries widgets again after
+about an hour.
 
 | Command | What it does |
 | --- | --- |
 | `/start` | Create an account for this chat, or link it with a code from the website |
-| `/add` | Keypad widget: amount, expense or income, one of your frequent tags (no AI) |
-| `/recent` | Recent transactions with all their tags (📎 marks ones with files); tap one for **📎 Files** (its files, each with **Send** and 🗑, and **+ Attach**), **✏️ Edit** (opens the editor) or **🗑 Delete** |
+| `/add` | Keypad: amount, expense or income, one of your frequent tags (no AI). A widget when available; otherwise the bot asks you to write the transaction |
+| `/recent` | Recent transactions with all their tags (📎 marks ones with files); open one for **📎 Files** (its files, each with **Send** and 🗑, and **+ Attach**), **✏️ Edit** or **🗑 Delete** |
 | `/month` | This month's income, expenses, net, a daily chart, and top tags (a parent tag includes its child tags) |
 | `/budgets` | Spending limits for the current period (spent / limit, left or over, period dates, days left) and savings goals (saved vs target, deadline, pace) |
 | `/tags` | Your top-level tags with this month's expenses (−) and income (+); tap a tag to split it by subtags. Tags with no transactions this month are folded |
@@ -55,15 +57,17 @@ were removed: use `/month`, or ask the [AI assistant](/docs/telegram/ai-assistan
 
 ## Editing and deleting transactions
 
-In a private chat, tap a transaction in the `/recent` widget: **✏️ Edit** opens the
-[editor](/docs/telegram/quick-add/#edit-a-transaction) as a new message below the list, and **🗑 Delete** asks
-*Delete this transaction?* first. A transaction with a [type](/docs/web/types/) shows the type next to its tags
-and a box with its fields (*Liters 40 l*, *Price per liter 58,90 ₴*…). The editor shows them too; change fields in
-the web app or by asking the assistant. **📎 Files (N)** above them opens the transaction's files in the widget (name and
-size); **Send** next to a file sends it to the chat below the widget, 🗑 deletes it after *Delete? Yes / No*, and **+ Attach** asks for a photo or file to
-[attach](/docs/telegram/receipts/#attach-to-an-existing-transaction). A card you just saved has the same **✏️ Edit** and **🗑 Delete** buttons; **🗑 Delete**
-turns the card into *Delete this transaction?* with **🗑 Delete** and **↩️ Cancel**, and nothing is deleted until you
-confirm. Groups have no widgets, so there **Open N** under `/recent` sends the transaction as a text card (date as
-DD.MM.YYYY) with **🏷 Tags**, **✏️ Amount** and **🗑 Delete**, plus **📎 Attach** and, when it has attachments, **📎 Files (N)**. A card you just added also has **↩️ Undo** for 5 minutes. You can also ask the
-[AI assistant](/docs/telegram/ai-assistant/) to change or delete a transaction; it shows what will change and asks
-for confirmation.
+Open a transaction from `/recent`: **✏️ Edit** opens the [editor](/docs/telegram/quick-add/#edit-a-transaction),
+and **🗑 Delete** asks *Delete this transaction?* first. A transaction with a [type](/docs/web/types/) shows the type
+next to its tags and a box with its fields (*Liters 40 l*, *Price per liter 58,90 ₴*…). The editor shows them too;
+change fields in the web app or by asking the assistant. **📎 Files (N)** lists the transaction's files (name and
+size); **Send** next to a file sends it to the chat, 🗑 deletes it after *Delete? Yes / No*, and **+ Attach** asks
+for a photo or file to [attach](/docs/telegram/receipts/#attach-to-an-existing-transaction). A card you just saved
+has the same **✏️ Edit** and **🗑 Delete** buttons; **🗑 Delete** turns the card into *Delete this transaction?* with
+**🗑 Delete** and **↩️ Cancel**, and nothing is deleted until you confirm.
+
+When widgets aren't available (in a group, or when Telegram refuses them in a private chat), `/recent` sends text
+cards (date as DD.MM.YYYY). **✏️ Edit** turns the card itself into an editor with buttons for tags, amount, date and
+note, plus **🗑 Delete**, **📎 Attach** and, when it has attachments, **📎 Files (N)**. A card you just added also has
+**↩️ Undo** for 5 minutes. You can also ask the [AI assistant](/docs/telegram/ai-assistant/) to change or delete a
+transaction; it shows what will change and asks for confirmation.

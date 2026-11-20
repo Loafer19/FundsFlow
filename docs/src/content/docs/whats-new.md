@@ -7,23 +7,29 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
 **1.13** update that put an AI assistant in the Telegram bot. Self-hosting and technical changes are listed in the
 [GitHub releases](https://github.com/Loafer19/FundsFlow/releases).
 
-## Upcoming
-
-In the next release.
+## 2.4.0 — 20 November 2026
 
 ### Web app
 
 - **Transaction types with your own fields.** Make a *Fuel* type with Liters, Price per liter and a Station, a
   *Groceries* type with the store, or a rating for restaurants. A computed field (`liters * price_per_liter`) can fill
-  the amount, and you can still type your own. Pick the type in **Add Transaction**; the List shows its key values.
-  Manage types in **Settings → Data & reports → Manage Types**. New accounts start with ⛽ Fuel, 🛒 Groceries,
-  🔄 Subscription and 🍽 Restaurant. [Learn more](/docs/web/types/)
-- **Type analytics.** Click a type segment in the List or Calendar, or **Analytics** in Manage Types, to see counts,
-  totals, the average, a month-over-month comparison, top field values and numeric trends, plus a breakdown of spend
-  by a field (top values and *Other*) as a pie and six-month stacked bars. [Learn more](/docs/web/types/#type-analytics)
+  the amount, and you can still type your own. Pick the type in **Add Transaction**. Manage types with the **Types**
+  button in the header, or in **Settings → Data & reports → Manage Types**. New accounts start with ⛽ Fuel,
+  🛒 Groceries, 🔄 Subscription and 🍽 Restaurant. [Learn more](/docs/web/types/)
+- **Type column.** In the List, Calendar, largest expenses and tag details, a colored stripe and a **Type** column
+  split the type and its values into segments: *⛽ Fuel | 40 l | 58,90 ₴ | +1*. The type is tinted with its color;
+  the values stay grey. Hover a segment to see the field name; *+N* lists the rest.
+  [Learn more](/docs/web/types/)
+- **Type analytics.** Click a type segment, or **Analytics** in Manage Types, to see counts, totals, the average, a
+  month-over-month comparison, top field values and numeric trends (**Overview**), plus a breakdown of spend by a
+  field (top values and *Other*) as a pie and six-month stacked bars (**Breakdown**).
+  [Learn more](/docs/web/types/#type-analytics)
 - **Types in bank imports.** The import preview suggests a type for known merchants (OKKO → Fuel, Silpo →
   Groceries, Netflix → Subscription) and lets you set one per row or for the whole file.
   [Learn more](/docs/web/import/#preview-page)
+- **Photos and files together.** The assistant accepts receipt photos and statement files in one message, in any
+  order, including a paste from the clipboard. If the text already has an amount, no AI assist is used. A single CSV
+  no longer fails to preview. [Learn more](/docs/web/assistant/#receipt-photos)
 
 ### Telegram bot
 
@@ -33,6 +39,14 @@ In the next release.
 - **Assistants manage types.** In the web app or in Telegram, ask *create these types: Fuel (liters, price/l, fuel type,
   station, total), Groceries, Subscription, Restaurant* and confirm one card. You can also add, rename or hide fields,
   change options and default tags, or archive a type the same way.
+- **Text cards when widgets are blocked.** Since 13 November 2026 Telegram has been refusing widgets for general
+  bots, even in a private chat. When that happens, `/month`, `/budgets`, `/tags`, `/recent`, `/recurring`,
+  `/notifications` and ➕ Add come as text, and **✏️ Edit** turns the card into an editor with buttons for the
+  amount, tags, date and note, plus delete and attach. The bot tries widgets again after about an hour, so they
+  return on their own if Telegram allows them. Groups already used these text cards.
+  [Learn more](/docs/telegram/quick-add/#edit-a-transaction)
+- **Receipt tags from your tags.** Suggested tags on a receipt now come only from your existing tags, not invented
+  names. [Learn more](/docs/telegram/receipts/)
 
 ## 2.3.0
 

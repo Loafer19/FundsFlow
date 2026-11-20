@@ -19,11 +19,13 @@ Send a photo (JPEG, PNG, WebP or HEIC), with or without a caption. A caption hel
 note and tags. A hint like `dinner with friends` works too.
 
 1. The bot replies *Reading receipt…* and AI vision extracts the **total**, the **date** if clearly visible, a short
-   **note** (merchant or place), and up to three **suggested tags**, which are matched to your existing tags.
+   **note** (merchant or place), and up to three **suggested tags** taken only from tags you already have — names
+   that aren't in your tags are not created.
 2. The *Reading receipt…* message turns into a **🧾 Receipt draft** card with **✅ Confirm**, **✏️ Edit**, and
    **↩️ Cancel**. **✏️ Edit** opens the same [editor](/docs/telegram/quick-add/#edit-a-transaction) as for saved
    transactions (amount, expense or income, date, tags, note); **Save** there updates the draft and **Discard** drops
-   it. In a group the button is **✏️ Amount** instead.
+   it. When widgets aren't available (in a group, or when Telegram refuses them), the draft uses the text editor
+   instead.
 3. On **Confirm** the transaction is saved with the photo attached, and the card shows **✅ Saved with receipt**
    with **↩️ Undo** for 5 minutes.
 
@@ -56,13 +58,12 @@ When you send several photos as one album, the bot waits a few seconds to collec
 
 ## Attach to an existing transaction
 
-- **+ Attach** — open the transaction in the `/recent` widget, tap **📎 Files** and then **+ Attach** (in a group, tap
-  **📎 Attach** on its card). The bot
+- **+ Attach** — open the transaction in `/recent`, tap **📎 Files** and then **+ Attach** (or **📎 Attach** on a
+  text card). The bot
   asks *Send a photo or file to attach to …* with **↩️ Cancel**; send the photo, PDF or an album within 10 minutes.
   Sending text or a command instead cancels it.
 - **Reply** — send the photo or file as a reply to a message about that transaction: its saved card or text card,
-  a **✅ Attached** message, the attach prompt, an open editor, or the `/recent` widget while that transaction is open
-  in it.
+  a **✅ Attached** message, the attach prompt, an open editor, or `/recent` while that transaction is open in it.
 
 The bot answers **✅ Attached N files to …** with **📎 Files (N)**, and no new transaction is created. The usual limits
 apply: JPEG, PNG, WebP, HEIC or PDF, up to 8 MB each, at most 5 files per transaction (**+ Attach** and **📎 Attach** are
@@ -71,8 +72,9 @@ your photos there (privacy mode), send them as a reply to the prompt.
 
 ## Get the files back
 
-Open the transaction in the `/recent` widget (📎 marks transactions with files) and tap **📎 Files (N)**: the files
-are listed with their names and sizes, and **Send** next to one sends it to the chat (photos as photos, PDFs as
-documents), and the red 🗑 next to it asks *Delete?* with **Yes** and **No** before removing that file. In a group, **📎 Files (N)** on the transaction card sends all of them. On the web, open the [transaction](/docs/web/transactions/) to preview, download or send them.
+Open the transaction in `/recent` (📎 marks transactions with files) and tap **📎 Files (N)**: the files are listed
+with their names and sizes, and **Send** next to one sends it to the chat (photos as photos, PDFs as documents), and
+the red 🗑 next to it asks *Delete?* with **Yes** and **No** before removing that file. On a text card, **📎 Files (N)**
+sends all of them. On the web, open the [transaction](/docs/web/transactions/) to preview, download or send them.
 
 Pending receipts and drafts expire after about 15 minutes; send the photo again if a card says it is outdated.

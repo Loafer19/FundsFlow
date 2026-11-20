@@ -72,7 +72,7 @@ transaction card does the same, and **↩️ Undo** removes it within 5 minutes.
 
 ### Can I export my data?
 
-Yes. **Settings → Data & reports → Download JSON** downloads everything: tags, transactions, budgets and recurring rules.
+Yes. **Settings → Data & reports → Download JSON** downloads everything: tags, transaction types, transactions, budgets and recurring rules.
 
 ### How do I stop notifications?
 

@@ -27,11 +27,11 @@ Muting doesn't affect replies to your own messages.
 
 ## Budget alert
 
-In a private chat the alert is a widget with a progress bar for each limit: blue up to 100%, red when it's over,
-with what you spent against the limit and how many days are left (or how much you're over). A **💰 Budgets** button
-opens your budgets.
+In a private chat, when widgets are available, the alert is a widget with a progress bar for each limit: blue up to
+100%, red when it's over, with what you spent against the limit and how many days are left (or how much you're over).
+A **💰 Budgets** button opens your budgets.
 
-If the widget can't be shown, the bot sends the same alert as text. Each line names the limit, what you spent against
+If the widget can't be shown (in a group, or when Telegram refuses widgets), the bot sends the same alert as text. Each line names the limit, what you spent against
 it, the percentage (rounded down, so 99.6% shows as 99%) and the period it applies to:
 
 ```text
@@ -45,9 +45,10 @@ it, the percentage (rounded down, so 99.6% shows as 99%) and the period it appli
 
 ## Weekly digest
 
-The digest is a widget too: last week's dates, **Income**, **Expenses** and **Net**, your top expense tag, the
-number of transactions and how much more or less you spent than the week before. Below that are progress bars for
-your active limits and savings goals. **📊 Month** and **💰 Budgets** buttons open those widgets.
+The digest is a widget too, when widgets are available: last week's dates, **Income**, **Expenses** and **Net**,
+your top expense tag, the number of transactions and how much more or less you spent than the week before. Below
+that are progress bars for your active limits and savings goals. **📊 Month** and **💰 Budgets** buttons open those
+views.
 
 If the widget can't be shown, the digest comes as text. After the week's totals it lists your active limits for their
 current period and your savings goals. 🟠 marks a limit at 80% or more, 🔴 one that is reached or over:
@@ -88,4 +89,5 @@ the chat, without a notification sound. It updates by itself after every transac
 expenses and top tags are always one tap away.
 
 When a new month starts, the bot pins a fresh summary for it. The old one stays in the chat as a record of the
-previous month and stops updating. Turning the switch off unpins it. Works only in a private chat with the bot.
+previous month and stops updating. Turning the switch off unpins it. Works only in a private chat with the bot,
+and only while Telegram allows widgets: if they are refused, a new pin waits until the bot can send widgets again.

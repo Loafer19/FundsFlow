@@ -98,15 +98,19 @@ Send a photo of a receipt and the assistant reads it into a transaction, like
 [receipts in Telegram](/docs/telegram/receipts/):
 
 - **Attach** photos with the 📎 button next to the message box (inside the Telegram mini app it opens your gallery or
-  camera), **drag and drop** them onto the panel, or **paste** an image with **Ctrl+V** (**⌘V**).
-- Up to **5 photos** per message, JPEG, PNG, WebP, or HEIC, up to 10 MB each. Before uploading, each photo is resized
-  to at most 1600 px on its long side and converted to JPEG. A HEIC photo the browser can't open (anything but
-  Safari) is sent as it is, up to 8 MB, and converted to JPEG on the server; its thumbnail just says *HEIC*.
+  camera), **drag and drop** them onto the panel, or **paste** an image with **Ctrl+V** (**⌘V**). You can attach
+  [files](#files-pdf-word-csv-excel-ofx-qif-json) in the same message, in any order.
+- Up to **5 photos** per message, JPEG, PNG, WebP, or HEIC, up to 10 MB each, and up to **5 files**, **20 MB** of
+  files together. Before uploading, each photo is resized to at most 1600 px on its long side and converted to JPEG.
+  A HEIC photo the browser can't open (anything but Safari) is sent as it is, up to 8 MB, and converted to JPEG on
+  the server; its thumbnail just says *HEIC*.
 - Thumbnails appear above the message box. Remove one with its **✕** before sending.
-- The text you send with the photos works like a Telegram photo caption:
+- The text you send with the photos (and any files in the same message) works like a Telegram photo caption:
   - **With an amount** (`-350 groceries`, `12.10 -40 taxi`), the transaction is prepared from that, with no AI and no
-    assist used.
-  - **Without an amount** (`lunch with Anna`), the AI reads the photo and uses your text as a hint.
+    assist used. Photos and files are attached to that transaction, or to one import if the files are a statement.
+  - **Without an amount** (`lunch with Anna`), the AI reads the photos and files together in one assist and uses your
+    text as a hint. If it's one purchase, you get one Confirm card with every attachment; several operations become
+    one import, without duplicates.
 - The AI reads the total, the date, and the shop, and suggests tags matched to your existing ones. A **Confirm** card
   shows the result, for example *Receipt · -350.00 · 📅 25.10.2026 · 📝 Silpo · 📎 1 photo · 🏷 🛒 Groceries*.
   Nothing is saved until you press **Confirm**. The transaction is then saved with the photos attached, so they show
@@ -133,11 +137,11 @@ Send a photo of a receipt and the assistant reads it into a transaction, like
 ## Files: PDF, Word, CSV, Excel, OFX, QIF, JSON
 
 Attach a **PDF**, **Word** (`.docx`), **CSV**, **Excel** (`.xlsx`, `.ods`), **OFX / QFX**, **QIF**, **JSON**, or
-**HTML** file with the 📎 button or drag it onto the panel: up to 5 files per message. A receipt becomes the usual
-Confirm card. Statements and spreadsheets become one card that imports all their transactions at once, and what you
-write with them (*only expenses*, *create the tags if needed*) is applied. Screenshots of a bank app's transaction
-list work too: attach them and write *statement*. See [Files and bulk import](/docs/web/import/) for formats, limits,
-and templates.
+**HTML** file with the 📎 button, drag it onto the panel, or paste it: up to 5 files per message, on their own or
+together with photos. A receipt becomes the usual Confirm card. Statements and spreadsheets become one card that
+imports all their transactions at once, and what you write with them (*only expenses*, *create the tags if needed*)
+is applied. Screenshots of a bank app's transaction list work too: attach them and write *statement*. See
+[Files and bulk import](/docs/web/import/) for formats, limits, and templates.
 
 ## It knows what you're looking at
 
@@ -175,16 +179,17 @@ The assistant never changes your data on its own. A proposed change appears as a
   messages in this panel stay visible).
 - While an answer is streaming, the **send** button turns into **stop**. Stop ends the stream in the panel.
 - The assistant answers one message at a time. You can send up to 20 messages per minute; a message can be up to
-  2000 characters, plus up to 5 photos.
+  2000 characters, plus up to 5 photos and 5 files.
 
 ## Daily AI limit
 
 The web assistant shares the [daily AI limit](/docs/telegram/ai-assistant/#daily-ai-limit) with Telegram (receipt
 reading, voice messages, and the Telegram assistant): each message you send counts as one **AI assist**, however many
-lookups it takes. Receipt photos count the way they do in Telegram:
+lookups it takes. Receipt photos and files count the way they do in Telegram:
 
 - one assist per photo the AI reads (one for **One transaction**, one per photo for **Separate**);
-- nothing when the text has an amount or the AI couldn't read the photo.
+- photos and files in the same message are read together in one assist;
+- nothing when the text has an amount or the AI couldn't read the attachment.
 
 The counter resets at **midnight in your timezone**.
 

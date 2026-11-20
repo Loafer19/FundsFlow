@@ -26,8 +26,11 @@ Each message like this uses one assist from the [daily AI limit](/docs/telegram/
 
 ## ➕ Add keypad (no AI)
 
-Tap **➕ Add** in the menu or send `/add` for the keypad widget: type the amount, pick **Expense** or **Income** and
-one of your frequent tags, then **Add**. It never uses the AI limit, so it keeps working when the limit is reached.
+Tap **➕ Add** in the menu or send `/add` for the keypad: type the amount, pick **Expense** or **Income** and one of
+your frequent tags, then **Add**. It never uses the AI limit, so it keeps working when the limit is reached.
+
+The keypad is a widget in a private chat, when Telegram allows widgets. Otherwise (in a group, or when Telegram
+refuses widgets) the bot asks you to write the transaction instead, like `350 groceries`.
 
 ## After saving
 
@@ -50,11 +53,11 @@ Under it are three buttons:
 - **🗑 Delete** — the card asks *Delete this transaction?* with **🗑 Delete** and **↩️ Cancel**; nothing is
   deleted until you confirm.
 
-You can open the same card later by tapping a transaction in the `/recent` widget (without **Undo**).
+You can open the same card later from `/recent` (without **Undo**).
 
 ## Edit a transaction
 
-**✏️ Edit** opens an editor widget in the chat:
+**✏️ Edit** opens an editor. When Telegram allows widgets in your private chat, that's a widget:
 
 - **Amount** — tap it to show a keypad and type the new amount.
 - **Expense / Income** — switch the direction; the tag chips follow it.
@@ -67,16 +70,19 @@ You can open the same card later by tapping a transaction in the `/recent` widge
 
 Only one editor per transaction is open at a time: tapping **✏️ Edit** again replaces the old one.
 
-### In a group
+### When widgets aren't available
 
-Widgets work only in a private chat with the bot. In a group the card keeps text buttons instead:
+Since 13 November 2026 Telegram has been refusing widgets for general bots, even in a private chat. When that
+happens, or in a group (groups never had widgets), the card itself becomes a text editor with buttons:
 
 - **🏷 Tags** — pick tags for the transaction (paged list; tap to toggle, then finish).
 - **✏️ Amount** — reply with the new amount, e.g. `+120` or `-50.5`. A number without a sign keeps the direction
   (an expense stays an expense).
+- **Date** and **note** — change them from the same card.
 - **🗑 Delete** — delete after confirmation.
 - **📎 Attach** — the next photo or file you send goes to this transaction (see
   [Attach to an existing transaction](/docs/telegram/receipts/#attach-to-an-existing-transaction)).
-- **📎 Files (N)** — next to Attach when the transaction has attachments; sends them to the group.
+- **📎 Files (N)** — next to Attach when the transaction has attachments; sends them to the chat.
 
-**↩️ Undo** is shown on its own row above them for the first 5 minutes.
+**↩️ Undo** is shown on its own row above them for the first 5 minutes. The bot tries widgets again after about an
+hour, so the widget editor returns on its own if Telegram allows it.

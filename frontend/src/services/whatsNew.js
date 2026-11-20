@@ -10,6 +10,20 @@ import { useAuthStore } from './auth.js'
  */
 export const RELEASES = [
     {
+        version: '2.4.0',
+        items: [
+            'Transaction types with your own fields: start with Fuel, Groceries, Subscription and Restaurant, or make your own. Manage them from Types in the header.',
+            'The List shows a type as a colored stripe and a Type column of field segments. Hover a segment to see what it is.',
+            'Click a type to open its analytics: totals, trends, and a breakdown of spend by a field.',
+            'Bank imports can suggest a type for known shops, or you can set one per row or for the whole file.',
+            'In the assistant, send receipt photos and statement files in the same message.',
+            'In Telegram, write Fuel: 40 l at 58.9 and the assistant fills the type and its fields.',
+            'Ask the assistant to create, change or archive types, then confirm one card.',
+            'If Telegram blocks live widgets, the bot switches to text cards and a button editor, and retries later.',
+            'Receipt suggestions use only tags you already have.',
+        ],
+    },
+    {
         version: '2.3.0',
         items: [
             'A cleaner layout: tabs grouped into Overview, Plan and Charts, with a bottom dock on phones.',
