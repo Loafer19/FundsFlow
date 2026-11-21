@@ -2,9 +2,11 @@
 
 namespace App\Actions\Agent;
 
+use App\Actions\TransactionTypes\AnalyzeTransactionTypeAction;
 use App\Actions\TransactionTypes\SaveTransactionTypeAction;
 use App\Models\TransactionType;
 use App\Models\User;
+use App\Support\PeriodRange;
 use App\Support\TransactionFields;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -12,20 +14,20 @@ use InvalidArgumentException;
 
 /**
  * Transaction type tools for every agent transport (wired in through AgentPlanningTools):
- * list types, and Confirm/Cancel proposals to create (several at once), edit and archive them.
+ * list types, type analytics, and Confirm/Cancel proposals to create (several at once), edit and archive them.
  * Schemas are validated in prepare() with TransactionFields::normalizeSchema (the EventFields-style
  * entry point the editor and API use), and saved after Confirm through SaveTransactionTypeAction.
  */
 class AgentTypeTools
 {
-    public const READ_TOOLS = ['list_transaction_types'];
+    public const READ_TOOLS = ['list_transaction_types', 'analyze_transaction_type'];
 
     public const STAGING_TOOLS = ['create_transaction_types', 'update_transaction_type', 'archive_transaction_type'];
 
     public const MAX_PER_PROPOSAL = 10;
 
     /** One line for both system prompts. */
-    public const PROMPT_RULE = '- Transaction types (Fuel, Groceries…: a type has custom fields, e.g. liters, price per liter, station, a computed total that fills the amount): you can manage them. list_transaction_types shows them with field keys. To create one or several ("create these types: …") call create_transaction_types once with all of them; to add/rename/hide fields, change options or default tags call update_transaction_type; archive_transaction_type archives one. Each stages one Confirm card. Field kinds: number (unit), rating (max 3/5/10), duration, boolean, select (options), multiselect (options), text, date, computed (formula over number/rating/duration/boolean keys of the same type with + - * / and parentheses, e.g. liters * price_per_liter; fill_amount=true makes it the transaction amount, at most one per type). Give snake_case keys; formulas use those keys. Default tags must be existing tag titles.';
+    public const PROMPT_RULE = '- Transaction types (Fuel, Groceries…: a type has custom fields, e.g. liters, price per liter, station, a computed total that fills the amount): you can manage them. list_transaction_types shows them with field keys. For totals or field stats on a type (how much on A-95 this year, liters in October, average price per liter) call analyze_transaction_type (type name or id, optional filters like {fuel: "A-95"}, period this_year/this_month or from/to, group_by none|month|field key). To create one or several ("create these types: …") call create_transaction_types once with all of them; to add/rename/hide fields, change options or default tags call update_transaction_type; archive_transaction_type archives one. Each stages one Confirm card. Field kinds: number (unit), rating (max 3/5/10), duration, boolean, select (options), multiselect (options), text, date, computed (formula over number/rating/duration/boolean keys of the same type with + - * / and parentheses, e.g. liters * price_per_liter; fill_amount=true makes it the transaction amount, at most one per type). Give snake_case keys; formulas use those keys. Default tags must be existing tag titles.';
 
     /** The Manage Types palette; a proposal without a color gets the next unused one. */
     private const COLORS = ['#f59e0b', '#ef4444', '#ec4899', '#a855f7', '#6366f1', '#3b82f6', '#06b6d4', '#14b8a6', '#22c55e', '#6b7280'];
@@ -42,7 +44,10 @@ class AgentTypeTools
         'computed' => 'Computed',
     ];
 
-    public function __construct(private readonly SaveTransactionTypeAction $save) {}
+    public function __construct(
+        private readonly SaveTransactionTypeAction $save,
+        private readonly AnalyzeTransactionTypeAction $analyzeType,
+    ) {}
 
     /**
      * @return list<array<string, mixed>>
@@ -73,6 +78,18 @@ class AgentTypeTools
             $fn('list_transaction_types', 'List the user\'s transaction types with id, emoji, fields (key, label, kind, unit, options, formula, fill_amount, hidden) and default tags. include_archived=true also lists archived ones.', [
                 'type' => 'object',
                 'properties' => ['include_archived' => ['type' => 'boolean']],
+            ]),
+            $fn('analyze_transaction_type', 'Totals and field stats for one transaction type. Use for questions like how much was spent on A-95 this year, liters of fuel in October, or the average price per liter. type is the name or id from list_transaction_types (archived types work). Optional filters match field values (key=value, e.g. fuel=A-95). period is a preset (default this_month) or pass from/to (YYYY-MM-DD). group_by is none (default), month, or a field key (e.g. station). Returns count, signed total and average amount (expenses negative), plus sum/avg/min/max for numeric fields (liters, price per liter, ratings, computed totals).', [
+                'type' => 'object',
+                'properties' => [
+                    'type' => $typeRef,
+                    'filters' => ['type' => 'object', 'additionalProperties' => ['type' => ['string', 'number', 'boolean']], 'description' => 'Field key = value, e.g. {"fuel": "A-95", "station": "WOG"}'],
+                    'period' => ['type' => 'string', 'enum' => PeriodRange::PRESETS, 'description' => 'Default this_month. Ignored when from/to are given.'],
+                    'from' => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD inclusive'],
+                    'to' => ['type' => 'string', 'description' => 'End date YYYY-MM-DD inclusive'],
+                    'group_by' => ['type' => 'string', 'description' => 'none (default), month, or a field key (e.g. station, fuel)'],
+                ],
+                'required' => ['type'],
             ]),
             $fn('create_transaction_types', 'Propose creating 1–' . self::MAX_PER_PROPOSAL . ' transaction types at once. Stages one Confirm/Cancel card; nothing is created until the user confirms.', [
                 'type' => 'object',
@@ -152,6 +169,15 @@ class AgentTypeTools
         ])->all();
 
         return ['count' => count($types), 'types' => $types];
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     * @return array<string, mixed>
+     */
+    public function analyze(User $user, array $args): array
+    {
+        return $this->analyzeType->execute($user, $args);
     }
 
     /**

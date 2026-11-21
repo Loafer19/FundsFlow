@@ -243,6 +243,7 @@ class AgentPlanningTools
             'upcoming_recurring' => $this->upcomingRecurring($user, $args),
             'compare_periods' => $this->comparePeriods($user, $args),
             'list_transaction_types' => $this->types->read($user, $args),
+            'analyze_transaction_type' => $this->types->analyze($user, $args),
             default => throw new InvalidArgumentException("Unknown read tool: {$name}"),
         };
     }

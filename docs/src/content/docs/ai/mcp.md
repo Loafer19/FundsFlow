@@ -5,7 +5,7 @@ description: Connect AI assistants to your FundsFlow data with the Model Context
 
 FundsFlow has a remote [MCP](https://modelcontextprotocol.io/) server. Connect it to an AI assistant — Claude, ChatGPT,
 Cursor, VS Code, Grok, and others — and the assistant can read and manage your FundsFlow data: “how much did I spend on
-groceries last month?”, “add yesterday's receipts”, “create a monthly budget of 300 for coffee”.
+A-95 this year?”, “add yesterday's receipts”, “create a monthly budget of 300 for coffee”.
 
 | | |
 | --- | --- |
@@ -34,7 +34,7 @@ personal token instead.
 
 ## What the assistant can do
 
-The server exposes 34 tools: tags, transaction types, transactions (including bulk operations of up to 50), attachments, budgets,
+The server exposes 35 tools: tags, transaction types (including type analytics), transactions (including bulk operations of up to 50), attachments, budgets,
 recurring rules, preferences, and a full JSON export. See the [tool reference](/docs/ai/tools/).
 
 - Transactions created through MCP are marked with the **MCP** source in the web app.

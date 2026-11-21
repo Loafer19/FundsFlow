@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\TransactionTypes\AnalyzeTransactionTypeAction;
 use App\Actions\TransactionTypes\BuildTypeAnalyticsAction;
 use App\Actions\TransactionTypes\SaveTransactionTypeAction;
 use App\Events\TransactionsChanged;
@@ -16,6 +17,7 @@ class TransactionTypeController extends Controller
     public function __construct(
         private readonly SaveTransactionTypeAction $save,
         private readonly BuildTypeAnalyticsAction $buildAnalytics,
+        private readonly AnalyzeTransactionTypeAction $analyzeType,
     ) {}
 
     /** Active and archived types (archived ones still label their old transactions). */
@@ -58,6 +60,15 @@ class TransactionTypeController extends Controller
         $model->restore();
 
         return new TransactionTypeResource($model->loadCount('transactions'));
+    }
+
+    /**
+     * Totals and field aggregates for a type (name or id), with optional field filters and grouping.
+     * Archived types are included: their transactions still carry the type.
+     */
+    public function analyze(Request $request): JsonResponse
+    {
+        return response()->json($this->analyzeType->execute($request->user(), $request->all()));
     }
 
     /**

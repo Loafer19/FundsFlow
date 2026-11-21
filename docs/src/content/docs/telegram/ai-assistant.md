@@ -62,6 +62,7 @@ The assistant works by calling tools on your account.
 | `budget_status` | For each active budget (or one): spent, left, days left, per-day allowance, average daily spend, and the projected total at the current pace (*on track*, *at risk*, or *over*). For savings goals: saved, left, days to the deadline, the amount needed per week or month, and when you will reach it at the current pace (*on track*, *behind*, *completed*) |
 | `upcoming_recurring` | Recurring charges and income due in the next N days (default 7, up to 90) with totals |
 | `compare_periods` | Income, expenses, and net for a period vs the previous one, plus per-tag spending changes. If the current period isn't over yet, it also compares with the same number of days of the previous period |
+| `analyze_transaction_type` | Totals and field stats for one type (name or id): count, signed total, average, and sum/avg/min/max for numeric fields. Optional filters (e.g. fuel = A-95), a period or from/to, and grouping by month or a field |
 
 **Show** (sends the same cards as the menu buttons): `show_menu`, `show_help`, `show_recent`, `show_budgets`,
 `show_tags`, `show_recurring`, `show_month`, `show_web`.
@@ -112,7 +113,7 @@ and, optionally, some tags (“PDF report for groceries and coffee this year”)
 **Transaction types.** The assistant knows your [types](/docs/web/types/) and their fields. `Fuel: 40 l at 58.9`
 saves a *Fuel* transaction with Liters 40 and Price per liter 58,90, and the amount comes from the type's computed
 total; the type's default tags are added. To change a field later, just say so (*make it 42 liters*). Values that
-don't fit a field are added to the note (*mood: great*) instead of being guessed or lost. You can also ask it to
+don't fit a field are added to the note (*mood: great*) instead of being guessed or lost. Ask *скільки я витратив на A-95 цього року*, or how many liters you bought in October, and it totals the type and its fields. You can also ask it to
 create, edit, or archive types (*create these types: Fuel, Groceries, Subscription, Restaurant*); every change comes as a
 Confirm card.
 

@@ -25,6 +25,7 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
 
 - `/recurring` (text list) shows the type and service when a rule has them. The command itself is unchanged.
 - The assistant and MCP `create_recurring` / `update_recurring` tools accept `transaction_type_id` and `data`.
+- The assistant and MCP can answer type-field questions (“how much did I spend on A-95 this year?”, liters in October, average price per liter) with `analyze_transaction_type`.
 
 ## 2.4.0 — 20 November 2026
 

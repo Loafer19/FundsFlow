@@ -66,7 +66,7 @@ help, and *open the web app* tools.
 
 - **Look things up** — your preferences and today's date, tags, recent transactions, transactions filtered by date
   range, tag, or note text (up to 50), budgets with spent amount and progress, recurring rules, and a month summary
-  (income, expenses, net, top expense tags). It uses real numbers from your account and never makes up amounts.
+  (income, expenses, net, top expense tags), plus totals and field stats for a [transaction type](/docs/web/types/) (how much on A-95 this year, liters in October, average price per liter). It uses real numbers from your account and never makes up amounts.
 - **Show cards** in the chat — recent transactions, budgets, tags, recurring rules, and this month's summary.
 - **Draw charts** — interactive charts drawn with the same chart components as the web app tabs:
   - spending by tag (donut, or a bar list),

@@ -1,6 +1,6 @@
 ---
 title: MCP tool reference
-description: All 34 tools exposed by the FundsFlow MCP server.
+description: All 35 tools exposed by the FundsFlow MCP server.
 ---
 
 Amounts are **signed**: negative for expenses, positive for income. Dates use `YYYY-MM-DD`.
@@ -46,6 +46,7 @@ Amounts are **signed**: negative for expenses, positive for income. Dates use `Y
 | Tool | Description |
 | --- | --- |
 | `list_transaction_types` | All types with their fields (keys, kinds, units, options, formulas), archived ones included |
+| `analyze_transaction_type` | Totals and field stats for one type (name or id): count, signed total, average, and sum/avg/min/max for numeric fields (liters, price per liter, …). Optional `filters` (e.g. `fuel=A-95`), `period` (`this_year`, `this_month`, …) or `from`/`to`, and `group_by` (`none`, `month`, or a field key) |
 | `create_transaction_type` | Create a type: name, emoji, color, up to 30 fields, default tags |
 | `update_transaction_type` | Update a type by id; send existing fields with their keys (a field left out is hidden, its values kept) |
 | `delete_transaction_type` | Archive a type by id; its transactions keep the type and values |

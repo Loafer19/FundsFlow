@@ -52,6 +52,20 @@ const RULE_AMOUNT_MAX = 99_999_999.99
 /** Savings goal deadline, YYYY-MM-DD (BudgetStoreRequest: date_format:Y-m-d). */
 const DATE_YMD = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
 
+// Copy of App\Support\PeriodRange::PRESETS.
+const PERIOD_PRESETS = [
+    'this_week',
+    'last_week',
+    'this_month',
+    'last_month',
+    'last_7_days',
+    'last_30_days',
+    'this_quarter',
+    'last_quarter',
+    'this_year',
+    'last_year',
+] as const
+
 const ALLOWED_HOSTS = (process.env.ALLOWED_HOSTS || '127.0.0.1,localhost,mcp.fundsflow.fun')
     .split(',')
     .map((h) => h.trim())
@@ -313,6 +327,43 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         },
         async () => textResult(unwrapList(await api(token, '/transaction-types'))),
     )
+
+    server.registerTool(
+        'analyze_transaction_type',
+        {
+            title: 'Analyze transaction type',
+            description:
+                'Totals and field stats for one transaction type: how much was spent on A-95 this year, liters of fuel in October, average price per liter, and similar questions. type is the name or id from list_transaction_types (archived types work). Optional filters match field values (key=value, e.g. fuel=A-95). period is a preset (default this_month) or pass from/to (YYYY-MM-DD). group_by is none (default), month, or a field key (e.g. station). Returns count, signed total and average amount (expenses negative), plus sum/avg/min/max for numeric fields.',
+            inputSchema: {
+                type: z.string().min(1).describe('Type name or id from list_transaction_types'),
+                filters: z
+                    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+                    .optional()
+                    .describe('Field key = value, e.g. { fuel: "A-95", station: "WOG" }'),
+                period: z.enum(PERIOD_PRESETS).optional().describe('Default this_month. Ignored when from/to are set.'),
+                from: isoDate().optional().describe('Start date YYYY-MM-DD inclusive'),
+                to: isoDate().optional().describe('End date YYYY-MM-DD inclusive'),
+                group_by: z.string().optional().describe('none (default), month, or a field key (e.g. station, fuel)'),
+            },
+        },
+        async ({ type, filters, period, from, to, group_by }) => {
+            const query = new URLSearchParams()
+            query.set('type', type)
+            if (period) query.set('period', period)
+            if (from) query.set('from', from)
+            if (to) query.set('to', to)
+            if (group_by) query.set('group_by', group_by)
+            if (filters) {
+                for (const [key, value] of Object.entries(filters)) {
+                    if (value !== undefined && value !== null && String(value) !== '') {
+                        query.append(`filters[${key}]`, String(value))
+                    }
+                }
+            }
+            return textResult(await api(token, `/transaction-types/analyze?${query}`))
+        },
+    )
+
 
     server.registerTool(
         'create_transaction_type',
