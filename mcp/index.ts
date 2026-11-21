@@ -396,6 +396,63 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         async ({ id }) => textResult(await api(token, `/transaction-types/${id}`, { method: 'DELETE' })),
     )
 
+    server.registerTool(
+        'list_dashboard_cards',
+        {
+            title: 'List dashboard cards',
+            description:
+                'The user\'s own Analytics "My cards" in order, with id, kind (stat, chart, pie), size (S, M, L), config and current numbers for a period (default this_month, or from/to YYYY-MM-DD).',
+            inputSchema: {
+                period: z.enum(PERIOD_PRESETS).optional(),
+                from: isoDate().optional(),
+                to: isoDate().optional(),
+            },
+        },
+        async ({ period, from, to }) => {
+            const query = new URLSearchParams()
+            if (period) query.set('period', period)
+            if (from) query.set('from', from)
+            if (to) query.set('to', to)
+            return textResult(await api(token, `/dashboard-cards?${query}`))
+        },
+    )
+
+    server.registerTool(
+        'add_dashboard_card',
+        {
+            title: 'Add dashboard card',
+            description:
+                'Add a card to Analytics → My cards. kind stat = one number (agg of amount or a number field; metric "fields" = every number field of the type) vs the previous period; chart = metric over time, line or bar, optional split by "tag" or a field key (max 6 series), e.g. avg price_per_liter split by station; pie = share by "tag" or a field key (split required). The period follows the Analytics date picker.',
+            inputSchema: {
+                kind: z.enum(['stat', 'chart', 'pie']),
+                title: z.string().max(60).optional(),
+                type: z.string().optional().describe('Transaction type name or id (needed for field metrics, field filters and field split)'),
+                tags: z.array(z.union([z.string(), z.number().int()])).max(10).optional().describe('Tag titles or ids (child tags included)'),
+                filters: z
+                    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+                    .optional()
+                    .describe('Field key = value, e.g. { station: "WOG" }'),
+                metric: z.string().optional().describe('amount (default), a number field key, or fields (stat only)'),
+                agg: z.enum(['sum', 'avg', 'count', 'min', 'max']).optional(),
+                flow: z.enum(['expense', 'income', 'all']).optional().describe('expense is the default for amount, all for fields'),
+                split: z.string().optional().describe('chart/pie: tag or a field key (e.g. station)'),
+                chart: z.enum(['line', 'bar']).optional(),
+                size: z.enum(['S', 'M', 'L']).optional(),
+            },
+        },
+        async (args) => textResult(await api(token, '/dashboard-cards', { method: 'POST', body: JSON.stringify(compactPayload(args)) })),
+    )
+
+    server.registerTool(
+        'remove_dashboard_card',
+        {
+            title: 'Remove dashboard card',
+            description: 'Remove one of My cards by id (list_dashboard_cards).',
+            inputSchema: { id: z.number().int() },
+        },
+        async ({ id }) => textResult(await api(token, `/dashboard-cards/${id}`, { method: 'DELETE' })),
+    )
+
     const transactionTypeInput = {
         transaction_type_id: z.number().int().nullable().optional().describe('Transaction type id (list_transaction_types); null clears it on update'),
         data: z

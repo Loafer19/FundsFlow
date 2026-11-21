@@ -21,6 +21,7 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
   there are none.
 - **Recurring list** shows type segments for typed rules.
 - **Limits per type or numeric field.** On the Budgets tab, a spending limit can now **Limit by** **Tags**, **Type** (all expenses of a transaction type), or **Field** (the sum of a numeric field like Tips or Liters). Limit cards show a clickable type/field badge that opens its analytics.
+- **My cards on Analytics.** Add your own cards under **My cards**: a **Stat** (a total, average, count, min or max of the amount or a number field, compared with the previous period), a **Chart** over time (line or bar, optionally split by tag or a field value such as Station, up to 6 lines), or a **Pie** (share by tag or field value). Each card can filter by type, tags and a field value (Station = WOG) and follows the Analytics date range. The ⋮ menu switches the size (S, M, L) and has Edit and Delete; drag the handle to reorder. The editor shows a live preview.
 - **Place ratings in Type analytics.** Types with a **Rating** field (including the default **Restaurant** type, which now includes a 1–5 **Rating** field) show a **Best rated / Best value** card grouped by place in Overview, comparing average rating, visits, average check, and rating per 100 spent.
 
 ### Telegram bot and assistants
@@ -29,6 +30,7 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
 - The assistant and MCP `create_recurring` / `update_recurring` tools accept `transaction_type_id` and `data`.
 - **Smarter type and field filling from receipts and messages.** When the assistant reads a receipt photo or PDF (in Telegram or on the web) or logs a transaction from free text, it picks the matching transaction type and fills its fields from the receipt — for example liters, price per liter, fuel grade, and station for Fuel, or the store name for Groceries — and shows them on the confirmation card.
 - The assistant and MCP can answer type-field questions (“how much did I spend on A-95 this year?”, liters in October, average price per liter) with `analyze_transaction_type`.
+- The assistant and MCP can list, add and remove Analytics cards (`list_dashboard_cards`, `add_dashboard_card`, `remove_dashboard_card`); in the assistant, adding or removing asks for Confirm.
 - `budget_status`, `update_budget`, and MCP budget tools support type and numeric-field limit scopes (`scope`).
 
 ## 2.4.0 — 20 November 2026

@@ -235,11 +235,14 @@ class AnalyzeTransactionTypeAction
     }
 
     /**
+     * Field-value filters (key or label = value) on a transactions query; also used by
+     * Analytics "My cards" (App\Actions\Dashboard\DashboardCardData). Returns the applied canonical values.
+     *
      * @param Builder<Transaction> $query
      * @param array<string, mixed> $filters
      * @return array<string, mixed>
      */
-    private function applyFilters(Builder $query, TransactionType $type, array $filters): array
+    public function applyFilters(Builder $query, TransactionType $type, array $filters): array
     {
         $applied = [];
 

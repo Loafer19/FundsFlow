@@ -48,7 +48,7 @@ use InvalidArgumentException;
  */
 class AgentPlanningTools
 {
-    public const READ_TOOLS = ['budget_status', 'upcoming_recurring', 'compare_periods', ...AgentTypeTools::READ_TOOLS];
+    public const READ_TOOLS = ['budget_status', 'upcoming_recurring', 'compare_periods', ...AgentTypeTools::READ_TOOLS, ...AgentDashboardTools::READ_TOOLS];
 
     public const STAGING_TOOLS = [
         'update_budget',
@@ -62,6 +62,7 @@ class AgentPlanningTools
         'delete_recurring',
         'create_support_ticket',
         ...AgentTypeTools::STAGING_TOOLS,
+        ...AgentDashboardTools::STAGING_TOOLS,
     ];
 
     public const MAX_UPCOMING_DAYS = 90;
@@ -89,6 +90,8 @@ class AgentPlanningTools
         private readonly CreateSupportTicketAction $createSupportTicket,
         /** Transaction types: list, create (several at once), edit, archive. */
         public readonly AgentTypeTools $types,
+        /** Analytics "My cards": list, add, remove. */
+        public readonly AgentDashboardTools $dashboard,
     ) {}
 
     public static function isRead(string $name): bool
@@ -116,6 +119,7 @@ class AgentPlanningTools
 
         return [
             ...$this->types->definitions(),
+            ...$this->dashboard->definitions(),
             $fn('budget_status', 'Budget status. Limits (type limit), for the current period: limit, spent, left, days left, safe daily allowance, average daily spend and projected end-of-period spend (status on_track|at_risk|over). Savings goals (type goal): saved of target, remaining, percent, deadline days left, required amount per month/week, monthly pace and projected reach date (status completed|on_track|behind|in_progress). Optional budget_id for one budget; include_paused also lists paused budgets (status paused).', [
                 'type' => 'object',
                 'properties' => [
@@ -255,6 +259,7 @@ class AgentPlanningTools
             'compare_periods' => $this->comparePeriods($user, $args),
             'list_transaction_types' => $this->types->read($user, $args),
             'analyze_transaction_type' => $this->types->analyze($user, $args),
+            'list_dashboard_cards' => $this->dashboard->read($user, $args),
             default => throw new InvalidArgumentException("Unknown read tool: {$name}"),
         };
     }
@@ -277,6 +282,7 @@ class AgentPlanningTools
             'delete_recurring' => $this->prepareRecurringState($user, $args, 'delete'),
             'create_support_ticket' => $this->prepareSupportTicket($user, $args),
             'create_transaction_types', 'update_transaction_type', 'archive_transaction_type' => $this->types->prepare($user, $name, $args),
+            'add_dashboard_card', 'remove_dashboard_card' => $this->dashboard->prepare($user, $name, $args),
             default => throw new InvalidArgumentException("Unknown staging tool: {$name}"),
         };
     }
@@ -294,6 +300,7 @@ class AgentPlanningTools
             'create_recurring', 'update_recurring', 'pause_recurring', 'resume_recurring', 'delete_recurring' => $this->applyRecurring($user, $action, $payload),
             'create_support_ticket' => $this->applySupportTicket($user, $payload),
             'create_transaction_types', 'update_transaction_type', 'archive_transaction_type' => $this->types->apply($user, $action, $payload),
+            'add_dashboard_card', 'remove_dashboard_card' => $this->dashboard->apply($user, $action, $payload),
             default => ['ok' => false, 'message' => 'Nothing to confirm.', 'summary' => 'Nothing to confirm.'],
         };
     }

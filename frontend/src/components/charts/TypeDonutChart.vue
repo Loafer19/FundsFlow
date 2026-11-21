@@ -12,6 +12,8 @@ ChartJS.register(ArcElement, Tooltip, Legend)
 
 const props = defineProps({
     slices: { type: Array, required: true },
+    // Value formatter for the tooltip (Analytics → My cards: liters, counts); money by default.
+    format: { type: Function, default: null },
 })
 
 const formatMoney = inject('formatMoney')
@@ -42,7 +44,7 @@ const chartOptions = computed(() => ({
                     const slice = props.slices[context.dataIndex]
                     if (!slice) return ''
                     const share = slice.share != null ? ` (${slice.share}%)` : ''
-                    return `${slice.count} · ${formatMoney(Math.abs(slice.total))}${share}`
+                    return `${slice.count} · ${(props.format ?? formatMoney)(Math.abs(slice.total))}${share}`
                 },
                 title: (items) => props.slices[items[0]?.dataIndex]?.label ?? '',
             },

@@ -5,6 +5,7 @@ namespace App\Actions\Telegram;
 use App\Actions\Agent\AgentChannel;
 use App\Actions\Agent\AgentHistory;
 use App\Actions\Agent\AgentTypeFields;
+use App\Actions\Agent\AgentDashboardTools;
 use App\Actions\Agent\AgentTypeTools;
 use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
@@ -85,7 +86,7 @@ final class TelegramAgentChannel implements AgentChannel
 
         // Transaction types with their field keys, so "Fuel: 40 l at 58.9" maps straight to fields.
         $typesBlock = AgentTypeFields::promptBlock($user);
-        $typesRule = AgentTypeTools::PROMPT_RULE;
+        $typesRule = AgentTypeTools::PROMPT_RULE . "\n" . AgentDashboardTools::PROMPT_RULE;
 
         return <<<PROMPT
 You are the FundsFlow personal finance assistant inside Telegram.

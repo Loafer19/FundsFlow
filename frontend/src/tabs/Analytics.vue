@@ -177,6 +177,8 @@
             </div>
         </div>
 
+        <MyCards v-if="!inReport" :from="range.start" :to="range.end" />
+
         <div v-if="!inReport || balancesByTags.length" class="card card-border border-base-300 bg-base-100 min-w-0 overflow-hidden">
             <div class="card-body p-4 gap-3 min-w-0">
                 <div class="flex flex-wrap items-center gap-2 min-w-0">
@@ -228,6 +230,7 @@
 <script setup>
 import { ChartPie, ChevronDown, ChevronRight, Flame, Info, Lightbulb, Presentation, Repeat, Telescope } from '@lucide/vue'
 import { computed, inject, ref } from 'vue'
+import MyCards from '../components/dashboard/MyCards.vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatCard from '../components/StatCard.vue'
 import TypeSegments from '../components/TypeSegments.vue'

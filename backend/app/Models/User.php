@@ -145,6 +145,16 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
+     * "My cards" on Analytics, in display order.
+     *
+     * @return HasMany<DashboardCard, $this>
+     */
+    public function dashboardCards(): HasMany
+    {
+        return $this->hasMany(DashboardCard::class)->orderBy('position')->orderBy('id');
+    }
+
+    /**
      * @return HasMany<Identity, $this>
      */
     public function identities(): HasMany

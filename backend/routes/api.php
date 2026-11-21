@@ -5,6 +5,7 @@ use App\Http\Controllers\AgentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BootstrapController;
 use App\Http\Controllers\BudgetController;
+use App\Http\Controllers\DashboardCardController;
 use App\Http\Controllers\IdentityController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\MonobankController;
@@ -92,6 +93,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->name('report.print-data')
         ->middleware('throttle:30,1,report-print:');
     Route::apiResource('budgets', BudgetController::class)->except(['show']);
+    // Analytics "My cards" (App\Actions\Dashboard\DashboardCards). from/to = the Analytics date range.
+    Route::get('/dashboard-cards', [DashboardCardController::class, 'index']);
+    Route::post('/dashboard-cards', [DashboardCardController::class, 'store'])->middleware('throttle:60,1,dash-cards:');
+    Route::post('/dashboard-cards/preview', [DashboardCardController::class, 'preview'])->middleware('throttle:120,1,dash-preview:');
+    Route::put('/dashboard-cards/order', [DashboardCardController::class, 'reorder'])->middleware('throttle:60,1,dash-cards:');
+    Route::match(['put', 'patch'], '/dashboard-cards/{card}', [DashboardCardController::class, 'update'])->whereNumber('card')
+        ->middleware('throttle:60,1,dash-cards:');
+    Route::delete('/dashboard-cards/{card}', [DashboardCardController::class, 'destroy'])->whereNumber('card');
 
     Route::post('/budgets/{budget}/pause', [BudgetController::class, 'pause']);
     Route::post('/budgets/{budget}/resume', [BudgetController::class, 'resume']);

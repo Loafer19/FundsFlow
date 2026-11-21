@@ -51,6 +51,14 @@ Amounts are **signed**: negative for expenses, positive for income. Dates use `Y
 | `update_transaction_type` | Update a type by id; send existing fields with their keys (a field left out is hidden, its values kept) |
 | `delete_transaction_type` | Archive a type by id; its transactions keep the type and values |
 
+## Analytics cards
+
+| Tool | Description |
+| --- | --- |
+| `list_dashboard_cards` | The user's **My cards** on Analytics with ids, kind, size and current numbers (optional `period` or `from`/`to`; default this month) |
+| `add_dashboard_card` | Add a card: `kind` `stat` (one number vs the previous period, or `metric: fields` for every number field of the type), `chart` (`line`/`bar` over time, optional `split` by `tag` or a field → up to 6 series) or `pie` (`split` required). Filters: `type`, `tags`, `filters` (`{"station": "WOG"}`, needs `type`); `metric` (`amount` or a number field), `agg` (`sum`, `avg`, `count`, `min`, `max`), `flow` (`expense`, `income`, `all`), `size` (`S`, `M`, `L`). In the assistant it stages Confirm/Cancel |
+| `remove_dashboard_card` | Remove a card by id (Confirm/Cancel in the assistant) |
+
 ## Attachments
 
 | Tool | Description |

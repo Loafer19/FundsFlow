@@ -6,6 +6,7 @@ use App\Actions\Agent\AgentChannel;
 use App\Actions\Agent\AgentPlanningTools;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Agent\AgentTypeFields;
+use App\Actions\Agent\AgentDashboardTools;
 use App\Actions\Agent\AgentTypeTools;
 use App\Actions\Charts\BuildUserChartAction;
 use App\Actions\Imports\ImportAgentTools;
@@ -74,6 +75,9 @@ final class WebAgentChannel implements AgentChannel
         'create_transaction_types' => 'Preparing types',
         'update_transaction_type' => 'Preparing type changes',
         'archive_transaction_type' => 'Preparing type archive',
+        'list_dashboard_cards' => 'Reading your cards',
+        'add_dashboard_card' => 'Preparing card',
+        'remove_dashboard_card' => 'Preparing card removal',
         'read_receipt' => 'Reading receipt',
         'convert_currency' => 'Checking the NBU rate',
         'update_pending_transaction' => 'Updating the card',
@@ -123,7 +127,7 @@ final class WebAgentChannel implements AgentChannel
         }
 
         $typesBlock = AgentTypeFields::promptBlock($user);
-        $typesRule = AgentTypeTools::PROMPT_RULE;
+        $typesRule = AgentTypeTools::PROMPT_RULE . "\n" . AgentDashboardTools::PROMPT_RULE;
 
         return <<<PROMPT
 You are the FundsFlow personal finance assistant in the chat panel of the FundsFlow web app.
