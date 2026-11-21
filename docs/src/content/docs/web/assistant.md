@@ -111,8 +111,10 @@ Send a photo of a receipt and the assistant reads it into a transaction, like
   - **Without an amount** (`lunch with Anna`), the AI reads the photos and files together in one assist and uses your
     text as a hint. If it's one purchase, you get one Confirm card with every attachment; several operations become
     one import, without duplicates.
-- The AI reads the total, the date, and the shop, and suggests tags matched to your existing ones. A **Confirm** card
-  shows the result, for example *Receipt · -350.00 · 📅 25.10.2026 · 📝 Silpo · 📎 1 photo · 🏷 🛒 Groceries*.
+- The AI reads the total, the date, and the shop, suggests tags matched to your existing ones, and — when the receipt
+  clearly matches one of your [transaction types](/docs/web/types/) — picks that type and fills its fields (such as
+  liters, price per liter, fuel grade, and station for *Fuel*, or the store for *Groceries*). A **Confirm** card shows
+  the result, for example *Receipt · -350.00 · 📅 25.10.2026 · 📝 Silpo · 🛒 Groceries · Store Silpo · 📎 1 photo · 🏷 🛒 Groceries*.
   Nothing is saved until you press **Confirm**. The transaction is then saved with the photos attached, so they show
   in the transaction's attachments.
 - To correct the card, just say so (*the date is yesterday*, *tag it Food*). A new card replaces the old one and the

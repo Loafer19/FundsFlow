@@ -35,7 +35,7 @@ final class ReadDocumentAction
      * @param string $withoutAi tail of the "no AI assists left" message (channel specific)
      * @return array{type: 'error', message: string}
      *                                               |array{type: 'quota', message: string}
-     *                                               |array{type: 'single', analysis: array{amount: ?float, at: ?string, note: ?string, suggested_tag_titles: list<string>, needs_price: bool}}
+     *                                               |array{type: 'single', analysis: array{amount: ?float, at: ?string, note: ?string, suggested_tag_titles: list<string>, type_id: ?int, data: array<string, mixed>, needs_price: bool}}
      *                                               |array{type: 'rows', file: array<string, mixed>, rows: list<array<string, mixed>>, skipped: list<array{line: int, reason: string}>, capped: bool, ai_used: bool}
      *
      * rows: {line, at, amount, note, tags: list<string>, soft?: true (AI-suggested tags), cur?: string, swap?: string}
@@ -216,6 +216,8 @@ final class ReadDocumentAction
                 'at' => $analysis['at'],
                 'note' => $analysis['note'],
                 'suggested_tag_titles' => $analysis['suggested_tag_titles'],
+                'type_id' => $analysis['type_id'] ?? null,
+                'data' => $analysis['data'] ?? [],
                 'needs_price' => $analysis['needs_price'] || $analysis['amount'] === null,
             ]];
         }
@@ -265,6 +267,8 @@ final class ReadDocumentAction
                 'at' => $first['at'] ?? null,
                 'note' => $first['note'] ?? null,
                 'suggested_tag_titles' => $first['suggested_tag_titles'] ?? [],
+                'type_id' => $first['type_id'] ?? null,
+                'data' => $first['data'] ?? [],
                 'needs_price' => $first === null,
             ]];
         }

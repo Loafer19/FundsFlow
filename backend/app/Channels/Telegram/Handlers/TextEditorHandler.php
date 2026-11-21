@@ -740,7 +740,7 @@ class TextEditorHandler
         $draft = $target['draft'];
 
         if ($typeId === 0) {
-            unset($draft['transaction_type_id']);
+            unset($draft['transaction_type_id'], $draft['data']);
         } else {
             $type = $user->transactionTypes()->find($typeId);
 
@@ -748,6 +748,9 @@ class TextEditorHandler
                 return 'Type not found';
             }
 
+            if ((int) ($draft['transaction_type_id'] ?? 0) !== $typeId) {
+                unset($draft['data']);
+            }
             $draft['transaction_type_id'] = $typeId;
             $ids = array_map('intval', $draft['tag_ids'] ?? $this->support->matchSuggestedTagIds($user, $draft['suggested_tag_titles'] ?? []));
 
@@ -770,7 +773,10 @@ class TextEditorHandler
             return;
         }
 
-        $target['draft']['tag_ids'] = $this->support->matchSuggestedTagIds($user, $target['draft']['suggested_tag_titles'] ?? []);
+        $matched = $this->support->matchSuggestedTagIds($user, $target['draft']['suggested_tag_titles'] ?? []);
+        $typeId = isset($target['draft']['transaction_type_id']) && is_numeric($target['draft']['transaction_type_id']) ? (int) $target['draft']['transaction_type_id'] : 0;
+        $type = $typeId > 0 ? $user->transactionTypes()->find($typeId) : null;
+        $target['draft']['tag_ids'] = array_values(array_unique([...$matched, ...($type instanceof TransactionType ? $type->defaultTagIds() : [])]));
         MediaHandler::storeDraft($chatId, $target['draft']);
     }
 

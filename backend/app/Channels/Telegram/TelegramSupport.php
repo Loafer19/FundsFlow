@@ -2,6 +2,7 @@
 
 namespace App\Channels\Telegram;
 
+use App\Actions\Agent\AgentTypeFields;
 use App\Actions\Tags\ListTagsAction;
 use App\Actions\Tags\MatchTagTitlesAction;
 use App\Channels\Telegram\Widgets\WidgetAvailability;
@@ -551,11 +552,29 @@ class TelegramSupport
         $date = fn (string $d): string => $this->escapeHtml(self::cardDate($d));
         $diff = fn (string $old, string $new): string => $old === $new ? $new : "<s>{$old}</s> → {$new}";
 
+        $typeId = array_key_exists('transaction_type_id', $payload) ? $payload['transaction_type_id'] : $before?->transaction_type_id;
+        $newType = $typeId ? $user->transactionTypes()->withTrashed()->find((int) $typeId) : null;
+        $newTypeLine = $newType instanceof TransactionType
+            ? AgentTypeFields::cardLine(
+                $newType,
+                AgentTypeFields::evaluate(
+                    $newType,
+                    is_array($payload['fields'] ?? null) ? $payload['fields'] : [],
+                    is_array($payload['data'] ?? null) ? $payload['data'] : (is_array($before?->data) ? $before->data : []),
+                ),
+                $user,
+            )
+            : null;
+
         if ($action !== 'update_transaction' || !$before) {
             $lines = ['➕ Save this transaction?', '', '<b>' . $money($amount) . '</b>', '📅 ' . $date($at)];
 
             if ($note !== null) {
                 $lines[] = '📝 ' . $this->escapeHtml($note);
+            }
+
+            if ($newTypeLine !== null) {
+                $lines[] = $this->escapeHtml($newTypeLine);
             }
             $lines[] = self::tagLine($tagLabel($tagIds));
 
@@ -566,6 +585,10 @@ class TelegramSupport
         $newTags = collect($tagIds)->sort()->values()->all();
         $oldNote = $before->note ? $this->escapeHtml($before->note) : '—';
         $newNote = $note !== null ? $this->escapeHtml($note) : '—';
+        $oldType = $before->transaction_type_id ? $before->transactionType : null;
+        $oldTypeLine = $oldType instanceof TransactionType
+            ? AgentTypeFields::cardLine($oldType, is_array($before->data) ? $before->data : [], $user)
+            : null;
 
         $lines = [
             '✏️ Change this transaction?',
@@ -576,6 +599,13 @@ class TelegramSupport
 
         if ($oldNote !== '—' || $newNote !== '—') {
             $lines[] = '📝 ' . $diff($oldNote, $newNote);
+        }
+
+        if ($oldTypeLine !== null || $newTypeLine !== null) {
+            $lines[] = $diff(
+                $oldTypeLine !== null ? $this->escapeHtml($oldTypeLine) : 'No type',
+                $newTypeLine !== null ? $this->escapeHtml($newTypeLine) : 'No type',
+            );
         }
         $lines[] = self::tagLine($oldTags === $newTags ? $tagLabel($newTags) : $diff($tagLabel($oldTags), $tagLabel($newTags)));
 
@@ -956,11 +986,14 @@ class TelegramSupport
             $lines[] = '📝 ' . $this->escapeHtml($note);
         }
 
-        if (isset($draft['transaction_type_id'])) {
-            $type = $user->transactionTypes()->find($draft['transaction_type_id']);
+        $draftType = null;
 
-            if ($type instanceof TransactionType) {
-                $lines[] = $this->escapeHtml($type->label());
+        if (isset($draft['transaction_type_id'])) {
+            $draftType = $user->transactionTypes()->find($draft['transaction_type_id']);
+
+            if ($draftType instanceof TransactionType) {
+                $values = AgentTypeFields::evaluate($draftType, is_array($draft['data'] ?? null) ? $draft['data'] : []);
+                $lines[] = $this->escapeHtml(AgentTypeFields::cardLine($draftType, $values, $user));
             }
         }
 
@@ -970,22 +1003,24 @@ class TelegramSupport
             // Picked in the editor: exact ids win over the AI's title guesses.
             $tags = $user->tags()->whereIn('id', $draft['tag_ids'])->orderBy('title')->get(['emoji', 'title']);
             $lines[] = self::tagLine($tags->isEmpty() ? 'No tags' : $tags->map(fn (Tag $tag) => $this->escapeHtml(trim($tag->emoji . ' ' . $tag->title)))->implode(' · '));
-        } elseif (is_array($titles) && $titles !== []) {
-            $matched = $this->matchSuggestedTagTitles($user, $titles);
+        } else {
+            $matched = is_array($titles) && $titles !== [] ? $this->matchSuggestedTagTitles($user, $titles) : [];
+            $defaultIds = $draftType instanceof TransactionType ? $draftType->defaultTagIds() : [];
+            $effectiveIds = array_values(array_unique([
+                ...array_map(static fn (Tag $tag): int => (int) $tag->id, $matched),
+                ...$defaultIds,
+            ]));
 
-            if ($matched !== []) {
-                $label = implode(', ', array_map(
-                    fn (Tag $tag) => $this->escapeHtml(trim($tag->emoji . ' ' . $tag->title)),
-                    $matched,
-                ));
-                $lines[] = self::tagLine($label);
-            } else {
+            if ($effectiveIds !== []) {
+                $tags = $user->tags()->whereIn('id', $effectiveIds)->orderBy('title')->get(['emoji', 'title']);
+                $lines[] = self::tagLine($tags->map(fn (Tag $tag) => $this->escapeHtml(trim($tag->emoji . ' ' . $tag->title)))->implode(' · '));
+            } elseif (is_array($titles) && $titles !== []) {
                 // None of the guesses is one of the user's tags: Confirm saves without tags, so say so.
                 $hint = implode(', ', array_map(fn ($t) => $this->escapeHtml((string) $t), $titles));
                 $lines[] = '🏷 No tags (not in your tags: ' . $hint . ')';
+            } else {
+                $lines[] = '🏷 No tags';
             }
-        } else {
-            $lines[] = '🏷 No tags';
         }
 
         return implode("\n", $lines);

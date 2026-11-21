@@ -384,11 +384,14 @@ final class TransactionFields
     /**
      * Compact schema line for the assistant prompt: "liters*:number(l) · total=liters*price_per_liter→amount".
      */
-    public static function promptSchema(TransactionType $type): string
+    public static function promptSchema(TransactionType $type, bool $includeComputed = true): string
     {
         $parts = [];
 
         foreach ($type->visibleFields() as $field) {
+            if (!$includeComputed && $field['type'] === 'computed') {
+                continue;
+            }
             $key = (string) $field['key'];
             $name = $key . (($field['required'] ?? false) ? '*' : '');
             $label = Str::slug(Str::ascii((string) $field['label']), '_') === $key ? '' : ' "' . $field['label'] . '"';

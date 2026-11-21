@@ -2,6 +2,7 @@
 
 namespace App\Actions\Agent\Documents;
 
+use App\Actions\Agent\AgentTypeFields;
 use App\Models\User;
 use App\Support\ImageConverter;
 use App\Support\PeriodRange;
@@ -37,6 +38,10 @@ class DocumentAi
     private const MAX_TOKENS_CAP = 32000;
 
     private ?string $lastFailure = null;
+
+    public function __construct(
+        private readonly AgentTypeFields $typeFields,
+    ) {}
 
     /**
      * @param list<list<mixed>> $rows header candidate + sample rows (already capped)
@@ -74,7 +79,7 @@ PROMPT;
     }
 
     /**
-     * @return null|array{kind: 'none'|'receipt'|'statement', transactions: list<array{amount: float, at: ?string, note: ?string, suggested_tag_titles: list<string>}>, needs_price: bool}
+     * @return null|array{kind: 'none'|'receipt'|'statement', transactions: list<array{amount: float, at: ?string, note: ?string, suggested_tag_titles: list<string>, type_id: ?int, data: array<string, mixed>}>, needs_price: bool}
      */
     public function extractTransactions(User $user, string $text, string $fileName, ?string $hint = null): ?array
     {
@@ -84,23 +89,26 @@ PROMPT;
         $rows = DocumentFile::maxRows();
         $today = $user->todayDateString();
         $tags = $user->tags()->orderBy('title')->limit(80)->pluck('title')->implode(', ');
+        $typesBlock = $this->typeFields->receiptPromptBlock($user);
 
         $system = <<<PROMPT
 You read the text of a document a user sent to a personal finance app and pull out money transactions.
 FundsFlow convention: expenses are negative amounts, income is positive.
 Reply with ONLY a JSON object (no markdown):
 {"kind": "receipt"|"statement"|"none", "needs_price": boolean,
- "transactions": [{"amount": number, "at": "YYYY-MM-DD"|null, "note": string|null, "suggested_tag_titles": string[]}]}
+ "transactions": [{"amount": number, "at": "YYYY-MM-DD"|null, "note": string|null, "suggested_tag_titles": string[], "type_id": integer|null, "data": object}]}
 - receipt: one purchase, invoice or bill. Return exactly ONE transaction: the final total paid (negative), not the line items.
-- statement: a bank / card statement or a list of many operations. Return every operation (at most {$rows}), each with its own date and signed amount. Skip balances, opening/closing totals and subtotals.
+- statement: a bank / card statement or a list of many operations. Return every operation (at most {$rows}), each with its own date and signed amount. Skip balances, opening/closing totals and subtotals. Leave type_id: null and data: {} for statements.
 - none: no money transactions in the text (transactions: []).
 - needs_price: true only for a receipt whose total is missing or unreadable (then transactions: [] ). Never invent amounts.
 - note: short merchant / description, max ~80 chars. at: the operation date, null if unknown.
 - suggested_tag_titles: 0-2 names, preferably from the user's tags: {$tags}
+- For kind "receipt": if the receipt clearly matches one of the user's transaction types listed in the user message, set type_id to its id and data to an object mapping its field keys to extracted values (omit missing/computed fields; for select use one of the listed options). Otherwise type_id: null, data: {}.
 PROMPT;
 
         $prompt = "Today (user timezone) is {$today}. File name: " . mb_substr($fileName, 0, 120) . '.'
             . ($hint !== null && trim($hint) !== '' ? "\nUser caption: " . mb_substr(trim($hint), 0, 300) : '')
+            . ($typesBlock !== '' ? "\n" . $typesBlock : '')
             . ($cut ? "\nThe text was cut to its first {$max} characters." : '')
             . "\n<document>\n" . $this->fence($text) . "\n</document>";
 
@@ -123,11 +131,16 @@ PROMPT;
                 array_map(static fn ($t) => is_string($t) ? trim(mb_substr($t, 0, 60)) : '', is_array($item['suggested_tag_titles'] ?? null) ? $item['suggested_tag_titles'] : []),
                 static fn (string $t) => $t !== '',
             ));
+            $typed = $kind === 'receipt'
+                ? $this->typeFields->validateExtracted($user, $item['type_id'] ?? null, $item['data'] ?? null)
+                : ['type_id' => null, 'data' => []];
             $items[] = [
                 'amount' => round((float) $item['amount'], 2),
                 'at' => $at,
                 'note' => $note !== '' ? $note : null,
                 'suggested_tag_titles' => array_slice($titles, 0, 3),
+                'type_id' => $typed['type_id'],
+                'data' => $typed['data'],
             ];
         }
 
@@ -282,12 +295,13 @@ PROMPT;
      *
      * @param list<array{bytes: string, mime: string, name?: string}> $images
      * @param list<array{name: string, text: string}> $documents text already read out of the files
-     * @return null|array{kind: 'list'|'none'|'receipt', transactions: list<array{amount: float, at: ?string, note: ?string, suggested_tag_titles: list<string>}>}
+     * @return null|array{kind: 'list'|'none'|'receipt', transactions: list<array{amount: float, at: ?string, note: ?string, suggested_tag_titles: list<string>, type_id: ?int, data: array<string, mixed>}>}
      */
     public function readMixed(User $user, array $images, array $documents, ?string $caption): ?array
     {
         $today = $user->todayDateString();
         $tags = $user->tags()->orderBy('title')->limit(80)->pluck('title')->implode(', ');
+        $typesBlock = $this->typeFields->receiptPromptBlock($user);
         $rows = DocumentFile::maxRows();
         $photoCount = count($images);
         $docCount = count($documents);
@@ -299,21 +313,23 @@ You read what a user sent to a personal finance app in ONE message: {$photoCount
 Photos may be receipts, invoices or screenshots of a banking app's operations list. Documents are given as text.
 FundsFlow convention: expenses are negative amounts, income / refunds / incoming transfers are positive.
 Reply with ONLY a JSON object (no markdown):
-{"kind": "receipt"|"list"|"none", "transactions": [{"amount": number, "at": "YYYY-MM-DD"|null, "note": string|null, "suggested_tag_titles": string[]}]}
+{"kind": "receipt"|"list"|"none", "transactions": [{"amount": number, "at": "YYYY-MM-DD"|null, "note": string|null, "suggested_tag_titles": string[], "type_id": integer|null, "data": object}]}
 - receipt: everything shows ONE purchase or bill (e.g. a photo of a receipt and the invoice PDF of the same order, or
   several photos of one long receipt). Return exactly ONE transaction: the final total paid, not the line items.
 - list: several operations (a statement, screenshots of an operations list, several different receipts). Return every
   operation at most once (at most {$rows}): when the same operation appears in a photo and in a document, or on two
-  overlapping screenshots, list it once. A separate receipt is one operation with its total.
+  overlapping screenshots, list it once. A separate receipt is one operation with its total. Leave type_id: null and data: {} for lists.
 - none: no money transactions anywhere (transactions: []).
 - at: resolve "Today" / "Yesterday" / "24 October"; today is {$today}. A date without a year is in the past 12 months.
   null if no date is visible for that operation. Ignore balances, daily totals and subtotals. Never invent amounts.
 - note: short merchant / description, max ~80 chars.
 - suggested_tag_titles: 0-2 names, preferably from the user's tags: {$tags}
+- For kind "receipt": if the purchase clearly matches one of the user's transaction types listed in the user message, set type_id to its id and data to an object mapping its field keys to extracted values (omit missing/computed fields; for select use one of the listed options). Otherwise type_id: null, data: {}.
 PROMPT;
 
         $intro = "Today (user timezone) is {$today}."
-            . ($caption !== null && trim($caption) !== '' ? "\nUser caption: " . mb_substr(trim($caption), 0, 300) : '');
+            . ($caption !== null && trim($caption) !== '' ? "\nUser caption: " . mb_substr(trim($caption), 0, 300) : '')
+            . ($typesBlock !== '' ? "\n" . $typesBlock : '');
 
         foreach ($documents as $i => $doc) {
             $text = (string) $doc['text'];
@@ -354,6 +370,9 @@ PROMPT;
                 continue;
             }
             $note = is_string($item['note'] ?? null) ? trim(mb_substr($item['note'], 0, 255)) : null;
+            $typed = $kind === 'receipt'
+                ? $this->typeFields->validateExtracted($user, $item['type_id'] ?? null, $item['data'] ?? null)
+                : ['type_id' => null, 'data' => []];
             $items[] = [
                 'amount' => round((float) $item['amount'], 2),
                 'at' => PeriodRange::isStorableDate($item['at'] ?? null) ? $item['at'] : null,
@@ -362,6 +381,8 @@ PROMPT;
                     array_map(static fn ($t) => is_string($t) ? trim(mb_substr($t, 0, 60)) : '', is_array($item['suggested_tag_titles'] ?? null) ? $item['suggested_tag_titles'] : []),
                     static fn (string $t) => $t !== '',
                 )), 0, 3),
+                'type_id' => $typed['type_id'],
+                'data' => $typed['data'],
             ];
         }
 

@@ -3,12 +3,14 @@
 namespace App\Actions\Agent\Web;
 
 use App\Actions\Agent\AgentToolExecutor;
+use App\Actions\Agent\AgentTypeFields;
 use App\Actions\Agent\Documents\DocumentFile;
 use App\Actions\Agent\Documents\DocumentImport;
 use App\Actions\Imports\ApplyImportRulesAction;
 use App\Actions\Imports\CreateImportBatchAction;
 use App\Actions\Tags\MatchTagTitlesAction;
 use App\Actions\Telegram\AnalyzeReceiptAction;
+use App\Models\TransactionType;
 use App\Models\User;
 use App\Support\QuickAddParser;
 use App\Support\ReceiptFiles;
@@ -190,8 +192,10 @@ final class RunWebReceiptAction
             $analysis = $result['analysis'];
             $at = is_string($analysis['at'] ?? null) ? $analysis['at'] : $user->todayDateString();
             $tagIds = $this->matchTags->ids($user, $analysis['suggested_tag_titles'] ?? []);
+            $typeId = isset($analysis['type_id']) && is_numeric($analysis['type_id']) ? (int) $analysis['type_id'] : null;
+            $typeData = is_array($analysis['data'] ?? null) ? $analysis['data'] : [];
 
-            return $this->stageOne($user, $channel, (float) $analysis['amount'], $at, $analysis['note'], $tagIds, $attachable);
+            return $this->stageOne($user, $channel, (float) $analysis['amount'], $at, $analysis['note'], $tagIds, $attachable, $typeId, $typeData);
         }
 
         if ($result['type'] === 'quota') {
@@ -264,6 +268,8 @@ final class RunWebReceiptAction
         $analysis = $result['analysis'];
         $at = is_string($analysis['at'] ?? null) ? $analysis['at'] : $user->todayDateString();
         $tagIds = $this->matchTags->ids($user, $analysis['suggested_tag_titles'] ?? []);
+        $typeId = isset($analysis['type_id']) && is_numeric($analysis['type_id']) ? (int) $analysis['type_id'] : null;
+        $typeData = is_array($analysis['data'] ?? null) ? $analysis['data'] : [];
 
         if ($analysis['needs_price'] || $analysis['amount'] === null) {
             if ($keep === []) {
@@ -274,10 +280,12 @@ final class RunWebReceiptAction
                 'at' => $at,
                 'note' => $analysis['note'],
                 'tag_ids' => $tagIds,
+                'transaction_type_id' => $typeId,
+                'data' => $typeData,
             ], "Couldn't find a clear total in {$name}. Send the amount like -350, or pick a button.");
         }
 
-        return $this->stageOne($user, $channel, (float) $analysis['amount'], $at, $analysis['note'], $tagIds, $keep);
+        return $this->stageOne($user, $channel, (float) $analysis['amount'], $at, $analysis['note'], $tagIds, $keep, $typeId, $typeData);
     }
 
     /**
@@ -628,6 +636,8 @@ final class RunWebReceiptAction
             is_string($note) ? $note : null,
             is_array($draft['tag_ids'] ?? null) ? $draft['tag_ids'] : [],
             $files,
+            isset($draft['transaction_type_id']) && is_numeric($draft['transaction_type_id']) ? (int) $draft['transaction_type_id'] : null,
+            is_array($draft['data'] ?? null) ? $draft['data'] : [],
         );
     }
 
@@ -665,16 +675,20 @@ final class RunWebReceiptAction
 
         $at = is_string($analysis['at'] ?? null) ? $analysis['at'] : $user->todayDateString();
         $tagIds = $this->matchTags->ids($user, $analysis['suggested_tag_titles'] ?? []);
+        $typeId = isset($analysis['type_id']) && is_numeric($analysis['type_id']) ? (int) $analysis['type_id'] : null;
+        $typeData = is_array($analysis['data'] ?? null) ? $analysis['data'] : [];
 
         if ($analysis['needs_price'] || $analysis['amount'] === null) {
             return $this->askPrice($channel, $session, $allFiles, [
                 'at' => $at,
                 'note' => $analysis['note'],
                 'tag_ids' => $tagIds,
+                'transaction_type_id' => $typeId,
+                'data' => $typeData,
             ], "Couldn't read a clear total (e.g. food photo). Send the amount like -350, or pick a button.");
         }
 
-        return $this->stageOne($user, $channel, (float) $analysis['amount'], $at, $analysis['note'], $tagIds, $allFiles);
+        return $this->stageOne($user, $channel, (float) $analysis['amount'], $at, $analysis['note'], $tagIds, $allFiles, $typeId, $typeData);
     }
 
     /**
@@ -719,12 +733,19 @@ final class RunWebReceiptAction
                 continue;
             }
 
-            $prepared = $this->tools->prepareCreateTransaction($user, [
+            $args = [
                 'amount' => (float) $analysis['amount'],
                 'at' => is_string($analysis['at'] ?? null) ? $analysis['at'] : $user->todayDateString(),
                 'note' => $analysis['note'],
                 'tag_ids' => $this->matchTags->ids($user, $analysis['suggested_tag_titles'] ?? []),
-            ]);
+            ];
+
+            if (isset($analysis['type_id']) && is_numeric($analysis['type_id'])) {
+                $args['transaction_type_id'] = (int) $analysis['type_id'];
+                $args['data'] = is_array($analysis['data'] ?? null) ? $analysis['data'] : [];
+                $args['strict_options'] = true;
+            }
+            $prepared = $this->tools->prepareCreateTransaction($user, $args);
             $rows[$n] = $prepared['payload'] + ['files' => [$file]];
         }
 
@@ -750,7 +771,17 @@ final class RunWebReceiptAction
         if (count($rows) === 1) {
             $row = array_values($rows)[0];
 
-            return $this->stageOne($user, $channel, (float) $row['amount'], (string) $row['at'], $row['note'], $row['tag_ids'], $row['files']);
+            return $this->stageOne(
+                $user,
+                $channel,
+                (float) $row['amount'],
+                (string) $row['at'],
+                $row['note'],
+                $row['tag_ids'],
+                $row['files'],
+                isset($row['transaction_type_id']) ? (int) $row['transaction_type_id'] : null,
+                is_array($row['fields'] ?? null) ? $row['fields'] : [],
+            );
         }
 
         $lines = [];
@@ -773,15 +804,23 @@ final class RunWebReceiptAction
     /**
      * @param list<int> $tagIds
      * @param list<array<string, mixed>> $files
+     * @param array<string, mixed> $typeData
      */
-    private function stageOne(User $user, WebAgentChannel $channel, float $amount, string $at, mixed $note, array $tagIds, array $files): string
+    private function stageOne(User $user, WebAgentChannel $channel, float $amount, string $at, mixed $note, array $tagIds, array $files, ?int $typeId = null, array $typeData = []): string
     {
-        $prepared = $this->tools->prepareCreateTransaction($user, [
+        $args = [
             'amount' => $amount,
             'at' => $at,
             'note' => is_string($note) ? $note : null,
             'tag_ids' => $tagIds,
-        ]);
+        ];
+
+        if ($typeId !== null && $typeId > 0) {
+            $args['transaction_type_id'] = $typeId;
+            $args['data'] = $typeData;
+            $args['strict_options'] = true;
+        }
+        $prepared = $this->tools->prepareCreateTransaction($user, $args);
         $prepared['payload']['files'] = array_values($files);
         // Title "Receipt" only when the photo is attached to the transaction.
         $prepared['card'] = $this->tools->transactionCard($user, 'create', $prepared['payload'], files: count($files));
@@ -800,8 +839,18 @@ final class RunWebReceiptAction
     {
         $tags = $row['tag_ids'] !== [] ? ' · ' . $this->tools->tagLabels($user, $row['tag_ids']) : '';
         $note = is_string($row['note'] ?? null) && $row['note'] !== '' ? ' · ' . $row['note'] : '';
+        $typeLine = '';
 
-        return '• ' . $label . ': ' . AgentToolExecutor::signedMoney($user, (float) $row['amount']) . ' · ' . UserFormatter::formatDate($user, (string) $row['at']) . $note . $tags;
+        if (!empty($row['transaction_type_id'])) {
+            $type = $user->transactionTypes()->find((int) $row['transaction_type_id']);
+
+            if ($type instanceof TransactionType) {
+                $values = AgentTypeFields::evaluate($type, is_array($row['fields'] ?? null) ? $row['fields'] : []);
+                $typeLine = ' · ' . AgentTypeFields::cardLine($type, $values, $user);
+            }
+        }
+
+        return '• ' . $label . ': ' . AgentToolExecutor::signedMoney($user, (float) $row['amount']) . ' · ' . UserFormatter::formatDate($user, (string) $row['at']) . $note . $typeLine . $tags;
     }
 
     /**

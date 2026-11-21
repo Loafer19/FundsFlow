@@ -15,6 +15,7 @@ export const RELEASES = [
             'Recurring rules can have a type and its fields, the same as a regular transaction. Period and Next charge follow the schedule and stay read-only.',
             'A Recurring card on Analytics shows your monthly and yearly totals for active expense rules, the next charge, and a bar per type. View all opens Recurring; click a type to filter the list.',
             'The Recurring list shows type segments. /recurring in Telegram names the type and service. The assistant can set a type when it creates or updates a rule.',
+            'Receipt photos, PDFs and free-text messages automatically pick your matching transaction type and fill its fields (like liters, price per liter and station for Fuel, or the store for Groceries) on the confirmation card.',
             'The assistant and MCP can answer type-field questions: how much you spent on A-95 this year, liters in October, or the average price per liter.',
         ],
     },

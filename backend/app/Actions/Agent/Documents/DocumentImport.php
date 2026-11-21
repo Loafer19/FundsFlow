@@ -235,6 +235,8 @@ final class DocumentImport
                             'at' => $first['at'],
                             'note' => $first['note'],
                             'suggested_tag_titles' => $first['suggested_tag_titles'],
+                            'type_id' => $first['type_id'] ?? null,
+                            'data' => $first['data'] ?? [],
                             'needs_price' => false,
                         ]];
                     } elseif ($items !== []) {

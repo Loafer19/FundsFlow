@@ -415,6 +415,7 @@ class MediaHandler
         $this->editor->closeDraft($chatId, 'Receipt saved');
 
         $typeId = isset($draft['transaction_type_id']) ? (int) $draft['transaction_type_id'] : null;
+        $typeData = is_array($draft['data'] ?? null) ? $draft['data'] : null;
         $this->createTransactionWithAttachments(
             $user,
             $chatId,
@@ -426,6 +427,8 @@ class MediaHandler
             tags: $tagIds,
             cardMessageId: $messageId,
             typeId: $typeId && $typeId > 0 ? $typeId : null,
+            data: $typeData,
+            defaultTags: !is_array($draft['tag_ids'] ?? null),
         );
 
         $this->continueAlbumQueue($user, $chatId);
@@ -952,7 +955,7 @@ class MediaHandler
      */
     private function buildDraftFromAnalysis(array $file, array $analysis, User $user, array $allFiles): array
     {
-        return [
+        $draft = [
             'file_id' => $file['file_id'],
             'name' => $file['name'],
             'mime' => $file['mime'],
@@ -962,12 +965,22 @@ class MediaHandler
             'at' => $analysis['at'] ?? $user->todayDateString(),
             'note' => $analysis['note'],
             'suggested_tag_titles' => $analysis['suggested_tag_titles'],
-            'category' => $analysis['category'],
+            'category' => $analysis['category'] ?? null,
             'needs_price' => $analysis['needs_price'],
-            'confidence' => $analysis['confidence'],
+            'confidence' => $analysis['confidence'] ?? null,
             'awaiting_price' => false,
             'awaiting_edit_amount' => false,
         ];
+
+        if (isset($analysis['type_id']) && is_numeric($analysis['type_id']) && (int) $analysis['type_id'] > 0) {
+            $draft['transaction_type_id'] = (int) $analysis['type_id'];
+
+            if (is_array($analysis['data'] ?? null) && $analysis['data'] !== []) {
+                $draft['data'] = $analysis['data'];
+            }
+        }
+
+        return $draft;
     }
 
     /**
@@ -1031,6 +1044,8 @@ class MediaHandler
         array $tags = [],
         ?int $cardMessageId = null,
         ?int $typeId = null,
+        ?array $data = null,
+        bool $defaultTags = true,
     ): void {
         $files = array_slice(array_values($files), 0, TransactionAttachmentRules::MAX_PER_TRANSACTION);
 
@@ -1046,6 +1061,14 @@ class MediaHandler
 
         if ($typeId) {
             $payload['transaction_type_id'] = $typeId;
+
+            if ($data !== null && $data !== []) {
+                $payload['data'] = $data;
+            }
+
+            if (!$defaultTags) {
+                $payload['default_tags'] = false;
+            }
         }
 
         $transaction = $this->createTransaction->execute(

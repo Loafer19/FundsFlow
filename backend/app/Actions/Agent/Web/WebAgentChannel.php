@@ -213,6 +213,7 @@ PROMPT;
                     'at' => ['type' => 'string', 'description' => 'YYYY-MM-DD'],
                     'note' => ['type' => 'string'],
                     'tag_ids' => ['type' => 'array', 'items' => ['type' => 'integer']],
+                    ...AgentTypeFields::toolProperties(),
                 ],
             ]),
             $this->tools->definition('update_transaction'),
@@ -469,6 +470,21 @@ PROMPT;
             'note' => array_key_exists('note', $args) ? $args['note'] : ($old['note'] ?? null),
             'tag_ids' => array_key_exists('tag_ids', $args) ? $args['tag_ids'] : ($old['tag_ids'] ?? []),
         ];
+
+        if (array_key_exists('type', $args)) {
+            $merged['type'] = $args['type'];
+        } elseif (!empty($old['transaction_type_id'])) {
+            $merged['transaction_type_id'] = (int) $old['transaction_type_id'];
+        }
+
+        if (array_key_exists('fields', $args) && is_array($args['fields'])) {
+            $merged['fields'] = array_key_exists('type', $args)
+                ? $args['fields']
+                : array_merge(is_array($old['fields'] ?? null) ? $old['fields'] : [], $args['fields']);
+        } elseif (!empty($old['fields']) && is_array($old['fields']) && !array_key_exists('type', $args)) {
+            $merged['fields'] = $old['fields'];
+            $merged['strict_options'] = true;
+        }
         $prepared = $this->tools->prepareCreateTransaction($user, $merged);
         $files = is_array($old['files'] ?? null) ? array_values($old['files']) : [];
 

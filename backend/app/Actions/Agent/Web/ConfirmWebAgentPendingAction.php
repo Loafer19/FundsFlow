@@ -6,6 +6,7 @@ use App\Actions\Agent\AgentPlanningTools;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Agent\Documents\ImportTransactionsAction;
 use App\Actions\Transactions\StoreTransactionAttachmentAction;
+use App\Channels\Telegram\TelegramSupport;
 use App\Enums\TransactionSource;
 use App\Models\Transaction;
 use App\Models\User;
@@ -300,18 +301,20 @@ final class ConfirmWebAgentPendingAction
 
     private function txLine(User $user, string $prefix, Transaction $tx): string
     {
-        $tx->loadMissing('tags');
+        $tx->loadMissing(['tags', 'transactionType']);
         $row = $this->tools->serializeTransaction($user, $tx);
         $tags = implode(', ', array_map(
             static fn (array $t): string => trim($t['emoji'] . ' ' . $t['title']),
             $row['tags'],
         ));
+        $typeLine = TelegramSupport::typeLine($user, $tx);
 
         return trim(sprintf(
-            '%s: %s · %s%s%s',
+            '%s: %s · %s%s%s%s',
             $prefix,
             UserFormatter::formatMoney($user, (float) $tx->amount),
             (string) $row['at'],
+            $typeLine !== null ? ' · ' . $typeLine : '',
             $tags !== '' ? ' · ' . $tags : '',
             $row['note'] !== '' ? ' · ' . $row['note'] : '',
         ));

@@ -2,12 +2,14 @@
 
 namespace App\Channels\Telegram;
 
+use App\Actions\Agent\AgentTypeFields;
 use App\Actions\Transactions\DeleteTransactionAction;
 use App\Actions\Transactions\UpdateTransactionAction;
 use App\Channels\Telegram\Handlers\MediaHandler;
 use App\Channels\Telegram\Widgets\TelegramWidgetData;
 use App\Channels\Telegram\Widgets\TelegramWidgetSender;
 use App\Models\Transaction;
+use App\Models\TransactionType;
 use App\Models\User;
 use App\Support\TagIds;
 use Carbon\CarbonImmutable;
@@ -70,6 +72,7 @@ class TelegramEditor
             (string) ($draft['at'] ?? $user->todayDateString()),
             is_string($draft['note'] ?? null) ? $draft['note'] : null,
             $this->draftTagIds($user, $draft),
+            typeLine: $this->draftTypeLine($user, $draft),
         )['chat_data'];
 
         return $this->open($chatId, 'draft', $chatData, [
@@ -399,6 +402,7 @@ class TelegramEditor
             (string) $draft['at'],
             is_string($draft['note'] ?? null) ? $draft['note'] : null,
             $this->draftTagIds($user, $draft),
+            typeLine: $this->draftTypeLine($user, $draft),
         )['chat_data']);
 
         if ($ref['card'] ?? null) {
@@ -431,13 +435,41 @@ class TelegramEditor
      * @param array<string, mixed> $draft
      * @return list<int>
      */
+    /**
+     * @param array<string, mixed> $draft
+     */
+    private function draftTypeLine(User $user, array $draft): ?string
+    {
+        $typeId = isset($draft['transaction_type_id']) && is_numeric($draft['transaction_type_id'])
+            ? (int) $draft['transaction_type_id']
+            : 0;
+
+        if ($typeId <= 0) {
+            return null;
+        }
+
+        $type = $user->transactionTypes()->find($typeId);
+
+        if (!$type instanceof TransactionType) {
+            return null;
+        }
+
+        $values = AgentTypeFields::evaluate($type, is_array($draft['data'] ?? null) ? $draft['data'] : []);
+
+        return AgentTypeFields::cardLine($type, $values, $user);
+    }
+
     private function draftTagIds(User $user, array $draft): array
     {
         if (is_array($draft['tag_ids'] ?? null)) {
             return array_map('intval', $draft['tag_ids']);
         }
 
-        return $this->support->matchSuggestedTagIds($user, $draft['suggested_tag_titles'] ?? []);
+        $matched = $this->support->matchSuggestedTagIds($user, $draft['suggested_tag_titles'] ?? []);
+        $typeId = isset($draft['transaction_type_id']) && is_numeric($draft['transaction_type_id']) ? (int) $draft['transaction_type_id'] : 0;
+        $type = $typeId > 0 ? $user->transactionTypes()->find($typeId) : null;
+
+        return array_values(array_unique([...$matched, ...($type instanceof TransactionType ? $type->defaultTagIds() : [])]));
     }
 
     /**

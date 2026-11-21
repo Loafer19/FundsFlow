@@ -19,9 +19,10 @@ Send a photo (JPEG, PNG, WebP or HEIC), with or without a caption. A caption hel
 note and tags. A hint like `dinner with friends` works too.
 
 1. The bot replies *Reading receipt…* and AI vision extracts the **total**, the **date** if clearly visible, a short
-   **note** (merchant or place), and up to three **suggested tags** taken only from tags you already have — names
-   that aren't in your tags are not created.
-2. The *Reading receipt…* message turns into a **🧾 Receipt draft** card with **✅ Confirm**, **✏️ Edit**, and
+   **note** (merchant or place), up to three **suggested tags** taken only from tags you already have (names that
+   aren't in your tags are not created), and — when the receipt matches one of your [transaction types](/docs/web/types/) —
+   the **type and its fields** (such as liters, price per liter, fuel grade, and station for *Fuel*, or the store for *Groceries*).
+2. The *Reading receipt…* message turns into a **🧾 Receipt draft** card showing the extracted fields, type, and tags, with **✅ Confirm**, **✏️ Edit**, and
    **↩️ Cancel**. **✏️ Edit** opens the same [editor](/docs/telegram/quick-add/#edit-a-transaction) as for saved
    transactions (amount, expense or income, date, tags, note); **Save** there updates the draft and **Discard** drops
    it. When widgets aren't available (in a group, or when Telegram refuses them), the draft uses the text editor

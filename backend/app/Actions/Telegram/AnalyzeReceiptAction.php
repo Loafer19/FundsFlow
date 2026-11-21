@@ -2,6 +2,7 @@
 
 namespace App\Actions\Telegram;
 
+use App\Actions\Agent\AgentTypeFields;
 use App\Models\User;
 use App\Support\ImageConverter;
 use App\Support\PeriodRange;
@@ -15,6 +16,7 @@ class AnalyzeReceiptAction
 {
     public function __construct(
         private readonly TelegramAiQuota $quota,
+        private readonly AgentTypeFields $typeFields,
     ) {}
 
     /**
@@ -26,6 +28,8 @@ class AnalyzeReceiptAction
      *     note: ?string,
      *     suggested_tag_titles: list<string>,
      *     category: ?string,
+     *     type_id: ?int,
+     *     data: array<string, mixed>,
      *     needs_price: bool,
      *     confidence: ?float
      * } Null when the call fails or is not configured (does not burn quota).
@@ -66,6 +70,8 @@ Reply with ONLY a JSON object (no markdown) matching this schema:
   "note": string|null,
   "suggested_tag_titles": string[],
   "category": string|null,
+  "type_id": integer|null,
+  "data": object,
   "needs_price": boolean,
   "confidence": number|null,
   "is_transaction_list": boolean,
@@ -78,6 +84,8 @@ Rules:
 - suggested_tag_titles: 0–3 tag titles copied exactly from the user's tags (listed in the user message). Only the
   user's own titles count: never invent a title, and use [] when none of them fits.
 - category: coarse label like food, groceries, transport, utilities, health, shopping, entertainment, other — or null.
+- type_id: integer id of one of the user's transaction types (listed in the user message) ONLY when the receipt clearly matches that type (e.g. gas station receipt → Fuel, supermarket/grocery receipt → Groceries, cafe/restaurant bill → Restaurant). Use null when unsure or when the user has no types. Never invent a type_id.
+- data: object mapping that type's field keys to values clearly visible on the receipt (omit missing fields and computed fields). number = numeric value in the field's unit (e.g. liters, price_per_liter, tip); select ("one of") = one of the listed options (omit if none fits); multiselect ("several of") = array of listed options; boolean = true/false; date = "YYYY-MM-DD"; text = short value (e.g. station "WOG"/"OKKO", store "Silpo"/"ATB", place). When type_id is null or is_transaction_list is true, return type_id: null and data: {}.
 - User caption: when the user's caption gives an amount ("350 groceries", "-350", "+500 refund", "кава 80"), use it as
   the amount (no sign = expense, negative; "+" or income words = positive) even if the image shows a different total,
   and set needs_price false. A leading DD.MM or DD.MM.YYYY (this year if no year) or "yesterday"/"вчора" in the caption
@@ -90,7 +98,10 @@ Rules:
   Otherwise is_transaction_list is false and "transactions" is [].
 PROMPT;
 
-        $userText = "Today (user timezone date) is {$today}. Extract the receipt fields.{$hint}\n" . $this->tagListLine($user);
+        $typesBlock = $this->typeFields->receiptPromptBlock($user);
+        $userText = "Today (user timezone date) is {$today}. Extract the receipt fields.{$hint}\n"
+            . $this->tagListLine($user)
+            . ($typesBlock !== '' ? "\n" . $typesBlock : '');
 
         try {
             $response = Http::withToken($apiKey)
@@ -139,7 +150,7 @@ PROMPT;
                 return null;
             }
 
-            return $this->parseModelJson($content, $today);
+            return $this->parseModelJson($content, $today, $user);
         } catch (Throwable $e) {
             Log::warning('AnalyzeReceiptAction: exception', ['message' => $e->getMessage()]);
 
@@ -199,12 +210,14 @@ PROMPT;
      *     note: ?string,
      *     suggested_tag_titles: list<string>,
      *     category: ?string,
+     *     type_id: ?int,
+     *     data: array<string, mixed>,
      *     needs_price: bool,
      *     confidence: ?float,
      *     transaction_list: null|list<array{amount: float, at: ?string, note: ?string, suggested_tag_titles: list<string>}>
      * }
      */
-    private function parseModelJson(string $content, string $fallbackDate): ?array
+    private function parseModelJson(string $content, string $fallbackDate, User $user): ?array
     {
         $json = trim($content);
 
@@ -297,16 +310,23 @@ PROMPT;
             }
         }
 
+        $isList = count($list) >= 2;
+        $typed = $isList
+            ? ['type_id' => null, 'data' => []]
+            : $this->typeFields->validateExtracted($user, $decoded['type_id'] ?? null, $decoded['data'] ?? null);
+
         return [
             'amount' => $amount,
             'at' => $at ?? $fallbackDate,
             'note' => $note,
             'suggested_tag_titles' => $titles,
             'category' => $category,
+            'type_id' => $typed['type_id'],
+            'data' => $typed['data'],
             'needs_price' => $needsPrice,
             'confidence' => $confidence,
             // >= 2 rows: one row is just a receipt.
-            'transaction_list' => count($list) >= 2 ? $list : null,
+            'transaction_list' => $isList ? $list : null,
         ];
     }
 }

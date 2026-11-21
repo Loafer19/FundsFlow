@@ -6,6 +6,7 @@ use App\Models\Transaction;
 use App\Models\TransactionType;
 use App\Models\User;
 use App\Support\FieldValueParser;
+use App\Support\SelectOptions;
 use App\Support\TransactionFields;
 use App\Support\TransactionTypeData;
 use Illuminate\Validation\ValidationException;
@@ -47,7 +48,85 @@ class AgentTypeFields
             return '- ' . $type->name . ($type->emoji ? " {$type->emoji}" : '') . ($auto !== '' ? " [auto tags: {$auto}]" : '') . ': ' . TransactionFields::promptSchema($type);
         })->implode("\n");
 
-        return "Transaction types (key*:kind = required; pass type + fields when a message fits one, e.g. \"Fuel: 40 l at 58.9\" → type Fuel, fields {liters: 40, price_per_liter: 58.9}; when a computed field says →amount, omit amount unless the user gave the total; the type's auto tags are added by the app):\n{$lines}\n";
+        return "Transaction types (key*:kind = required; whenever a transaction fits one of these types — even if the user didn't name the type, e.g. \"WOG 40 l A-95 at 58.9\", \"Silpo 450\", \"Netflix 300\" — pass type + the extracted fields; for select/one-of use a listed option; omit computed fields, and when a computed field says →amount omit amount unless the user gave the total; the type's auto tags are added by the app):\n{$lines}\n";
+    }
+
+    /**
+     * Compact type + field list for receipt/document extraction prompts, or '' when the user has none.
+     */
+    public function receiptPromptBlock(User $user): string
+    {
+        $types = $user->transactionTypes()->orderBy('name')->limit(self::MAX_PROMPT_TYPES)->get();
+
+        if ($types->isEmpty()) {
+            return '';
+        }
+
+        $lines = $types->map(function (TransactionType $type): string {
+            $schema = TransactionFields::promptSchema($type, includeComputed: false);
+
+            return '- id=' . (int) $type->id . ' ' . $type->name . ($type->emoji ? " {$type->emoji}" : '')
+                . ($schema !== '' ? ': ' . $schema : '');
+        })->implode("\n");
+
+        return "User's transaction types (return type_id + data ONLY when the receipt clearly matches one of these types; otherwise type_id: null, data: {}):\n{$lines}";
+    }
+
+    /**
+     * Validate model-extracted type_id + data against the user's active types and field definitions:
+     * drop unknown/computed keys, coerce numbers/dates/booleans, ignore invalid select values;
+     * leave type empty when type_id is missing or not owned/active.
+     *
+     * @return array{type_id: ?int, data: array<string, mixed>}
+     */
+    public function validateExtracted(User $user, mixed $typeId, mixed $rawData): array
+    {
+        if (!is_numeric($typeId) || (int) $typeId <= 0) {
+            return ['type_id' => null, 'data' => []];
+        }
+
+        $type = $user->transactionTypes()->find((int) $typeId);
+
+        if (!$type instanceof TransactionType) {
+            return ['type_id' => null, 'data' => []];
+        }
+
+        if (!is_array($rawData) || $rawData === []) {
+            return ['type_id' => (int) $type->id, 'data' => []];
+        }
+
+        $mapped = $this->mapFields($type, $rawData);
+
+        // Keep only valid options on multiselect so one unrecognized choice does not drop valid ones.
+        foreach ($type->visibleFields() as $field) {
+            $key = (string) $field['key'];
+
+            if ($field['type'] === 'multiselect' && isset($mapped[$key])) {
+                $options = $field['options'] ?? [];
+                $matched = [];
+
+                foreach (SelectOptions::split($mapped[$key]) as $choice) {
+                    $hit = SelectOptions::match($options, $choice);
+
+                    if ($hit !== null) {
+                        $matched[$hit] = true;
+                    }
+                }
+
+                if ($matched === []) {
+                    unset($mapped[$key]);
+                } else {
+                    $mapped[$key] = array_keys($matched);
+                }
+            }
+        }
+
+        [$values] = TransactionFields::validSubset($type, $mapped);
+
+        return [
+            'type_id' => (int) $type->id,
+            'data' => $values,
+        ];
     }
 
     /**
@@ -59,7 +138,9 @@ class AgentTypeFields
     public function fromArgs(User $user, array $args, ?Transaction $before = null): array
     {
         $name = is_string($args['type'] ?? null) ? trim($args['type']) : null;
-        $rawFields = is_array($args['fields'] ?? null) ? $args['fields'] : [];
+        $rawFields = is_array($args['fields'] ?? null)
+            ? $args['fields']
+            : (is_array($args['data'] ?? null) ? $args['data'] : []);
         $result = ['type' => null, 'touched' => false, 'cleared' => false, 'fields' => [], 'dropped' => []];
 
         if ($name !== null && in_array(mb_strtolower($name), ['', 'none', 'no type'], true)) {
@@ -72,6 +153,10 @@ class AgentTypeFields
             throw new \InvalidArgumentException("unknown transaction type \"{$name}\"; use one of the listed types or omit type");
         }
 
+        if ($type === null && isset($args['transaction_type_id']) && is_numeric($args['transaction_type_id']) && (int) $args['transaction_type_id'] > 0) {
+            $type = $user->transactionTypes()->find((int) $args['transaction_type_id']);
+        }
+
         if ($type === null && $rawFields !== []) {
             $type = $before?->transactionType ?? $this->typeFromFields($user, array_keys($rawFields));
         }
@@ -82,7 +167,9 @@ class AgentTypeFields
 
         $mapped = $this->mapFields($type, $rawFields);
         // Unknown select values are judged against a copy here; the real options are added on save.
-        $probe = TransactionTypeData::absorbOptions(clone $type, $mapped, persist: false);
+        $probe = !empty($args['strict_options'])
+            ? $type
+            : TransactionTypeData::absorbOptions(clone $type, $mapped, persist: false);
         [$values, $dropped] = TransactionFields::validSubset($probe, $mapped);
         $unmapped = array_values(array_diff(array_map('strval', array_keys($rawFields)), array_keys($mapped)));
         $labels = array_column($type->fields ?? [], 'label', 'key');

@@ -190,6 +190,7 @@
                                             </span>
                                             <span class="text-base-content/60">📅 {{ row.date }}</span>
                                         </p>
+                                        <p v-if="row.type_line" class="text-base-content/80 break-words">{{ row.type_line }}</p>
                                         <p v-if="row.note || row.tags?.length" class="text-base-content/80 break-words">
                                             <template v-if="row.note">📝 {{ row.note }} </template>
                                             <template v-if="row.tags?.length">🏷 {{ row.tags.join(' · ') }}</template>
