@@ -10,7 +10,7 @@
 
                 <div class="modal-action">
                     <button type="submit" class="btn btn-primary tg-primary"
-                        :disabled="budgetsStore.isLoading || !form.tag_ids.length">
+                        :disabled="budgetsStore.isLoading || !isBudgetFormValid(form)">
                         <span v-if="budgetsStore.isLoading" class="loading loading-spinner"></span>
                         <Save v-else :size="20" />
                         Save
@@ -29,7 +29,7 @@ import { PiggyBank, Save, Target } from '@lucide/vue'
 import { ref } from 'vue'
 import BudgetFormFields from '../components/budgets/BudgetFormFields.vue'
 import ModalHeader from '../components/ModalHeader.vue'
-import { budgetPayload } from '../services/budgetPayload.js'
+import { budgetPayload, isBudgetFormValid } from '../services/budgetPayload.js'
 import { useBudgetsStore } from '../services/budgets.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
 
@@ -40,6 +40,9 @@ const createDefault = (type = 'limit') => ({
     title: '',
     amount: '',
     length: 'month',
+    limit_by: 'tags',
+    scope_type_id: '',
+    scope_field: '',
     tag_ids: [],
     // Filled by BudgetFormFields: calendar period start for limits, today for goals.
     start_date: '',
@@ -56,7 +59,7 @@ useTelegramPrimary('budgets_add_modal', {
     text: 'Save',
     form: formRef,
     busy: () => Boolean(budgetsStore.isLoading),
-    enabled: () => form.value.tag_ids.length > 0,
+    enabled: () => isBudgetFormValid(form.value),
 })
 
 const handleSubmit = async () => {

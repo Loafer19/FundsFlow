@@ -17,6 +17,8 @@ export const RELEASES = [
             'The Recurring list shows type segments. /recurring in Telegram names the type and service. The assistant can set a type when it creates or updates a rule.',
             'Receipt photos, PDFs and free-text messages automatically pick your matching transaction type and fill its fields (like liters, price per liter and station for Fuel, or the store for Groceries) on the confirmation card.',
             'The assistant and MCP can answer type-field questions: how much you spent on A-95 this year, liters in October, or the average price per liter.',
+            'Limits can track a transaction type or the sum of a numeric field (like Tips) as well as tags.',
+            'Type analytics shows Best rated and Best value rankings grouped by place for types with a Rating field (including the default Restaurant type).',
         ],
     },
     {

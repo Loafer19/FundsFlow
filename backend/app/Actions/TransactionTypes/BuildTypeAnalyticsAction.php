@@ -79,7 +79,135 @@ class BuildTypeAnalyticsAction
             'breakdown' => $groupKey === null
                 ? null
                 : $this->breakdown($user, $type, $range, $months, $this->fieldByKey($groupable, $groupKey), $topN),
+            'ratings' => $this->ratings($user, $type, $range, $fields),
         ];
+    }
+
+    /**
+     * Place-grouped ratings for types with a rating field and a text/select grouping field
+     * (Best rated / Best value = rating per 100 of currency). Returns null when the type
+     * lacks either field so callers hide the card cleanly.
+     *
+     * @param list<array<string, mixed>> $fields
+     * @return null|array{
+     *   rating_field: array<string, mixed>,
+     *   group_field: array<string, mixed>,
+     *   max: int,
+     *   rows: list<array{
+     *     place: string,
+     *     rating: float,
+     *     rated_count: int,
+     *     visits: int,
+     *     spent: float,
+     *     avg_check: float,
+     *     value: null|float
+     *   }>
+     * }
+     */
+    private function ratings(User $user, TransactionType $type, PeriodRange $range, array $fields): ?array
+    {
+        $ratingField = null;
+
+        foreach ($fields as $field) {
+            if (($field['type'] ?? null) === 'rating') {
+                $ratingField = $field;
+
+                break;
+            }
+        }
+
+        if ($ratingField === null) {
+            return null;
+        }
+
+        $groupField = $this->pickRatingGroupField($fields);
+
+        if ($groupField === null) {
+            return null;
+        }
+
+        $placeExpr = JsonPath::text('data', (string) $groupField['key']);
+        $ratingExpr = JsonPath::number('data', (string) $ratingField['key']);
+
+        $raw = $this->base($user, $type)
+            ->onDays($range->from->toDateString(), $range->to->toDateString())
+            ->where('amount', '<', 0)
+            ->selectRaw("{$placeExpr} as place")
+            ->selectRaw('COUNT(*) as visits')
+            ->selectRaw("COUNT({$ratingExpr}) as rated_count")
+            ->selectRaw("AVG({$ratingExpr}) as avg_rating")
+            ->selectRaw('COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) as spent')
+            ->whereRaw("{$placeExpr} IS NOT NULL AND {$placeExpr} != ''")
+            ->groupByRaw($placeExpr)
+            ->get();
+
+        $max = max(1, (int) ($ratingField['max'] ?? 5));
+        $rows = [];
+
+        foreach ($raw as $item) {
+            $ratedCount = (int) ($item->rated_count ?? 0);
+
+            if ($ratedCount <= 0) {
+                continue;
+            }
+
+            $place = trim((string) ($item->place ?? ''));
+
+            if ($place === '') {
+                continue;
+            }
+
+            $visits = max(1, (int) ($item->visits ?? 0));
+            $rating = round((float) $item->avg_rating, 1);
+            $spent = $this->money($item->spent ?? 0);
+            $avgCheck = $this->money($spent / $visits);
+            $value = $avgCheck > 0 ? round($rating / ($avgCheck / 100), 2) : null;
+
+            $rows[] = [
+                'place' => $place,
+                'rating' => $rating,
+                'rated_count' => $ratedCount,
+                'visits' => $visits,
+                'spent' => $spent,
+                'avg_check' => $avgCheck,
+                'value' => $value,
+            ];
+        }
+
+        usort($rows, static fn (array $a, array $b): int => [$b['rating'], $b['rated_count'], $b['visits']] <=> [$a['rating'], $a['rated_count'], $a['visits']]);
+
+        return [
+            'rating_field' => $this->fieldMeta($ratingField),
+            'group_field' => $this->fieldMeta($groupField),
+            'max' => $max,
+            'rows' => array_values($rows),
+        ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $fields
+     * @return null|array<string, mixed>
+     */
+    private function pickRatingGroupField(array $fields): ?array
+    {
+        $candidates = array_values(array_filter(
+            $fields,
+            static fn (array $field): bool => in_array($field['type'] ?? '', ['text', 'select'], true),
+        ));
+
+        if ($candidates === []) {
+            return null;
+        }
+
+        foreach (['place', 'restaurant', 'cafe', 'venue', 'merchant', 'store', 'station', 'service', 'format'] as $preferred) {
+            foreach ($candidates as $field) {
+                if (($field['key'] ?? null) === $preferred) {
+                    return $field;
+                }
+            }
+        }
+
+        return $candidates[0];
     }
 
     /**

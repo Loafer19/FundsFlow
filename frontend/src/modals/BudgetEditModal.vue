@@ -10,7 +10,7 @@
 
                 <div class="modal-action">
                     <button type="submit" class="btn btn-primary tg-primary"
-                        :disabled="budgetsStore.isLoading || !(form.tag_ids.length || form.monobank_jar)">
+                        :disabled="budgetsStore.isLoading || !isBudgetFormValid(form)">
                         <span v-if="budgetsStore.isLoading" class="loading loading-spinner"></span>
                         <Save v-else :size="20" />
                         Update
@@ -29,7 +29,7 @@ import { PiggyBank, Save, Target } from '@lucide/vue'
 import { ref, watch } from 'vue'
 import BudgetFormFields from '../components/budgets/BudgetFormFields.vue'
 import ModalHeader from '../components/ModalHeader.vue'
-import { budgetPayload } from '../services/budgetPayload.js'
+import { budgetPayload, isBudgetFormValid } from '../services/budgetPayload.js'
 import { useBudgetsStore } from '../services/budgets.js'
 import { nowDateStr } from '../services/formatters.js'
 import { chainStart } from '../services/limits.js'
@@ -37,7 +37,7 @@ import { useTelegramPrimary } from '../services/telegramChrome.js'
 
 const budgetsStore = useBudgetsStore()
 
-const form = ref({ type: 'limit', tag_ids: [] })
+const form = ref({ type: 'limit', limit_by: 'tags', scope_type_id: '', scope_field: '', tag_ids: [] })
 
 const formRef = ref(null)
 
@@ -51,7 +51,7 @@ useTelegramPrimary('budgets_edit_modal', {
     text: 'Update',
     form: formRef,
     busy: () => Boolean(budgetsStore.isLoading),
-    enabled: () => form.value.tag_ids.length > 0 || Boolean(form.value.monobank_jar),
+    enabled: () => isBudgetFormValid(form.value),
 })
 
 watch(
@@ -66,6 +66,7 @@ watch(
         if (!current) return
 
         const goal = budget.type === 'goal'
+        const scope = !goal ? (current.scope ?? null) : null
         // Limits: the start of the open period (paused: resume from today); it cannot move
         // before the previous settings ended.
         const limitStart = current.active ? current.starts_at : nowDateStr()
@@ -81,6 +82,9 @@ watch(
             title: budget.title ?? '',
             amount: current.amount,
             length: current.length ?? 'month',
+            limit_by: scope?.kind ?? 'tags',
+            scope_type_id: scope?.type_id ?? '',
+            scope_field: scope?.field ?? '',
             tag_ids: current.tags.map((tag) => tag.id),
             start_date: goal ? (budget.start_date ?? earliestStart(budget.periods)) : limitStart,
             start_original: goal ? '' : limitStart,

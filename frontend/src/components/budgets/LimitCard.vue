@@ -8,6 +8,7 @@
                     </span>
                     <span class="line-clamp-2 break-words">
                         <template v-if="budget.title">{{ budget.title }}</template>
+                        <template v-else-if="scopeTitle">{{ scopeTitle }}</template>
                         <template v-else-if="tags.length">
                             {{ tags.map((tag) => `${tag.emoji} ${tag.title}`).join(' · ') }}
                         </template>
@@ -40,9 +41,24 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-1 flex-wrap">
-                <button v-for="tag in tags" :key="tag.id" type="button" class="tooltip cursor-pointer hover:opacity-70"
-                    :data-tip="tag.title" @click="$emit('view-tags', tags)">{{ tag.emoji }}</button>
+            <div class="flex items-center gap-1.5 flex-wrap">
+                <template v-if="scope">
+                    <button type="button"
+                        class="badge badge-sm badge-outline gap-1 cursor-pointer hover:bg-base-200 tooltip"
+                        :data-tip="`Open ${scopeType?.name || 'type'} analytics`"
+                        @click="typesStore.openAnalytics(scope.type_id)">
+                        <span v-if="scopeType?.emoji">{{ scopeType.emoji }}</span>
+                        <span>{{ scopeType?.name || `Type #${scope.type_id}` }}</span>
+                    </button>
+                    <span v-if="scope.kind === 'field_sum'" class="badge badge-sm badge-ghost">
+                        Field · {{ scopeFieldLabel }}
+                    </span>
+                    <span v-else class="badge badge-sm badge-ghost">Type</span>
+                </template>
+                <template v-else>
+                    <button v-for="tag in tags" :key="tag.id" type="button" class="tooltip cursor-pointer hover:opacity-70"
+                        :data-tip="tag.title" @click="$emit('view-tags', tags)">{{ tag.emoji }}</button>
+                </template>
                 <div class="badge badge-sm ml-auto" :class="statusBadge">{{ statusLabel }}</div>
             </div>
 
@@ -104,8 +120,9 @@ import { CalendarClock, Gauge, Pause, Pencil, Play, TrendingUp } from '@lucide/v
 import { computed, inject } from 'vue'
 import { useBudgetsStore } from '../../services/budgets.js'
 import { formatDate, formatMoney } from '../../services/formatters.js'
-import { historyBuckets, limitPercent, limitProgress, spentBetween } from '../../services/limits.js'
+import { historyBuckets, limitPercent, limitProgress, scopeKey, spentBetween } from '../../services/limits.js'
 import { useTransactionsStore } from '../../services/transactions.js'
+import { useTransactionTypesStore } from '../../services/transactionTypes.js'
 import DeleteHold from '../buttons/DeleteHold.vue'
 import LimitHistory from './LimitHistory.vue'
 
@@ -117,12 +134,27 @@ defineEmits(['edit', 'view-tags'])
 
 const budgetsStore = useBudgetsStore()
 const transactionsStore = useTransactionsStore()
+const typesStore = useTransactionTypesStore()
 const inReport = inject('inReport', false)
 
 // Periods come newest-first; a paused limit has no active one.
 const current = computed(() => props.budget.periods.find((period) => period.active) ?? null)
 const latest = computed(() => current.value ?? props.budget.periods[0] ?? null)
 const tags = computed(() => latest.value?.tags ?? [])
+const scope = computed(() => latest.value?.scope ?? null)
+const scopeType = computed(() => (scope.value?.type_id ? typesStore.byId(scope.value.type_id) : null))
+const scopeFieldLabel = computed(() => {
+    if (scope.value?.kind !== 'field_sum' || !scope.value.field) return ''
+    const match = (scopeType.value?.fields ?? []).find((f) => f.key === scope.value.field)
+    return match?.label ?? scope.value.field
+})
+const scopeTitle = computed(() => {
+    if (!scope.value) return ''
+    const base = scopeType.value
+        ? `${scopeType.value.emoji ? `${scopeType.value.emoji} ` : ''}${scopeType.value.name}`.trim()
+        : `Type #${scope.value.type_id}`
+    return scope.value.kind === 'field_sum' && scope.value.field ? `${base} · ${scopeFieldLabel.value}` : base
+})
 
 const p = computed(() =>
     current.value
@@ -163,25 +195,21 @@ const cardBorder = computed(() => (status.value === 'over' ? 'border-error/40' :
 
 // Closed versions (from their effective start; a version replaced mid-period hands that period to its successor) plus the open one's finished buckets, sliced into week/month/year buckets on the budget's schedule, newest first, one compact pass/fail row each.
 const history = computed(() => {
-    const currentIds = tags.value
-        .map((tag) => tag.id)
-        .sort()
-        .join(',')
+    const currentKey = scopeKey(scope.value, tags.value)
 
     return props.budget.periods
         .filter((period) => period.ends_at || period.active)
         .flatMap((period) => {
             const amount = Number(period.amount)
-            const tagsChanged =
-                period.tags
-                    .map((tag) => tag.id)
-                    .sort()
-                    .join(',') !== currentIds
+            const tagsChanged = scopeKey(period.scope, period.tags) !== currentKey
+            const periodEmoji = period.scope
+                ? (typesStore.byId(period.scope.type_id)?.emoji ?? '🏷️')
+                : period.tags.map((tag) => tag.emoji).join('')
 
             return historyBuckets(period, props.budget.periods, props.budget.anchor_date)
                 .reverse()
                 .map((bucket) => {
-                    const spent = spentBetween(transactionsStore, bucket.start, bucket.end, period.tags)
+                    const spent = spentBetween(transactionsStore, bucket.start, bucket.end, period.tags, period.scope)
 
                     return {
                         key: `${period.id}-${bucket.start}`,
@@ -191,7 +219,7 @@ const history = computed(() => {
                         ok: spent <= amount,
                         percent: limitPercent(spent, amount),
                         tagsChanged,
-                        emojis: period.tags.map((tag) => tag.emoji).join(''),
+                        emojis: periodEmoji,
                     }
                 })
         })

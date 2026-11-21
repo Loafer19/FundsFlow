@@ -744,12 +744,21 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
     )
 
 
+    const budgetScopeInput = z
+        .object({
+            kind: z.enum(['type', 'field_sum']),
+            type_id: z.number().int(),
+            field: z.string().max(64).optional(),
+        })
+        .nullable()
+        .optional()
+
     server.registerTool(
         'list_budgets',
         {
             title: 'List budgets',
             description:
-                'List all budgets: spending limits (type "limit") and savings goals (type "goal"). Active limits include current_period: start, end, amount, spent, left, percent (rounded down), days_left, status (on_track|at_risk|over); spent counts expenses on the tags assigned to the limit and their child tags (each transaction once), from the start of the current period even if the limit was edited during it; null when paused. Goals include a progress object (contributions on the tags assigned to the goal and their child tags): saved, target, remaining, percent, status (completed|paused|on_track|behind|in_progress), days_left, required_amount per week|month, projected_date.',
+                'List all budgets: spending limits (type "limit") and savings goals (type "goal"). Active limits include current_period: start, end, amount, spent, left, percent (rounded down), days_left, status (on_track|at_risk|over), plus scope (null for tag limits, or {kind: "type"|"field_sum", type_id, field?}); spent counts matching expenses from the start of the current period even if the limit was edited during it (or sums the named numeric field for field_sum); null when paused. Goals include a progress object (contributions on the tags assigned to the goal and their child tags): saved, target, remaining, percent, status (completed|paused|on_track|behind|in_progress), days_left, required_amount per week|month, projected_date.',
             inputSchema: {},
         },
         async () => textResult(unwrapList(await api(token, '/budgets'))),
@@ -760,12 +769,13 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         {
             title: 'Create budget',
             description:
-                'Create a spending limit (type "limit", default; length week|month|year required; without start_date it runs on calendar weeks/months/years from the start of the current one (spending already made this period counts); pass start_date YYYY-MM-DD (today or earlier) only when the user names a start day: its periods then repeat from it, e.g. monthly from the 15th runs 15th → 14th; legacy align_to_calendar is still accepted, false = start today) or a savings goal (type "goal"; amount is the target, length is ignored). tag_ids required (at least one); a parent tag includes its child tags, so there is no need to list them too. Goal progress = start_amount + net of transactions with these tags since start_date (YYYY-MM-DD, default today, may be in the past, not after target_date); target_date must be today or later: expenses (transfers into savings) add, income (withdrawals) subtracts.',
+                'Create a spending limit (type "limit", default; length week|month|year required; without start_date it runs on calendar weeks/months/years from the start of the current one; pass start_date YYYY-MM-DD (today or earlier) only when the user names a start day) or a savings goal (type "goal"; amount is the target, length is ignored). For limits, pass either tag_ids (at least one; a parent tag includes its child tags) OR scope ({kind: "type", type_id} to limit expenses of a transaction type, or {kind: "field_sum", type_id, field} to limit the sum of a numeric field like Tips). Goals always require tag_ids; goal progress = start_amount + net of transactions with these tags since start_date.',
             inputSchema: {
                 type: z.enum(['limit', 'goal']).optional(),
                 amount: z.number().min(0.01).max(RULE_AMOUNT_MAX),
                 length: z.enum(['week', 'month', 'year']).optional(),
-                tag_ids: z.array(z.number().int()).min(1),
+                tag_ids: z.array(z.number().int()).optional(),
+                scope: budgetScopeInput,
                 title: z.string().max(255).optional(),
                 align_to_calendar: z.boolean().optional(),
                 start_date: DATE_YMD.nullable().optional(),
@@ -787,12 +797,13 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         {
             title: 'Update budget',
             description:
-                'Update a budget by id. The type cannot change. Limits (length required): a changed amount/length/tags applies to the whole current period (spent still counts from its start; history kept); start_date (today or earlier, not before the previous settings ended) moves the start of the current period in place and its periods then repeat from that day; omitted = keep the current start; on a paused limit saving resumes it from start_date (default today); legacy align_to_calendar=true puts it on calendar weeks/months/years. Goals: edited in place, progress is kept; amount is the target; start_date (today or earlier) moves the day progress counts from and is kept when omitted; target_date/start_amount are left as is when omitted and cleared when null; a new target_date must be today or later.',
+                'Update a budget by id. The type cannot change. Limits (length required): a changed amount/length/tags/scope applies to the whole current period (spent still counts from its start; history kept); pass scope ({kind: "type"|"field_sum", type_id, field?}) to limit by type or numeric field, or scope: null with tag_ids to limit by tags; start_date (today or earlier, not before the previous settings ended) moves the start of the current period in place; on a paused limit saving resumes it from start_date (default today). Goals: edited in place, progress is kept; amount is the target; start_date moves the day progress counts from.',
             inputSchema: {
                 id: z.number().int(),
                 amount: z.number().min(0.01).max(RULE_AMOUNT_MAX),
                 length: z.enum(['week', 'month', 'year']).optional(),
-                tag_ids: z.array(z.number().int()).min(1),
+                tag_ids: z.array(z.number().int()).optional(),
+                scope: budgetScopeInput,
                 title: z.string().max(255).optional(),
                 align_to_calendar: z.boolean().optional(),
                 start_date: DATE_YMD.nullable().optional(),

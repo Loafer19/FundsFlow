@@ -6,6 +6,7 @@ use App\Enums\BudgetLength;
 use App\Enums\BudgetType;
 use App\Models\Budget;
 use App\Models\User;
+use App\Support\BudgetScope;
 use App\Support\TagIds;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -19,13 +20,18 @@ class CreateBudgetAction
     {
         Gate::forUser($user)->authorize('create', Budget::class);
 
-        $tagIds = TagIds::forSync($user, $data['tag_ids']);
+        $type = BudgetType::tryFrom((string) ($data['type'] ?? '')) ?? BudgetType::Limit;
+        $scope = $type === BudgetType::Limit
+            ? BudgetScope::normalize($user, is_array($data['scope'] ?? null) ? $data['scope'] : null)
+            : null;
 
-        if ($tagIds === []) {
+        $tagIds = $scope === null
+            ? TagIds::forSync($user, is_array($data['tag_ids'] ?? null) ? $data['tag_ids'] : [])
+            : [];
+
+        if ($scope === null && $tagIds === []) {
             throw ValidationException::withMessages(['tag_ids' => 'Pick at least one existing tag.']);
         }
-
-        $type = BudgetType::tryFrom((string) ($data['type'] ?? '')) ?? BudgetType::Limit;
 
         if ($type === BudgetType::Goal) {
             return $this->createGoal($user, $data, $tagIds);
@@ -52,11 +58,14 @@ class CreateBudgetAction
         $period = $budget->periods()->create([
             'amount' => $data['amount'],
             'length' => $data['length'],
+            'scope' => $scope,
             'starts_at' => $startsAt,
             'ends_at' => null,
         ]);
 
-        $period->tags()->sync($tagIds);
+        if ($tagIds !== []) {
+            $period->tags()->sync($tagIds);
+        }
 
         return $budget->load('periods.tags');
     }

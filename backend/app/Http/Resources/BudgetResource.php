@@ -85,6 +85,7 @@ class BudgetResource extends JsonResource
             'percent' => $st['percent'],
             'days_left' => $st['days_left'],
             'status' => $st['status'],
+            'scope' => $period->scope ?: null,
         ];
     }
 

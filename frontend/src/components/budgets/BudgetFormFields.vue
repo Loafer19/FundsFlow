@@ -56,14 +56,56 @@
         </p>
     </template>
     <template v-else>
-    <div class="flex items-center gap-1 text-sm text-base-content/60 mb-1">
-        <span>Tags</span>
-        <span class="tooltip tooltip-right before:max-w-56 before:text-left" :data-tip="tagsHint" tabindex="0"
-            role="img" :aria-label="tagsHint">
-            <Info :size="14" />
-        </span>
-    </div>
-    <TagPicker v-model="form.tag_ids" />
+        <div v-if="!goal" class="mb-3">
+            <div class="flex items-center gap-1 text-sm text-base-content/60 mb-1">
+                <span>Limit by</span>
+                <span class="tooltip tooltip-right before:max-w-56 before:text-left" :data-tip="scopeHint" tabindex="0"
+                    role="img" :aria-label="scopeHint">
+                    <Info :size="14" />
+                </span>
+            </div>
+            <SegmentedControl v-model="form.limit_by" block size="sm" label="Limit by" :options="limitByOptions" />
+        </div>
+
+        <template v-if="!goal && form.limit_by !== 'tags'">
+            <div v-if="!availableTypes.length" class="text-sm text-base-content/60 mb-4">
+                No transaction types yet. Create one in Settings → Transaction types first.
+            </div>
+            <div v-else class="flex flex-col gap-3 mb-4">
+                <div>
+                    <label :for="typeId" class="block text-sm text-base-content/60 mb-1">Transaction type</label>
+                    <select :id="typeId" v-model="form.scope_type_id" class="select w-full" aria-label="Transaction type">
+                        <option value="" disabled>Pick a type…</option>
+                        <option v-for="t in availableTypes" :key="t.id" :value="t.id">
+                            {{ t.emoji ? `${t.emoji} ` : '' }}{{ t.name }}{{ t.archived_at ? ' (archived)' : '' }}
+                        </option>
+                    </select>
+                </div>
+                <div v-if="form.limit_by === 'field_sum'">
+                    <label :for="fieldId" class="block text-sm text-base-content/60 mb-1">Number field</label>
+                    <select v-if="numericFields.length" :id="fieldId" v-model="form.scope_field" class="select w-full"
+                        aria-label="Number field">
+                        <option value="" disabled>Pick a field…</option>
+                        <option v-for="f in numericFields" :key="f.key" :value="f.key">
+                            {{ f.label }}{{ f.unit ? ` (${f.unit})` : '' }}
+                        </option>
+                    </select>
+                    <p v-else class="text-xs text-base-content/60">
+                        This type has no number fields yet.
+                    </p>
+                </div>
+            </div>
+        </template>
+        <template v-else>
+            <div class="flex items-center gap-1 text-sm text-base-content/60 mb-1">
+                <span>Tags</span>
+                <span class="tooltip tooltip-right before:max-w-56 before:text-left" :data-tip="tagsHint" tabindex="0"
+                    role="img" :aria-label="tagsHint">
+                    <Info :size="14" />
+                </span>
+            </div>
+            <TagPicker v-model="form.tag_ids" />
+        </template>
     </template>
 
     <details v-if="goal && !jarLinked" class="mb-2" :open="showMore" @toggle="showMore = $event.target.open">
@@ -81,6 +123,7 @@ import { Gauge, Info, Target } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
 import { nowDateStr, parseLocalDate } from '../../services/formatters.js'
 import { bucketBounds } from '../../services/limits.js'
+import { useTransactionTypesStore } from '../../services/transactionTypes.js'
 import AmountField from '../AmountField.vue'
 import DateField from '../DateField.vue'
 import SegmentedControl from '../SegmentedControl.vue'
@@ -92,6 +135,7 @@ defineProps({
 })
 
 const form = defineModel({ type: Object, required: true })
+const typesStore = useTransactionTypesStore()
 
 const lengthOptions = [
     { value: 'week', label: 'Weekly' },
@@ -99,11 +143,64 @@ const lengthOptions = [
     { value: 'year', label: 'Yearly' },
 ]
 
+const limitByOptions = [
+    { value: 'tags', label: 'Tags' },
+    { value: 'type', label: 'Type' },
+    { value: 'field_sum', label: 'Field' },
+]
+
 const goal = computed(() => form.value.type === 'goal')
-
 const jarLinked = computed(() => form.value.monobank_jar ?? null)
-
 const today = computed(() => nowDateStr())
+
+const NUMERIC_FIELD_TYPES = new Set(['number', 'computed'])
+
+const visibleNumericFields = (type) => (type?.fields ?? []).filter((f) => !f.hidden && NUMERIC_FIELD_TYPES.has(f.type))
+
+const availableTypes = computed(() => {
+    const active = typesStore.active
+    const currentId = Number(form.value.scope_type_id)
+    if (!currentId) return active
+    if (active.some((t) => t.id === currentId)) return active
+    const existing = typesStore.byId(currentId)
+    return existing ? [...active, existing] : active
+})
+
+const selectedType = computed(() => typesStore.byId(form.value.scope_type_id))
+
+const numericFields = computed(() => {
+    const fields = visibleNumericFields(selectedType.value)
+    const currentKey = form.value.scope_field
+    if (!currentKey || fields.some((f) => f.key === currentKey)) return fields
+    const hidden = (selectedType.value?.fields ?? []).find(
+        (f) => f.key === currentKey && NUMERIC_FIELD_TYPES.has(f.type),
+    )
+    return hidden ? [...fields, hidden] : fields
+})
+
+watch(
+    () => [form.value.limit_by, form.value.scope_type_id],
+    ([limitBy]) => {
+        if (goal.value || limitBy === 'tags') return
+
+        if (!form.value.scope_type_id && availableTypes.value.length) {
+            const preferred =
+                limitBy === 'field_sum'
+                    ? (availableTypes.value.find((t) => visibleNumericFields(t).length > 0) ?? availableTypes.value[0])
+                    : availableTypes.value[0]
+            form.value.scope_type_id = preferred.id
+            return
+        }
+
+        if (limitBy === 'field_sum') {
+            const fields = numericFields.value
+            if (!fields.some((f) => f.key === form.value.scope_field)) {
+                form.value.scope_field = fields[0]?.key ?? ''
+            }
+        }
+    },
+    { immediate: true },
+)
 
 // Start: today or earlier, and not after the deadline.
 const startMax = computed(() => [today.value, form.value.target_date].filter(Boolean).sort()[0])
@@ -118,6 +215,8 @@ const deadlineMin = computed(
 )
 
 const startId = useId()
+const typeId = useId()
+const fieldId = useId()
 
 // Goal "More options" (already saved): open when editing a goal that has one.
 const showMore = ref(false)
@@ -152,6 +251,12 @@ const tagsHint = computed(() =>
         ? 'Transactions with these tags since the start date count: expenses (transfers into savings) add to the goal, income (withdrawals) takes from it'
         : 'Spending on these tags counts toward the limit',
 )
+
+const scopeHint = computed(() => {
+    if (form.value.limit_by === 'type') return 'Count all expenses with the picked transaction type'
+    if (form.value.limit_by === 'field_sum') return 'Sum a numeric field (like Tips or Liters) on expenses of that type'
+    return 'Count expenses carrying any of the picked tags (or their child tags)'
+})
 
 const validStart = computed(() => /^\d{4}-\d{2}-\d{2}$/.test(form.value.start_date ?? ''))
 

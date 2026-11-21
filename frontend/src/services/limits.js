@@ -141,9 +141,37 @@ export const historyBuckets = (period, periods, anchor = null, today = nowDateSt
     return buckets
 }
 
-// Expenses (negative amounts) carrying any of the tags or their child tags, counted once, on days [start, end].
-export const spentBetween = (transactionsStore, start, end, tags) => {
-    const tagIds = useTagsStore().expandIds(tags.map((tag) => tag.id))
+export const scopeKey = (scope, tags = []) => {
+    if (scope?.kind === 'type') return `type:${scope.type_id}`
+    if (scope?.kind === 'field_sum') return `field:${scope.type_id}:${scope.field}`
+
+    return `tags:${(tags ?? [])
+        .map((tag) => tag.id)
+        .sort()
+        .join(',')}`
+}
+
+// Expenses (negative amounts) matching tags (and children) OR a type / numeric-field scope on [start, end].
+export const spentBetween = (transactionsStore, start, end, tags, scope = null) => {
+    if (scope?.kind === 'type' || scope?.kind === 'field_sum') {
+        const typeId = Number(scope.type_id)
+        if (!typeId) return 0
+
+        const rows = transactionsStore
+            .filteredByDateRange(start, end)
+            .filter((t) => t.amount < 0 && Number(t.transaction_type_id) === typeId)
+
+        if (scope.kind === 'field_sum') {
+            return rows.reduce((sum, t) => {
+                const value = Number(t.data?.[scope.field])
+                return Number.isFinite(value) ? sum + value : sum
+            }, 0)
+        }
+
+        return rows.reduce((sum, t) => sum - t.amount, 0)
+    }
+
+    const tagIds = useTagsStore().expandIds((tags ?? []).map((tag) => tag.id))
 
     return transactionsStore
         .filteredByDateRange(start, end)
@@ -170,7 +198,7 @@ export const limitProgress = (period, periods, transactionsStore, anchor = null,
     const start = currentBucketStart(period, periods, anchor, today)
     const end = currentBucketEnd(period, anchor, today)
     const amount = Number(period.amount)
-    const spent = spentBetween(transactionsStore, start, today, period.tags)
+    const spent = spentBetween(transactionsStore, start, today, period.tags, period.scope)
     const totalDays = Math.max(1, daysBetween(start, end) + 1)
     const elapsedDays = Math.max(1, Math.min(totalDays, daysBetween(start, today) + 1))
     const daysLeft = Math.max(1, totalDays - elapsedDays + 1) // today still counts as a day to spend

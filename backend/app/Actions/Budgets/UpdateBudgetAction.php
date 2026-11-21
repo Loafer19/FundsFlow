@@ -6,6 +6,7 @@ use App\Enums\BudgetLength;
 use App\Models\Budget;
 use App\Models\BudgetPeriod;
 use App\Models\User;
+use App\Support\BudgetScope;
 use App\Support\TagIds;
 use App\Support\UserFormatter;
 use Illuminate\Support\Facades\Gate;
@@ -20,15 +21,25 @@ class UpdateBudgetAction
     {
         Gate::forUser($user)->authorize('update', $budget);
 
-        $current = $budget->currentPeriod;
-        $incomingTags = array_key_exists('tag_ids', $data)
-            ? $data['tag_ids']
-            : ($current?->tags->pluck('id')->all() ?? []);
-        $newTagIds = collect(TagIds::forSync($user, $incomingTags, $current?->tags->pluck('id') ?? []))
-            ->sort()
-            ->values();
+        $current = $budget->currentPeriod ?? $budget->periods()->latest('id')->first();
+        $scope = $budget->isGoal()
+            ? null
+            : (array_key_exists('scope', $data)
+                ? BudgetScope::normalize($user, is_array($data['scope']) ? $data['scope'] : null, $current)
+                : ($current?->scope ?: null));
 
-        if ($newTagIds->isEmpty() && !$budget->isMonobankJar()) {
+        $incomingTags = $scope !== null
+            ? []
+            : (array_key_exists('tag_ids', $data)
+                ? (is_array($data['tag_ids']) ? $data['tag_ids'] : [])
+                : ($current?->tags->pluck('id')->all() ?? []));
+        $newTagIds = $scope !== null
+            ? collect()
+            : collect(TagIds::forSync($user, $incomingTags, $current?->tags->pluck('id') ?? []))
+                ->sort()
+                ->values();
+
+        if ($scope === null && $newTagIds->isEmpty() && !$budget->isMonobankJar()) {
             throw ValidationException::withMessages(['tag_ids' => 'Pick at least one existing tag.']);
         }
 
@@ -40,7 +51,7 @@ class UpdateBudgetAction
             return $this->updateGoal($user, $budget, $data, $newTagIds->all());
         }
 
-        return $this->updateLimit($user, $budget, $current, $data, $newTagIds->all());
+        return $this->updateLimit($user, $budget, $budget->currentPeriod, $data, $newTagIds->all(), $scope);
     }
 
     /**
@@ -90,7 +101,10 @@ class UpdateBudgetAction
      * @param array<string, mixed> $data
      * @param list<int> $tagIds
      */
-    private function updateLimit(User $user, Budget $budget, ?BudgetPeriod $current, array $data, array $tagIds): Budget
+    /**
+     * @param null|array{kind: string, type_id: int, field?: string} $scope
+     */
+    private function updateLimit(User $user, Budget $budget, ?BudgetPeriod $current, array $data, array $tagIds, ?array $scope): Budget
     {
         $length = BudgetLength::from($data['length']);
         $today = $user->todayDateString();
@@ -99,7 +113,7 @@ class UpdateBudgetAction
         $calendarStart = !$startDate && !empty($data['align_to_calendar'])
             ? $length->calendarStart($user->nowInTimezone())->toDateString()
             : null;
-        $fields = ['amount' => $data['amount'], 'length' => $data['length']];
+        $fields = ['amount' => $data['amount'], 'length' => $data['length'], 'scope' => $scope];
 
         if ($current) {
             if ($startDate !== null && $startDate !== $current->starts_at->toDateString()) {
@@ -113,6 +127,7 @@ class UpdateBudgetAction
 
             $unchanged = (float) $current->amount === (float) $data['amount']
                 && $current->length->value === $data['length']
+                && BudgetScope::same($current->scope, $scope)
                 && $current->tags->pluck('id')->sort()->values()->all() === $tagIds;
 
             if ($unchanged) {

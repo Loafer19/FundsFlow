@@ -21,8 +21,8 @@ use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Support\GoalSummary;
-use App\Support\TagTree;
 use App\Support\RecurringTypeData;
+use App\Support\TagTree;
 use App\Support\UserFormatter;
 
 class MenuHandler
@@ -310,6 +310,7 @@ class MenuHandler
             ];
 
             $typeLine = RecurringTypeData::typeLine($rule);
+
             if ($typeLine) {
                 $lines[] = $this->support->escapeHtml($typeLine);
             }
@@ -454,8 +455,17 @@ class MenuHandler
         $money = fn (float $v): string => $esc(UserFormatter::formatMoney($user, $v));
         $balance = $st['left'] >= 0 ? $money($st['left']) . ' left' : $money(-$st['left']) . ' over';
         $days = $st['days_left'] === 1 ? 'last day' : $st['days_left'] . ' days left';
+        $scopeLine = '';
 
-        return '<b>' . $esc($label) . "</b>\n"
+        if ($period->scope) {
+            $scopeLabel = $period->scopeLabel();
+
+            if ($scopeLabel !== '' && $scopeLabel !== $label) {
+                $scopeLine = "\n<i>" . $esc($scopeLabel) . '</i>';
+            }
+        }
+
+        return '<b>' . $esc($label) . '</b>' . $scopeLine . "\n"
             . $this->support->progressBar($st['limit'] > 0 ? $st['spent'] / $st['limit'] : 0.0) . ' ' . $st['percent'] . "%\n"
             . $money($st['spent']) . ' / ' . $money($st['limit']) . ' · ' . $balance . "\n"
             . $esc(TelegramSupport::cardDate($st['start']) . ' – ' . TelegramSupport::cardDate($st['end'])) . ' · ' . $days;

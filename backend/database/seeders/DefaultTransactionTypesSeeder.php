@@ -61,6 +61,7 @@ class DefaultTransactionTypesSeeder extends Seeder
                 ['key' => 'place', 'label' => 'Place', 'type' => 'text'],
                 ['key' => 'format', 'label' => 'Format', 'type' => 'select', 'options' => ['Cafe', 'Restaurant', 'Delivery']],
                 ['key' => 'tip', 'label' => 'Tip', 'type' => 'number', 'unit' => '₴'],
+                ['key' => 'rating', 'label' => 'Rating', 'type' => 'rating', 'max' => 5],
             ],
         ],
     ];

@@ -165,6 +165,8 @@
                             </div>
                         </div>
 
+                        <RatingsCard v-if="payload.ratings?.rows?.length" :ratings="payload.ratings" class="mb-3" />
+
                         <div v-if="payload.top_values.length" class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                             <div
                                 v-for="group in topValueGroups"
@@ -365,6 +367,7 @@
 <script setup>
 import { Activity, Droplet, Gauge, Hash, List, MapPin, ToggleLeft, Type, Wallet, X } from '@lucide/vue'
 import { computed, inject, ref, watch } from 'vue'
+import RatingsCard from '../components/analytics/RatingsCard.vue'
 import TypeDonutChart from '../components/charts/TypeDonutChart.vue'
 import TypeSeriesChart from '../components/charts/TypeSeriesChart.vue'
 import TypeStackedBar from '../components/charts/TypeStackedBar.vue'

@@ -26,6 +26,7 @@ use App\Models\SupportTicket;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\BudgetScope;
 use App\Support\LimitBuckets;
 use App\Support\PeriodRange;
 use App\Support\RecurringTypeData;
@@ -35,6 +36,7 @@ use App\Support\UserFormatter;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 /**
@@ -138,7 +140,7 @@ class AgentPlanningTools
                     'tag_ids' => $tagIds,
                 ],
             ]),
-            $fn('update_budget', 'Propose editing a budget or savings goal. Stages Confirm/Cancel. Omitted fields keep their current value. Limits: amount, length, tags, title and start_date; a changed limit/length/tags applies to the whole current period (spent still counts from its start; history kept, same period grid); start_date (YYYY-MM-DD, today or earlier, not before the previous settings ended) moves the start of the current period in place, its periods then repeat from that day (monthly from the 15th runs 15th → 14th); on a paused budget saving resumes it from start_date (default today). align_to_calendar is a legacy flag: true puts the budget on calendar weeks/months/years. Goals: amount is the target; also tags, title, start_date (YYYY-MM-DD, today or earlier, not after the deadline: progress counts from that day), target_date (deadline, today or later; clear_target_date removes it) and start_amount (already saved before tracking); edited in place, progress keeps counting from the goal start unless start_date moves it. The type cannot change.', [
+            $fn('update_budget', 'Propose editing a budget or savings goal. Stages Confirm/Cancel. Omitted fields keep their current value. Limits: amount, length, tags or scope, title and start_date; scope limits by a transaction type ({kind:"type", type_id}) or numeric field sum ({kind:"field_sum", type_id, field}), or pass scope: null with tag_ids to switch back to tags. A changed limit/length/tags/scope applies to the whole current period (spent still counts from its start; history kept, same period grid); start_date (YYYY-MM-DD, today or earlier, not before the previous settings ended) moves the start of the current period in place, its periods then repeat from that day (monthly from the 15th runs 15th → 14th); on a paused budget saving resumes it from start_date (default today). align_to_calendar is a legacy flag: true puts the budget on calendar weeks/months/years. Goals: amount is the target; also tags, title, start_date (YYYY-MM-DD, today or earlier, not after the deadline: progress counts from that day), target_date (deadline, today or later; clear_target_date removes it) and start_amount (already saved before tracking); edited in place, progress keeps counting from the goal start unless start_date moves it. The type cannot change.', [
                 'type' => 'object',
                 'properties' => [
                     'id' => $id,
@@ -146,6 +148,15 @@ class AgentPlanningTools
                     'amount' => ['type' => 'number'],
                     'length' => ['type' => 'string', 'enum' => ['week', 'month', 'year'], 'description' => 'Limits only'],
                     'tag_ids' => $tagIds,
+                    'scope' => [
+                        'type' => ['object', 'null'],
+                        'description' => 'Limits only: {kind: "type"|"field_sum", type_id, field?}, or null to limit by tag_ids.',
+                        'properties' => [
+                            'kind' => ['type' => 'string', 'enum' => ['type', 'field_sum']],
+                            'type_id' => ['type' => 'integer'],
+                            'field' => ['type' => 'string'],
+                        ],
+                    ],
                     'align_to_calendar' => ['type' => 'boolean', 'description' => 'Limits only, legacy: true = calendar weeks/months/years from now on'],
                     'start_date' => ['type' => 'string', 'description' => 'Start YYYY-MM-DD, today or earlier. Limits: new start of the current period (periods repeat from it). Goals: progress counts from this day (not after target_date)'],
                     'target_date' => ['type' => 'string', 'description' => 'Goals only: deadline YYYY-MM-DD'],
@@ -339,6 +350,8 @@ class AgentPlanningTools
                 'anchor_date' => $budget->anchor_date?->toDateString(),
                 'schedule' => self::scheduleText($period->length, $budget->anchor_date?->toDateString()),
                 'tag_ids' => $this->periodTagIds($period),
+                'scope' => $period->scope ?: null,
+                'scope_label' => $period->scope ? $period->scopeLabel() : null,
             ];
         }
 
@@ -395,6 +408,8 @@ class AgentPlanningTools
             'projected_spend_formatted' => $money($st['projected_spend']),
             'projected_over_by' => max(0.0, round($st['projected_spend'] - $st['limit'], 2)),
             'tag_ids' => $this->periodTagIds($period),
+            'scope' => $period->scope ?: null,
+            'scope_label' => $period->scope ? $period->scopeLabel() : null,
         ];
     }
 
@@ -721,10 +736,27 @@ class AgentPlanningTools
             $length = (string) $args['length'];
         }
 
-        $baseTagIds = $this->periodTagIds($base);
-        $tagIds = $baseTagIds;
+        $baseScope = is_array($base->scope) && $base->scope !== [] ? $base->scope : null;
+        $scope = $baseScope;
 
-        if (is_array($args['tag_ids'] ?? null)) {
+        if (array_key_exists('scope', $args)) {
+            if ($args['scope'] !== null && !is_array($args['scope'])) {
+                throw new InvalidArgumentException('scope must be an object or null');
+            }
+
+            try {
+                $scope = BudgetScope::normalize($user, $args['scope'], $base);
+            } catch (ValidationException $e) {
+                $first = collect($e->errors())->flatten()->first() ?? 'Invalid limit scope.';
+
+                throw new InvalidArgumentException((string) $first);
+            }
+        }
+
+        $baseTagIds = $this->periodTagIds($base);
+        $tagIds = $scope !== null ? [] : $baseTagIds;
+
+        if ($scope === null && is_array($args['tag_ids'] ?? null)) {
             // Keep tags the budget already has (even if since deleted); new ones must be owned.
             $owned = $this->ownedTagIds($user, $args['tag_ids']);
             $kept = array_values(array_intersect(array_map('intval', array_filter($args['tag_ids'], 'is_numeric')), $baseTagIds));
@@ -733,6 +765,10 @@ class AgentPlanningTools
             if ($tagIds === []) {
                 throw new InvalidArgumentException('tag_ids must contain at least one of the user\'s tags');
             }
+        }
+
+        if ($scope === null && $tagIds === []) {
+            throw new InvalidArgumentException('tag_ids must contain at least one of the user\'s tags');
         }
         sort($tagIds);
         $sortedBase = $baseTagIds;
@@ -776,7 +812,8 @@ class AgentPlanningTools
             }
         }
 
-        $periodChanged = abs($amount - (float) $base->amount) > 0.001 || $length !== $base->length->value || $tagIds !== $sortedBase;
+        $scopeChanged = !BudgetScope::same($baseScope, $scope);
+        $periodChanged = abs($amount - (float) $base->amount) > 0.001 || $length !== $base->length->value || $scopeChanged || ($scope === null && $tagIds !== $sortedBase);
 
         if (!$periodChanged && !$titleChanged && $startDate === null && !$align && $current) {
             throw new InvalidArgumentException('nothing to change: values equal the current budget');
@@ -793,9 +830,12 @@ class AgentPlanningTools
             ? 'Limit: ' . $money((float) $base->amount) . ' → ' . $money($amount)
             : 'Limit: ' . $money($amount);
         $lines[] = $length !== $base->length->value ? "Length: {$base->length->value} → {$length}" : "Length: {$length}";
-        $lines[] = $tagIds !== $sortedBase
-            ? 'Tags: ' . $this->tagLabels($user, $baseTagIds) . ' → ' . $this->tagLabels($user, $tagIds)
-            : 'Tags: ' . $this->tagLabels($user, $tagIds);
+        $oldScopeDesc = $baseScope ? BudgetScope::label($baseScope) : $this->tagLabels($user, $baseTagIds);
+        $newScopeDesc = $scope ? BudgetScope::label($scope) : $this->tagLabels($user, $tagIds);
+        $scopePrefix = $scope ? 'Scope: ' : 'Tags: ';
+        $lines[] = ($scopeChanged || ($scope === null && $tagIds !== $sortedBase))
+            ? ($baseScope || $scope ? 'Scope: ' : 'Tags: ') . $oldScopeDesc . ' → ' . $newScopeDesc
+            : $scopePrefix . $newScopeDesc;
         $lengthEnum = BudgetLength::from($length);
         $date = fn (string $d): string => UserFormatter::formatDate($user, $d);
         $anchor = $budget->anchor_date?->toDateString();
@@ -823,6 +863,8 @@ class AgentPlanningTools
                 'amount' => $amount,
                 'length' => $length,
                 'tag_ids' => $tagIds,
+                'scope' => $scope,
+                'scope_present' => array_key_exists('scope', $args) || $scope !== null,
                 'start_date' => $startDate,
                 'align_to_calendar' => $align,
             ],
@@ -867,9 +909,12 @@ class AgentPlanningTools
         $sortedBase = $baseTagIds;
         sort($sortedBase);
         $changed = $changed || $tagIds !== $sortedBase;
-        $lines[] = $tagIds !== $sortedBase
-            ? 'Tags: ' . $this->tagLabels($user, $baseTagIds) . ' → ' . $this->tagLabels($user, $tagIds)
-            : 'Tags: ' . $this->tagLabels($user, $tagIds);
+        $oldScopeDesc = $baseScope ? BudgetScope::label($baseScope) : $this->tagLabels($user, $baseTagIds);
+        $newScopeDesc = $scope ? BudgetScope::label($scope) : $this->tagLabels($user, $tagIds);
+        $scopePrefix = $scope ? 'Scope: ' : 'Tags: ';
+        $lines[] = ($scopeChanged || ($scope === null && $tagIds !== $sortedBase))
+            ? ($baseScope || $scope ? 'Scope: ' : 'Tags: ') . $oldScopeDesc . ' → ' . $newScopeDesc
+            : $scopePrefix . $newScopeDesc;
 
         $title = $budget->title;
         $titleChanged = false;
@@ -1003,7 +1048,7 @@ class AgentPlanningTools
                 : "Pause budget “{$label}” ({$terms}).\nTracking stops today; history is kept. You can resume it later.",
             'resume' => $budget->isGoal()
                 ? "Resume savings goal “{$label}” ({$terms}).\nTags: " . $this->tagLabels($user, $this->periodTagIds($base))
-                : "Resume budget “{$label}” ({$terms}) from today.\nTags: " . $this->tagLabels($user, $this->periodTagIds($base)),
+                : "Resume budget “{$label}” ({$terms}) from today.\n" . ($base->scope ? 'Scope: ' . BudgetScope::label($base->scope) : 'Tags: ' . $this->tagLabels($user, $this->periodTagIds($base))),
             default => "Delete {$noun} “{$label}”" . ($terms !== '' ? " ({$terms})" : '') . " and all its history.\nThis can't be undone (pause keeps history instead).",
         };
 
@@ -1053,6 +1098,10 @@ class AgentPlanningTools
                     'start_date' => $payload['start_date'] ?? null,
                     'align_to_calendar' => (bool) ($payload['align_to_calendar'] ?? false),
                 ];
+
+                if (!empty($payload['scope_present'])) {
+                    $data['scope'] = $payload['scope'] ?? null;
+                }
 
                 if (!empty($payload['title_changed'])) {
                     $data['title'] = $payload['title'] ?? null;
@@ -1110,6 +1159,7 @@ class AgentPlanningTools
         if ($typed['line'] !== null) {
             $lines[] = 'Type: ' . $typed['line'];
         }
+
         if ($note !== '') {
             $lines[] = 'Note: ' . $note;
         }
@@ -1214,6 +1264,7 @@ class AgentPlanningTools
 
         if (array_key_exists('transaction_type_id', $args) || array_key_exists('data', $args)) {
             $typed = $this->recurringTypeFromArgs($user, $args, $rule);
+
             if ($typed['changed']) {
                 $changes = [...$changes, ...$typed['payload']];
                 $lines[] = 'Type: ' . ($typed['from'] ?? '—') . ' → ' . ($typed['line'] ?? '—');
@@ -1276,6 +1327,7 @@ class AgentPlanningTools
                 'note' => $payload['note'] ?? null,
                 'tags' => $this->ownedTagIds($user, $payload['tag_ids'] ?? []),
             ], fn ($v, $k) => $k !== 'ends_at' || $v !== null, ARRAY_FILTER_USE_BOTH);
+
             if (array_key_exists('transaction_type_id', $payload)) {
                 $create['transaction_type_id'] = $payload['transaction_type_id'];
                 $create['data'] = is_array($payload['data'] ?? null) ? $payload['data'] : [];
@@ -1400,9 +1452,8 @@ class AgentPlanningTools
         return $budget;
     }
 
-
     /**
-     * @param  array<string, mixed>  $args
+     * @param array<string, mixed> $args
      * @return array{payload: array<string, mixed>, line: ?string, from: ?string, changed: bool, transaction_type_id?: ?int, data?: ?array}
      */
     private function recurringTypeFromArgs(User $user, array $args, ?RecurringTransaction $current = null): array
@@ -1432,6 +1483,7 @@ class AgentPlanningTools
         $data = is_array($args['data'] ?? null) ? $args['data'] : ($current?->data ?? []);
         $lineParts = [trim($type->emoji . ' ' . $type->name)];
         $service = trim((string) ($data['service'] ?? ''));
+
         if ($service !== '') {
             $lineParts[] = $service;
         }

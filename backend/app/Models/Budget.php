@@ -117,6 +117,7 @@ class Budget extends Model
 
         return $this->title
             ?: $period?->tags->map(fn (Tag $tag) => trim($tag->emoji . ' ' . $tag->title))->filter()->implode(', ')
+            ?: ($period?->scopeLabel() ?: null)
             ?: ($this->isGoal() ? 'Goal #' : 'Limit #') . $this->id;
     }
 

@@ -5,9 +5,11 @@ namespace App\Http\Requests;
 use App\Enums\BudgetLength;
 use App\Enums\BudgetType;
 use App\Models\Budget;
+use App\Support\BudgetScope;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Validator;
 
 class BudgetStoreRequest extends FormRequest
@@ -39,16 +41,21 @@ class BudgetStoreRequest extends FormRequest
     {
         $existing = $this->route('budget');
         $jarGoal = $existing instanceof Budget && $existing->isMonobankJar();
+        $hasScope = $this->budgetType() === BudgetType::Limit && is_array($this->input('scope')) && $this->input('scope') !== [];
 
         $rules = [
             'type' => ['sometimes', Rule::enum(BudgetType::class)],
             'title' => 'nullable|string|max:255',
             'amount' => 'required|numeric|min:0.01|max:99999999.99',
-            'tag_ids' => $jarGoal ? 'sometimes|array' : 'required|array|min:1',
+            'tag_ids' => ($jarGoal || $hasScope) ? 'sometimes|array' : 'required|array|min:1',
             'tag_ids.*' => [
                 'integer',
                 Rule::exists('tags', 'id')->where('user_id', $this->user()->id),
             ],
+            'scope' => 'nullable|array',
+            'scope.kind' => ['required_with:scope', 'string', Rule::in(BudgetScope::KINDS)],
+            'scope.type_id' => 'required_with:scope|integer',
+            'scope.field' => 'nullable|string|max:64',
         ];
 
         if ($this->budgetType() === BudgetType::Goal) {
@@ -80,6 +87,27 @@ class BudgetStoreRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
+                if ($this->budgetType() === BudgetType::Goal && $this->filled('scope')) {
+                    $validator->errors()->add('scope', 'Goals can only track tags.');
+
+                    return;
+                }
+
+                if ($this->budgetType() === BudgetType::Limit && is_array($this->input('scope')) && $this->input('scope') !== [] && !$validator->errors()->hasAny(['scope', 'scope.kind', 'scope.type_id', 'scope.field'])) {
+                    $budget = $this->route('budget');
+                    $stored = $budget instanceof Budget ? $budget : null;
+
+                    try {
+                        BudgetScope::normalize($this->user(), $this->input('scope'), $stored?->currentPeriod);
+                    } catch (ValidationException $e) {
+                        foreach ($e->errors() as $key => $messages) {
+                            foreach ($messages as $message) {
+                                $validator->errors()->add($key, $message);
+                            }
+                        }
+                    }
+                }
+
                 if ($this->budgetType() !== BudgetType::Goal || $validator->errors()->hasAny(['start_date', 'target_date'])) {
                     return;
                 }

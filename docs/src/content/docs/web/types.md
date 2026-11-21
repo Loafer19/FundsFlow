@@ -12,7 +12,7 @@ New accounts start with four types you can change or archive:
   tagged *Transport*.
 - **🛒 Groceries** — Store and Kind (Big shop, Quick buy).
 - **🔄 Subscription** — Service, Period (Monthly, Yearly) and Next charge; tagged *Bills & subscriptions*.
-- **🍽 Restaurant** — Place, Format (Cafe, Restaurant, Delivery) and Tip.
+- **🍽 Restaurant** — Place, Format (Cafe, Restaurant, Delivery), Tip, and Rating (1–5).
 
 Accounts created before types appeared start with none — add your own in **Manage Types**.
 
@@ -85,14 +85,22 @@ transactions there were, the total and the average, a comparison with the previo
 each text, select or yes/no field, and month-by-month totals and averages for number fields (for example liters per
 month and the average price per litre). **Breakdown** splits the spend by a field you pick (Fuel by station, Groceries
 by store) as a pie for the current period and stacked bars for the last six months, with the top values plus *Other*.
+Types with a **Rating** field also show a **Best rated / Best value** card in Overview grouped by place, comparing average stars, visits, average check, and rating per 100 spent (hidden when no entries in the period are rated).
+
 Archived types still open this panel, because their transactions keep the type. A type with no fields, or with no
 transactions in the period, shows an empty state instead of empty charts.
 
 ## With the assistants
 
 The [web assistant](/docs/web/assistant/) and the [Telegram assistant](/docs/telegram/ai-assistant/) know your types.
-Write `Fuel: 40 l at 58.9 OKKO` and the transaction is saved as *Fuel* with Liters 40, Price per liter 58,90, Station
-OKKO, and the amount from the total.
+Write `WOG 40 l A-95 at 58.9` or `Fuel: 40 l at 58.9 OKKO` and the transaction is saved as *Fuel* with Liters 40,
+Price per liter 58,90, Fuel A-95, Station OKKO, and the amount from the total.
+
+Receipt photos and PDFs work the same way: when a receipt clearly matches one of your types, the AI picks that type,
+fills its fields (for example liters, price per liter, fuel grade and station on a gas station receipt, or the store on a
+grocery receipt), and shows them on the draft or Confirm card before saving.
+
+Ask how much you spent on A-95 this year, how many liters you bought in October, or the average price per liter, and the assistant totals the type and its fields.
 
 They can also manage the types. Ask *create these types: Fuel (liters, price/l, fuel type A-95/A-95+/Diesel/LPG,
 station, total computed), Groceries, Subscription, Restaurant* and one **Confirm** card lists every new type with its

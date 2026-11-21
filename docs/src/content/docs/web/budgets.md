@@ -14,9 +14,12 @@ Both are built on tags, so there is nothing extra to log: tag your transactions 
 
 On the **Budgets** tab click **Add Budget or Goal** and keep **Limit** selected:
 
-- **Title** — optional; without it the budget is labelled by its tags' emojis.
-- **Tags** — at least one. Spending on these tags and their child tags counts toward the budget (a limit on
-  *Food* also counts *Groceries* and *Restaurants* under it). A transaction counts once, even with several of the tags.
+- **Title** — optional; without it the budget is labelled by its tags' emojis, or by its type / field name.
+- **Limit by** — choose **Tags**, **Type**, or **Field**:
+  - **Tags** — pick at least one tag. Spending on these tags and their child tags counts toward the budget (a limit on
+    *Food* also counts *Groceries* and *Restaurants* under it). A transaction counts once, even with several of the tags.
+  - **Type** — counts all expenses with the picked transaction type (for example, all *🍽 Restaurant* visits).
+  - **Field** — sums a numeric or computed field across expenses of the picked type (for example, *Tip* on *Restaurant* or *Liters* on *Fuel*).
 - **Amount** — the limit per period.
 - **Weekly / Monthly / Yearly**.
 - **Start date** — by default the start of the current calendar week, month or year (Monday, the 1st or

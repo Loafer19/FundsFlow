@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\BudgetLength;
+use App\Support\BudgetScope;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,6 +19,7 @@ class BudgetPeriod extends Model
     protected $fillable = [
         'amount',
         'length',
+        'scope',
         'starts_at',
         'ends_at',
     ];
@@ -25,6 +27,7 @@ class BudgetPeriod extends Model
     protected $casts = [
         'amount' => 'decimal:2',
         'length' => BudgetLength::class,
+        'scope' => 'array',
         'starts_at' => 'date',
         'ends_at' => 'date',
     ];
@@ -78,5 +81,10 @@ class BudgetPeriod extends Model
     public function isActive(): bool
     {
         return $this->ends_at === null;
+    }
+
+    public function scopeLabel(): string
+    {
+        return BudgetScope::label($this->scope);
     }
 }
