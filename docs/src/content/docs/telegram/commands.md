@@ -22,8 +22,8 @@ The Web UI opens from the menu button next to the message field.
 
 The bot's command menu lists the commands in this order. In a private chat, when Telegram allows widgets, most of
 them open a live widget that updates by itself after every transaction. In a group, and when Telegram refuses
-widgets (since 13 November 2026, even in a private chat), they reply with text. The bot tries widgets again after
-about an hour.
+widgets (since 13 November 2026, even in a private chat), they reply with a rich card (tables and bars) or, if
+Telegram refuses that too, plain text. The bot tries widgets again after about an hour.
 
 | Command | What it does |
 | --- | --- |

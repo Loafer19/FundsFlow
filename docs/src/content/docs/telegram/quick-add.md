@@ -55,6 +55,13 @@ Under it are three buttons:
 
 You can open the same card later from `/recent` (without **Undo**).
 
+### Pin a place
+
+Reply to a transaction card with a **location** or a **venue** (📎 → Location) and the bot pins that place to the
+transaction: the card shows **📍** with the place name. Send a location without replying and the bot offers your
+four latest transactions to choose from, or **✕ Ignore** (the choice expires after 15 minutes). On the website the
+place shows in [Edit Transaction](/docs/web/transactions/#edit-a-transaction) with a Google Maps link.
+
 ## Edit a transaction
 
 **✏️ Edit** opens an editor. When Telegram allows widgets in your private chat, that's a widget:

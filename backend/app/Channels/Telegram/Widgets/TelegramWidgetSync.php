@@ -3,6 +3,8 @@
 namespace App\Channels\Telegram\Widgets;
 
 use App\Channels\Telegram\PinnedMonthSummary;
+use App\Channels\Telegram\RichCards;
+use App\Channels\Telegram\TelegramClient;
 use App\Models\Identity;
 use App\Models\User;
 use Throwable;
@@ -15,6 +17,7 @@ class TelegramWidgetSync
     public function __construct(
         private readonly TelegramWidgetSender $sender,
         private readonly TelegramWidgetData $data,
+        private readonly TelegramClient $client,
     ) {}
 
     public function refresh(User $user): void
@@ -47,10 +50,30 @@ class TelegramWidgetSync
             return;
         }
 
-        $payload = $this->data->summary($user)['chat_data'];
+        $payload = null;
+        $card = null;
 
         foreach ($refs as $ref) {
-            $this->editRef($ref, TelegramWidgetData::KIND_SUMMARY_PIN, $payload);
+            if ($ref['mode'] === TelegramWidgetSender::MODE_TEXT) {
+                // A rich / HTML stand-in for the widget: edit its text in place.
+                $card ??= RichCards::monthSummary($user, pinned: true);
+                $result = $this->client->editRichOrHtml($ref['chat_id'], $ref['message_id'], $card['rich'], $card['html']);
+
+                if (!($result['ok'] ?? false) && self::isGone($result)) {
+                    $this->sender->forget($ref['identity'], TelegramWidgetData::KIND_SUMMARY_PIN);
+                }
+
+                continue;
+            }
+
+            $payload ??= $this->data->summary($user)['chat_data'];
+            $result = $this->editRef($ref, TelegramWidgetData::KIND_SUMMARY_PIN, $payload);
+
+            if ($result !== null && WidgetAvailability::isNotAllowed($result)) {
+                // Telegram stopped taking widget edits: re-pin the summary as a rich / HTML card.
+                WidgetAvailability::markBlocked();
+                app(PinnedMonthSummary::class)->repin($user, $ref['identity']);
+            }
         }
     }
 
@@ -104,31 +127,38 @@ class TelegramWidgetSync
 
     /**
      * @param array{identity: Identity, chat_id: int|string, message_id: int} $ref
+     * @return null|array<string, mixed> the failed API answer, null when done
      */
-    private function editRef(array $ref, string $kind, string $payload): void
+    private function editRef(array $ref, string $kind, string $payload): ?array
     {
         try {
             $result = $this->sender->editChatData($ref['chat_id'], $ref['message_id'], $payload);
         } catch (Throwable $e) {
             report($e);
 
-            return;
+            return null;
         }
 
-        if ($result['ok'] ?? false) {
-            return;
+        if (($result['ok'] ?? false) || TelegramClient::notModified($result)) {
+            return null;
         }
 
-        $description = (string) ($result['description'] ?? '');
-
-        if (str_contains($description, 'message is not modified')) {
-            return;
-        }
-
-        if (str_contains($description, 'message to edit not found')
-            || str_contains($description, 'MESSAGE_ID_INVALID')
-            || str_contains($description, 'message not found')) {
+        if (self::isGone($result)) {
             $this->sender->forget($ref['identity'], $kind);
         }
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     */
+    private static function isGone(array $result): bool
+    {
+        $description = (string) ($result['description'] ?? '');
+
+        return str_contains($description, 'message to edit not found')
+            || str_contains($description, 'MESSAGE_ID_INVALID')
+            || str_contains($description, 'message not found');
     }
 }

@@ -3,10 +3,10 @@
 namespace App\Actions\Agent\Web;
 
 use App\Actions\Agent\AgentChannel;
+use App\Actions\Agent\AgentDashboardTools;
 use App\Actions\Agent\AgentPlanningTools;
 use App\Actions\Agent\AgentToolExecutor;
 use App\Actions\Agent\AgentTypeFields;
-use App\Actions\Agent\AgentDashboardTools;
 use App\Actions\Agent\AgentTypeTools;
 use App\Actions\Charts\BuildUserChartAction;
 use App\Actions\Imports\ImportAgentTools;
@@ -32,7 +32,7 @@ final class WebAgentChannel implements AgentChannel
     /** What still works in the web app without AI (quota exhausted). */
     public const WITHOUT_AI = 'Until then, you can still add transactions with the + button and explore your tabs and analytics.';
 
-    private const TOOL_LABELS = [
+    public const TOOL_LABELS = [
         'get_me' => 'Checking your settings',
         'list_tags' => 'Reading tags',
         'list_recent_transactions' => 'Reading recent transactions',
@@ -309,6 +309,12 @@ PROMPT;
     public function onDelta(string $text): void
     {
         ($this->emit)('delta', ['text' => $text]);
+    }
+
+    public function onRetract(): void
+    {
+        // The client drops the streamed draft on a tool event.
+        ($this->emit)('tool', ['name' => 'retract', 'label' => 'Checking']);
     }
 
     public function onToolCall(string $name, array $arguments): void

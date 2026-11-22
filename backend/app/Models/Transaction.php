@@ -26,6 +26,7 @@ class Transaction extends Model
         'import_batch_id',
         'transaction_type_id',
         'data',
+        'location',
     ];
 
     protected $casts = [
@@ -34,6 +35,7 @@ class Transaction extends Model
         'source' => TransactionSource::class,
         'external_meta' => 'array',
         'data' => 'array',
+        'location' => 'array',
     ];
 
     /**

@@ -23,6 +23,9 @@ Click **Add Transaction** (or the round **+** button):
 Click the edit button on a transaction in the [List](/docs/web/tabs/#list) tab or a calendar day. You can change all
 fields, add or remove attachments, or delete the transaction.
 
+A transaction with a place pinned from Telegram (see [Pin a place](/docs/telegram/quick-add/#pin-a-place)) shows
+it under **Place**: the name and address, a button to open it in Google Maps, and **✕** to remove it.
+
 ## Attachments
 
 Click an attachment to preview it. From the preview you can **Download** it or **Send to Telegram** (to your linked

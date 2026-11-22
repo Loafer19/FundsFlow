@@ -163,7 +163,13 @@ class CallbackHandler
             return;
         }
 
-        if (preg_match('/^rec:(skip|pause|resume):(\d+)(?::(\d{8}))?$/', $data, $matches)) {
+        if (preg_match('/^loc:(\d{1,10}|x)$/', $data, $matches)) {
+            $this->client->answerCallbackQuery($callbackId, app(LocationHandler::class)->handleButton($user, $chatId, $messageId, $matches[1]));
+
+            return;
+        }
+
+        if (preg_match('/^rec:(done|snooze|skip|pause|resume|undo):(\d+)(?::(\d{8}))?$/', $data, $matches)) {
             $this->client->answerCallbackQuery(
                 $callbackId,
                 $this->reminders->handleButton($user, $chatId, $messageId, $matches[1], (int) $matches[2], $matches[3] ?? null),

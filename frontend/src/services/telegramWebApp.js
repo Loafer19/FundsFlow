@@ -96,3 +96,44 @@ export const takeStashedInitData = () => {
 
     return value
 }
+
+/** Bot API 8.0+: the client can add a home-screen shortcut to the Mini App. */
+export const supportsHomeScreen = () => {
+    try {
+        return Boolean(supports('8.0') && typeof webApp()?.addToHomeScreen === 'function')
+    } catch {
+        return false
+    }
+}
+
+/** Open Telegram's native “Add to Home Screen” prompt; no-op outside a supporting Mini App. */
+export const addToHomeScreen = () => {
+    try {
+        webApp()?.addToHomeScreen?.()
+    } catch {
+        // ignore
+    }
+}
+
+/** Calls back with unsupported, unknown, added or missed. */
+export const checkHomeScreenStatus = (callback) => {
+    try {
+        webApp()?.checkHomeScreenStatus?.(callback)
+    } catch {
+        // ignore
+    }
+}
+
+/** Subscribe to a WebApp event; returns an unsubscribe function. */
+export const onTelegramEvent = (name, handler) => {
+    const app = webApp()
+    if (!app?.onEvent) return () => {}
+    app.onEvent(name, handler)
+    return () => {
+        try {
+            app.offEvent?.(name, handler)
+        } catch {
+            // ignore
+        }
+    }
+}

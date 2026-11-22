@@ -10,7 +10,8 @@ use Throwable;
 
 /**
  * "Pinned month summary" switch in /notifications: the /month widget pinned at the top of the
- * private chat, refreshed by the usual widget sync. On the 1st a fresh one is sent and pinned,
+ * private chat, refreshed by the usual widget sync. While Telegram refuses widgets the pin is a
+ * rich (else classic HTML) card with the same numbers, edited in place by the sync. On the 1st a fresh one is sent and pinned,
  * and last month's message is unpinned and left as it was (a record of that month).
  *
  * Identity meta: pin (switch), pin_period (Y-m the pinned widget shows), widgets.summary_pin.
@@ -81,6 +82,24 @@ class PinnedMonthSummary
     public function isCurrent(Identity $identity): bool
     {
         return $identity->user !== null && ($identity->meta['pin_period'] ?? null) === $this->period($identity->user);
+    }
+
+    /**
+     * Replace the pinned message (a widget Telegram no longer lets the bot edit) with a fresh
+     * one, which falls back to a rich / HTML card. The old message is unpinned and left as is.
+     */
+    public function repin(User $user, Identity $identity): bool
+    {
+        $this->unpinCurrent($identity);
+
+        if ($this->pinFresh($user, $identity->refresh())) {
+            return true;
+        }
+
+        // Nothing pinned now: the hourly rollover tries again.
+        $this->setMeta($identity, ['pin_period' => null]);
+
+        return false;
     }
 
     private function pinFresh(User $user, Identity $identity): bool

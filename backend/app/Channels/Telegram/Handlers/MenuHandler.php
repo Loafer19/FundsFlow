@@ -9,6 +9,7 @@ use App\Actions\RecurringTransactions\ListRecurringTransactionsAction;
 use App\Actions\Tags\CreateTagAction;
 use App\Actions\Tags\ListTagsAction;
 use App\Actions\Transactions\ListTransactionsAction;
+use App\Channels\Telegram\RichCards;
 use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
@@ -22,7 +23,6 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Support\GoalSummary;
 use App\Support\RecurringTypeData;
-use App\Support\TagTree;
 use App\Support\UserFormatter;
 
 class MenuHandler
@@ -52,46 +52,8 @@ class MenuHandler
             return;
         }
 
-        $month = $user->nowInTimezone()->format('Y-m');
-
-        $transactions = $this->listTransactions->execute($user)
-            ->filter(fn (Transaction $transaction) => $transaction->at->format('Y-m') === $month);
-
-        $income = (float) $transactions->filter(fn (Transaction $transaction) => $transaction->amount > 0)->sum('amount');
-        $expense = (float) $transactions->filter(fn (Transaction $transaction) => $transaction->amount < 0)->sum('amount');
-
-        $monthLabel = $this->support->escapeHtml($user->nowInTimezone()->format('m.Y'));
-        $lines = [
-            '📊 <b>' . $monthLabel . '</b>',
-            'Income: +' . $this->support->escapeHtml(UserFormatter::formatMoney($user, $income)),
-            'Expenses: ' . $this->support->escapeHtml(UserFormatter::formatMoney($user, $expense)),
-            'Net: ' . $this->support->escapeHtml(UserFormatter::formatMoney($user, $income + $expense)),
-        ];
-
-        // Top-level tags, each including its child tags; a transaction counts once per top-level tag.
-        $tagTree = TagTree::for($user);
-        $byTag = [];
-
-        foreach ($transactions->filter(fn (Transaction $transaction) => $transaction->amount < 0) as $transaction) {
-            foreach ($tagTree->rootsOf($transaction->tags->pluck('id')) as $id) {
-                $byTag[$id] ??= ['label' => $tagTree->label($id), 'amount' => 0.0];
-                $byTag[$id]['amount'] += abs((float) $transaction->amount);
-            }
-        }
-
-        $top = collect($byTag)->sortByDesc('amount')->take(3)->values();
-
-        if ($top->isNotEmpty()) {
-            $lines[] = '';
-            $lines[] = '<b>Top expense tags</b>';
-
-            foreach ($top as $index => $row) {
-                $lines[] = ($index + 1) . ') ' . $this->support->escapeHtml($row['label'])
-                    . ' — ' . $this->support->escapeHtml(UserFormatter::formatMoney($user, -1 * $row['amount']));
-            }
-        }
-
-        $this->client->sendMessage($chatId, implode("\n", $lines), null, TelegramSupport::PARSE_HTML);
+        $card = RichCards::monthSummary($user);
+        $this->client->sendRichOrHtml($chatId, $card['rich'], $card['html']);
         $this->session->setDomain($identity, $chatId, 'analytics');
         $this->session->setSummary($identity, $chatId, 'Month summary sent.');
     }
@@ -165,16 +127,11 @@ class MenuHandler
         $this->session->setDomain($identity, $chatId, 'transactions');
         $this->session->setLastList($identity, $chatId, $payload['list']);
         $this->session->setSummary($identity, $chatId, 'Recent transactions listed.');
-        $this->client->sendMessage(
-            $chatId,
-            $payload['text'],
-            $payload['reply_markup'],
-            TelegramSupport::PARSE_HTML,
-        );
+        $this->client->sendRichOrHtml($chatId, $payload['rich'], $payload['text'], $payload['reply_markup']);
     }
 
     /**
-     * @return null|array{text: string, reply_markup: array<string, mixed>, list: list<array{id: int, title: string}>}
+     * @return null|array{text: string, rich: string, reply_markup: array<string, mixed>, list: list<array{id: int, title: string}>}
      */
     public function recentListPayload(User $user): ?array
     {
@@ -206,8 +163,19 @@ class MenuHandler
             ];
         })->all();
 
+        $rows = $transactions->map(function (Transaction $transaction, int $index) use ($user): string {
+            $tags = $transaction->tags->map(fn ($tag) => trim($tag->emoji . ' ' . $tag->title))->take(2)->implode(' · ');
+
+            return '<tr><td>' . ($index + 1) . '</td>'
+                . '<td><code>' . $transaction->at->format('d.m') . '</code></td>'
+                . '<td><b>' . RichCards::esc($this->support->signedMoney($user, (float) $transaction->amount)) . '</b></td>'
+                . '<td>' . RichCards::esc($this->support->truncateNote($transaction->note) ?: '—')
+                . ($tags !== '' ? '<br><i>' . RichCards::esc($tags) . '</i>' : '') . '</td></tr>';
+        })->implode('');
+
         return [
             'text' => "🕘 <b>Recent</b>\n\n" . implode("\n\n", $items),
+            'rich' => '<h3>🕘 Recent</h3><table striped compact>' . $rows . '</table>',
             'reply_markup' => ['inline_keyboard' => array_chunk($buttons, 5)],
             'list' => $list,
         ];
@@ -219,6 +187,8 @@ class MenuHandler
         $budgets = $this->listBudgets->execute($user);
         $blocks = [];
         $goals = [];
+        $richLimits = [];
+        $richGoals = [];
         $list = [];
 
         foreach ($budgets as $budget) {
@@ -232,12 +202,14 @@ class MenuHandler
 
             if ($budget->isGoal()) {
                 $goals[] = $this->goalBlock($user, $budget, $label);
+                $richGoals[] = $this->goalRow($user, $budget, $label);
                 $list[] = ['id' => (int) $budget->id, 'title' => $label];
 
                 continue;
             }
 
             $blocks[] = $this->limitBlock($user, $period, $label);
+            $richLimits[] = $this->limitRow($user, $period, $label);
 
             $list[] = [
                 'id' => (int) $budget->id,
@@ -266,22 +238,20 @@ class MenuHandler
         }
 
         $sections = [];
+        $rich = '';
 
         if ($blocks !== []) {
             $sections[] = "💰 <b>Limits</b>\n\n" . implode("\n\n", $blocks);
+            $rich .= '<h3>💰 Limits</h3><table striped compact>' . implode('', $richLimits) . '</table>';
         }
 
         if ($goals !== []) {
             $sections[] = "🎯 <b>Savings goals</b>\n\n" . implode("\n\n", $goals);
+            $rich .= '<h3>🎯 Savings goals</h3><table striped compact>' . implode('', $richGoals) . '</table>';
         }
 
         $this->session->setSummary($identity, $chatId, 'Budgets listed.');
-        $this->client->sendMessage(
-            $chatId,
-            implode("\n\n", $sections),
-            null,
-            TelegramSupport::PARSE_HTML,
-        );
+        $this->client->sendRichOrHtml($chatId, $rich, implode("\n\n", $sections));
     }
 
     public function sendRecurring(User $user, int|string $chatId): void
@@ -322,11 +292,20 @@ class MenuHandler
             return implode("\n", $lines);
         })->all();
 
-        $this->client->sendMessage(
+        $rows = $rules->map(function (RecurringTransaction $rule) use ($user): string {
+            $type = RecurringTypeData::typeLine($rule);
+            $detail = trim(($rule->note ?? '') . ($type ? ($rule->note ? ' · ' : '') . $type : ''));
+
+            return '<tr><td>' . ($rule->active ? '✅' : '⏸') . '</td>'
+                . '<td><b>' . RichCards::esc($this->support->signedMoney($user, (float) $rule->amount)) . '</b><br><i>' . RichCards::esc($rule->frequency->value) . '</i></td>'
+                . '<td><code>' . RichCards::esc($rule->active ? TelegramSupport::cardDate($rule->next_run_at) : 'paused') . '</code></td>'
+                . '<td>' . RichCards::esc($detail !== '' ? $detail : '—') . '</td></tr>';
+        })->implode('');
+
+        $this->client->sendRichOrHtml(
             $chatId,
+            '<h3>🔁 Recurring</h3><table striped compact>' . $rows . '</table>',
             "🔁 <b>Recurring</b>\n\n" . implode("\n\n", $blocks),
-            null,
-            TelegramSupport::PARSE_HTML,
         );
     }
 
@@ -480,6 +459,35 @@ class MenuHandler
         return '<b>' . $this->support->escapeHtml($label) . "</b>\n"
             . $this->support->progressBar($ratio) . ' ' . $progress['percent'] . "%\n"
             . implode("\n", array_map(fn (string $line) => $this->support->escapeHtml($line), $lines));
+    }
+
+    /** One rich table row per limit: name, bar and %, spent / limit, left and days. */
+    private function limitRow(User $user, BudgetPeriod $period, string $label): string
+    {
+        $st = $this->limitStatus->execute($period, $user);
+        $money = fn (float $v): string => RichCards::esc(UserFormatter::formatMoney($user, $v));
+        $tone = match ($st['status']) {
+            'over' => '🔴 ',
+            'at_risk' => '🟠 ',
+            default => '',
+        };
+        $balance = $st['left'] >= 0 ? $money($st['left']) . ' left' : $money(-$st['left']) . ' over';
+        $days = $st['days_left'] === 1 ? 'last day' : $st['days_left'] . ' days left';
+
+        return '<tr><td>' . $tone . '<b>' . RichCards::esc($label) . '</b></td>'
+            . '<td><code>' . RichCards::bar($st['limit'] > 0 ? $st['spent'] / $st['limit'] : 0.0, 8) . '</code> ' . $st['percent'] . '%</td>'
+            . '<td>' . $money($st['spent']) . ' / ' . $money($st['limit']) . '<br><i>' . $balance . ' · ' . $days . '</i></td></tr>';
+    }
+
+    private function goalRow(User $user, Budget $budget, string $label): string
+    {
+        $progress = $this->goalProgress->execute($budget, $user);
+        $ratio = $progress['target'] > 0 ? min(1.0, $progress['saved'] / $progress['target']) : 0.0;
+        $money = fn (float $v): string => RichCards::esc(UserFormatter::formatMoney($user, $v));
+
+        return '<tr><td>' . ($progress['status'] === 'completed' ? '🟢 ' : '') . '<b>' . RichCards::esc($label) . '</b></td>'
+            . '<td><code>' . RichCards::bar($ratio, 8) . '</code> ' . $progress['percent'] . '%</td>'
+            . '<td>' . $money($progress['saved']) . ' / ' . $money($progress['target']) . '<br><i>' . RichCards::esc(GoalSummary::statusLabel($progress['status'])) . '</i></td></tr>';
     }
 
     /**

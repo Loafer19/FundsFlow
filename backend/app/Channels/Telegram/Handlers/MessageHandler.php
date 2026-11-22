@@ -99,7 +99,9 @@ class MessageHandler
             return;
         }
 
-        $this->client->sendMessage($chatId, 'Listening…');
+        if (!$this->client->statusDraft($chatId, 'Transcribing voice', 'record_voice')) {
+            $this->client->sendMessage($chatId, 'Listening…');
+        }
 
         $downloaded = $this->downloadVoiceFile($chatId, $file);
 

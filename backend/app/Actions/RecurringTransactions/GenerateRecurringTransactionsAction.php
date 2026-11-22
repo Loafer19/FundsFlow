@@ -45,6 +45,63 @@ class GenerateRecurringTransactionsAction
         }
     }
 
+    /**
+     * Add the rule's next occurrence as a transaction and move next_run_at on, in one DB
+     * transaction so a crash between them can't replay the same occurrence. $at dates the
+     * transaction (default the occurrence date): the reminder's ✓ Done pays it today.
+     */
+    public function createOccurrence(RecurringTransaction $rule, ?string $at = null): Transaction
+    {
+        return DB::transaction(function () use ($rule, $at) {
+            $chargeDate = $rule->next_run_at->toDateString();
+            $payload = [
+                'at' => $at ?? $chargeDate,
+                'amount' => $rule->amount,
+                'note' => $rule->note,
+                'tags' => $rule->tags->pluck('id')->all(),
+                'default_tags' => false,
+            ];
+
+            $type = $rule->transactionType;
+
+            if ($rule->transaction_type_id && $type) {
+                // Copy the template; stamp next_charge on the transaction to this occurrence.
+                $payload['transaction_type_id'] = $rule->transaction_type_id;
+                $payload['data'] = RecurringTypeData::applyScheduleFields(
+                    $type,
+                    $rule->data ?? [],
+                    $rule->frequency->value,
+                    $chargeDate,
+                );
+            }
+
+            $transaction = $this->createTransaction->execute(
+                $rule->user,
+                $payload,
+                TransactionSource::Recurring,
+                requireAllFields: false,
+                allowArchivedType: true,
+            );
+
+            $rule->next_run_at = $rule->frequency->firstOnOrAfter(
+                $rule->starts_at,
+                $rule->next_run_at->copy()->addDay(),
+            );
+
+            if ($type) {
+                $rule->data = RecurringTypeData::applyScheduleFields(
+                    $type,
+                    $rule->data ?? [],
+                    $rule->frequency->value,
+                    $rule->next_run_at->toDateString(),
+                );
+            }
+            $rule->save();
+
+            return $transaction;
+        });
+    }
+
     private function run(): void
     {
         $this->messagesByChat = [];
@@ -95,54 +152,7 @@ class GenerateRecurringTransactionsAction
                 return;
             }
 
-            // Insert and advance together, so a crash between them can't
-            // replay the same occurrence on the next run.
-            $transaction = DB::transaction(function () use ($rule) {
-                $chargeDate = $rule->next_run_at->toDateString();
-                $payload = [
-                    'at' => $chargeDate,
-                    'amount' => $rule->amount,
-                    'note' => $rule->note,
-                    'tags' => $rule->tags->pluck('id')->all(),
-                    'default_tags' => false,
-                ];
-
-                $type = $rule->transactionType;
-                if ($rule->transaction_type_id && $type) {
-                    // Copy the template; stamp next_charge on the transaction to this occurrence.
-                    $payload['transaction_type_id'] = $rule->transaction_type_id;
-                    $payload['data'] = RecurringTypeData::applyScheduleFields(
-                        $type,
-                        $rule->data ?? [],
-                        $rule->frequency->value,
-                        $chargeDate,
-                    );
-                }
-
-                $transaction = $this->createTransaction->execute(
-                    $rule->user,
-                    $payload,
-                    TransactionSource::Recurring,
-                    requireAllFields: false,
-                    allowArchivedType: true,
-                );
-
-                $rule->next_run_at = $rule->frequency->firstOnOrAfter(
-                    $rule->starts_at,
-                    $rule->next_run_at->copy()->addDay(),
-                );
-                if ($type) {
-                    $rule->data = RecurringTypeData::applyScheduleFields(
-                        $type,
-                        $rule->data ?? [],
-                        $rule->frequency->value,
-                        $rule->next_run_at->toDateString(),
-                    );
-                }
-                $rule->save();
-
-                return $transaction;
-            });
+            $transaction = $this->createOccurrence($rule);
 
             $this->queueNotification($rule, $transaction);
             $created++;

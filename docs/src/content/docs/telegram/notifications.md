@@ -76,18 +76,27 @@ The day before a [recurring payment](/docs/web/recurring/), at about **18:00 in 
 🏷 🎬 Fun
 ```
 
+- **✓ Done** — you've paid it: the bot logs the payment dated today and moves the rule to its next date, so it
+  isn't added again on the due day.
+- **⏰ +1 day** — postpone this payment by a day; you get the reminder again the next evening.
 - **⏭ Skip** — skip only this payment; the rule moves on to the next date.
 - **⏸ Pause** — pause the rule; the message then offers **▶️ Resume**.
+
+After **Done**, **+1 day** or **Skip**, the message shows **↩️ Undo** for a day: it removes the logged payment and
+puts the date back. When Telegram allows rich messages, the reminder is a small table instead of plain text.
 
 Daily rules don't get reminders. Turn them off with the **Recurring reminders**
 switch in `/notifications`.
 
 ## Pinned month summary
 
-Turn on **Pinned month summary** in `/notifications` and the bot sends the `/month` widget and pins it at the top of
+Turn on **Pinned month summary** in `/notifications` and the bot sends the `/month` summary and pins it at the top of
 the chat, without a notification sound. It updates by itself after every transaction, so this month's income,
 expenses and top tags are always one tap away.
 
 When a new month starts, the bot pins a fresh summary for it. The old one stays in the chat as a record of the
-previous month and stops updating. Turning the switch off unpins it. Works only in a private chat with the bot,
-and only while Telegram allows widgets: if they are refused, a new pin waits until the bot can send widgets again.
+previous month and stops updating. Turning the switch off unpins it. Works only in a private chat with the bot.
+
+The summary is a widget when Telegram allows widgets. If they are refused (even for an already pinned widget), the
+bot pins a rich card with the same totals and top tags instead, or plain text if rich messages are refused too,
+and keeps it up to date the same way.

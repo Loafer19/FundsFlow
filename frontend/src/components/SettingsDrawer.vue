@@ -53,7 +53,19 @@
 
                     <div class="flex-1 min-w-0 min-h-0 overflow-y-auto overflow-x-hidden p-4">
                         <template v-if="activeSection === 'appearance'">
-                            
+                    <div v-if="homeScreenOffer" class="p-3 rounded-box bg-base-200 mb-3 flex items-center gap-3">
+                        <span class="shrink-0 rounded-lg p-1.5 bg-primary/15 text-primary">
+                            <Smartphone :size="18" />
+                        </span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block font-medium text-sm">Home screen</span>
+                            <span class="block text-xs text-base-content/60">Open FundsFlow straight from your phone's home screen</span>
+                        </span>
+                        <button type="button" class="btn btn-primary btn-sm shrink-0" @click="addToHomeScreen">
+                            Add
+                        </button>
+                    </div>
+
                     <div class="p-3 rounded-box bg-base-200 mb-3">
                         <div class="flex items-center justify-between gap-2 mb-2">
                             <label for="formatDate" class="font-medium text-sm">Date</label>
@@ -378,6 +390,7 @@ import {
     Send,
     Settings as SettingsIcon,
     Shapes,
+    Smartphone,
     Tags,
     UserRound,
     X,
@@ -414,7 +427,13 @@ import settings, {
     updateTimezone,
 } from '../services/settings'
 import { useTagsStore } from '../services/tags'
-import { isTelegramWebApp } from '../services/telegramWebApp.js'
+import {
+    addToHomeScreen,
+    checkHomeScreenStatus,
+    isTelegramWebApp,
+    onTelegramEvent,
+    supportsHomeScreen,
+} from '../services/telegramWebApp.js'
 import toasts from '../services/toasts'
 import { useTransactionsStore } from '../services/transactions'
 import BankSync from './BankSync.vue'
@@ -754,6 +773,20 @@ const generatingTelegramLink = ref(false)
 const identityFor = (provider) => authStore.user?.identities?.find((identity) => identity.provider === provider) ?? null
 
 const inTelegram = isTelegramWebApp()
+
+// Mini App only (Bot API 8.0+): offer a home-screen shortcut until it is added.
+const homeScreenOffer = ref(false)
+let offHomeScreen = () => {}
+if (supportsHomeScreen()) {
+    checkHomeScreenStatus((status) => {
+        homeScreenOffer.value = status !== 'added' && status !== 'unsupported'
+    })
+    offHomeScreen = onTelegramEvent('homeScreenAdded', () => {
+        homeScreenOffer.value = false
+        toasts.success('Shortcut added!')
+    })
+}
+onBeforeUnmount(() => offHomeScreen())
 const telegramIdentity = computed(() => identityFor('telegram'))
 const googleIdentity = computed(() => identityFor('google'))
 const githubIdentity = computed(() => identityFor('github'))

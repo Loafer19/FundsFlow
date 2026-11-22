@@ -20,6 +20,7 @@ class TransactionResource extends JsonResource
             'source' => $this->source,
             'transaction_type_id' => $this->transaction_type_id !== null ? (int) $this->transaction_type_id : null,
             'data' => $this->data ?: (object) [],
+            'location' => $this->location ?: null,
             'tags' => TagResource::collection($this->whenLoaded('tags')),
             'attachments' => TransactionAttachmentResource::collection($this->whenLoaded('attachments')),
         ];

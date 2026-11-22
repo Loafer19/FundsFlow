@@ -3,6 +3,7 @@
 namespace App\Channels\Telegram;
 
 use App\Channels\Telegram\Handlers\CallbackHandler;
+use App\Channels\Telegram\Handlers\LocationHandler;
 use App\Channels\Telegram\Handlers\MediaHandler;
 use App\Channels\Telegram\Handlers\MessageHandler;
 use App\Channels\Telegram\Handlers\WidgetQueryHandler;
@@ -15,6 +16,7 @@ class TelegramBot
         private readonly MessageHandler $messageHandler,
         private readonly MediaHandler $mediaHandler,
         private readonly WidgetQueryHandler $widgetQueryHandler,
+        private readonly LocationHandler $locationHandler,
         private readonly TelegramSupport $support,
         private readonly TelegramClient $client,
     ) {}
@@ -64,6 +66,13 @@ class TelegramBot
         // video_note skipped for MVP.
         if (isset($message['voice']) || isset($message['audio'])) {
             $this->messageHandler->handleVoiceMessage($message);
+
+            return;
+        }
+
+        // A location or venue: pinned to the transaction card it replies to, or offered to pick.
+        if (isset($message['location']) || isset($message['venue'])) {
+            $this->locationHandler->handle($message);
 
             return;
         }

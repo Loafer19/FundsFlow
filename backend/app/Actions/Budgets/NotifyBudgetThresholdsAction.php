@@ -2,7 +2,6 @@
 
 namespace App\Actions\Budgets;
 
-use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\Widgets\TelegramWidgetSender;
 use App\Enums\BudgetType;
 use App\Models\Budget;
@@ -17,7 +16,6 @@ class NotifyBudgetThresholdsAction
     private const THRESHOLDS = [100, 80];
 
     public function __construct(
-        private readonly TelegramClient $client,
         private readonly CalculateLimitStatusAction $limitStatus,
         private readonly CalculateGoalProgressAction $goalProgress,
         private readonly TelegramWidgetSender $widgets,
@@ -163,22 +161,15 @@ class NotifyBudgetThresholdsAction
     }
 
     /**
-     * Widget first, the same text if the widget cannot be sent. A failed send drops the
-     * dedupe keys so the next run can try again.
+     * Widget first, else a rich card, else the same text. A failed send drops the dedupe keys
+     * so the next run can try again.
      *
      * @param array<string, mixed> $widget
      * @param list<string> $keys
      */
     private function deliver(int|string $chatId, string $text, array $widget, array $keys): void
     {
-        $sent = $this->widgets->sendReport($chatId, $widget, self::budgetsKeyboard());
-
-        if (!$sent) {
-            $result = $this->client->sendMessageResult($chatId, $text, self::budgetsKeyboard());
-            $sent = ($result['ok'] ?? false) === true;
-        }
-
-        if (!$sent) {
+        if (!$this->widgets->sendReport($chatId, $widget, self::budgetsKeyboard(), $text)) {
             foreach ($keys as $key) {
                 Cache::forget($key);
             }

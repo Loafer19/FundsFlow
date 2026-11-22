@@ -2,6 +2,7 @@
 
 namespace App\Channels\Telegram\Widgets;
 
+use App\Channels\Telegram\RichCards;
 use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\TelegramSupport;
 use App\Models\Identity;
@@ -14,6 +15,11 @@ use Illuminate\Support\Facades\Log;
  */
 class TelegramWidgetSender
 {
+    public const MODE_WIDGET = 'widget';
+
+    /** A rich / HTML message standing in for a refused widget (the pinned summary). */
+    public const MODE_TEXT = 'text';
+
     public function __construct(
         private readonly TelegramClient $client,
         private readonly TelegramWidgetData $data,
@@ -97,13 +103,16 @@ class TelegramWidgetSender
 
     /**
      * Budget alert / weekly digest (report.html) with buttons under it. Items are dropped from
-     * the end to stay within 1 KB of chat_data ("+N more in /budgets").
+     * the end to stay within 1 KB of chat_data ("+N more in /budgets"). When the widget can't be
+     * sent and $fallbackText is given: the same report as a rich message, else that text as
+     * classic HTML (widget -> rich -> text).
      *
      * @param array{h: string, s?: string, k?: list<array{0: string, 1: string, 2?: string}>, l?: list<string>, g?: list<array{0: string, 1: list<array<int, mixed>>}>} $report
      * @param array<string, mixed> $keyboard
      */
-    public function sendReport(int|string $chatId, array $report, array $keyboard): bool
+    public function sendReport(int|string $chatId, array $report, array $keyboard, ?string $fallbackText = null): bool
     {
+        $full = $report;
         $json = fn (array $p): string => json_encode($p, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
         $more = 0;
 
@@ -118,7 +127,17 @@ class TelegramWidgetSender
             $report['more'] = $more;
         }
 
-        return $this->sendOnce($chatId, TelegramWidgetData::KIND_REPORT, $json($report), false, $keyboard) !== null;
+        if ($this->sendOnce($chatId, TelegramWidgetData::KIND_REPORT, $json($report), false, $keyboard) !== null) {
+            return true;
+        }
+
+        if ($fallbackText === null) {
+            return false;
+        }
+
+        $result = $this->client->sendRichOrHtml($chatId, RichCards::report($full), RichCards::esc($fallbackText), $keyboard);
+
+        return ($result['ok'] ?? false) === true;
     }
 
     /**
@@ -129,19 +148,29 @@ class TelegramWidgetSender
     {
         $chatId = $identity->external_id;
         $id = $this->sendOnce($chatId, TelegramWidgetData::KIND_SUMMARY, $this->data->summary($user)['chat_data'], false);
+        $mode = self::MODE_WIDGET;
+
+        if ($id === null) {
+            // Widgets refused: pin the same summary as a rich (else classic HTML) message, which
+            // the sync edits in place.
+            $card = RichCards::monthSummary($user, pinned: true);
+            $result = $this->client->sendRichOrHtml($chatId, $card['rich'], $card['html']);
+            $id = is_int($result['result']['message_id'] ?? null) ? $result['result']['message_id'] : null;
+            $mode = self::MODE_TEXT;
+        }
 
         if ($id === null) {
             return null;
         }
 
-        $this->remember($identity, TelegramWidgetData::KIND_SUMMARY_PIN, $chatId, $id);
+        $this->remember($identity, TelegramWidgetData::KIND_SUMMARY_PIN, $chatId, $id, $mode);
         $this->client->pinChatMessage($chatId, $id);
 
         return $id;
     }
 
     /**
-     * @return list<array{identity: Identity, chat_id: int|string, message_id: int}>
+     * @return list<array{identity: Identity, chat_id: int|string, message_id: int, mode: string}>
      */
     public function stored(User $user, string $kind): array
     {
@@ -157,19 +186,22 @@ class TelegramWidgetSender
                 'identity' => $identity,
                 'chat_id' => $ref['chat_id'] ?? $identity->external_id,
                 'message_id' => (int) $ref['message_id'],
+                'mode' => (string) ($ref['mode'] ?? self::MODE_WIDGET),
             ];
         }
 
         return $out;
     }
 
-    public function remember(Identity $identity, string $kind, int|string $chatId, int $messageId): void
+    public function remember(Identity $identity, string $kind, int|string $chatId, int $messageId, string $mode = self::MODE_WIDGET): void
     {
         $meta = $identity->meta ?? [];
-        $meta['widgets'][$kind] = [
+        $meta['widgets'][$kind] = array_filter([
             'chat_id' => $chatId,
             'message_id' => $messageId,
-        ];
+            // Only a text stand-in is marked; a widget ref stays as before.
+            'mode' => $mode === self::MODE_TEXT ? $mode : null,
+        ], static fn ($v) => $v !== null);
         $identity->meta = $meta;
         $identity->save();
     }
@@ -232,7 +264,7 @@ class TelegramWidgetSender
             $upgradeMenu ? $this->support->menuKeyboard() : null,
         );
 
-        if ($upgradeMenu && !($result['ok'] ?? false)) {
+        if ($upgradeMenu && !($result['ok'] ?? false) && !WidgetAvailability::isNotAllowed($result)) {
             // Never lose the widget over the keyboard: retry without it.
             $upgradeMenu = false;
             $result = $this->client->sendWidget($chatId, $html, $payload['chat_data'], null, $allowQueries, $height);

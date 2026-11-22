@@ -57,6 +57,7 @@ class RunTelegramAgentAction
 
         $channel = $this->channel($chatId, $identity, $shared ? $user : null, $prior, $replyTo);
         $channel->typing(force: true);
+        $channel->status('Thinking');
 
         return $this->agent->execute($user, $channel, $text, $askContext);
     }

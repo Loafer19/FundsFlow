@@ -855,8 +855,11 @@ class MediaHandler
             return;
         }
 
-        $status = $this->client->sendMessageResult($chatId, 'Reading receipt…');
-        $this->statusMessageId = is_int($status['result']['message_id'] ?? null) ? $status['result']['message_id'] : null;
+        // A live "⏳ Analyzing receipt…" draft in a private chat, else a status message deleted after.
+        if (!$this->client->statusDraft($chatId, 'Analyzing receipt', 'upload_photo')) {
+            $status = $this->client->sendMessageResult($chatId, 'Reading receipt…');
+            $this->statusMessageId = is_int($status['result']['message_id'] ?? null) ? $status['result']['message_id'] : null;
+        }
 
         try {
             $this->readReceipt($user, $chatId, $file, $captionHint, $attachmentFiles, $albumPhoto);

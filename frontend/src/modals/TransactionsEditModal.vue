@@ -24,6 +24,32 @@
 
                 <TagPicker v-model="transaction.tags" />
 
+                <div v-if="transaction.location" class="mb-4">
+                    <span class="text-sm text-base-content/60">Place</span>
+                    <div class="mt-1 flex items-center gap-2 rounded-lg border border-base-300 bg-base-200/40 px-2 py-1.5">
+                        <MapPin :size="16" class="shrink-0 text-base-content/60" />
+                        <div class="min-w-0 flex-1">
+                            <div class="truncate text-sm">{{ transaction.location.title || 'Pinned location' }}</div>
+                            <div class="truncate text-[10px] text-base-content/50">
+                                {{ transaction.location.address || coords(transaction.location) }}
+                            </div>
+                        </div>
+                        <div class="tooltip tooltip-left" data-tip="Open in Google Maps">
+                            <a :href="mapUrl(transaction.location)" target="_blank" rel="noopener"
+                                class="btn btn-ghost btn-xs btn-square" aria-label="Open in Google Maps">
+                                <ExternalLink :size="14" />
+                            </a>
+                        </div>
+                        <div class="tooltip tooltip-left" data-tip="Remove place">
+                            <button type="button" class="btn btn-ghost btn-xs btn-square text-error"
+                                :disabled="Boolean(transactionsStore.isLoading)" aria-label="Remove place"
+                                @click="removeLocation">
+                                <X :size="14" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <AttachmentField :transaction-id="transaction.id" :attachments="liveAttachments"
                     :busy="Boolean(transactionsStore.isLoading)" />
 
@@ -46,7 +72,7 @@
 </template>
 
 <script setup>
-import { ArrowLeftRight, Save } from '@lucide/vue'
+import { ArrowLeftRight, ExternalLink, MapPin, Save, X } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import AmountField from '../components/AmountField.vue'
 import AttachmentField from '../components/AttachmentField.vue'
@@ -103,13 +129,26 @@ watch(
             tags: for_edit.tags.map((tag) => tag.id),
             transaction_type_id: for_edit.transaction_type_id ?? null,
             data: { ...(for_edit.data ?? {}) },
+            location: for_edit.location ?? null,
         }
+        locationRemoved.value = false
         typed.load({ amount: for_edit.amount })
     },
 )
 
+// Set from Telegram (a location sent as a reply to the card); here it can only be removed.
+const locationRemoved = ref(false)
+const coords = (location) => `${Number(location.lat).toFixed(5)}, ${Number(location.lng).toFixed(5)}`
+const mapUrl = (location) => `https://www.google.com/maps/search/?api=1&query=${location.lat},${location.lng}`
+const removeLocation = () => {
+    transaction.value.location = null
+    locationRemoved.value = true
+}
+
 const handleSubmit = async () => {
     const payload = typed.payload(transaction.value)
+    if (locationRemoved.value) payload.location = null
+    else delete payload.location
     const ok = await transactionsStore.update(payload)
 
     if (!ok) return

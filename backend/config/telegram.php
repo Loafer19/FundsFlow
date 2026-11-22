@@ -23,6 +23,11 @@ return [
     // the formatted answer is sent when it's done. Set false to show only "typing…" until then.
     'stream_drafts' => (bool) env('TELEGRAM_STREAM_DRAFTS', true),
 
+    // Bot API 10.1 rich messages (sendRichMessage, editMessageText with rich_message): the middle
+    // step of widget -> rich -> classic HTML for the month summary, budgets, recent, reports and
+    // reminders. Set false to skip straight to classic HTML.
+    'rich_messages' => (bool) env('TELEGRAM_RICH_MESSAGES', true),
+
     // Soft "few AI requests left" hint shows when remaining <= this.
     'low_quota_threshold' => (int) env('TELEGRAM_LOW_QUOTA_THRESHOLD', 2),
 

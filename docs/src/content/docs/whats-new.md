@@ -22,6 +22,10 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
 - **Recurring list** shows type segments for typed rules.
 - **Limits per type or numeric field.** On the Budgets tab, a spending limit can now **Limit by** **Tags**, **Type** (all expenses of a transaction type), or **Field** (the sum of a numeric field like Tips or Liters). Limit cards show a clickable type/field badge that opens its analytics.
 - **My cards on Analytics.** Add your own cards under **My cards**: a **Stat** (a total, average, count, min or max of the amount or a number field, compared with the previous period), a **Chart** over time (line or bar, optionally split by tag or a field value such as Station, up to 6 lines), or a **Pie** (share by tag or field value). Each card can filter by type, tags and a field value (Station = WOG) and follows the Analytics date range. The ⋮ menu switches the size (S, M, L) and has Edit and Delete; drag the handle to reorder. The editor shows a live preview.
+- **Places on transactions.** A place pinned from Telegram shows in **Edit Transaction** under **Place**, with a
+  button to open it in Google Maps and one to remove it.
+- **Add to home screen (Mini App).** In the Telegram Mini App, **Settings → Appearance** offers **Home screen → Add**
+  where Telegram supports it (Telegram 8.0+).
 - **Place ratings in Type analytics.** Types with a **Rating** field (including the default **Restaurant** type, which now includes a 1–5 **Rating** field) show a **Best rated / Best value** card grouped by place in Overview, comparing average rating, visits, average check, and rating per 100 spent.
 
 ### Telegram bot and assistants
@@ -32,6 +36,18 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
 - The assistant and MCP can answer type-field questions (“how much did I spend on A-95 this year?”, liters in October, average price per liter) with `analyze_transaction_type`.
 - The assistant and MCP can list, add and remove Analytics cards (`list_dashboard_cards`, `add_dashboard_card`, `remove_dashboard_card`); in the assistant, adding or removing asks for Confirm.
 - `budget_status`, `update_budget`, and MCP budget tools support type and numeric-field limit scopes (`scope`).
+- **Rich cards when widgets are refused.** Widget → rich message → plain text: if Telegram refuses widgets, `/month`,
+  `/recent`, `/budgets`, `/recurring`, the weekly digest, limit alerts and recurring reminders come as rich cards
+  with tables and bars; if rich messages are refused too, as plain text. The pinned month summary switches to a rich
+  card that keeps updating. Self-hosters can turn rich messages off with `TELEGRAM_RICH_MESSAGES=false`.
+- **Recurring reminders with buttons.** **✓ Done** logs the payment today, **⏰ +1 day** reminds again tomorrow
+  evening, **⏭ Skip** skips this payment; after any of them **↩️ Undo** puts things back for a day.
+- **Locations.** Send a location or venue as a reply to a transaction card to pin the place to it. A location
+  without a reply offers your recent transactions to choose from, or **✕ Ignore**.
+- **Status while working.** In a private chat the bot shows a short status (*Thinking…*, *Analyzing receipt…*,
+  *Transcribing voice…*, the tool it's running) instead of a silent wait.
+- **No fake “saved”.** If the assistant's reply says something was saved or changed but no change was actually made,
+  it is asked to check and fix it before answering, on Telegram and on the web.
 
 ## 2.4.0 — 20 November 2026
 

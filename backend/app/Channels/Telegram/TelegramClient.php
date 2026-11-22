@@ -2,6 +2,7 @@
 
 namespace App\Channels\Telegram;
 
+use App\Channels\Telegram\Widgets\WidgetAvailability;
 use App\Support\TelegramHtml;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -9,6 +10,8 @@ use RuntimeException;
 
 class TelegramClient
 {
+    public const RICH_LIMIT = 32000;
+
     private readonly string $baseUrl;
 
     public function __construct()
@@ -100,6 +103,100 @@ class TelegramClient
     }
 
     /**
+     * Bot API 10.1 rich message (h3/h4, tables, footer). Returns the decoded API payload.
+     *
+     * @param null|array<string, mixed> $replyMarkup
+     * @return array<string, mixed>
+     */
+    public function sendRichMessageResult(int|string $chatId, string $html, ?array $replyMarkup = null, ?int $replyTo = null): array
+    {
+        return $this->postResult('sendRichMessage', [
+            'chat_id' => $chatId,
+            'rich_message' => ['html' => mb_substr($html, 0, self::RICH_LIMIT)],
+            'reply_markup' => $replyMarkup ? json_encode($replyMarkup) : null,
+            'reply_parameters' => $replyTo !== null
+                ? json_encode(['message_id' => $replyTo, 'allow_sending_without_reply' => true])
+                : null,
+        ]);
+    }
+
+    /**
+     * The middle step of widget -> rich -> classic HTML: a rich message, else $fallbackHtml as a
+     * classic HTML message (the same buttons either way). Returns the API payload of the send
+     * that went out.
+     *
+     * @param null|array<string, mixed> $replyMarkup
+     * @return array<string, mixed>
+     */
+    public function sendRichOrHtml(int|string $chatId, string $richHtml, string $fallbackHtml, ?array $replyMarkup = null, ?int $replyTo = null): array
+    {
+        if ($richHtml !== '' && !WidgetAvailability::richBlocked()) {
+            $result = $this->sendRichMessageResult($chatId, $richHtml, $replyMarkup, $replyTo);
+
+            if (($result['ok'] ?? false) === true) {
+                return $result;
+            }
+
+            WidgetAvailability::noteRichFailure($result);
+            Log::warning('TelegramClient: sendRichMessage failed, sending classic HTML', [
+                'error_code' => $result['error_code'] ?? null,
+                'description' => mb_substr((string) ($result['description'] ?? ''), 0, 200),
+            ]);
+        }
+
+        $result = $this->sendMessageResult($chatId, $fallbackHtml, $replyMarkup, 'HTML', $replyTo);
+
+        if (($result['ok'] ?? false) !== true && ($result['error_code'] ?? null) === 400) {
+            // Last resort: the same text without markup.
+            $result = $this->sendMessageResult($chatId, mb_substr(TelegramHtml::toPlain($fallbackHtml), 0, TelegramHtml::LIMIT), $replyMarkup, null, $replyTo);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Edit a message as rich, else as classic HTML. "message is not modified" counts as done.
+     *
+     * @param null|array<string, mixed> $replyMarkup
+     * @return array<string, mixed>
+     */
+    public function editRichOrHtml(int|string $chatId, int $messageId, string $richHtml, string $fallbackHtml, ?array $replyMarkup = null): array
+    {
+        $markup = $replyMarkup !== null ? json_encode($replyMarkup) : null;
+
+        if ($richHtml !== '' && !WidgetAvailability::richBlocked()) {
+            $result = $this->postResult('editMessageText', [
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'rich_message' => ['html' => mb_substr($richHtml, 0, self::RICH_LIMIT)],
+                'reply_markup' => $markup,
+            ]);
+
+            if (($result['ok'] ?? false) === true || self::notModified($result)) {
+                return $result;
+            }
+
+            WidgetAvailability::noteRichFailure($result);
+        }
+
+        return $this->postResult('editMessageText', [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'text' => $fallbackHtml,
+            'parse_mode' => 'HTML',
+            'reply_markup' => $markup,
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     */
+    public static function notModified(array $result): bool
+    {
+        return str_contains((string) ($result['description'] ?? ''), 'message is not modified');
+    }
+
+    /**
      * "typing…" (or another action) in the chat header for ~5 seconds or until the next message.
      */
     public function sendChatAction(int|string $chatId, string $action = 'typing'): void
@@ -129,6 +226,22 @@ class TelegramClient
         } catch (\Throwable) {
             return false;
         }
+    }
+
+    /**
+     * "⏳ Analyzing receipt…" as a live draft plus a chat action, for work that takes a while
+     * (receipts, voice). Private chats with drafts on only; false = not shown, so the caller can
+     * send a status message instead. The draft goes away with the next real message.
+     */
+    public function statusDraft(int|string $chatId, string $label, string $action = 'typing'): bool
+    {
+        if (!config('telegram.stream_drafts') || !is_numeric($chatId) || (int) $chatId <= 0) {
+            return false;
+        }
+
+        $this->sendChatAction($chatId, $action);
+
+        return $this->sendMessageDraft($chatId, random_int(1, 2_000_000_000), '⏳ ' . $label . '…');
     }
 
     public function answerCallbackQuery(string $callbackQueryId, ?string $text = null): void
@@ -375,6 +488,23 @@ class TelegramClient
                 'description' => mb_substr((string) (is_array($json) ? ($json['description'] ?? '') : ''), 0, 200),
             ]);
         }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function postResult(string $method, array $payload): array
+    {
+        try {
+            $response = Http::timeout(20)->post($this->baseUrl . $method, $this->fields($payload));
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'description' => $e->getMessage()];
+        }
+
+        $json = $response->json();
+
+        return is_array($json) ? $json : ['ok' => false, 'error_code' => $response->status()];
     }
 
     /**

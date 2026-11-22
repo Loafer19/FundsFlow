@@ -3,10 +3,11 @@
 namespace App\Actions\Telegram;
 
 use App\Actions\Agent\AgentChannel;
+use App\Actions\Agent\AgentDashboardTools;
 use App\Actions\Agent\AgentHistory;
 use App\Actions\Agent\AgentTypeFields;
-use App\Actions\Agent\AgentDashboardTools;
 use App\Actions\Agent\AgentTypeTools;
+use App\Actions\Agent\Web\WebAgentChannel;
 use App\Channels\Telegram\TelegramChatSession;
 use App\Channels\Telegram\TelegramClient;
 use App\Models\User;
@@ -192,6 +193,36 @@ PROMPT;
         // Text streamed before a tool call is a preamble, not the answer.
         $this->draft = '';
         $this->typing();
+        $this->status(WebAgentChannel::TOOL_LABELS[$name] ?? 'Working');
+    }
+
+    public function onRetract(): void
+    {
+        $this->draft = '';
+        $this->status('Checking');
+    }
+
+    /**
+     * A status line in the live draft while the agent works ("⏳ Searching transactions…"),
+     * replaced by the streamed answer. Private chats with streaming on; at most one draft
+     * update a second (shared with the streamed text).
+     */
+    public function status(string $label): void
+    {
+        if (!$this->streams() || $this->draftsFailed) {
+            return;
+        }
+
+        $now = microtime(true);
+
+        if ($now - $this->lastDraft < 1.0) {
+            return;
+        }
+        $this->lastDraft = $now;
+
+        if (!$this->client->sendMessageDraft($this->chatId, $this->draftId, '⏳ ' . $label . '…')) {
+            $this->draftsFailed = true;
+        }
     }
 
     public function onAnswer(string $text): void

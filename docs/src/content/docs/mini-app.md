@@ -10,6 +10,12 @@ The Mini App is the full FundsFlow web app running inside Telegram.
 - Tap the **Web UI** menu button next to the message field in the bot chat, or
 - send `/app` for a reminder of where the button is.
 
+### Add to home screen
+
+On Telegram 8.0 and newer, **Settings → Appearance** shows **Home screen → Add**. It puts a FundsFlow shortcut on
+your phone's home screen that opens the Mini App directly. The card disappears once the shortcut is added, or if
+your device doesn't support it.
+
 ## Sign-in
 
 - If this Telegram account is **linked** to FundsFlow, you're signed in automatically.

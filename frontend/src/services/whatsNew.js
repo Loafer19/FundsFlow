@@ -19,6 +19,11 @@ export const RELEASES = [
             'The assistant and MCP can answer type-field questions: how much you spent on A-95 this year, liters in October, or the average price per liter.',
             'Limits can track a transaction type or the sum of a numeric field (like Tips) as well as tags.',
             'Type analytics shows Best rated and Best value rankings grouped by place for types with a Rating field (including the default Restaurant type).',
+            'In Telegram, when widgets are refused, /month, /recent, /budgets, /recurring, the digest, alerts and the pinned month summary come as rich cards with tables, or as plain text if those are refused too.',
+            'Recurring reminders in Telegram have ✓ Done (logs the payment), ⏰ +1 day and ⏭ Skip, with ↩️ Undo afterwards.',
+            'Send a location in Telegram as a reply to a transaction card to pin the place. The edit form shows it with a Google Maps link.',
+            'The bot shows what it is doing (thinking, reading a receipt, transcribing) while it works, and double-checks before saying something was saved.',
+            'In the Mini App, Settings → Appearance can add FundsFlow to your home screen.',
         ],
     },
     {

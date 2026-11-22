@@ -51,6 +51,11 @@ interface AgentChannel
     public function onDelta(string $text): void;
 
     /**
+     * The streamed text was a false "done" claim and the model is asked again: clear it.
+     */
+    public function onRetract(): void;
+
+    /**
      * Called right before a tool runs (status updates).
      *
      * @param array<string, mixed> $arguments

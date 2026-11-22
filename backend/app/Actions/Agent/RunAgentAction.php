@@ -4,6 +4,7 @@ namespace App\Actions\Agent;
 
 use App\Models\User;
 use App\Support\TelegramAiQuota;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -62,6 +63,9 @@ class RunAgentAction
         $quotaConsumed = false;
 
         $nudged = false;
+        $claimNudged = false;
+        // A tool that changed something (or staged a Confirm card) ran in this turn.
+        $wrote = false;
         $maxRounds = (int) config('telegram.agent_max_rounds');
 
         for ($round = 0; $round < $maxRounds; $round++) {
@@ -118,6 +122,24 @@ class RunAgentAction
                     continue;
                 }
 
+                // "Added / saved / deleted" with no tool that changed anything this turn: the
+                // model claims a change that never happened. Ask once for the real tool call,
+                // then keep the answer with a plain correction.
+                if ($assistantContent !== '' && !$wrote && self::claimsDone($assistantContent) && !$this->recentProposal($user)) {
+                    if (!$claimNudged && $round < $maxRounds - 1) {
+                        $claimNudged = true;
+                        $channel->onRetract();
+                        $messages[] = [
+                            'role' => 'user',
+                            'content' => '(System) Your reply says something was done, but no tool changed anything in this turn: nothing was saved, added, created, updated or deleted. If one of your tools can do it, call it now (the user then gets a Confirm card). Otherwise tell the user plainly that it was NOT done. Never claim success without a tool call.',
+                        ];
+
+                        continue;
+                    }
+
+                    $assistantContent .= self::correction($assistantContent);
+                }
+
                 if ($assistantContent !== '') {
                     $channel->onAnswer($assistantContent);
 
@@ -172,6 +194,7 @@ class RunAgentAction
                 // Any stop control in the batch ends the run, not only the last call's.
                 $lastControl = $executed['control'] ?? $lastControl;
                 $stagedInBatch = $stagedInBatch || $executed['control'] === 'confirm_staged';
+                $wrote = $wrote || ($executed['ok'] && ($executed['control'] !== null || in_array($name, $stagingTools, true) || self::isWriteTool($name)));
 
                 $toolPayload = [
                     'ok' => $executed['ok'],
@@ -213,6 +236,61 @@ class RunAgentAction
     public static function looksLikeTextProposal(string $text): bool
     {
         return preg_match('/^[\s*_]*(proposed change|(\[via (web|telegram)\] )?\[confirm card|create transaction:|update transaction|delete transaction|запропонована зміна|пропонована зміна)/iu', trim($text)) === 1;
+    }
+
+    /**
+     * Past-tense "done" words (Ukrainian or English) outside a negation: "додав", "збережено",
+     * "deleted"… "не додав", "not saved", "haven't added" do not count.
+     */
+    public static function claimsDone(string $text): bool
+    {
+        $pattern = '/(?<![\p{L}])(дода(в|ла|ли|но)|створ(ив|ила|или|ено)|збереж(ено|ив|ила)|зберіг|зберегла|запис(ав|ала|ано)|онов(ив|ила|лено)|змін(ив|ила|ено)|видал(ив|ила|ено)|перейменува(в|ла|но)|added|created|saved|updated|deleted|removed|renamed|logged|recorded)(?![\p{L}])/iu';
+
+        if (!preg_match_all($pattern, $text, $matches, PREG_OFFSET_CAPTURE)) {
+            return false;
+        }
+
+        foreach ($matches[0] as [$word, $offset]) {
+            // mb_strcut keeps whole UTF-8 characters (offsets are bytes).
+            $before = mb_strcut($text, max(0, $offset - 48), min(48, $offset));
+
+            if (!preg_match("/(\\bне|\\bnot|n't|\\bnever|\\bнічого не)\\s+(\\S+\\s+)?$/iu", $before)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Appended when the model still claims a change after the nudge. */
+    public static function correction(string $text): string
+    {
+        return preg_match('/\p{Cyrillic}/u', $text)
+            ? "\n\n⚠️ Насправді нічого не змінено: у цій відповіді не виконалась жодна дія."
+            : "\n\n⚠️ Nothing was actually changed: no action ran in this reply.";
+    }
+
+    private static function isWriteTool(string $name): bool
+    {
+        return preg_match('/^(create|update|delete|add|remove|rename|archive|pause|resume|set|apply|commit|undo)_/', $name) === 1;
+    }
+
+    /**
+     * A Confirm card from the last 15 minutes (pending or confirmed): "added" may be about it.
+     */
+    private function recentProposal(User $user): bool
+    {
+        $since = now()->subMinutes(15);
+
+        foreach (app(AgentHistory::class)->items($user) as $item) {
+            if (($item['kind'] ?? null) === 'proposal'
+                && in_array($item['status'] ?? null, ['pending', 'confirmed'], true)
+                && isset($item['at']) && Carbon::parse($item['at'])->gte($since)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

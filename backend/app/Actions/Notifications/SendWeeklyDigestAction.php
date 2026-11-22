@@ -5,7 +5,6 @@ namespace App\Actions\Notifications;
 use App\Actions\Budgets\CalculateGoalProgressAction;
 use App\Actions\Budgets\CalculateLimitStatusAction;
 use App\Actions\Budgets\ListBudgetsAction;
-use App\Channels\Telegram\TelegramClient;
 use App\Channels\Telegram\Widgets\TelegramWidgetSender;
 use App\Models\BudgetPeriod;
 use App\Models\Transaction;
@@ -18,7 +17,6 @@ use Carbon\Carbon;
 class SendWeeklyDigestAction
 {
     public function __construct(
-        private readonly TelegramClient $client,
         private readonly ListBudgetsAction $listBudgets,
         private readonly CalculateLimitStatusAction $limitStatus,
         private readonly CalculateGoalProgressAction $goalProgress,
@@ -55,18 +53,16 @@ class SendWeeklyDigestAction
                 ['text' => '💰 Budgets', 'callback_data' => 'menu:budgets'],
             ]]];
 
-            // Widget with stat cards and budget bars; the text digest if the widget can't be sent.
-            if ($this->widgets->sendReport($identity->external_id, $this->report($user, $start, $end, $current, $previous), $keyboard)) {
-                continue;
-            }
-
+            // Widget with stat cards and budget bars, else the same report as a rich message,
+            // else the text digest.
             $message = $this->formatMessage($user, $start, $end, $current, $previous);
             $budgets = $this->budgetLines($user);
 
-            $this->client->sendMessage(
+            $this->widgets->sendReport(
                 $identity->external_id,
-                $budgets === [] ? $message : $message . "\n\n" . implode("\n", $budgets),
+                $this->report($user, $start, $end, $current, $previous),
                 $keyboard,
+                $budgets === [] ? $message : $message . "\n\n" . implode("\n", $budgets),
             );
         }
     }

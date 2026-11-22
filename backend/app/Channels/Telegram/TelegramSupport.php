@@ -294,9 +294,28 @@ class TelegramSupport
             $lines[] = '📎 ' . $count . ' file' . ($count === 1 ? '' : 's');
         }
 
+        if ($place = $this->placeLine($transaction)) {
+            $lines[] = $place;
+        }
+
         $lines[] = self::tagLine($this->formatTagListHtml($transaction));
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * "📍 WOG" for a transaction with a location, else null. No map link: it would add a link
+     * preview to every card (the web drawer has the map link).
+     */
+    public function placeLine(Transaction $transaction): ?string
+    {
+        $location = is_array($transaction->location) ? $transaction->location : null;
+
+        if (!isset($location['lat'], $location['lng'])) {
+            return null;
+        }
+
+        return '📍 ' . $this->escapeHtml(trim((string) ($location['title'] ?? '')) ?: 'Place pinned');
     }
 
     /** "⛽ Fuel · 40 l · 58,90 ₴ · OKKO" (type + first values), or null for a typeless transaction. */
