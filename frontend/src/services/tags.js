@@ -14,7 +14,10 @@ export const useTagsStore = defineStore('tags', {
     }),
 
     getters: {
-        list: (state) => () => state.buildTagsList(state.tags),
+        // Archived tags (archived_at set) still label old transactions but are not offered for new ones.
+        active: (state) => state.tags.filter((tag) => !tag.archived_at),
+        archived: (state) => state.tags.filter((tag) => tag.archived_at).sort((a, b) => a.title.localeCompare(b.title)),
+        list: (state) => () => state.buildTagsList(state.tags.filter((tag) => !tag.archived_at)),
         forBalances: (state) => () => state.list().filter((tag) => tag.calc_balance),
         descendantIds: (state) => (rootId) => {
             const ids = new Set([rootId])
@@ -99,33 +102,60 @@ export const useTagsStore = defineStore('tags', {
             }
         },
 
-        async delete(id) {
+        async archive(id) {
             this.isLoading = id
 
             try {
                 await api.delete('/tags/' + id)
 
-                const toRemove = new Set([id])
+                const toArchive = new Set([id])
 
                 for (let added = true; added; ) {
                     added = false
 
                     this.tags.forEach((t) => {
-                        if (toRemove.has(t.parent_id) && !toRemove.has(t.id)) {
-                            toRemove.add(t.id)
+                        if (toArchive.has(t.parent_id) && !toArchive.has(t.id)) {
+                            toArchive.add(t.id)
                             added = true
                         }
                     })
                 }
 
-                this.tags = this.tags.filter((t) => !toRemove.has(t.id))
+                const at = new Date().toISOString()
+                this.tags = this.tags.map((t) => (toArchive.has(t.id) ? { ...t, archived_at: t.archived_at || at } : t))
                 this.persist()
 
-                toasts.info('Tag deleted!')
+                toasts.success('Tag archived!')
 
                 return true
             } catch (error) {
-                toasts.error(apiErrorMessage(error, 'Could not delete tag: '))
+                toasts.error(apiErrorMessage(error, 'Could not archive tag: '))
+
+                return false
+            } finally {
+                this.isLoading = false
+            }
+        },
+
+        async restore(id) {
+            this.isLoading = id
+
+            try {
+                const { data } = await api.post(`/tags/${id}/restore`)
+                const index = this.tags.findIndex((t) => t.id === id)
+                const fresh = data?.id ? data : { ...this.tags[index], archived_at: null }
+
+                if (index === -1) this.tags.push(fresh)
+                else this.tags[index] = { ...this.tags[index], ...fresh, archived_at: fresh.archived_at ?? null }
+
+                this.persist()
+                await patchTagCopies({ ...fresh, archived_at: fresh.archived_at ?? null })
+
+                toasts.success('Tag restored!')
+
+                return true
+            } catch (error) {
+                toasts.error(apiErrorMessage(error, 'Could not restore tag: '))
 
                 return false
             } finally {
@@ -158,6 +188,7 @@ const copiedTag = (tag, fresh) =>
               emoji: fresh.emoji,
               parent_id: fresh.parent_id,
               calc_balance: fresh.calc_balance,
+              archived_at: fresh.archived_at ?? null,
           }
         : tag
 

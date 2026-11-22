@@ -253,7 +253,7 @@ PROMPT;
 
             return match ($name) {
                 'get_me' => AgentToolExecutor::ok($tools->getMe($user)),
-                'list_tags' => AgentToolExecutor::ok($tools->listTags($user, $session)),
+                'list_tags' => AgentToolExecutor::ok($tools->listTags($user, $session, $arguments)),
                 'list_recent_transactions' => AgentToolExecutor::ok($tools->listRecent($user, $session, $arguments)),
                 'list_transactions' => AgentToolExecutor::ok($tools->listTransactions($user, $session, $arguments)),
                 'list_budgets' => AgentToolExecutor::ok($tools->listBudgets($user, $session)),

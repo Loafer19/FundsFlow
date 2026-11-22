@@ -18,6 +18,7 @@ class TagResource extends JsonResource
             'title' => $this->title,
             'emoji' => $this->emoji,
             'calc_balance' => $this->calc_balance,
+            'archived_at' => $this->deleted_at?->toIso8601String(),
         ];
     }
 }

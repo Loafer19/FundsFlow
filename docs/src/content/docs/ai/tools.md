@@ -1,6 +1,6 @@
 ---
 title: MCP tool reference
-description: All 35 tools exposed by the FundsFlow MCP server.
+description: All 39 tools exposed by the FundsFlow MCP server.
 ---
 
 Amounts are **signed**: negative for expenses, positive for income. Dates use `YYYY-MM-DD`.
@@ -18,10 +18,11 @@ Amounts are **signed**: negative for expenses, positive for income. Dates use `Y
 
 | Tool | Description |
 | --- | --- |
-| `list_tags` | All tags |
+| `list_tags` | All tags, including archived ones (`archived_at` set) |
 | `create_tag` | Create a tag (emoji required, optional parent) |
 | `update_tag` | Update a tag by id |
-| `delete_tag` | Delete a tag by id (soft delete) |
+| `delete_tag` | Archive a tag by id (and its children). Transactions keep the tag |
+| `restore_tag` | Restore one archived tag (a parent’s children stay archived) |
 
 ## Transactions
 

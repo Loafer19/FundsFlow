@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * Deleting archives it (soft delete): old transactions keep the tag.
+ * Archiving a parent archives its children; restoring a parent leaves them archived.
+ */
 class Tag extends Model
 {
     use HasFactory;
@@ -51,7 +55,7 @@ class Tag extends Model
 
     protected static function booted(): void
     {
-        // Keep TagTree::for() in step when tags are added, moved, deleted or restored mid-request.
+        // Keep TagTree::for() in step when tags are added, moved, archived or restored mid-request.
         $forget = static function (Tag $tag): void {
             if ($tag->user_id !== null) {
                 app(TagTreeCache::class)->forget((int) $tag->user_id);

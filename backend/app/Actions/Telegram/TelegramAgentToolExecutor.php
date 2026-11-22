@@ -180,7 +180,7 @@ class TelegramAgentToolExecutor
 
             return match ($name) {
                 'get_me' => AgentToolExecutor::ok($this->tools->getMe($user)),
-                'list_tags' => AgentToolExecutor::ok($this->tools->listTags($user, $session)),
+                'list_tags' => AgentToolExecutor::ok($this->tools->listTags($user, $session, $arguments)),
                 'list_recent_transactions' => AgentToolExecutor::ok($this->tools->listRecent($user, $session, $arguments)),
                 'list_transactions' => AgentToolExecutor::ok($this->tools->listTransactions($user, $session, $arguments)),
                 'list_budgets' => AgentToolExecutor::ok($this->tools->listBudgets($user, $session)),

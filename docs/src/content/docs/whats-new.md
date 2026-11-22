@@ -26,6 +26,9 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
   button to open it in Google Maps and one to remove it.
 - **Add to home screen (Mini App).** In the Telegram Mini App, **Settings → Appearance** offers **Home screen → Add**
   where Telegram supports it (Telegram 8.0+).
+- **Archive tags.** In **Manage Tags**, hold-to-archive replaces delete. Archiving a parent archives its children.
+  Archived tags sit at the bottom of the list with **Restore** (a restored parent does not restore its children).
+  They leave the picker, the tag filter and new transactions, but stay visible on records that already have them.
 - **Place ratings in Type analytics.** Types with a **Rating** field (including the default **Restaurant** type, which now includes a 1–5 **Rating** field) show a **Best rated / Best value** card grouped by place in Overview, comparing average rating, visits, average check, and rating per 100 spent.
 
 ### Telegram bot and assistants

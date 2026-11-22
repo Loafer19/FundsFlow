@@ -24,6 +24,7 @@ export const RELEASES = [
             'Send a location in Telegram as a reply to a transaction card to pin the place. The edit form shows it with a Google Maps link.',
             'The bot shows what it is doing (thinking, reading a receipt, transcribing) while it works, and double-checks before saying something was saved.',
             'In the Mini App, Settings → Appearance can add FundsFlow to your home screen.',
+            'Tags are archived instead of deleted. Archived tags leave the picker and new transactions, stay on old records, and can be restored from the bottom of Manage Tags.',
         ],
     },
     {

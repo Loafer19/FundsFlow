@@ -29,7 +29,8 @@ class LoadBootstrapDataAction
     public function execute(User $user): array
     {
         return [
-            'tags' => TagResource::collection($this->listTags->execute($user))->resolve(),
+            // Archived tags too, flagged: old transactions still show them.
+            'tags' => TagResource::collection($this->listTags->execute($user, withArchived: true))->resolve(),
             'transactions' => TransactionResource::collection($this->listTransactions->execute($user))->resolve(),
             // Archived types too, flagged: old transactions still show their label and values.
             'transaction_types' => TransactionTypeResource::collection(

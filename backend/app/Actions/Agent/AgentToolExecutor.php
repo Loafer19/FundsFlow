@@ -81,9 +81,9 @@ class AgentToolExecutor
                 'type' => 'object',
                 'properties' => (object) [],
             ]),
-            'list_tags' => self::fn('list_tags', 'List all tags/categories for the account (id, emoji, title, parent_id).', [
+            'list_tags' => self::fn('list_tags', 'List tags for the account (id, emoji, title, parent_id). By default only active tags. include_archived=true also lists archived ones (archived=true); those stay on old transactions but are not for new ones.', [
                 'type' => 'object',
-                'properties' => (object) [],
+                'properties' => ['include_archived' => ['type' => 'boolean']],
             ]),
             'list_transactions' => self::fn('list_transactions', 'List transactions with optional filters (newest first). Caps at 50 rows.', [
                 'type' => 'object',
@@ -305,15 +305,17 @@ class AgentToolExecutor
     /**
      * @return array<string, mixed>
      */
-    public function listTags(User $user, AgentSession $session): array
+    public function listTags(User $user, AgentSession $session, array $args = []): array
     {
-        $tags = $this->listTags->execute($user);
+        $withArchived = ($args['include_archived'] ?? false) === true;
+        $tags = $this->listTags->execute($user, $withArchived);
         $items = $tags->map(static fn (Tag $tag): array => [
             'id' => (int) $tag->id,
             'title' => (string) $tag->title,
             'emoji' => (string) $tag->emoji,
             'parent_id' => $tag->parent_id !== null ? (int) $tag->parent_id : null,
             'calc_balance' => (bool) $tag->calc_balance,
+            ...($tag->trashed() ? ['archived' => true] : []),
         ])->values()->all();
 
         $session->setDomain('tags');

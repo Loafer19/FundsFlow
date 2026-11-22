@@ -1,5 +1,5 @@
 <template>
-    <div v-if="tagsStore.tags.length" class="mb-4">
+    <div v-if="tagsStore.active.length || selectedArchived.length" class="mb-4">
         <label v-if="searchable" class="input input-sm w-full border-base-300 mb-2">
             <Search :size="14" class="text-base-content/60" />
             <input v-model="query" type="search" placeholder="Search tags" aria-label="Search tags" />
@@ -16,7 +16,8 @@
                 <span v-else-if="hasTree" class="w-6 shrink-0" aria-hidden="true"></span>
 
                 <button type="button" @click="toggle(tag.id)" class="badge badge-info gap-0 px-1 text-lg cursor-pointer"
-                    :class="{ 'badge-soft': !modelValue.includes(tag.id) }"
+                    :class="{ 'badge-soft': !modelValue.includes(tag.id), tooltip: tag.archived_at }"
+                    :data-tip="tag.archived_at ? 'Archived tag' : undefined"
                     :aria-label="[tag.emoji, tag.title].filter(Boolean).join(' ')"
                     :aria-pressed="modelValue.includes(tag.id)">
                     <span>{{ tag.emoji }}</span>
@@ -57,11 +58,16 @@ const SEARCH_FROM = 9
 const query = ref('')
 const manual = ref({})
 
-const searchable = computed(() => tagsStore.tags.length >= SEARCH_FROM)
+const searchable = computed(() => tagsStore.active.length >= SEARCH_FROM)
 const searching = computed(() => query.value.trim() !== '')
 
+// Already-selected archived tags stay visible so an old record can keep or drop them.
+const selectedArchived = computed(() =>
+    tagsStore.tags.filter((tag) => tag.archived_at && modelValue.value.includes(tag.id)),
+)
+
 const tree = computed(() => {
-    const list = tagsStore.list()
+    const list = [...tagsStore.list(), ...selectedArchived.value.map((tag) => ({ ...tag, depth: 0 }))]
     const children = {}
     for (const tag of list) {
         if (tag.parent_id != null) (children[tag.parent_id] ??= []).push(tag.id)

@@ -57,6 +57,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/bootstrap', BootstrapController::class);
 
     Route::apiResource('tags', TagController::class)->except(['show']);
+    Route::post('/tags/{tag}/restore', [TagController::class, 'restore'])->whereNumber('tag');
     Route::get('/transaction-types', [TransactionTypeController::class, 'index']);
     Route::post('/transaction-types', [TransactionTypeController::class, 'store'])->middleware('throttle:60,1,tx-types:');
     Route::match(['put', 'patch'], '/transaction-types/{type}', [TransactionTypeController::class, 'update'])->whereNumber('type')

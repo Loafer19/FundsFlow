@@ -12,10 +12,16 @@ class ListTagsAction
     /**
      * @return Collection<int, Tag>
      */
-    public function execute(User $user): Collection
+    public function execute(User $user, bool $withArchived = false): Collection
     {
         Gate::forUser($user)->authorize('viewAny', Tag::class);
 
-        return $user->tags()->get();
+        $query = $user->tags();
+
+        if ($withArchived) {
+            $query->withTrashed();
+        }
+
+        return $query->get();
     }
 }

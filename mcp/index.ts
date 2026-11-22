@@ -209,7 +209,7 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         'list_tags',
         {
             title: 'List tags',
-            description: 'List all tags for the account.',
+            description: 'List tags for the account, including archived ones (archived_at set). Archived tags stay on old transactions but should not be added to new ones.',
             inputSchema: {},
         },
         async () => textResult(unwrapList(await api(token, '/tags'))),
@@ -267,11 +267,21 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
     server.registerTool(
         'delete_tag',
         {
-            title: 'Delete tag',
-            description: 'Soft-delete a tag by id.',
+            title: 'Archive tag',
+            description: 'Archive a tag by id (soft-delete). Child tags are archived with it. Transactions keep the tag. Use restore_tag to bring it back (children stay archived).',
             inputSchema: { id: z.number().int() },
         },
         async ({ id }) => textResult(await api(token, `/tags/${id}`, { method: 'DELETE' })),
+    )
+
+    server.registerTool(
+        'restore_tag',
+        {
+            title: 'Restore tag',
+            description: 'Restore one archived tag by id. Restoring a parent does not restore its children.',
+            inputSchema: { id: z.number().int() },
+        },
+        async ({ id }) => textResult(await api(token, `/tags/${id}/restore`, { method: 'POST' })),
     )
 
     server.registerTool(
