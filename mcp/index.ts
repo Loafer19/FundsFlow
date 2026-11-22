@@ -19,7 +19,7 @@ const ATTACHMENT_LABEL = 'JPEG, PNG, WebP, HEIC and PDF'
 const TYPE_FIELD_KINDS = ['number', 'rating', 'duration', 'boolean', 'select', 'multiselect', 'text', 'date', 'computed'] as const
 type AttachmentMime = (typeof ATTACHMENT_MIMES)[number]
 
-const MCP_VERSION = '1.4.0'
+const MCP_VERSION = '1.5.0'
 const MCP_WEBSITE_URL = 'https://fundsflow.fun'
 const MCP_ICONS = [
     {

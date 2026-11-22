@@ -7,7 +7,7 @@ FundsFlow 2.0 is the biggest update so far. It brings together everything added 
 **1.13** update that put an AI assistant in the Telegram bot. Self-hosting and technical changes are listed in the
 [GitHub releases](https://github.com/Loafer19/FundsFlow/releases).
 
-## Upcoming — 2.5.0
+## 2.5.0 — 22 November 2026
 
 ### Web app
 
