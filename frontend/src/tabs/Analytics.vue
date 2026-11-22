@@ -228,7 +228,17 @@
 </template>
 
 <script setup>
-import { ChartPie, ChevronDown, ChevronRight, Flame, Info, Lightbulb, Presentation, Repeat, Telescope } from '@lucide/vue'
+import {
+    ChartPie,
+    ChevronDown,
+    ChevronRight,
+    Flame,
+    Info,
+    Lightbulb,
+    Presentation,
+    Repeat,
+    Telescope,
+} from '@lucide/vue'
 import { computed, inject, ref } from 'vue'
 import MyCards from '../components/dashboard/MyCards.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -238,11 +248,11 @@ import { today } from '../services/clock.js'
 import { tagChange } from '../services/comparison.js'
 import { parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { projectOccurrences } from '../services/recurringSchedule.js'
-import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 import { recurringSummary } from '../services/recurringTotals.js'
+import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 import { useTagsStore } from '../services/tags.js'
-import { useTransactionTypesStore } from '../services/transactionTypes.js'
 import { useTransactionsStore } from '../services/transactions.js'
+import { useTransactionTypesStore } from '../services/transactionTypes.js'
 
 const emit = defineEmits(['jump-to-list'])
 

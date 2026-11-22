@@ -74,6 +74,35 @@ class AnalyzeTransactionTypeAction
     }
 
     /**
+     * Field-value filters (key or label = value) on a transactions query; also used by
+     * Analytics "My cards" (App\Actions\Dashboard\DashboardCardData). Returns the applied canonical values.
+     *
+     * @param Builder<Transaction> $query
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    public function applyFilters(Builder $query, TransactionType $type, array $filters): array
+    {
+        $applied = [];
+
+        foreach ($filters as $ref => $value) {
+            $field = $this->fieldByRef($type, (string) $ref);
+
+            if ($field === null) {
+                $keys = implode(', ', $this->fieldKeys($type));
+
+                throw ValidationException::withMessages([
+                    'filters' => 'Unknown field "' . $ref . '".' . ($keys !== '' ? ' Fields: ' . $keys . '.' : ''),
+                ]);
+            }
+
+            $applied[(string) $field['key']] = $this->applyFilter($query, $field, $value);
+        }
+
+        return $applied;
+    }
+
+    /**
      * @param array<string, mixed> $args
      */
     private function assertPeriod(array $args): void
@@ -232,35 +261,6 @@ class AnalyzeTransactionTypeAction
         return Transaction::query()
             ->where('user_id', $user->id)
             ->where('transaction_type_id', $type->id);
-    }
-
-    /**
-     * Field-value filters (key or label = value) on a transactions query; also used by
-     * Analytics "My cards" (App\Actions\Dashboard\DashboardCardData). Returns the applied canonical values.
-     *
-     * @param Builder<Transaction> $query
-     * @param array<string, mixed> $filters
-     * @return array<string, mixed>
-     */
-    public function applyFilters(Builder $query, TransactionType $type, array $filters): array
-    {
-        $applied = [];
-
-        foreach ($filters as $ref => $value) {
-            $field = $this->fieldByRef($type, (string) $ref);
-
-            if ($field === null) {
-                $keys = implode(', ', $this->fieldKeys($type));
-
-                throw ValidationException::withMessages([
-                    'filters' => 'Unknown field "' . $ref . '".' . ($keys !== '' ? ' Fields: ' . $keys . '.' : ''),
-                ]);
-            }
-
-            $applied[(string) $field['key']] = $this->applyFilter($query, $field, $value);
-        }
-
-        return $applied;
     }
 
     /**

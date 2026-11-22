@@ -20,8 +20,7 @@ export const periodFromFrequency = (frequency) => {
     return null
 }
 
-export const typeHasField = (type, key) =>
-    (type?.fields ?? []).some((field) => field.key === key && !field.hidden)
+export const typeHasField = (type, key) => (type?.fields ?? []).some((field) => field.key === key && !field.hidden)
 
 export const applyScheduleData = (type, data, frequency, nextRunAt) => {
     const next = { ...(data ?? {}) }
@@ -74,7 +73,9 @@ export const recurringSummary = (rules, types) => {
     if (!items.length) return null
 
     const monthly = items.reduce((sum, item) => sum + item.monthly, 0)
-    const next = [...items].sort((a, b) => String(a.next_run_at).localeCompare(String(b.next_run_at)) || a.name.localeCompare(b.name))[0]
+    const next = [...items].sort(
+        (a, b) => String(a.next_run_at).localeCompare(String(b.next_run_at)) || a.name.localeCompare(b.name),
+    )[0]
 
     const groupsMap = new Map()
     for (const item of items) {

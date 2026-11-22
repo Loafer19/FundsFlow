@@ -39,6 +39,7 @@ class CreateRecurringTransactionAction
 
         if ($applyDefaults && $typed['transaction_type_id']) {
             $type = $user->transactionTypes()->find($typed['transaction_type_id']);
+
             if ($type) {
                 $tagIds = TagIds::forSync($user, array_values(array_unique([
                     ...$tagIds,

@@ -57,8 +57,8 @@ import SegmentedControl from '../components/SegmentedControl.vue'
 import TagPicker from '../components/TagPicker.vue'
 import TypeChips from '../components/TypeChips.vue'
 import TypeFieldsCard from '../components/TypeFieldsCard.vue'
-import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 import { applyScheduleData, scheduleAutoFields } from '../services/recurringTotals.js'
+import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
 import { useTransactionTypesStore } from '../services/transactionTypes.js'
 import { useTypedTransaction } from '../services/typedTransaction.js'
@@ -117,7 +117,12 @@ watch(
             data: { ...(rule.data || {}) },
         }
         typed.load({ amount: rule.amount })
-        form.value.data = applyScheduleData(typedType.value, form.value.data, form.value.frequency, form.value.next_run_at)
+        form.value.data = applyScheduleData(
+            typedType.value,
+            form.value.data,
+            form.value.frequency,
+            form.value.next_run_at,
+        )
     },
 )
 
@@ -125,7 +130,12 @@ watch(
     () => [form.value.frequency, form.value.next_run_at, form.value.transaction_type_id],
     () => {
         if (!typedType.value) return
-        form.value.data = applyScheduleData(typedType.value, form.value.data, form.value.frequency, nextChargeDate.value)
+        form.value.data = applyScheduleData(
+            typedType.value,
+            form.value.data,
+            form.value.frequency,
+            nextChargeDate.value,
+        )
     },
 )
 

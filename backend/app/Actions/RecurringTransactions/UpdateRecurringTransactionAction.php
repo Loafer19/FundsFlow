@@ -74,6 +74,7 @@ class UpdateRecurringTransactionAction
             unset($data['transaction_type_id'], $data['data']);
             $recurringTransaction->loadMissing('transactionType');
             $type = $recurringTransaction->transactionType;
+
             if ($type) {
                 $data['data'] = RecurringTypeData::applyScheduleFields(
                     $type,

@@ -18,7 +18,7 @@ final class RecurringTypeData
     public const PERIOD_YEARLY = 'Yearly';
 
     /**
-     * @param  array<string, mixed>  $input
+     * @param array<string, mixed> $input
      * @return array{transaction_type_id: ?int, data: ?array<string, mixed>}
      */
     public static function forWrite(User $user, array $input, string $frequency, string $nextRunAt, bool $allowArchived = false, bool $requireAll = true): array
@@ -46,13 +46,14 @@ final class RecurringTypeData
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
     public static function applyScheduleFields(TransactionType $type, array $data, string $frequency, string $nextRunAt): array
     {
         if ($type->hasFieldKey('period')) {
             $auto = self::periodFromFrequency($frequency);
+
             if ($auto !== null) {
                 $data['period'] = $auto;
             }
@@ -82,6 +83,7 @@ final class RecurringTypeData
 
         $rule->loadMissing('transactionType');
         $type = $rule->transactionType;
+
         if (!$type) {
             return null;
         }

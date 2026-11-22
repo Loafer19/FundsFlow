@@ -77,8 +77,8 @@ import TypeFieldsCard from '../components/TypeFieldsCard.vue'
 import { today } from '../services/clock.js'
 import { formatDate, nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { advanceDateStr } from '../services/recurringSchedule.js'
-import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 import { applyScheduleData, scheduleAutoFields } from '../services/recurringTotals.js'
+import { useRecurringTransactionsStore } from '../services/recurringTransactions.js'
 import { useTelegramPrimary } from '../services/telegramChrome.js'
 import { useTransactionTypesStore } from '../services/transactionTypes.js'
 import { useTypedTransaction } from '../services/typedTransaction.js'
@@ -132,14 +132,24 @@ const defaultTagNote = computed(() => {
 const pickType = (id) => {
     typed.pickType(id)
     nextTick(() => {
-        form.value.data = applyScheduleData(typedType.value, form.value.data, form.value.frequency, form.value.starts_at)
+        form.value.data = applyScheduleData(
+            typedType.value,
+            form.value.data,
+            form.value.frequency,
+            form.value.starts_at,
+        )
     })
 }
 watch(
     () => [form.value.frequency, form.value.starts_at, form.value.transaction_type_id],
     () => {
         if (!typedType.value) return
-        form.value.data = applyScheduleData(typedType.value, form.value.data, form.value.frequency, form.value.starts_at)
+        form.value.data = applyScheduleData(
+            typedType.value,
+            form.value.data,
+            form.value.frequency,
+            form.value.starts_at,
+        )
     },
 )
 
