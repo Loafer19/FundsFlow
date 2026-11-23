@@ -104,6 +104,9 @@
 
 	# Relative Location.
 	redir /docs /docs/ 301
+	# Well-known policy URL for Telegram BotFather and footer links.
+	redir /privacy /docs/help/privacy/ 301
+	redir /privacy/ /docs/help/privacy/ 301
 
 	handle /docs/* {
 		import docs_headers

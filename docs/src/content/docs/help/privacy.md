@@ -1,5 +1,5 @@
 ---
-title: Privacy and data
+title: Privacy Policy
 description: What FundsFlow stores, what is sent to AI providers, and how to export your data.
 ---
 
@@ -8,14 +8,20 @@ This page describes how FundsFlow handles your data, based on how the product wo
 ## What FundsFlow stores
 
 - **Account** — name, email, and a hashed password if you set one; linked Google, GitHub, and Telegram identities;
-  preferences like timezone and formats.
-- **Your finance data** — transactions, tags, budgets, recurring rules, and the files you attach (receipts and PDFs).
+  preferences like timezone and formats. The account also stores a few first-time timestamps (how you signed up,
+  when Telegram was linked, when you added a first transaction) and a short product-event log for the operator's
+  activation view. These are not used for advertising and are removed if the account is deleted.
+- **Your finance data** — transactions (including a type and its fields, and a place if you pin one), tags,
+  budgets and goals, recurring rules, Analytics cards you add, and the files you attach (receipts and PDFs).
+- **Web login** — a login token in your browser's local storage (not a cookie). Signing out removes it.
 - **Monobank** — if you connect it, an encrypted copy of your personal API token, the list of cards you
   chose to sync, and merchant-to-tag rules learned from your corrections. The token is never shown again,
   included in a data export, or sent to an AI provider. Disconnecting deletes the token.
 - **Telegram** — your chat id, to message you, and short-lived conversation state (pending drafts, kept for minutes).
 - **Support requests** — what you write to us and our replies, with the app version and your browser (web) so we
   can reproduce a problem.
+- **MCP access tokens** — if you create a token in **Settings → Connections → MCP**, a hashed copy is stored so
+  your AI client can connect. The token is shown only once when you create it; you can revoke it there at any time.
 - **AI assistant conversation** — the recent messages shared by the web panel and your private Telegram chat, kept in
   the server cache for about an hour after your last message (by default) and cleared by **New chat** or `/reset`.
 

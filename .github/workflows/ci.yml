@@ -100,7 +100,7 @@ jobs:
 
       - name: Create Release
         if: steps.current_version.outputs.version != steps.latest_release.outputs.result
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: v-${{ steps.current_version.outputs.version }}

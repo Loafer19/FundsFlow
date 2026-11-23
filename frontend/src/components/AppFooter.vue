@@ -19,6 +19,8 @@
                 <button v-if="authStore.isAuthenticated" type="button" class="link link-hover"
                     @click="showModal('support_modal')">Feedback</button>
                 <a v-else :href="FEEDBACK_URL" target="_blank" rel="noopener noreferrer" class="link link-hover">Feedback</a>
+                <span aria-hidden="true">·</span>
+                <a href="/privacy" class="link link-hover">Privacy</a>
             </nav>
         </div>
     </footer>

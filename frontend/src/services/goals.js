@@ -79,7 +79,7 @@ export const goalProgress = (budget, transactions, today = nowDateStr()) => {
         startAmount = Number(jar.balance_at_link ?? 0)
         saved = Math.max(0, round2(Number(jar.balance ?? 0)))
         contributed = round2(saved - startAmount)
-        windowContributed = contributed > 0 ? contributed : 0
+        windowContributed = Math.max(0, contributed)
         windowStart = startedAt
     } else {
         windowStart = latestOf(addDays(today, -(PACE_WINDOW_DAYS - 1)), startedAt)

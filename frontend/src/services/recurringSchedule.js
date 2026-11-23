@@ -63,6 +63,8 @@ export const projectOccurrences = (rule, rangeStart, rangeEnd) => {
     const startStr = toLocalDateStr(rangeStart)
     const endStr = toLocalDateStr(rangeEnd)
     const anchor = rule.starts_at || rule.next_run_at
+    // Y-m-d strings compare lexicographically; Math.max would coerce them to NaN.
+    // biome-ignore lint/complexity/useMathMinMax: date strings, not numbers
     const from = rule.next_run_at > startStr ? rule.next_run_at : startStr
 
     const dates = []
