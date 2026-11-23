@@ -22,7 +22,7 @@
                     <div class="grid grid-cols-3 gap-2 min-w-0">
                         <div v-for="item in forecast.items" :key="item.label" class="min-w-0">
                             <div class="text-xs uppercase tracking-wide text-base-content/60 truncate">{{ item.label }}</div>
-                            <div class="text-base sm:text-lg font-semibold tabular-nums truncate" :class="item.class">
+                            <div class="text-base sm:text-lg font-semibold tabular-nums" :class="item.class">
                                 {{ formatMoney(item.value) }}
                             </div>
                         </div>
@@ -179,7 +179,7 @@
 
         <MyCards v-if="!inReport" :from="range.start" :to="range.end" />
 
-        <div v-if="!inReport || balancesByTags.length" class="card card-border border-base-300 bg-base-100 min-w-0 overflow-hidden">
+        <div v-if="!inReport || balancesByTags.length" class="card card-border border-base-300 bg-base-100 min-w-0">
             <div class="card-body p-4 gap-3 min-w-0">
                 <div class="flex flex-wrap items-center gap-2 min-w-0">
                     <button type="button" class="card-title text-base sm:text-lg min-w-0 cursor-pointer rounded-field px-1 -mx-1 hover:bg-base-200 disabled:hover:bg-transparent"
@@ -213,7 +213,7 @@
                             </div>
                             <span class="truncate">{{ tag.title }}</span>
                         </div>
-                        <span class="min-w-0 max-w-[45%] shrink text-base sm:text-xl tabular-nums tooltip tooltip-left truncate text-right"
+                        <span class="min-w-0 max-w-[45%] shrink text-base sm:text-xl tabular-nums tooltip tooltip-left text-right whitespace-nowrap"
                             :data-tip="tag.txns + ' transaction' + (tag.txns === 1 ? '' : 's')">
                             {{ formatMoney(tag.balance) }}
                         </span>

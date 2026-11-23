@@ -1,7 +1,5 @@
 <template>
-    <div v-if="loading && !tickets.length && !active" class="flex justify-center py-8">
-        <span class="loading loading-dots loading-md text-base-content/40"></span>
-    </div>
+    <LoadingBlock v-if="loading && !tickets.length && !active" label="Loading support requests…" />
 
     <!-- One request: the conversation and a reply box. -->
     <div v-else-if="active">
@@ -92,6 +90,7 @@ import {
 } from '../services/support.js'
 import toasts from '../services/toasts.js'
 import EmptyState from './EmptyState.vue'
+import LoadingBlock from './LoadingBlock.vue'
 
 const tickets = ref([])
 const loading = ref(false)

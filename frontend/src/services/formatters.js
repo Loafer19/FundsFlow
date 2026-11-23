@@ -137,16 +137,27 @@ export const transactionSourceLabels = {
 
 export const getTransactionSourceLabel = (source) => transactionSourceLabels[source] ?? transactionSourceLabels.web
 
+export const apiFieldErrors = (error) => {
+    const errors = error.response?.data?.errors
+    if (!errors || typeof errors !== 'object' || errors instanceof Blob) return {}
+
+    const fields = {}
+
+    for (const [key, value] of Object.entries(errors)) {
+        const message = Array.isArray(value) ? value.find(Boolean) : value
+        if (message) fields[key] = String(message)
+    }
+
+    return fields
+}
+
 export const apiErrorMessage = (error, prefix = '') => {
     const data = error.response?.data
-    const fieldErrors = data && typeof data === 'object' && !(data instanceof Blob) ? data.errors : null
+    const fieldErrors = apiFieldErrors(error)
+    const fieldMessages = Object.values(fieldErrors).filter(Boolean)
 
-    if (fieldErrors && typeof fieldErrors === 'object') {
-        const messages = Object.values(fieldErrors).flat().filter(Boolean)
-
-        if (messages.length) {
-            return prefix + messages.join(' ')
-        }
+    if (fieldMessages.length) {
+        return prefix + fieldMessages.join(' ')
     }
 
     if (error.response?.status === 429) {
@@ -165,7 +176,17 @@ export const apiErrorMessage = (error, prefix = '') => {
 
     const message = data && typeof data === 'object' && !(data instanceof Blob) ? data.error || data.message : null
 
-    return prefix + (message || error.message)
+    if (message) return prefix + message
+
+    if (!error.response) {
+        return prefix + 'Network error. Check your connection and try again.'
+    }
+
+    if (error.response.status >= 500) {
+        return prefix + 'The server had a problem. Try again.'
+    }
+
+    return prefix + 'Something went wrong. Try again.'
 }
 
 // Short axis labels on narrow charts: 12 345 → "12.3K". Always English suffixes (uk-UA would print "тис."),

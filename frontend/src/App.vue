@@ -1,5 +1,6 @@
 <template>
     <Toasts />
+    <ConfirmDialog />
     <AuthModal />
     <TagsModal />
     <TagsAddModal />
@@ -228,6 +229,7 @@ import { computed, defineAsyncComponent, markRaw, nextTick, onMounted, provide, 
 import AgentDrawer from './components/AgentDrawer.vue'
 import AppFooter from './components/AppFooter.vue'
 import BootLoader from './components/BootLoader.vue'
+import ConfirmDialog from './components/ConfirmDialog.vue'
 import GroupDock from './components/GroupDock.vue'
 import GroupedTabs from './components/GroupedTabs.vue'
 import GroupSegments from './components/GroupSegments.vue'
@@ -258,7 +260,7 @@ import { useAuthStore } from './services/auth.js'
 import { bootstrapStores, isBootstrapping } from './services/bootstrap.js'
 import { useBudgetsStore } from './services/budgets.js'
 import { resetCachedNotice } from './services/cache.js'
-import { parseLocalDate } from './services/formatters.js'
+import { parseLocalDate, toLocalDateStr } from './services/formatters.js'
 import { closeSettings, openSettingsTab, showModal } from './services/modal.js'
 import { reportOnboarding, shouldShowOnboarding, syncOnboardingFromUser } from './services/onboarding.js'
 import { useRecurringTransactionsStore } from './services/recurringTransactions.js'
@@ -275,6 +277,7 @@ import {
     ready as telegramReady,
 } from './services/telegramWebApp.js'
 import { useTransactionsStore } from './services/transactions.js'
+import { patchUiState, readUiState } from './services/uiState.js'
 import { hasUnseenWhatsNew, markWhatsNewSeen } from './services/whatsNew.js'
 import Analytics from './tabs/Analytics.vue'
 import TabLoadError from './tabs/TabLoadError.vue'
@@ -436,6 +439,31 @@ function selectRange(type, date) {
     nextTick(() => datePicker.value?.parseModel())
 }
 
+const uiReady = ref(false)
+
+const restoreUiState = () => {
+    const saved = readUiState()
+
+    if (['week', 'month', 'year'].includes(saved.periodType) && saved.periodDate) {
+        try {
+            selectRange(saved.periodType, parseLocalDate(saved.periodDate))
+        } catch {
+            // Ignore a bad stored date and keep the default period.
+        }
+    }
+
+    const validIds = new Set(tagsStore.tags.map((tag) => tag.id))
+    transactionsStore.selectedTagIds = (saved.tagIds || []).filter((id) => validIds.has(id))
+    transactionsStore.filterUntagged = !!saved.untagged
+    uiReady.value = true
+}
+
+const resetUiState = () => {
+    uiReady.value = false
+    selectRange('month', new Date())
+    transactionsStore.clearTagFilter()
+}
+
 const tagFilterChips = computed(() => {
     const chips = tagsStore.tags
         .filter((tag) => transactionsStore.selectedTagIds.includes(tag.id))
@@ -556,8 +584,11 @@ watch(
             } else if (hasUnseenWhatsNew.value) {
                 showModal('whats_new_modal')
             }
+
+            restoreUiState()
         } else {
             isBootstrapping.value = false
+            resetUiState()
             tagsStore.tags = []
             transactionsStore.transactions = []
             budgetsStore.budgets = []
@@ -681,6 +712,25 @@ const getDateRange = computed(() => {
     return { currentStart, currentEnd, previousStart, previousEnd }
 })
 provide('insightDateRange', getDateRange)
+
+watch(
+    [
+        dateSelectionType,
+        getDateRange,
+        () => [...transactionsStore.selectedTagIds],
+        () => transactionsStore.filterUntagged,
+    ],
+    () => {
+        if (!uiReady.value || !authStore.isAuthenticated) return
+
+        patchUiState({
+            periodType: dateSelectionType.value,
+            periodDate: toLocalDateStr(getDateRange.value.currentStart),
+            tagIds: [...transactionsStore.selectedTagIds],
+            untagged: transactionsStore.filterUntagged,
+        })
+    },
+)
 
 const formatPeriodLabel = (monthStyle) => {
     const { currentStart: start, currentEnd: end } = getDateRange.value

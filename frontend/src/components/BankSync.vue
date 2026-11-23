@@ -1,7 +1,5 @@
 <template>
-    <div v-if="loading && !loaded" class="flex justify-center py-8">
-        <span class="loading loading-dots loading-md text-base-content/40"></span>
-    </div>
+    <LoadingBlock v-if="loading && !loaded" label="Loading monobank connection…" />
 
     <div v-else class="flex flex-col gap-2 p-3 rounded-box bg-base-200">
         <div class="flex items-center gap-2">
@@ -153,10 +151,13 @@
             </div>
 
             <div class="flex flex-wrap justify-end gap-2 pt-1">
-                <button type="button" class="btn btn-outline btn-sm" :disabled="busy || cooldown > 0" @click="syncNow">
-                    <span v-if="syncing" class="loading loading-spinner loading-xs"></span>
-                    {{ cooldown > 0 ? `Sync in ${cooldown}s` : 'Sync now' }}
-                </button>
+                <span class="tooltip tooltip-top before:max-w-56 sm:before:max-w-64"
+                    data-tip="Fetches new purchases since the last sync. Deleted ones stay deleted.">
+                    <button type="button" class="btn btn-outline btn-sm" :disabled="busy || cooldown > 0" @click="syncNow">
+                        <span v-if="syncing" class="loading loading-spinner loading-xs"></span>
+                        {{ cooldown > 0 ? `Sync in ${cooldown}s` : 'Sync now' }}
+                    </button>
+                </span>
                 <button type="button" class="btn btn-outline btn-error btn-sm" :disabled="busy" @click="disconnect">
                     Disconnect
                 </button>
@@ -168,10 +169,12 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useBudgetsStore } from '../services/budgets'
+import { askConfirm } from '../services/confirmDialog.js'
 import { apiErrorMessage, formatDateTime, formatMoney } from '../services/formatters'
 import { connectMonobank, disconnectMonobank, getMonobank, syncMonobank, updateMonobank } from '../services/monobank'
 import { useTagsStore } from '../services/tags'
 import toasts from '../services/toasts'
+import LoadingBlock from './LoadingBlock.vue'
 import PopoverMenu from './PopoverMenu.vue'
 import TagPicker from './TagPicker.vue'
 
@@ -341,13 +344,14 @@ const syncNow = async () => {
 }
 
 const disconnect = async () => {
-    if (
-        !confirm(
-            'Disconnect monobank? New transactions will stop syncing. Existing ones stay in your list. Jar goals are kept and marked as unlinked.',
-        )
-    ) {
-        return
-    }
+    const ok = await askConfirm({
+        title: 'Disconnect monobank',
+        message:
+            'New transactions will stop syncing. Existing ones stay in your list. Jar goals are kept and marked as unlinked.',
+        actionLabel: 'Disconnect',
+        danger: true,
+    })
+    if (!ok) return
     busy.value = true
     try {
         const { data } = await disconnectMonobank()

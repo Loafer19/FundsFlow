@@ -57,9 +57,12 @@
                 <div class="card-body gap-3 py-4">
                     <div class="flex items-center justify-between gap-2">
                         <h2 class="font-medium text-sm">Previous imports</h2>
-                        <span v-if="historyLoading" class="loading loading-spinner loading-xs"></span>
                     </div>
-                    <p v-if="historyError" class="text-error text-sm">{{ historyError }}</p>
+                    <LoadingBlock v-if="historyLoading && !historyItems.length" compact label="Loading previous imports…" />
+                    <p v-if="historyError" class="text-error text-sm flex flex-wrap items-center gap-2">
+                        <span>{{ historyError }}</span>
+                        <button type="button" class="btn btn-ghost btn-xs" @click="loadHistory">Retry</button>
+                    </p>
                     <p v-else-if="!historyLoading && !historyItems.length" class="text-sm text-base-content/60">
                         No previous imports yet
                     </p>
@@ -94,11 +97,12 @@
             </div>
         </div>
 
-        <div v-else-if="loading" class="flex justify-center py-16">
-            <span class="loading loading-spinner loading-lg"></span>
-        </div>
+        <LoadingBlock v-else-if="loading" label="Loading import preview…" />
 
-        <div v-else-if="loadError" class="alert alert-error">{{ loadError }}</div>
+        <div v-else-if="loadError" class="alert alert-error flex flex-wrap items-center justify-between gap-2">
+            <span>{{ loadError }}</span>
+            <button type="button" class="btn btn-sm" @click="reload">Retry</button>
+        </div>
 
         <template v-else-if="batch">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -277,6 +281,10 @@
                     <Search :size="16" class="text-base-content/60" />
                     <input v-model="search" type="search" placeholder="Search notes" aria-label="Search notes"
                         @change="reload()" />
+                    <button v-if="search" type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="Clear search"
+                        @click="search = ''; page = 1; reload()">
+                        <X :size="12" />
+                    </button>
                 </label>
             </div>
 
@@ -377,7 +385,15 @@
                                 </td>
                             </tr>
                             <tr v-if="!batch.rows.length">
-                                <td :colspan="typesStore.active.length || batch.summary?.typed ? 7 : 6" class="text-center text-base-content/60">No rows in this filter</td>
+                                <td :colspan="typesStore.active.length || batch.summary?.typed ? 7 : 6" class="text-center text-base-content/60">
+                                    <div class="flex flex-col items-center gap-2 py-4">
+                                        <span>No rows in this filter</span>
+                                        <button v-if="statusFilter !== 'all' || search" type="button"
+                                            class="btn btn-ghost btn-sm" @click="clearRowFilters">
+                                            Clear filter
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -394,7 +410,7 @@
 
             <div v-if="['previewing', 'failed'].includes(batch.status)"
                 class="sticky bottom-0 z-20 -mx-4 px-4 py-3 mt-4 bg-base-100/95 backdrop-blur border-t border-base-300 flex items-center justify-end gap-2">
-                <button type="button" class="btn btn-ghost" :disabled="busy" @click="goHome">Cancel</button>
+                <button type="button" class="btn btn-ghost" :disabled="busy" @click="goHome">Back</button>
                 <button type="button" class="btn btn-primary" :disabled="busy || !importableCount" @click="onCommit">
                     <span v-if="busy" class="loading loading-spinner loading-sm"></span>
                     Import {{ importableCount }} transaction{{ importableCount === 1 ? '' : 's' }}
@@ -437,9 +453,11 @@ import {
     TrendingDown,
     TrendingUp,
     Upload,
+    X,
 } from '@lucide/vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAuthStore } from '../services/auth.js'
+import { askConfirm } from '../services/confirmDialog.js'
 import { apiErrorMessage, formatDate, formatMoney, parseLocalDate } from '../services/formatters.js'
 import {
     applyImportRules,
@@ -459,6 +477,7 @@ import toasts from '../services/toasts.js'
 import { useTransactionTypesStore } from '../services/transactionTypes.js'
 import DateField from './DateField.vue'
 import EmptyState from './EmptyState.vue'
+import LoadingBlock from './LoadingBlock.vue'
 import SegmentedControl from './SegmentedControl.vue'
 import StatCard from './StatCard.vue'
 import TagPicker from './TagPicker.vue'
@@ -633,6 +652,13 @@ const goHome = () => {
     window.location.assign('/')
 }
 
+const clearRowFilters = () => {
+    statusFilter.value = 'all'
+    search.value = ''
+    page.value = 1
+    reload()
+}
+
 const formatRowDate = (value) => {
     if (!value) return '—'
     try {
@@ -767,7 +793,13 @@ const openBatch = (id) => goToImport(id)
 
 const undoBatch = async (item) => {
     if (!item?.can_undo || undoingId.value) return
-    if (!confirm('Delete every transaction created by this import?')) return
+    const ok = await askConfirm({
+        title: 'Undo import',
+        message: 'Delete every transaction created by this import?',
+        actionLabel: 'Undo import',
+        danger: true,
+    })
+    if (!ok) return
     undoingId.value = item.id
     try {
         await undoImport(item.id)
@@ -1005,7 +1037,13 @@ const onCommit = async () => {
 }
 
 const onUndo = async () => {
-    if (!confirm('Delete every transaction created by this import?')) return
+    const ok = await askConfirm({
+        title: 'Undo import',
+        message: 'Delete every transaction created by this import?',
+        actionLabel: 'Undo import',
+        danger: true,
+    })
+    if (!ok) return
     busy.value = true
     try {
         batch.value = await undoImport(props.uuid)

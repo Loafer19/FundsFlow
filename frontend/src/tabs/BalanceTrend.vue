@@ -30,12 +30,14 @@
 
 <script setup>
 import { TrendingUp } from '@lucide/vue'
-import { computed, inject, ref } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import TrendChart from '../components/charts/TrendChart.vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatCard from '../components/StatCard.vue'
+import { useAuthStore } from '../services/auth.js'
 import { nowDateStr, toLocalDateStr } from '../services/formatters.js'
 import { useTransactionsStore } from '../services/transactions.js'
+import { patchUiState, readUiState } from '../services/uiState.js'
 
 const transactionsStore = useTransactionsStore()
 
@@ -57,7 +59,21 @@ const formatDate = inject('formatDate')
 
 // The previous-period line is shown by default (the chart always had it); unlike Flow's bar overlay,
 // the cards below always compare against the previous period, same as Flow.
-const compare = ref(true)
+const authStore = useAuthStore()
+const compare = ref(readUiState().compare !== false)
+
+watch(
+    () => authStore.user?.id,
+    () => {
+        compare.value = readUiState().compare !== false
+    },
+)
+
+watch(compare, (value) => {
+    if (!authStore.isAuthenticated) return
+    patchUiState({ compare: value })
+})
+
 const openAdd = () => transactions_add_modal.showModal()
 
 const hasPeriodData = computed(() => {

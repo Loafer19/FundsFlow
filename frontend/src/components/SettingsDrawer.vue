@@ -172,10 +172,14 @@
                     <form @submit.prevent="saveCredentials" class="mb-4">
                         <div class="font-medium text-sm mb-2">Login credentials</div>
                         <input v-model="credentialsForm.email" type="email" placeholder="Email" aria-label="Email"
-                            class="input w-full mb-4" maxlength="255" required />
+                            class="input w-full" :class="credentialErrors.email ? 'input-error mb-1' : 'mb-4'"
+                            maxlength="255" required />
+                        <p v-if="credentialErrors.email" class="text-error text-sm mb-4">{{ credentialErrors.email }}</p>
                         <input v-model="credentialsForm.password" type="password" placeholder="New password"
-                            aria-label="New password" class="input w-full mb-4" minlength="8" maxlength="255"
-                            required />
+                            aria-label="New password" class="input w-full"
+                            :class="credentialErrors.password ? 'input-error mb-1' : 'mb-4'" minlength="8"
+                            maxlength="255" required />
+                        <p v-if="credentialErrors.password" class="text-error text-sm mb-4">{{ credentialErrors.password }}</p>
                         <div class="flex justify-end">
                             <button type="submit" class="btn btn-primary btn-sm" :disabled="savingCredentials">
                                 <span v-if="savingCredentials" class="loading loading-spinner loading-xs"></span>
@@ -190,15 +194,19 @@
                             <span class="font-medium w-24 shrink-0">Google</span>
                             <span v-if="googleIdentity" class="badge badge-success badge-sm">Linked</span>
                             <span v-else class="badge badge-ghost badge-sm">Not linked</span>
-                            <span v-if="googleLabel" class="ml-auto text-xs text-base-content/50 truncate max-w-[40%]"
-                                :title="googleLabel">{{ googleLabel }}</span>
+                            <span v-if="googleLabel"
+                                class="ml-auto text-xs text-base-content/50 truncate max-w-[40%] tooltip tooltip-left"
+                                :data-tip="googleLabel">{{ googleLabel }}</span>
+                            <a v-if="!googleIdentity" :href="googleAuthUrl" class="btn btn-primary btn-xs ml-auto">Link</a>
                         </div>
                         <div class="flex items-center gap-2 p-3 rounded-box bg-base-200">
                             <span class="font-medium w-24 shrink-0">GitHub</span>
                             <span v-if="githubIdentity" class="badge badge-success badge-sm">Linked</span>
                             <span v-else class="badge badge-ghost badge-sm">Not linked</span>
-                            <span v-if="githubLabel" class="ml-auto text-xs text-base-content/50 truncate max-w-[40%]"
-                                :title="githubLabel">{{ githubLabel }}</span>
+                            <span v-if="githubLabel"
+                                class="ml-auto text-xs text-base-content/50 truncate max-w-[40%] tooltip tooltip-left"
+                                :data-tip="githubLabel">{{ githubLabel }}</span>
+                            <a v-if="!githubIdentity" :href="githubAuthUrl" class="btn btn-primary btn-xs ml-auto">Link</a>
                         </div>
                     </div>
                         </template>
@@ -209,14 +217,15 @@
                         <template v-if="telegramIdentity">
                             <span class="badge badge-success badge-sm">Linked</span>
                             <span v-if="telegramLinkLabel"
-                                class="ml-auto text-xs text-base-content/50 truncate max-w-[40%]"
-                                :title="telegramLinkLabel">{{ telegramLinkLabel }}</span>
+                                class="ml-auto text-xs text-base-content/50 truncate max-w-[40%] tooltip tooltip-left"
+                                :data-tip="telegramLinkLabel">{{ telegramLinkLabel }}</span>
                         </template>
                         <template v-else>
                             <span class="badge badge-ghost badge-sm">Not linked</span>
-                            <button type="button" class="btn btn-primary btn-xs ml-auto"
+                            <button type="button"
+                                class="btn btn-primary btn-xs ml-auto tooltip tooltip-left before:max-w-48"
                                 @click="openTelegramLink" :disabled="generatingTelegramLink"
-                                title="Link Telegram to add transactions from chat">
+                                data-tip="Link Telegram to add transactions from chat">
                                 Open Bot
                                 <span v-if="generatingTelegramLink"
                                     class="loading loading-spinner loading-xs"></span>
@@ -406,8 +415,10 @@ import {
     updatePreferences,
 } from '../services/account'
 import { useAuthStore } from '../services/auth'
+import { askConfirm } from '../services/confirmDialog.js'
 import {
     apiErrorMessage,
+    apiFieldErrors,
     dateFormatMap,
     formatDateOptions,
     formatMoneyOptions,
@@ -845,6 +856,16 @@ const refreshMcpTokenStatus = async () => {
 }
 
 const generateMcpToken = async () => {
+    if (mcpTokenActive.value || mcpPlainToken.value) {
+        const ok = await askConfirm({
+            title: 'Regenerate MCP token',
+            message: 'The old token will stop working immediately. Anything still using it will be disconnected.',
+            actionLabel: 'Regenerate',
+            danger: true,
+        })
+        if (!ok) return
+    }
+
     mcpTokenBusy.value = true
 
     try {
@@ -860,6 +881,14 @@ const generateMcpToken = async () => {
 }
 
 const revokeMcpTokenAction = async () => {
+    const ok = await askConfirm({
+        title: 'Revoke MCP token',
+        message: 'The token will stop working immediately. Anything still using it will be disconnected.',
+        actionLabel: 'Revoke',
+        danger: true,
+    })
+    if (!ok) return
+
     mcpTokenBusy.value = true
 
     try {
@@ -896,10 +925,14 @@ const openTelegramLink = async () => {
 }
 
 const credentialsForm = ref({ email: '', password: '' })
+const credentialErrors = ref({ email: '', password: '' })
 const savingCredentials = ref(false)
+const googleAuthUrl = import.meta.env.VITE_API_URL + '/auth/google'
+const githubAuthUrl = import.meta.env.VITE_API_URL + '/auth/github'
 
 const saveCredentials = async () => {
     savingCredentials.value = true
+    credentialErrors.value = { email: '', password: '' }
 
     try {
         const response = await updateCredentials(credentialsForm.value)
@@ -909,7 +942,12 @@ const saveCredentials = async () => {
         toasts.success('Credentials saved!')
         credentialsForm.value = { email: response.data.user.email, password: '' }
     } catch (error) {
-        toasts.error(apiErrorMessage(error, 'Could not save: '))
+        const fields = apiFieldErrors(error)
+        credentialErrors.value = { email: fields.email || '', password: fields.password || '' }
+
+        if (!credentialErrors.value.email && !credentialErrors.value.password) {
+            toasts.error(apiErrorMessage(error, 'Could not save: '))
+        }
     } finally {
         savingCredentials.value = false
     }

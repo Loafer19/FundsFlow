@@ -8,18 +8,21 @@
             <p v-if="description" class="text-base-content/60 max-w-sm" :class="size === 'sm' ? 'text-xs' : ''">
                 {{ description }}
             </p>
-            <button v-if="actionLabel" type="button" class="btn btn-primary btn-sm mt-2" @click="$emit('action')">
-                <component :is="actionIcon || Plus" :size="20" />
-                {{ actionLabel }}
+            <button v-if="buttonLabel" type="button" class="btn btn-primary btn-sm mt-2" @click="onAction">
+                <component :is="buttonIcon" :size="20" />
+                {{ buttonLabel }}
             </button>
         </div>
     </div>
 </template>
 
 <script setup>
-import { Plus } from '@lucide/vue'
+import { LogIn, Plus } from '@lucide/vue'
+import { computed } from 'vue'
+import { useAuthStore } from '../services/auth.js'
+import { showModal } from '../services/modal.js'
 
-defineProps({
+const props = defineProps({
     // Lucide component. Rendered in the same tile language as StatCard.
     icon: { type: [Object, Function], default: null },
     iconClass: { type: String, default: 'bg-base-content/10 text-base-content/70' },
@@ -31,5 +34,21 @@ defineProps({
     size: { type: String, default: 'md' },
 })
 
-defineEmits(['action'])
+const emit = defineEmits(['action'])
+const authStore = useAuthStore()
+
+const loggedOutAdd = computed(() => props.actionLabel === 'Add Transaction' && !authStore.isAuthenticated)
+const buttonLabel = computed(() => {
+    if (!props.actionLabel) return ''
+    return loggedOutAdd.value ? 'Log in' : props.actionLabel
+})
+const buttonIcon = computed(() => (loggedOutAdd.value ? LogIn : props.actionIcon || Plus))
+
+const onAction = () => {
+    if (loggedOutAdd.value) {
+        showModal('auth_modal')
+        return
+    }
+    emit('action')
+}
 </script>

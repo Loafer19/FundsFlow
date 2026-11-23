@@ -43,8 +43,10 @@ import BarChart from '../components/charts/BarChart.vue'
 import EmptyState from '../components/EmptyState.vue'
 import SegmentedControl from '../components/SegmentedControl.vue'
 import StatCard from '../components/StatCard.vue'
+import { useAuthStore } from '../services/auth.js'
 import { nowDateStr, parseLocalDate, toLocalDateStr } from '../services/formatters.js'
 import { useTransactionsStore } from '../services/transactions.js'
+import { patchUiState, readUiState } from '../services/uiState.js'
 
 const transactionsStore = useTransactionsStore()
 
@@ -62,8 +64,30 @@ const props = defineProps({
 // App passes the same listeners to every tab; Flow uses jump-to-list for bar clicks.
 const emit = defineEmits(['jump-to-list', 'jump-to-month'])
 
-const groupBy = ref('day')
-const compare = ref(true)
+const authStore = useAuthStore()
+const groupBy = ref(['day', 'week', 'month'].includes(readUiState().flowGroupBy) ? readUiState().flowGroupBy : 'day')
+const compare = ref(readUiState().compare !== false)
+
+watch(
+    () => authStore.user?.id,
+    () => {
+        const saved = readUiState()
+        const grouping = saved.flowGroupBy
+        groupBy.value = ['day', 'week', 'month'].includes(grouping) ? grouping : 'day'
+        compare.value = saved.compare !== false
+    },
+)
+
+watch(compare, (value) => {
+    if (!authStore.isAuthenticated) return
+    patchUiState({ compare: value })
+})
+
+watch(groupBy, (value) => {
+    if (!authStore.isAuthenticated) return
+    patchUiState({ flowGroupBy: value })
+})
+
 const openAdd = () => transactions_add_modal.showModal()
 const hasPeriodData = computed(
     () =>

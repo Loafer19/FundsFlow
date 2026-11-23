@@ -2,7 +2,11 @@
     <div class="flex flex-wrap items-center gap-2 mb-3">
         <label v-if="dateRangeTransactions.length" class="input input-sm min-w-0 flex-1 max-w-xs border-base-300 text-sm">
             <Search :size="16" class="text-base-content/60" />
-            <input v-model="searchQuery" type="text" placeholder="Search notes" />
+            <input v-model="searchQuery" type="text" placeholder="Search notes" aria-label="Search notes" />
+            <button v-if="searchQuery" type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="Clear search"
+                @click="searchQuery = ''">
+                <X :size="12" />
+            </button>
         </label>
 
         <span v-if="listDay" class="badge badge-info gap-1 pl-2 pr-0.5">
@@ -13,6 +17,11 @@
                 <X :size="12" />
             </button>
         </span>
+
+        <button v-if="listFiltersActive && !inReport" type="button" class="btn btn-ghost btn-sm report-hide"
+            @click="clearAllFilters">
+            Clear all
+        </button>
 
         <button v-if="!inReport" type="button"
             class="btn btn-sm border-base-300 text-base-content/50 gap-1 tooltip tooltip-bottom report-hide max-sm:btn-square ml-auto"
@@ -31,7 +40,8 @@
     <template v-else>
 
         <EmptyState v-if="!filteredTransactions.length" :icon="Search" title="No transactions match the current filters"
-            :description="listDay ? 'Try a different search term, clear the tag filter or show the whole period' : 'Try a different search term or clear the tag filter (including Untagged)'" />
+            :description="listDay ? 'Try a different search term, clear the tag filter or show the whole period' : 'Try a different search term or clear the tag filter (including Untagged)'"
+            action-label="Clear all" :action-icon="X" @action="clearAllFilters" />
 
         <div v-else class="card card-border border-base-300 bg-base-100 overflow-hidden" data-type-row-list>
             <div class="overflow-x-auto">
@@ -242,17 +252,19 @@ import {
     X,
 } from '@lucide/vue'
 
-import { computed, inject, ref } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import DeleteHold from '../components/buttons/DeleteHold.vue'
 import EmptyState from '../components/EmptyState.vue'
 import TagDetailModal from '../components/TagDetailModal.vue'
 import TypeSegments from '../components/TypeSegments.vue'
+import { useAuthStore } from '../services/auth.js'
 import { today } from '../services/clock.js'
 import { getTransactionSourceLabel, parseLocalDate, toLocalDateStr } from '../services/formatters'
 import { goToImport } from '../services/imports.js'
 import { useTransactionsStore } from '../services/transactions'
 import { useTransactionTypesStore } from '../services/transactionTypes.js'
 import { typeRows } from '../services/typeFields.js'
+import { patchUiState, readUiState } from '../services/uiState.js'
 
 const formatMoney = inject('formatMoney')
 const formatDate = inject('formatDate')
@@ -290,12 +302,49 @@ const emit = defineEmits(['jump-to-list', 'jump-to-month'])
 // A day picked from a Flow bar (App clears it when the period or tab changes); null = whole period.
 const listDay = inject('listDay', ref(null))
 
+const authStore = useAuthStore()
 const sortConfig = ref({
     key: 'at',
     direction: 'desc',
 })
 
 const searchQuery = ref('')
+
+const applyListUi = () => {
+    const saved = readUiState()
+    searchQuery.value = saved.search || ''
+    sortConfig.value = {
+        key: saved.listSortKey === 'amount' ? 'amount' : 'at',
+        direction: saved.listSortDirection === 'asc' ? 'asc' : 'desc',
+    }
+}
+
+applyListUi()
+watch(() => authStore.user?.id, applyListUi)
+
+watch(
+    [searchQuery, sortConfig],
+    () => {
+        if (!authStore.isAuthenticated) return
+
+        patchUiState({
+            search: searchQuery.value,
+            listSortKey: sortConfig.value.key,
+            listSortDirection: sortConfig.value.direction,
+        })
+    },
+    { deep: true },
+)
+
+const listFiltersActive = computed(() =>
+    Boolean(searchQuery.value.trim() || listDay.value || transactionsStore.tagFilterActive),
+)
+
+const clearAllFilters = () => {
+    searchQuery.value = ''
+    listDay.value = null
+    transactionsStore.clearTagFilter()
+}
 
 const sortBy = (key) => {
     if (sortConfig.value.key === key) {
