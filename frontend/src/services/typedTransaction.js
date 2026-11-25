@@ -137,7 +137,11 @@ export const useTypedTransaction = (transaction, amountField) => {
         for (const field of visibleFields(t)) {
             if (field.type === 'computed') continue
             const raw = transaction.value.data?.[field.key]
-            if (isEmptyValue(raw)) continue
+            // Backend update keeps previous values for omitted keys; send null to clear.
+            if (isEmptyValue(raw)) {
+                data[field.key] = null
+                continue
+            }
 
             if (field.type === 'number') data[field.key] = parseNumber(raw) ?? raw
             else if (field.type === 'duration') data[field.key] = parseDuration(raw) ?? raw
