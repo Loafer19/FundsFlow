@@ -4,6 +4,17 @@ import { hostHeaderValidation } from '@modelcontextprotocol/sdk/server/middlewar
 import { createHash, timingSafeEqual } from 'node:crypto'
 import express, { type Request, type Response } from 'express'
 import { z } from 'zod'
+import {
+    computeTagBalances,
+    filterTransactions,
+    flowTotals,
+    resolvePeriod,
+    resolveTypeId,
+    todayInTimeZone,
+    type PeriodPreset,
+    type TagRecord,
+    type TransactionRecord,
+} from './analytics.ts'
 import { formatApiError, nameFromContentDisposition, unwrapList } from './util.ts'
 import { oauthClientId, oauthClientSecret, oauthPublicBase, registerOAuthRoutes, unauthorizedMcp } from './oauth.ts'
 
@@ -118,6 +129,46 @@ function textResult(data: unknown) {
             },
         ],
     }
+}
+
+type NamedType = { id: number; name: string }
+
+function userTimezone(user: unknown): string {
+    const prefs =
+        user && typeof user === 'object' && 'preferences' in user
+            ? (user as { preferences?: { timezone?: unknown } }).preferences
+            : undefined
+    const zone = typeof prefs?.timezone === 'string' && prefs.timezone.trim() ? prefs.timezone.trim() : 'Europe/Kyiv'
+
+    return zone
+}
+
+async function loadUserToday(token: string | null): Promise<string> {
+    const body = await api<{ user?: unknown }>(token, '/auth/me')
+
+    return todayInTimeZone(userTimezone(body.user))
+}
+
+async function loadTags(token: string | null): Promise<TagRecord[]> {
+    return unwrapList(await api(token, '/tags')) as TagRecord[]
+}
+
+async function loadTransactions(token: string | null): Promise<TransactionRecord[]> {
+    return unwrapList(await api(token, '/transactions')) as TransactionRecord[]
+}
+
+async function loadTypes(token: string | null): Promise<NamedType[]> {
+    return unwrapList(await api(token, '/transaction-types')) as NamedType[]
+}
+
+async function resolveQueryPeriod(
+    token: string | null,
+    args: { period?: PeriodPreset; from?: string; to?: string },
+    defaultPreset: PeriodPreset = 'this_month',
+) {
+    const today = await loadUserToday(token)
+
+    return resolvePeriod(today, args, defaultPreset)
 }
 
 function resolveUserToken(req: Request): string | null {
@@ -288,10 +339,33 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
         'list_transactions',
         {
             title: 'List transactions',
-            description: 'List all transactions, newest first (by date).',
-            inputSchema: {},
+            description:
+                'List transactions, newest first (by date). Optional period (or from/to YYYY-MM-DD), type (name or id) and tag_ids (a parent includes its children) filter the list. With no filters this is every transaction.',
+            inputSchema: {
+                period: z.enum(PERIOD_PRESETS).optional().describe('Ignored when from/to are set.'),
+                from: isoDate().optional(),
+                to: isoDate().optional(),
+                type: z.union([z.string(), z.number()]).optional().describe('Type name or id from list_transaction_types.'),
+                tag_ids: z.array(z.number().int()).optional().describe('A parent tag includes its child tags.'),
+            },
         },
-        async () => textResult(unwrapList(await api(token, '/transactions'))),
+        async ({ period, from, to, type, tag_ids }) => {
+            const [transactions, types, tags] = await Promise.all([
+                loadTransactions(token),
+                type != null ? loadTypes(token) : Promise.resolve([] as NamedType[]),
+                tag_ids?.length ? loadTags(token) : Promise.resolve([] as TagRecord[]),
+            ])
+            const range = period || from || to ? await resolveQueryPeriod(token, { period, from, to }) : null
+            const rows = filterTransactions(transactions, {
+                from: range?.from,
+                to: range?.to,
+                typeId: type != null ? resolveTypeId(types, type) : undefined,
+                tagIds: tag_ids,
+                tags,
+            })
+
+            return textResult(rows)
+        },
     )
 
     server.registerTool(
@@ -404,6 +478,112 @@ function createServer(token: string | null, onTool?: (name: string) => void) {
             inputSchema: { id: z.number().int() },
         },
         async ({ id }) => textResult(await api(token, `/transaction-types/${id}`, { method: 'DELETE' })),
+    )
+
+    server.registerTool(
+        'restore_transaction_type',
+        {
+            title: 'Restore transaction type',
+            description: 'Restore one archived transaction type by id.',
+            inputSchema: { id: z.number().int() },
+        },
+        async ({ id }) => textResult(await api(token, `/transaction-types/${id}/restore`, { method: 'POST' })),
+    )
+
+    server.registerTool(
+        'get_tag_balances',
+        {
+            title: 'Balances per tag',
+            description:
+                'The Analytics "Balances Per Tag" card: each tag with "Calculate balance" enabled, a parent including its children (each transaction counted once). Returns income, expense (signed, expenses negative), net and transaction count. Default is all time, like the card; pass period or from/to (YYYY-MM-DD) for a range. Optional type (name or id) and tag_ids (which rows to include). include_zero (default true) keeps tags with a zero net.',
+            inputSchema: {
+                period: z.enum(PERIOD_PRESETS).optional().describe('Ignored when from/to are set.'),
+                from: isoDate().optional(),
+                to: isoDate().optional(),
+                type: z.union([z.string(), z.number()]).optional().describe('Type name or id from list_transaction_types.'),
+                tag_ids: z.array(z.number().int()).optional().describe('Only return these tag rows (parents still include children in the numbers).'),
+                include_zero: z.boolean().optional().describe('Default true, like the Analytics card. Set false to hide zero-net tags.'),
+            },
+        },
+        async ({ period, from, to, type, tag_ids, include_zero }) => {
+            const [tags, transactions, types] = await Promise.all([
+                loadTags(token),
+                loadTransactions(token),
+                type != null ? loadTypes(token) : Promise.resolve([] as NamedType[]),
+            ])
+            const range = period || from || to ? await resolveQueryPeriod(token, { period, from, to }) : null
+            const scoped = filterTransactions(transactions, {
+                from: range?.from,
+                to: range?.to,
+                typeId: type != null ? resolveTypeId(types, type) : undefined,
+            })
+            let rows = computeTagBalances(tags, scoped, { tagIds: tag_ids })
+            if (include_zero === false) rows = rows.filter((row) => row.net !== 0 || row.transactions > 0)
+
+            return textResult({
+                scope: range ? 'period' : 'all',
+                from: range?.from ?? null,
+                to: range?.to ?? null,
+                label: range?.label ?? 'All time',
+                type: type ?? null,
+                tags: rows,
+            })
+        },
+    )
+
+    server.registerTool(
+        'get_period_summary',
+        {
+            title: 'Period summary',
+            description:
+                'Income, expense (signed, expenses negative), net and transaction count for a period (default this_month, or from/to YYYY-MM-DD), optionally vs the previous period. Optional type (name or id) and tag_ids (a parent includes its children). This is the Analytics period totals, not a chart.',
+            inputSchema: {
+                period: z.enum(PERIOD_PRESETS).optional().describe('Default this_month. Ignored when from/to are set.'),
+                from: isoDate().optional(),
+                to: isoDate().optional(),
+                type: z.union([z.string(), z.number()]).optional().describe('Type name or id from list_transaction_types.'),
+                tag_ids: z.array(z.number().int()).optional().describe('A parent tag includes its child tags.'),
+                compare: z.boolean().optional().describe('Default true: also return the previous period.'),
+            },
+        },
+        async ({ period, from, to, type, tag_ids, compare }) => {
+            const [transactions, types, tags, range] = await Promise.all([
+                loadTransactions(token),
+                type != null ? loadTypes(token) : Promise.resolve([] as NamedType[]),
+                tag_ids?.length ? loadTags(token) : Promise.resolve([] as TagRecord[]),
+                resolveQueryPeriod(token, { period, from, to }),
+            ])
+            const typeId = type != null ? resolveTypeId(types, type) : undefined
+            const current = filterTransactions(transactions, {
+                from: range.from,
+                to: range.to,
+                typeId,
+                tagIds: tag_ids,
+                tags,
+            })
+            const payload: Record<string, unknown> = {
+                from: range.from,
+                to: range.to,
+                label: range.label,
+                current: flowTotals(current),
+            }
+            if (compare !== false) {
+                const previous = filterTransactions(transactions, {
+                    from: range.previousFrom,
+                    to: range.previousTo,
+                    typeId,
+                    tagIds: tag_ids,
+                    tags,
+                })
+                payload.previous = {
+                    from: range.previousFrom,
+                    to: range.previousTo,
+                    ...flowTotals(previous),
+                }
+            }
+
+            return textResult(payload)
+        },
     )
 
     server.registerTool(

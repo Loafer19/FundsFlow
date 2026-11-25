@@ -34,8 +34,8 @@ personal token instead.
 
 ## What the assistant can do
 
-The server exposes 39 tools: tags, transaction types (including type analytics), transactions (including bulk operations of up to 50), attachments, budgets,
-recurring rules, preferences, and a full JSON export. See the [tool reference](/docs/ai/tools/).
+The server exposes 42 tools: tags, transaction types (including type analytics), transactions (including bulk operations of up to 50), attachments, budgets,
+recurring rules, period totals, balances per tag, preferences, and a full JSON export. See the [tool reference](/docs/ai/tools/).
 
 - Transactions created through MCP are marked with the **MCP** source in the web app.
 - Bulk operations are all-or-nothing: if one item fails, none are saved.

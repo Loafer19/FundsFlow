@@ -1,6 +1,6 @@
 ---
 title: MCP tool reference
-description: All 39 tools exposed by the FundsFlow MCP server.
+description: All 42 tools exposed by the FundsFlow MCP server.
 ---
 
 Amounts are **signed**: negative for expenses, positive for income. Dates use `YYYY-MM-DD`.
@@ -28,7 +28,7 @@ Amounts are **signed**: negative for expenses, positive for income. Dates use `Y
 
 | Tool | Description |
 | --- | --- |
-| `list_transactions` | All transactions, newest first |
+| `list_transactions` | Transactions, newest first. Optional `period` or `from`/`to`, `type` (name or id), and `tag_ids` (a parent includes its children) |
 | `list_recent_transactions` | The newest N transactions |
 | `create_transaction` | Create one transaction (source recorded as MCP) |
 | `create_transactions` | Create up to 50 transactions, all-or-nothing |
@@ -51,11 +51,14 @@ Amounts are **signed**: negative for expenses, positive for income. Dates use `Y
 | `create_transaction_type` | Create a type: name, emoji, color, up to 30 fields, default tags |
 | `update_transaction_type` | Update a type by id; send existing fields with their keys (a field left out is hidden, its values kept) |
 | `delete_transaction_type` | Archive a type by id; its transactions keep the type and values |
+| `restore_transaction_type` | Restore one archived type by id |
 
-## Analytics cards
+## Analytics
 
 | Tool | Description |
 | --- | --- |
+| `get_tag_balances` | Analytics **Balances Per Tag**: income, expense (signed), net and count for each tag with "Calculate balance" on (a parent includes its children). Default all time; optional `period` or `from`/`to`, `type`, `tag_ids`, `include_zero` (default true) |
+| `get_period_summary` | Period totals: income, expense (signed), net and count (default `this_month`, or `from`/`to`). Optional `type`, `tag_ids`, and `compare` (default true) for the previous period |
 | `list_dashboard_cards` | The user's **My cards** on Analytics with ids, kind, size and current numbers (optional `period` or `from`/`to`; default this month) |
 | `add_dashboard_card` | Add a card: `kind` `stat` (one number vs the previous period, or `metric: fields` for every number field of the type), `chart` (`line`/`bar` over time, optional `split` by `tag` or a field → up to 6 series) or `pie` (`split` required). Filters: `type`, `tags`, `filters` (`{"station": "WOG"}`, needs `type`); `metric` (`amount` or a number field), `agg` (`sum`, `avg`, `count`, `min`, `max`), `flow` (`expense`, `income`, `all`), `size` (`S`, `M`, `L`). In the assistant it stages Confirm/Cancel |
 | `remove_dashboard_card` | Remove a card by id (Confirm/Cancel in the assistant) |
