@@ -4,6 +4,7 @@
 backend/vendor
 
 frontend/node_modules
+mcp/node_modules
 frontend/dist
 
 docs/node_modules

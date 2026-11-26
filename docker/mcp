@@ -5,12 +5,15 @@ WORKDIR /app
 COPY mcp/package.json mcp/bun.lock ./
 RUN bun install --frozen-lockfile --production
 
-COPY mcp/index.ts mcp/oauth.ts mcp/util.ts mcp/analytics.ts mcp/tsconfig.json ./
+COPY mcp/ ./
 
 ENV HOST=0.0.0.0
 ENV PORT=8787
 ENV ALLOWED_HOSTS=mcp.fundsflow.fun,127.0.0.1,localhost
 
 EXPOSE 8787
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget -q --spider http://127.0.0.1:8787/ || exit 1
 
 CMD ["bun", "run", "index.ts"]

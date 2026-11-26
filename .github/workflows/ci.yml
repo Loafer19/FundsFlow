@@ -59,6 +59,43 @@ jobs:
           composer install --no-interaction --no-scripts --prefer-dist
           vendor/bin/pint --test
 
+
+  prod-health:
+    needs: [frontend, mcp, backend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Poll production health
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 600))
+          ok_streak=0
+          while true; do
+            mcp_code=$(curl -sS -o /tmp/mcp.json -w '%{http_code}' --max-time 15 https://mcp.fundsflow.fun/ || echo 000)
+            fe_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 https://fundsflow.fun/ || echo 000)
+            mcp_ok=0
+            if [ "$mcp_code" = 200 ] && python3 -c 'import json,sys; sys.exit(0 if json.load(open("/tmp/mcp.json")).get("name")=="fundsflow-mcp" else 1)'; then
+              mcp_ok=1
+            fi
+            if [ "$mcp_ok" = 1 ] && [ "$fe_code" = 200 ]; then
+              ok_streak=$((ok_streak + 1))
+            else
+              ok_streak=0
+            fi
+            echo "mcp=$mcp_code ok=$mcp_ok frontend=$fe_code streak=$ok_streak elapsed=${SECONDS}s"
+            # 3 successes (~30s) after 5 minutes, so a crash loop after Dokploy's "done" is still caught.
+            if [ "$ok_streak" -ge 3 ] && [ "$SECONDS" -ge 300 ]; then
+              echo "Production is healthy."
+              exit 0
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "Production did not become healthy in time."
+              exit 1
+            fi
+            sleep 15
+          done
+
   release:
     needs: [frontend, mcp, backend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
