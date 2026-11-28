@@ -40,7 +40,7 @@
 
         <section v-if="sections.trend" class="report-section">
             <h2 class="report-tab-title">Trend</h2>
-            <BalanceTrend :dateRange="dateRange" />
+            <BalanceTrend :dateRange="dateRange" :dateSelectionType="tabSelectionType" />
         </section>
 
         <section v-if="sections.list" class="report-section">

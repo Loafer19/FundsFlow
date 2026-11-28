@@ -1,6 +1,6 @@
 <template>
     <div class="card card-border border-base-300 bg-base-100 min-w-0">
-        <div class="card-body p-4 gap-1 min-w-0">
+        <div class="card-body min-w-0" :class="compact ? 'p-2.5 gap-0.5 sm:p-4 sm:gap-1' : 'p-4 gap-1'">
             <div class="flex items-center gap-2 min-w-0">
                 <span v-if="iconMeta" class="shrink-0 rounded-lg p-1.5" :class="iconMeta.class">
                     <component :is="iconMeta.component" :size="16" />
@@ -13,7 +13,7 @@
                 </div>
             </div>
             <div class="flex flex-wrap items-baseline gap-x-2 min-w-0">
-                <span class="text-lg font-semibold tabular-nums" :class="valueClass">{{ value || display(current) }}</span>
+                <span class="font-semibold tabular-nums" :class="[compact ? 'text-base sm:text-lg' : 'text-lg', valueClass]">{{ value || display(current) }}</span>
                 <span v-if="note" class="text-xs text-base-content/60">{{ note }}</span>
             </div>
             <div v-if="compare" class="flex flex-wrap items-center gap-2 text-xs">
@@ -72,6 +72,7 @@ const props = defineProps({
     lowerIsBetter: { type: Boolean, default: false },
     // Neither direction is good or bad (e.g. transaction count): grey pill.
     neutral: { type: Boolean, default: false },
+    compact: { type: Boolean, default: false },
     hint: { type: String, default: '' },
     // Tooltip placement classes for the hint. DaisyUI lays the tooltip bubble out even while hidden, so a card in the
     // last grid column must open it inwards (tooltip-left) or the bubble widens the whole page.

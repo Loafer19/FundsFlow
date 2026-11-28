@@ -4,24 +4,32 @@
         action-label="Add Transaction" @action="openAdd" />
 
     <template v-else>
-        <div class="flex flex-wrap items-center gap-3 mb-3">
-            <label class="label text-sm cursor-pointer ml-auto report-hide">
-                <input v-model="compare" type="checkbox" class="toggle toggle-primary toggle-sm" />
-                Compare with previous period
-            </label>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3 mb-3 max-lg:[&>:last-child:nth-child(odd)]:col-span-2"
+        <div class="max-lg:-mx-4 max-lg:px-4 flex gap-2 overflow-x-auto mb-3 pb-1 max-lg:snap-x max-lg:snap-mandatory lg:grid lg:gap-3 lg:mx-0 lg:px-0 lg:overflow-visible"
             :class="summary.length > 4 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'">
-            <StatCard v-for="item in summary" :key="item.key" :icon="item.icon" :label="item.label"
+            <StatCard v-for="item in summary" :key="item.key" compact class="min-w-[10.5rem] shrink-0 max-lg:snap-start"
+                :icon="item.icon" :label="item.label"
                 :current="item.current" :previous="item.previous" :note="item.note" :previous-note="item.previousNote"
-                :hint="item.hint" :hint-placement="item.hintPlacement" :compare="compare" />
+                :hint="item.hint" :hint-placement="item.hintPlacement" :compare="compare && hasPrevious" />
         </div>
 
-        <div class="card card-border border-base-300 bg-base-100">
-            <div class="card-body gap-3 p-3 sm:p-6">
-                <div class="h-64 sm:h-96">
-                    <TrendChart :balances="chartBalances" fill />
+        <div class="card card-border border-base-300 bg-base-100 min-w-0 max-md:scroll-mb-[calc(6rem+env(safe-area-inset-bottom))]">
+            <div class="card-body gap-3 p-3 sm:p-6 max-md:pb-4">
+                <div class="flex flex-wrap items-center gap-2 min-w-0">
+                    <h2 class="card-title text-base sm:text-lg min-w-0 gap-2">
+                        <span>Trend</span>
+                        <span class="tooltip tooltip-bottom before:max-w-56 font-normal report-hide"
+                            data-tip="Cumulative net for this period, starting at 0. This is not your account balance.">
+                            <Info :size="16" class="opacity-60" />
+                        </span>
+                    </h2>
+                    <label class="label text-sm cursor-pointer ml-auto gap-2 py-0 report-hide min-w-0">
+                        <span class="text-base-content/70 truncate">Compare</span>
+                        <input v-model="compare" type="checkbox" class="toggle toggle-primary toggle-sm" />
+                    </label>
+                </div>
+                <div class="h-56 sm:h-96">
+                    <TrendChart :balances="chartBalances" :bucket="chartBucket" :today="todayKey" fill
+                        :clickable="!inReport" @select="openPoint" />
                 </div>
             </div>
         </div>
@@ -29,7 +37,7 @@
 </template>
 
 <script setup>
-import { TrendingUp } from '@lucide/vue'
+import { Info, TrendingUp } from '@lucide/vue'
 import { computed, inject, ref, watch } from 'vue'
 import TrendChart from '../components/charts/TrendChart.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -52,13 +60,11 @@ const props = defineProps({
     },
 })
 
-// App passes the same listeners to every tab; declared so they are not extraneous attrs.
-defineEmits(['jump-to-list', 'jump-to-month'])
+const emit = defineEmits(['jump-to-list', 'jump-to-month'])
 
 const formatDate = inject('formatDate')
+const inReport = inject('inReport', false)
 
-// The previous-period line is shown by default (the chart always had it); unlike Flow's bar overlay,
-// the cards below always compare against the previous period, same as Flow.
 const authStore = useAuthStore()
 const compare = ref(readUiState().compare !== false)
 
@@ -79,6 +85,11 @@ const openAdd = () => transactions_add_modal.showModal()
 const hasPeriodData = computed(() => {
     const { currentStart, currentEnd } = props.dateRange
     return transactionsStore.filteredByDateRangeAndTags(currentStart, currentEnd).length > 0
+})
+
+const hasPrevious = computed(() => {
+    const { previousStart, previousEnd } = props.dateRange
+    return transactionsStore.filteredByDateRangeAndTags(previousStart, previousEnd).length > 0
 })
 
 // Running (cumulative) net of the period's tag-filtered transactions, one point per day, starting from 0.
@@ -112,7 +123,7 @@ const balanceTrend = computed(() => {
 
     return {
         currentBalances: calculateBalance(currentStart, currentEnd),
-        previousBalances: calculateBalance(previousStart, previousEnd),
+        previousBalances: hasPrevious.value ? calculateBalance(previousStart, previousEnd) : {},
     }
 })
 
@@ -134,6 +145,21 @@ const forecastBalances = computed(() => {
     return out
 })
 
+// Year view: one point per month (the last daily value in that month, including a trailing null month).
+const lastByMonth = (daily) => {
+    const out = {}
+    for (const [date, value] of Object.entries(daily)) {
+        const key = `${date.slice(0, 7)}-01`
+        if (!(key in out)) out[key] = null
+        if (value != null) out[key] = value
+    }
+    return out
+}
+
+const chartBucket = computed(() => (props.dateSelectionType === 'year' ? 'month' : 'day'))
+
+const bucket = (daily) => (chartBucket.value === 'month' ? lastByMonth(daily) : daily)
+
 const chartBalances = computed(() => {
     const current = balanceTrend.value.currentBalances
     const forecast = forecastBalances.value
@@ -149,11 +175,19 @@ const chartBalances = computed(() => {
     }
 
     return {
-        currentBalances: currentForChart,
-        previousBalances: compare.value ? balanceTrend.value.previousBalances : {},
-        forecastBalances: forecast,
+        currentBalances: bucket(currentForChart),
+        previousBalances: compare.value ? bucket(balanceTrend.value.previousBalances) : {},
+        forecastBalances: bucket(forecast),
     }
 })
+
+const todayKey = computed(() => {
+    const today = nowDateStr()
+    const key = chartBucket.value === 'month' ? `${today.slice(0, 7)}-01` : today
+    return key in chartBalances.value.currentBalances ? key : ''
+})
+
+const openPoint = (date) => emit('jump-to-list', { groupBy: chartBucket.value, date })
 
 // Lowest / highest running net and the first day it was reached (null for an empty list).
 const extreme = (balances, pick) => {
@@ -189,9 +223,11 @@ const summary = computed(() => {
         {
             key: 'avg',
             icon: 'avg',
-            label: 'Avg daily change',
+            label: 'Avg / day',
             current: elapsedDays ? net / elapsedDays : 0,
             previous: previous.length ? prevNet / previous.length : 0,
+            hint: 'Average daily change of the running net',
+            hintPlacement: 'tooltip-left before:max-w-52',
         },
         {
             key: 'low',
