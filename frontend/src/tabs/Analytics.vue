@@ -15,7 +15,7 @@
                     <h2 class="card-title text-base sm:text-lg min-w-0">
                         <Telescope :size="22" class="text-accent shrink-0" />
                         <span class="truncate">Forecast · end of {{ periodName }}</span>
-                        <span class="tooltip tooltip-bottom before:max-w-52 sm:before:max-w-64 font-normal text-sm report-hide" :data-tip="forecast.explanation">
+                        <span class="tooltip tooltip-left sm:tooltip-bottom before:max-w-52 sm:before:max-w-64 font-normal text-sm report-hide" :data-tip="forecast.explanation">
                             <Info :size="16" class="opacity-60" />
                         </span>
                     </h2>
@@ -54,7 +54,7 @@
                     <h2 class="card-title text-base sm:text-lg min-w-0">
                         <ChartPie :size="22" class="text-primary shrink-0" />
                         <span class="truncate">Top spending tags</span>
-                        <span class="tooltip tooltip-bottom before:max-w-52 sm:before:max-w-64 font-normal text-sm report-hide" :data-tip="topTagsHint">
+                        <span class="tooltip tooltip-left sm:tooltip-bottom before:max-w-52 sm:before:max-w-64 font-normal text-sm report-hide" :data-tip="topTagsHint">
                             <Info :size="16" class="opacity-60" />
                         </span>
                     </h2>
@@ -187,7 +187,7 @@
                         :disabled="inReport" @click="toggleBalances">
                         <ChevronDown :size="20" class="shrink-0 transition-transform report-hide"
                             :class="{ '-rotate-90': !balancesOpen }" />
-                        <span class="tooltip tooltip-right font-semibold"
+                        <span class="tooltip tooltip-bottom before:max-w-52 font-semibold"
                             data-tip="Parent tags include child tags">
                             Balances Per Tag
                         </span>
@@ -394,6 +394,8 @@ const statCards = computed(() => {
             previous: savingsRate(prev),
             format: 'percent',
             hint: 'Share of income kept (net ÷ income). Change in percentage points.',
+            // Right column on a phone (2 columns), middle column from md (3 columns).
+            hintPlacement: 'tooltip-left md:tooltip-bottom before:max-w-44',
         },
         {
             key: 'count',
@@ -410,6 +412,8 @@ const statCards = computed(() => {
             previous: prev.expenses / previousActiveDays,
             lowerIsBetter: true,
             hint: running ? `Expenses ÷ ${activeDays} days so far` : `Expenses ÷ ${activeDays} days`,
+            // Last column at every width.
+            hintPlacement: 'tooltip-left before:max-w-44',
         },
     ]
 })

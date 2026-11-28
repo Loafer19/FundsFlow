@@ -245,23 +245,6 @@ html.report-print-page #fundsflow-report {
         max-height: none !important;
     }
 
-    /* Tag tables: full card width; amount column stays compact */
-    html.printing-report #fundsflow-report .tags-list .table {
-        width: 100% !important;
-        max-width: none !important;
-        table-layout: auto;
-    }
-
-    html.printing-report #fundsflow-report .tags-list .table td.w-full {
-        width: auto !important;
-    }
-
-    html.printing-report #fundsflow-report .tags-list .table td:last-child {
-        width: 1%;
-        white-space: nowrap;
-        text-align: right;
-    }
-
     html.printing-report #fundsflow-report .grid.sm\:grid-cols-2,
     html.printing-report #fundsflow-report .sm\:grid-cols-2,
     html.printing-report #fundsflow-report .lg\:grid-cols-2 {

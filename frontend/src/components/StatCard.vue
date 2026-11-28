@@ -73,8 +73,9 @@ const props = defineProps({
     // Neither direction is good or bad (e.g. transaction count): grey pill.
     neutral: { type: Boolean, default: false },
     hint: { type: String, default: '' },
-    // Tooltip placement classes for the hint (a card in the last column can open it to the left).
-    hintPlacement: { type: String, default: 'tooltip-bottom' },
+    // Tooltip placement classes for the hint. DaisyUI lays the tooltip bubble out even while hidden, so a card in the
+    // last grid column must open it inwards (tooltip-left) or the bubble widens the whole page.
+    hintPlacement: { type: String, default: 'tooltip-bottom before:max-w-44' },
     // income · expenses · net · avg · savings · count · daily · goal · done · low · peak · forecast
     // (unknown → no icon).
     icon: { type: String, default: '' },

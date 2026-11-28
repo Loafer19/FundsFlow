@@ -8,87 +8,55 @@
             <SegmentedControl v-model="viewMode" size="sm" label="Tag distribution view" :options="viewModeOptions" />
         </div>
 
-        <div v-if="!inReport" class="grid grid-cols-2 gap-3 mb-3">
-            <StatCard icon="income" label="Income" :current="sectionTotals.income" :previous="null" :compare="false" />
-            <StatCard icon="expenses" label="Expenses" :current="sectionTotals.expenses" :previous="null" :compare="false" />
-        </div>
+        <div class="grid grid-cols-1 gap-3 min-w-0" :class="viewMode === 'donuts' ? 'md:grid-cols-2' : 'lg:grid-cols-2'">
+            <template v-for="section in sections" :key="section.key">
+                <EmptyState v-if="!section.rows.length" size="sm" :icon="section.icon" :icon-class="section.iconClass"
+                    :title="section.empty" description="Add a transaction or change the range."
+                    :action-label="inReport ? '' : 'Add Transaction'" @action="openAdd" />
 
-        <div class="card card-border border-base-300 bg-base-100">
-            <div class="card-body">
-                <div v-if="viewMode === 'donuts'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <h3 class="card-title text-base sm:text-lg mb-2">
-                            <TrendingUp :size="22" class="text-success shrink-0" />
-                            Income
-                        </h3>
-                        <div v-if="positiveTagsWithAmount.length > 0">
-                            <TagDonutChart :tagsWithAmount="positiveTagsWithAmount" :clickable="!inReport"
-                                @select="openDetail($event, 'income')" />
+                <div v-else class="card card-border border-base-300 bg-base-100 min-w-0">
+                    <div class="card-body p-4 gap-3 min-w-0">
+                        <div class="min-w-0">
+                            <h3 class="card-title text-base sm:text-lg min-w-0">
+                                <component :is="section.icon" :size="22" class="shrink-0" :class="section.textClass" />
+                                <span class="truncate">{{ section.title }}</span>
+                                <span class="ml-auto tabular-nums shrink-0">{{ formatMoney(section.total) }}</span>
+                            </h3>
+                            <p class="text-xs text-base-content/60">
+                                {{ formatPercentage(section.turnoverShare) }} of turnover
+                            </p>
                         </div>
-                        <div v-else class="text-base-content/60 py-8 text-center">No income in this period</div>
-                    </div>
-                    <div>
-                        <h3 class="card-title text-base sm:text-lg mb-2">
-                            <TrendingDown :size="22" class="text-error shrink-0" />
-                            Expenses
-                        </h3>
-                        <div v-if="negativeTagsWithAmount.length > 0">
-                            <TagDonutChart :tagsWithAmount="negativeTagsWithAmount" :clickable="!inReport"
-                                @select="openDetail($event, 'expenses')" />
-                        </div>
-                        <div v-else class="text-base-content/60 py-8 text-center">No expenses in this period</div>
+
+                        <template v-if="viewMode === 'donuts'">
+                            <nav v-if="section.crumbs.length" class="flex flex-wrap items-center gap-1 text-sm min-w-0"
+                                :aria-label="`${section.title} drill-down`">
+                                <button type="button" class="link link-hover" @click="drillTo(section.key, 0)">All</button>
+                                <template v-for="(crumb, index) in section.crumbs" :key="crumb.id">
+                                    <ChevronRight :size="14" class="text-base-content/40 shrink-0" />
+                                    <button v-if="index < section.crumbs.length - 1" type="button"
+                                        class="link link-hover truncate" @click="drillTo(section.key, index + 1)">
+                                        {{ crumb.emoji }} {{ crumb.title }}
+                                    </button>
+                                    <span v-else class="font-medium truncate">{{ crumb.emoji }} {{ crumb.title }}</span>
+                                </template>
+                                <button type="button" class="btn btn-ghost btn-xs ml-auto font-normal"
+                                    @click="openDetail(section.crumbs.at(-1), section.key)">
+                                    Details
+                                    <ChevronRight :size="14" />
+                                </button>
+                            </nav>
+
+                            <TagDonutChart :items="section.donutItems" :center-label="section.centerLabel"
+                                :center-value="formatMoney(section.centerValue)" :clickable="!inReport"
+                                @select="selectSlice(section.key, $event)" />
+                        </template>
+
+                        <TagBreakdownList v-else :rows="section.visibleRows" :badge="section.badge" :in-report="inReport"
+                            @select="openDetail($event, section.key)" @toggle="toggleRow($event)"
+                            @more="showAllRoots[section.key] = !showAllRoots[section.key]" />
                     </div>
                 </div>
-
-                <div v-else-if="viewMode === 'list'" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div v-for="section in listSections" :key="section.key" class="tags-list min-w-0">
-                        <h3 class="card-title text-base sm:text-lg mb-2">
-                            <component :is="section.key === 'income' ? TrendingUp : TrendingDown" :size="22"
-                                class="shrink-0" :class="section.key === 'income' ? 'text-success' : 'text-error'" />
-                            {{ section.title }}
-                        </h3>
-                        <table class="table table-sm w-full">
-                            <tbody>
-                                <tr v-if="!section.rows.length">
-                                    <td colspan="3" class="text-base-content/60">{{ section.empty }}</td>
-                                </tr>
-                                <tr v-for="tag in section.rows" :key="tag.id || `untagged-${section.key}`"
-                                    :class="{ 'hover:bg-base-200/60': tag.clickable }">
-                                    <!-- In the app the button fills the cell (its padding replaces the cell's); the print report
-                                         keeps plain cells so the report table styles apply -->
-                                    <td :class="{ 'p-0': !inReport }">
-                                        <component :is="tag.clickable ? 'button' : 'div'"
-                                            :type="tag.clickable ? 'button' : undefined"
-                                            class="w-full flex items-center gap-2 text-left min-w-0"
-                                            :class="{ 'px-3 py-2': !inReport, 'cursor-pointer': tag.clickable }"
-                                            :style="{ paddingLeft: `${(inReport ? 0 : 12) + tag.depth * 20}px` }"
-                                            :aria-label="tag.clickable ? `Open ${tag.title} details` : undefined"
-                                            @click="tag.clickable && openDetail(tag, section.key)">
-                                            <span class="badge badge-soft text-xl py-4 px-2" :class="section.badge">
-                                                {{ tag.emoji }}
-                                            </span>
-                                            <span class="truncate">{{ tag.title }}</span>
-                                        </component>
-                                    </td>
-                                    <td class="w-0 text-right whitespace-nowrap">
-                                        <span v-if="tag.change.label"
-                                            class="badge badge-sm tabular-nums tooltip tooltip-left"
-                                            :class="tag.change.badge"
-                                            :data-tip="`Previous period: ${formatMoney(tag.previousAmount)}`">
-                                            {{ tag.change.label }}
-                                        </span>
-                                    </td>
-                                    <td class="w-0 font-medium text-right whitespace-nowrap tabular-nums">
-                                        <span class="tooltip tooltip-left" :data-tip="tag.count + ' txns'">
-                                            {{ formatMoney(tag.amount) }}
-                                        </span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+            </template>
         </div>
 
         <TagDetailModal v-if="!inReport" ref="detailModal" :dateRange="dateRange"
@@ -97,14 +65,16 @@
 </template>
 
 <script setup>
-import { Tags, TrendingDown, TrendingUp } from '@lucide/vue'
-import { computed, inject, ref } from 'vue'
+import { ChevronRight, Tags, TrendingDown, TrendingUp } from '@lucide/vue'
+import { computed, inject, reactive, ref } from 'vue'
 import TagDonutChart from '../components/charts/TagDonutChart.vue'
 import EmptyState from '../components/EmptyState.vue'
 import SegmentedControl from '../components/SegmentedControl.vue'
-import StatCard from '../components/StatCard.vue'
 import TagDetailModal from '../components/TagDetailModal.vue'
+import TagBreakdownList from '../components/tags/TagBreakdownList.vue'
+import { useChartTheme } from '../services/chartTheme.js'
 import { tagChange } from '../services/comparison.js'
+import { NEUTRAL_TAG_COLOR, tagColor } from '../services/tagColors.js'
 import { useTagsStore } from '../services/tags'
 import { useTransactionsStore } from '../services/transactions'
 
@@ -133,6 +103,7 @@ const openAdd = () => transactions_add_modal.showModal()
 const inReport = inject('inReport', false)
 const detailModal = ref(null)
 const openDetail = (tag, side) => detailModal.value?.open(tag.id, side)
+const { narrow } = useChartTheme()
 
 const hasPeriodData = computed(
     () =>
@@ -144,16 +115,17 @@ const viewModeOptions = [
     { value: 'list', label: 'List' },
 ]
 
-const sectionTotals = computed(() => {
-    const list = transactionsStore.filteredByDateRangeAndTags(props.dateRange.currentStart, props.dateRange.currentEnd)
+const totalsFor = (start, end) => {
     let income = 0
     let expenses = 0
-    for (const row of list) {
+    for (const row of transactionsStore.filteredByDateRangeAndTags(start, end)) {
         if (row.amount >= 0) income += row.amount
         else expenses += Math.abs(row.amount)
     }
     return { income, expenses }
-})
+}
+
+const sectionTotals = computed(() => totalsFor(props.dateRange.currentStart, props.dateRange.currentEnd))
 
 const parentById = computed(() => new Map(tagsStore.tags.map((tag) => [tag.id, tag.parent_id ?? null])))
 
@@ -208,7 +180,7 @@ const buildTagTree = (currentData, previousData, isPositive) => {
     const tagList = tagsStore.list()
     const tree = []
 
-    if (untaggedCurrent.amount > 0 || untaggedCurrent.count > 0 || untaggedPrevious.amount > 0) {
+    if (untaggedCurrent.amount > 0 || untaggedCurrent.count > 0) {
         tree.push({
             id: null,
             clickable: false,
@@ -231,20 +203,9 @@ const buildTagTree = (currentData, previousData, isPositive) => {
             clickable: !inReport,
         }
 
-        const hasActivity = tagData.amount > 0 || tagData.count > 0 || tagData.previousAmount > 0
-        const hasActiveChildren = tagList.some((child) => {
-            if (child.parent_id === tag.id) {
-                const childCurrent = current[child.id]?.amount || 0
-                const childCount = current[child.id]?.count || 0
-                const childPrevious = previous[child.id]?.amount || 0
-                return childCurrent > 0 || childCount > 0 || childPrevious > 0
-            }
-            return false
-        })
-
-        if (hasActivity || hasActiveChildren) {
-            tree.push(tagData)
-        }
+        // Only tags active in this period (a parent's own totals include its sub-tags). A tag that was used
+        // only in the previous period is not listed: it would be a row of zeros.
+        if (tagData.amount > 0 || tagData.count > 0) tree.push(tagData)
     })
 
     return tree
@@ -256,36 +217,187 @@ const previousPeriod = computed(() => calculateTagAmounts(props.dateRange.previo
 const filteredPositiveTagTree = computed(() => buildTagTree(currentPeriod.value, previousPeriod.value, true))
 const filteredNegativeTagTree = computed(() => buildTagTree(currentPeriod.value, previousPeriod.value, false))
 
-// Expenses: a drop is good; income: growth is good. "new" when the previous period had nothing.
-const withChange = (tree, lowerIsBetter) =>
-    tree.map((tag) => ({
-        ...tag,
-        change: tagChange(tag.amount, tag.previousAmount, { lowerIsBetter, formatPercentage }),
-    }))
+// ── Sections (Income / Expenses) ─────────────────────────────────────────────────────────────────
+// Rows are ordered as a tree with the biggest amount first at every level; "Untagged" always goes last.
+const arrange = (tree, lowerIsBetter) => {
+    const present = new Set(tree.filter((row) => row.id != null).map((row) => row.id))
+    const children = new Map()
+    const roots = []
 
-const listSections = computed(() => [
-    {
-        key: 'income',
+    for (const row of tree) {
+        const parentId = row.id != null && row.parent_id != null && present.has(row.parent_id) ? row.parent_id : null
+        const entry = { ...row, parentId }
+        if (parentId == null) roots.push(entry)
+        else children.set(parentId, [...(children.get(parentId) || []), entry])
+    }
+
+    const byAmount = (a, b) => b.amount - a.amount
+    const rowsOut = []
+    const visit = (entry, depth) => {
+        const kids = (children.get(entry.id) || []).sort(byAmount)
+        rowsOut.push({
+            ...entry,
+            key: entry.id ?? 'untagged',
+            depth,
+            hasChildren: kids.length > 0,
+            color: tagColor(entry.id),
+            change: tagChange(entry.amount, entry.previousAmount, { lowerIsBetter, formatPercentage }),
+        })
+        for (const kid of kids) visit(kid, depth + 1)
+    }
+
+    roots.sort((a, b) => (a.id == null) - (b.id == null) || byAmount(a, b))
+    for (const root of roots) visit(root, 0)
+
+    const rootsSum = rowsOut.filter((row) => row.parentId == null).reduce((sum, row) => sum + row.amount, 0)
+
+    return rowsOut.map((row) => ({ ...row, share: rootsSum > 0 ? (row.amount / rootsSum) * 100 : 0 }))
+}
+
+const SECTION_META = {
+    income: {
         title: 'Income',
-        empty: 'No income tags',
+        empty: 'No income in this period',
+        icon: TrendingUp,
+        textClass: 'text-success',
+        iconClass: 'bg-success/15 text-success',
         badge: 'badge-success',
-        rows: withChange(filteredPositiveTagTree.value, false),
     },
-    {
-        key: 'expenses',
+    expenses: {
         title: 'Expenses',
-        empty: 'No expense tags',
+        empty: 'No expenses in this period',
+        icon: TrendingDown,
+        textClass: 'text-error',
+        iconClass: 'bg-error/15 text-error',
         badge: 'badge-error',
-        rows: withChange(filteredNegativeTagTree.value, true),
     },
-])
+}
 
-// Donuts show top-level tags only (each includes its child tags), so no amount is drawn twice.
-const positiveTagsWithAmount = computed(() => {
-    return filteredPositiveTagTree.value.filter((tag) => tag.amount > 0 && tag.depth === 0)
+const incomeRows = computed(() => arrange(filteredPositiveTagTree.value, false))
+const expenseRows = computed(() => arrange(filteredNegativeTagTree.value, true))
+
+// Donut drill-down: the path of tag ids opened per side, and the list's per-row open/closed overrides.
+const drillPath = reactive({ income: [], expenses: [] })
+const showAllRoots = reactive({ income: false, expenses: false })
+const openOverrides = reactive({})
+
+// Phones start with sub-tags closed and only the top tags listed; desktop shows everything.
+const TOP_ON_PHONE = 6
+const isOpen = (row) => (inReport ? true : (openOverrides[row.key] ?? !narrow.value))
+const toggleRow = (row) => {
+    openOverrides[row.key] = !isOpen(row)
+}
+
+const listRows = (rows, key) => {
+    const out = []
+    const collapse = !inReport && narrow.value && !showAllRoots[key]
+    const roots = rows.filter((row) => row.parentId == null)
+    const hiddenRoots = collapse && roots.length > TOP_ON_PHONE + 1 ? roots.slice(TOP_ON_PHONE) : []
+    const hidden = new Set(hiddenRoots.map((row) => row.key))
+    let skipBelow = null
+    let inHidden = false
+
+    for (const row of rows) {
+        if (row.parentId == null) {
+            inHidden = hidden.has(row.key)
+            skipBelow = null
+        }
+        if (inHidden) continue
+        if (skipBelow !== null && row.depth > skipBelow) continue
+        skipBelow = null
+
+        const open = isOpen(row)
+        out.push({ ...row, open })
+        if (row.hasChildren && !open) skipBelow = row.depth
+    }
+
+    if (hiddenRoots.length) {
+        out.push({
+            key: 'more',
+            more: hiddenRoots.length,
+            amount: hiddenRoots.reduce((sum, row) => sum + row.amount, 0),
+        })
+    }
+
+    return out
+}
+
+const donutFor = (rows, key, total) => {
+    const crumbs = []
+    for (const id of drillPath[key]) {
+        const row = rows.find((candidate) => candidate.id === id)
+        if (!row) break
+        crumbs.push(row)
+    }
+
+    const parent = crumbs.at(-1) ?? null
+    const slices = rows
+        .filter((row) => (row.parentId ?? null) === (parent?.id ?? null) && row.amount > 0)
+        .map((row) => ({
+            key: row.key,
+            id: row.id,
+            title: row.title,
+            emoji: row.emoji,
+            amount: row.amount,
+            count: row.count,
+            color: row.color,
+            clickable: row.clickable,
+            drillable: row.hasChildren && !inReport,
+        }))
+
+    if (parent) {
+        // Part of the tag that has no sub-tag of its own.
+        const direct = parent.amount - slices.reduce((sum, slice) => sum + slice.amount, 0)
+        if (direct > 0.005) {
+            slices.push({
+                key: `direct-${parent.id}`,
+                id: null,
+                title: `${parent.title} (no sub-tag)`,
+                emoji: parent.emoji,
+                amount: direct,
+                count: 0,
+                color: NEUTRAL_TAG_COLOR,
+                clickable: false,
+                drillable: false,
+            })
+        }
+    }
+
+    slices.sort((a, b) => b.amount - a.amount)
+
+    return {
+        crumbs,
+        donutItems: slices,
+        centerLabel: parent ? parent.title : 'Total',
+        centerValue: parent ? parent.amount : total,
+    }
+}
+
+const sections = computed(() => {
+    const turnover = sectionTotals.value.income + sectionTotals.value.expenses
+    const build = (key, rows, total) => ({
+        key,
+        ...SECTION_META[key],
+        rows,
+        total,
+        turnoverShare: turnover > 0 ? (total / turnover) * 100 : 0,
+        visibleRows: listRows(rows, key),
+        ...donutFor(rows, key, total),
+    })
+
+    return [
+        build('income', incomeRows.value, sectionTotals.value.income),
+        build('expenses', expenseRows.value, sectionTotals.value.expenses),
+    ]
 })
 
-const negativeTagsWithAmount = computed(() => {
-    return filteredNegativeTagTree.value.filter((tag) => tag.amount > 0 && tag.depth === 0)
-})
+const drillTo = (key, length) => {
+    drillPath[key] = drillPath[key].slice(0, length)
+}
+
+// A slice with sub-tags opens them; a leaf slice opens the tag's details.
+const selectSlice = (key, item) => {
+    if (item.drillable) drillPath[key] = [...drillPath[key], item.id]
+    else if (item.clickable && item.id != null) detailModal.value?.open(item.id, key)
+}
 </script>

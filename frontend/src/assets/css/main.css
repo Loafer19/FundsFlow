@@ -40,18 +40,6 @@ select:focus {
     overflow-x: auto;
 }
 
-.tags-list .table td:first-child {
-    padding-left: 0;
-}
-
-.tags-list .table tr:first-child {
-    border-top: var(--border) solid color-mix(in oklch, var(--color-base-content) 5%, #0000);
-}
-
-.tags-list .table tr:last-child {
-    border-bottom: var(--border) solid color-mix(in oklch, var(--color-base-content) 5%, #0000);
-}
-
 /* Plugins */
 :root {
     --dp-menu-padding: 0.4rem !important;
