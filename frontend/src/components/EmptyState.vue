@@ -12,6 +12,7 @@
                 <component :is="buttonIcon" :size="20" />
                 {{ buttonLabel }}
             </button>
+            <slot />
         </div>
     </div>
 </template>

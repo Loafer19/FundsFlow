@@ -7,7 +7,7 @@
             <button v-for="type in choices" :key="type.id" type="button" role="radio" class="btn btn-sm"
                 :aria-checked="model === type.id"
                 :class="[model === type.id ? 'btn-primary' : 'btn-soft', type.archived_at ? 'tooltip' : '']"
-                :style="model === type.id && type.color ? { backgroundColor: type.color, borderColor: type.color, color: '#fff' } : null"
+                :style="model === type.id && type.color ? { backgroundColor: type.color, borderColor: type.color, color: readableTextOn(type.color) } : null"
                 :data-tip="type.archived_at ? 'Archived type' : undefined" @click="pick(type.id)">
                 <span v-if="type.emoji">{{ type.emoji }}</span>
                 {{ type.name }}
@@ -20,6 +20,7 @@
 import { computed, useId } from 'vue'
 import { haptic } from '../services/telegramWebApp.js'
 import { useTransactionTypesStore } from '../services/transactionTypes.js'
+import { readableTextOn } from '../services/typeFields.js'
 
 const typesStore = useTransactionTypesStore()
 

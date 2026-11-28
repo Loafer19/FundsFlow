@@ -338,3 +338,16 @@ export const parseDuration = (raw) => {
     if (!parts || (!parts[1] && !parts[2])) return undefined
     return Math.round(Number((parts[1] ?? '0').replace(',', '.')) * 60) + Number(parts[2] ?? 0)
 }
+
+/** Dark or white text for a solid background, whichever has the better WCAG contrast. */
+export const readableTextOn = (hex) => {
+    const match = /^#?([0-9a-f]{6})$/i.exec(hex ?? '')
+    if (!match) return '#fff'
+    const n = Number.parseInt(match[1], 16)
+    const linear = (channel) => {
+        const c = channel / 255
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    }
+    const luminance = 0.2126 * linear((n >> 16) & 255) + 0.7152 * linear((n >> 8) & 255) + 0.0722 * linear(n & 255)
+    return luminance > 0.179 ? '#111827' : '#fff'
+}
