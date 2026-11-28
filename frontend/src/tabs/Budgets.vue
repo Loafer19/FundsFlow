@@ -4,13 +4,6 @@
         action-label="Add Budget or Goal" @action="openAdd" />
 
     <template v-else>
-        <div class="flex justify-end mb-3 report-hide">
-            <button type="button" class="btn btn-primary btn-sm" @click="openAdd">
-                <Plus :size="20" />
-                Add Budget or Goal
-            </button>
-        </div>
-
         <template v-if="goals.length">
             <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
                 <StatCard label="Total saved" :current="goalSummary.saved" :previous="null" :compare="false"
@@ -18,23 +11,51 @@
                 <StatCard label="Left to save" :current="goalSummary.remaining" :previous="null" :compare="false"
                     :note="goalSummary.monthlyNeed ? 'need ~' + formatMoney(Math.ceil(goalSummary.monthlyNeed)) + '/month' : ''"
                     icon="goal" />
-                <StatCard class="col-span-2 md:col-span-1" label="Goals completed" :current="goalSummary.completed"
+                <StatCard class="max-md:hidden" label="Goals completed" :current="goalSummary.completed"
                     :previous="null" :compare="false" format="count" :note="'of ' + goals.length" icon="done" />
             </div>
+            <p class="md:hidden flex items-center gap-1.5 text-sm text-base-content/70 mb-3">
+                <Flag :size="14" class="text-success" />
+                {{ goalSummary.completed }} of {{ goals.length }} goals completed
+            </p>
 
-            <h3 v-if="limits.length" class="text-sm font-semibold uppercase tracking-wide text-base-content/60 mb-2">
-                Savings goals
-            </h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3" :class="{ 'mb-5': limits.length }">
-                <GoalCard v-for="{ budget, progress } in goalCards" :key="budget.id" :budget="budget"
+            <div class="flex items-center justify-between gap-2 mb-2">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">Savings goals</h3>
+                <button type="button" class="btn btn-primary btn-sm report-hide" aria-label="Add Budget or Goal"
+                    @click="openAdd">
+                    <Plus :size="20" />
+                    <span class="max-sm:hidden">Add Budget or Goal</span>
+                    <span class="sm:hidden">Add</span>
+                </button>
+            </div>
+            <div v-if="activeGoalCards.length" class="grid grid-cols-1 md:grid-cols-2 gap-3"
+                :class="{ 'mb-3': completedGoalCards.length, 'mb-5': !completedGoalCards.length && limits.length }">
+                <GoalCard v-for="{ budget, progress } in activeGoalCards" :key="budget.id" :budget="budget"
                     :progress="progress" @edit="openEdit" @view-tags="viewTransactions" />
             </div>
 
-            <h3 v-if="limits.length" class="text-sm font-semibold uppercase tracking-wide text-base-content/60 mb-2">
-                Spending limits
-            </h3>
+            <details v-if="completedGoalCards.length" class="mb-5" :open="completedOpen ?? !activeGoalCards.length"
+                @toggle="completedOpen = $event.target.open">
+                <summary
+                    class="cursor-pointer text-sm font-medium text-base-content/70 rounded-field px-1 -mx-1 py-1 mb-2 hover:bg-base-200">
+                    Completed goals ({{ completedGoalCards.length }})
+                </summary>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <GoalCard v-for="{ budget, progress } in completedGoalCards" :key="budget.id" :budget="budget"
+                        :progress="progress" @edit="openEdit" @view-tags="viewTransactions" />
+                </div>
+            </details>
         </template>
 
+        <div v-if="limits.length || !goals.length" class="flex items-center justify-between gap-2 mb-2">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-base-content/60">Spending limits</h3>
+            <button v-if="!goals.length" type="button" class="btn btn-primary btn-sm report-hide"
+                aria-label="Add Budget or Goal" @click="openAdd">
+                <Plus :size="20" />
+                <span class="max-sm:hidden">Add Budget or Goal</span>
+                <span class="sm:hidden">Add</span>
+            </button>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <LimitCard v-for="budget in limitCards" :key="budget.id" :budget="budget" @edit="openEdit"
                 @view-tags="viewTransactions" />
@@ -43,8 +64,8 @@
 </template>
 
 <script setup>
-import { PiggyBank, Plus } from '@lucide/vue'
-import { computed } from 'vue'
+import { Flag, PiggyBank, Plus } from '@lucide/vue'
+import { computed, ref } from 'vue'
 import GoalCard from '../components/budgets/GoalCard.vue'
 import LimitCard from '../components/budgets/LimitCard.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -81,6 +102,12 @@ const goalCards = computed(() => {
         .map((budget) => ({ budget, progress: goalProgress(budget, transactionsStore.transactions, today) }))
         .sort((a, b) => rank(a.progress) - rank(b.progress) || b.progress.percent - a.progress.percent)
 })
+
+const activeGoalCards = computed(() => goalCards.value.filter(({ progress }) => !progress.completed))
+const completedGoalCards = computed(() => goalCards.value.filter(({ progress }) => progress.completed))
+
+// Completed goals are folded away while other goals are in progress; the reader's choice sticks.
+const completedOpen = ref(null)
 
 const goalSummary = computed(() => {
     const sum = { saved: 0, target: 0, remaining: 0, completed: 0, monthlyNeed: 0 }

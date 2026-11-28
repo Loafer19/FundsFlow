@@ -7,38 +7,13 @@
                         <Gauge :size="18" />
                     </span>
                     <span class="line-clamp-2 break-words">
-                        <template v-if="budget.title">{{ budget.title }}</template>
-                        <template v-else-if="scopeTitle">{{ scopeTitle }}</template>
-                        <template v-else-if="tags.length">
-                            {{ tags.map((tag) => `${tag.emoji} ${tag.title}`).join(' · ') }}
-                        </template>
-                        <template v-else>Spending limit</template>
+                        {{ name }}
                     </span>
                 </h3>
 
-                <div class="flex gap-1 shrink-0 report-hide">
-                    <button v-if="current" type="button"
-                        class="btn btn-outline btn-warning btn-square btn-sm tooltip" data-tip="Pause"
-                        aria-label="Pause" :disabled="budgetsStore.isLoading === budget.id"
-                        @click="budgetsStore.pause(budget.id)">
-                        <span v-if="budgetsStore.isLoading === budget.id" class="loading loading-spinner loading-xs"></span>
-                        <Pause v-else :size="20" />
-                    </button>
-                    <button v-else type="button" class="btn btn-outline btn-success btn-square btn-sm tooltip"
-                        data-tip="Resume" aria-label="Resume" :disabled="budgetsStore.isLoading === budget.id"
-                        @click="budgetsStore.resume(budget.id)">
-                        <span v-if="budgetsStore.isLoading === budget.id" class="loading loading-spinner loading-xs"></span>
-                        <Play v-else :size="20" />
-                    </button>
-
-                    <button type="button" class="btn btn-outline btn-secondary btn-square btn-sm tooltip"
-                        data-tip="Edit" aria-label="Edit" :disabled="budgetsStore.isLoading" @click="$emit('edit', budget)">
-                        <Pencil :size="20" />
-                    </button>
-
-                    <DeleteHold :id="budget.id" :disabled="budgetsStore.isLoading"
-                        :isLoading="budgetsStore.isLoading === budget.id" @delete="(id) => budgetsStore.delete(id)" />
-                </div>
+                <BudgetMenu :budget="budget" :name="name" kind="limit" :active="Boolean(current)"
+                    :can-view="!scope && tags.length > 0" @edit="$emit('edit', budget)"
+                    @view-tags="$emit('view-tags', tags)" />
             </div>
 
             <div class="flex items-center gap-1.5 flex-wrap">
@@ -116,14 +91,13 @@
 </template>
 
 <script setup>
-import { CalendarClock, Gauge, Pause, Pencil, Play, TrendingUp } from '@lucide/vue'
+import { CalendarClock, Gauge, TrendingUp } from '@lucide/vue'
 import { computed, inject } from 'vue'
-import { useBudgetsStore } from '../../services/budgets.js'
 import { formatDate, formatMoney } from '../../services/formatters.js'
 import { historyBuckets, limitPercent, limitProgress, scopeKey, spentBetween } from '../../services/limits.js'
 import { useTransactionsStore } from '../../services/transactions.js'
 import { useTransactionTypesStore } from '../../services/transactionTypes.js'
-import DeleteHold from '../buttons/DeleteHold.vue'
+import BudgetMenu from './BudgetMenu.vue'
 import LimitHistory from './LimitHistory.vue'
 
 const props = defineProps({
@@ -132,7 +106,6 @@ const props = defineProps({
 
 defineEmits(['edit', 'view-tags'])
 
-const budgetsStore = useBudgetsStore()
 const transactionsStore = useTransactionsStore()
 const typesStore = useTransactionTypesStore()
 const inReport = inject('inReport', false)
@@ -155,6 +128,14 @@ const scopeTitle = computed(() => {
         : `Type #${scope.value.type_id}`
     return scope.value.kind === 'field_sum' && scope.value.field ? `${base} · ${scopeFieldLabel.value}` : base
 })
+
+const name = computed(
+    () =>
+        props.budget.title ||
+        scopeTitle.value ||
+        tags.value.map((tag) => `${tag.emoji} ${tag.title}`).join(' · ') ||
+        'Spending limit',
+)
 
 const p = computed(() =>
     current.value

@@ -50,19 +50,19 @@
                     <span>Add Transaction</span>
                 </button>
 
+                <!-- Recurring, Tags, Types and Logout live in the phone's More sheet, so the header stays on one row. -->
                 <button type="button" @click="showModal('recurring_modal')"
-                    class="btn btn-ghost btn-square tooltip tooltip-bottom" data-tip="Recurring"
+                    class="btn btn-ghost btn-square tooltip tooltip-bottom max-md:hidden" data-tip="Recurring"
                     aria-label="Recurring">
                     <Repeat :size="24" />
                 </button>
 
                 <button type="button" @click="showModal('tags_modal')"
-                    class="btn btn-ghost btn-square tooltip tooltip-bottom" data-tip="Tags"
+                    class="btn btn-ghost btn-square tooltip tooltip-bottom max-md:hidden" data-tip="Tags"
                     aria-label="Tags">
                     <Tag :size="24" />
                 </button>
 
-                <!-- Phones reach Types from More (the header already wraps there), so no duplicate. -->
                 <button type="button" @click="showModal('types_modal')"
                     class="btn btn-ghost btn-square tooltip tooltip-bottom max-md:hidden" data-tip="Types"
                     aria-label="Types">
@@ -76,7 +76,7 @@
                 </button>
 
                 <button type="button" @click="authStore.logout"
-                    class="btn btn-ghost btn-square tooltip tooltip-bottom hover:text-error"
+                    class="btn btn-ghost btn-square tooltip tooltip-bottom hover:text-error max-md:hidden"
                     data-tip="Logout" aria-label="Logout" :disabled="authStore.isLoading">
                     <span v-if="authStore.isLoading" class="loading loading-spinner"></span>
                     <LogOut v-else :size="24" />

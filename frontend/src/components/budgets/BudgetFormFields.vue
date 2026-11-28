@@ -12,10 +12,22 @@
         </button>
     </div>
 
+    <div v-if="goal && !form.id && !form.title?.trim()" class="mb-3">
+        <div class="text-sm text-base-content/60 mb-1">Start from</div>
+        <div class="flex flex-wrap gap-1.5">
+            <button v-for="template in GOAL_TEMPLATES" :key="template.title" type="button" class="btn btn-sm btn-soft"
+                @click="applyTemplate(template)">
+                {{ template.title }}
+            </button>
+        </div>
+    </div>
+
+    <div class="text-sm text-base-content/60 mb-1">{{ goal ? 'Name' : 'Title (optional)' }}</div>
     <input type="text" v-model="form.title" :placeholder="goal ? 'Goal name, e.g. 🛟 Emergency fund' : 'Title (optional)'"
         aria-label="Title" class="input w-full mb-4" maxlength="255" autofocus />
 
-    <AmountField v-model="form.amount" :signed="false" :max="99_999_999.99" :autofocus="false"
+    <div class="text-sm text-base-content/60 mb-1">{{ goal ? 'Target amount' : 'Amount' }}</div>
+    <AmountField v-model="form.amount" :signed="false" :max="99_999_999.99" :autofocus="false" grouped
         :placeholder="goal ? 'Target amount' : 'Amount'" :label="goal ? 'Target amount' : 'Amount'" />
 
     <div v-if="!goal" class="mb-3">
@@ -104,7 +116,24 @@
                     <Info :size="14" />
                 </span>
             </div>
-            <TagPicker v-model="form.tag_ids" />
+            <div v-if="selectedTags.length" class="flex flex-wrap gap-1.5 mb-2">
+                <span v-for="tag in selectedTags" :key="tag.id" class="badge badge-info badge-soft gap-1 pr-0.5">
+                    {{ tag.emoji }} {{ tag.title }}
+                    <button type="button" class="btn btn-ghost btn-circle size-5 min-h-0 p-0"
+                        :aria-label="`Remove ${tag.title}`" @click="removeTag(tag.id)">
+                        <X :size="12" />
+                    </button>
+                </span>
+            </div>
+            <p v-else class="text-xs text-base-content/70 mb-2">Pick at least one tag to save.</p>
+            <details class="rounded-box border border-base-300 mb-4">
+                <summary class="cursor-pointer px-3 py-2 text-sm">
+                    {{ selectedTags.length ? 'Change tags' : 'Choose tags' }}
+                </summary>
+                <div class="px-3 pt-1">
+                    <TagPicker v-model="form.tag_ids" />
+                </div>
+            </details>
         </template>
     </template>
 
@@ -112,17 +141,18 @@
         <summary class="text-sm text-base-content/60 cursor-pointer mb-2 rounded-field px-1 -mx-1 py-0.5 hover:bg-base-200">More options</summary>
         <label class="block">
             <span class="block text-sm text-base-content/60 mb-1">Already saved</span>
-            <AmountField v-model="form.start_amount" :signed="false" :max="99_999_999.99" :autofocus="false"
+            <AmountField v-model="form.start_amount" :signed="false" :max="99_999_999.99" :autofocus="false" grouped
                 :required="false" placeholder="0" label="Already saved" />
         </label>
     </details>
 </template>
 
 <script setup>
-import { Gauge, Info, Target } from '@lucide/vue'
+import { Gauge, Info, Target, X } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
 import { nowDateStr, parseLocalDate } from '../../services/formatters.js'
 import { bucketBounds } from '../../services/limits.js'
+import { useTagsStore } from '../../services/tags.js'
 import { useTransactionTypesStore } from '../../services/transactionTypes.js'
 import AmountField from '../AmountField.vue'
 import DateField from '../DateField.vue'
@@ -136,6 +166,31 @@ defineProps({
 
 const form = defineModel({ type: Object, required: true })
 const typesStore = useTransactionTypesStore()
+const tagsStore = useTagsStore()
+
+// Quick starts for a new goal: a name, plus a tag when the user already has a fitting one.
+const GOAL_TEMPLATES = [
+    { title: '🛟 Emergency fund', match: /saving|emergency|reserve|safety/i },
+    { title: '🏖 Vacation', match: /travel|vacation|trip|holiday/i },
+    { title: '💻 Laptop', match: /electronic|laptop|gadget|tech/i },
+]
+
+const applyTemplate = (template) => {
+    form.value.title = template.title
+
+    if (form.value.tag_ids?.length) return
+
+    const tag = tagsStore.active.find((candidate) => template.match.test(candidate.title))
+    if (tag) form.value.tag_ids = [tag.id]
+}
+
+const selectedTags = computed(() =>
+    (form.value.tag_ids ?? []).map((id) => tagsStore.tags.find((tag) => tag.id === id)).filter(Boolean),
+)
+
+const removeTag = (id) => {
+    form.value.tag_ids = form.value.tag_ids.filter((tagId) => tagId !== id)
+}
 
 const lengthOptions = [
     { value: 'week', label: 'Weekly' },

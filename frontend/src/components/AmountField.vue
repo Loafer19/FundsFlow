@@ -28,7 +28,7 @@
 
 <script setup>
 import { computed, ref, useId, watch, watchEffect } from 'vue'
-import { parseAmountInput, toEditableAmount } from '../services/amountInput.js'
+import { localeSeparators, parseAmountInput, toEditableAmount } from '../services/amountInput.js'
 import { formatMoney } from '../services/formatters.js'
 import settings from '../services/settings.js'
 import { haptic } from '../services/telegramWebApp.js'
@@ -45,6 +45,8 @@ const props = defineProps({
     label: { type: String, default: 'Amount' },
     /** The amount follows a computed type field (tinted); typing here unlinks it (emits "manual"). */
     linked: { type: Boolean, default: false },
+    /** Show the value with thousands separators once it is not being edited (budgets, goals). */
+    grouped: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['manual'])
@@ -90,6 +92,19 @@ const emitModel = () => {
     model.value = lastEmitted
 }
 
+// 60000 → "60 000" (the parser ignores spaces, so it reads back the same).
+// Groups of three in every locale (en-IN's 12,34,567 would not read back), so the text always parses.
+const displayNumber = (number) => {
+    const plain = toEditableAmount(number, settings.moneyFormat)
+
+    if (!props.grouped) return plain
+
+    const { group, decimal } = localeSeparators(settings.moneyFormat)
+    const [whole, fraction] = plain.split(decimal)
+
+    return whole.replace(/\B(?=(\d{3})+(?!\d))/g, group) + (fraction === undefined ? '' : decimal + fraction)
+}
+
 const applyModel = (value) => {
     if (value === '' || value === null || value === undefined || Number.isNaN(Number(value))) {
         display.value = ''
@@ -100,7 +115,7 @@ const applyModel = (value) => {
     const number = Number(value)
 
     if (props.signed) isIncome.value = number >= 0
-    display.value = number === 0 ? '' : toEditableAmount(number, settings.moneyFormat)
+    display.value = number === 0 ? '' : displayNumber(number)
 }
 
 watch(
@@ -146,8 +161,8 @@ const onBlur = () => {
     editing.value = false
 
     // Collapse "120+35" into "155" once the user is done with the field.
-    if (parsed.value.expression && !error.value) {
-        display.value = toEditableAmount(parsed.value.value, settings.moneyFormat)
+    if ((parsed.value.expression || props.grouped) && !error.value && parsed.value.value !== null) {
+        display.value = displayNumber(parsed.value.value)
     }
 }
 

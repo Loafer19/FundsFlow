@@ -7,57 +7,38 @@
 
         <div class="card-body gap-2">
             <div class="flex justify-between items-start gap-2">
-                <h3 class="card-title min-w-0">
+                <div class="flex items-start gap-2 min-w-0">
                     <span class="shrink-0 rounded-lg p-1.5"
                         :class="progress.completed ? 'bg-success/15 text-success' : 'bg-primary/10 text-primary'">
                         <Target :size="18" />
                     </span>
-                    <span class="line-clamp-2 break-words">
-                        <template v-if="budget.title">{{ budget.title }}</template>
-                        <template v-else-if="progress.tags.length">
-                            {{ progress.tags.map((tag) => tag.emoji).join(' ') }}
-                        </template>
-                        <template v-else>Savings goal</template>
-                    </span>
-                </h3>
-
-                <div class="flex gap-1 shrink-0 report-hide">
-                    <button v-if="active" type="button"
-                        class="btn btn-outline btn-warning btn-square btn-sm tooltip" data-tip="Pause"
-                        aria-label="Pause" :disabled="budgetsStore.isLoading === budget.id"
-                        @click="budgetsStore.pause(budget.id)">
-                        <span v-if="budgetsStore.isLoading === budget.id" class="loading loading-spinner loading-xs"></span>
-                        <Pause v-else :size="20" />
-                    </button>
-                    <button v-else type="button" class="btn btn-outline btn-success btn-square btn-sm tooltip"
-                        data-tip="Resume" aria-label="Resume" :disabled="budgetsStore.isLoading === budget.id"
-                        @click="budgetsStore.resume(budget.id)">
-                        <span v-if="budgetsStore.isLoading === budget.id" class="loading loading-spinner loading-xs"></span>
-                        <Play v-else :size="20" />
-                    </button>
-
-                    <button type="button" class="btn btn-outline btn-secondary btn-square btn-sm tooltip"
-                        data-tip="Edit" aria-label="Edit" :disabled="budgetsStore.isLoading" @click="$emit('edit', budget)">
-                        <Pencil :size="20" />
-                    </button>
-
-                    <DeleteHold :id="budget.id" :disabled="budgetsStore.isLoading"
-                        :isLoading="budgetsStore.isLoading === budget.id" @delete="(id) => budgetsStore.delete(id)" />
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 pt-0.5">
+                        <h3 class="card-title min-w-0 line-clamp-2 break-words">{{ name }}</h3>
+                        <div class="badge badge-sm gap-1 shrink-0" :class="statusBadge">
+                            <PartyPopper v-if="progress.completed" :size="12" />
+                            {{ goalStatusLabel(progress.status) }}
+                        </div>
+                    </div>
                 </div>
+
+                <BudgetMenu :budget="budget" :name="name" kind="goal" :active="active" :can-view="progress.tags.length > 0"
+                    @edit="$emit('edit', budget)" @view-tags="$emit('view-tags', progress.tags)" />
             </div>
 
-            <div class="flex items-center gap-1 flex-wrap">
-                <button v-for="tag in progress.tags" :key="tag.id" type="button" class="tooltip cursor-pointer hover:opacity-70"
-                    :data-tip="tag.title" @click="$emit('view-tags', progress.tags)">{{ tag.emoji }}</button>
-                <span v-if="budget.monobank_jar" class="badge badge-sm badge-outline gap-1"
-                    :class="budget.monobank_jar.linked ? '' : 'badge-warning'"
-                    :title="budget.monobank_jar.linked ? 'Progress follows this monobank jar' : 'This jar is no longer in monobank — using the last known balance'">
-                    {{ budget.monobank_jar.linked ? 'Mono jar' : 'Unlinked jar' }}
+            <div v-if="(budget.title && progress.tags.length) || budget.monobank_jar" class="flex items-center gap-1.5 flex-wrap">
+                <template v-if="budget.title">
+                    <button v-for="tag in progress.tags" :key="tag.id" type="button"
+                        class="badge badge-sm badge-ghost gap-1 cursor-pointer hover:bg-base-300"
+                        @click="$emit('view-tags', progress.tags)">
+                        {{ tag.emoji }} {{ tag.title }}
+                    </button>
+                </template>
+                <span v-if="budget.monobank_jar" class="tooltip tooltip-bottom before:max-w-56 before:text-left"
+                    :data-tip="budget.monobank_jar.linked ? 'Progress follows this monobank jar' : 'This jar is no longer in monobank — using the last known balance'">
+                    <span class="badge badge-sm badge-outline gap-1" :class="budget.monobank_jar.linked ? '' : 'badge-warning'">
+                        {{ budget.monobank_jar.linked ? 'Mono jar' : 'Unlinked jar' }}
+                    </span>
                 </span>
-                <div class="badge badge-sm ml-auto gap-1" :class="statusBadge">
-                    <PartyPopper v-if="progress.completed" :size="12" />
-                    {{ goalStatusLabel(progress.status) }}
-                </div>
             </div>
 
             <div>
@@ -70,8 +51,15 @@
                         {{ progress.percent }}%
                     </span>
                 </div>
-                <progress class="progress w-full" :class="progressClass" :value="Math.min(progress.saved, progress.target)"
-                    :max="progress.target || 1"></progress>
+                <!-- Savings bar; the thin tick is where a straight line to the deadline would be today. -->
+                <div class="goal-bar tooltip tooltip-bottom w-full mt-1.5" role="progressbar"
+                    :aria-valuenow="Math.round(Math.min(progress.saved, progress.target))" aria-valuemin="0"
+                    :aria-valuemax="progress.target || 1" :aria-label="`Saved ${progress.percent}% of the goal`"
+                    :data-tip="barTip">
+                    <div class="goal-bar__fill" :class="barClass" :style="{ width: Math.min(progress.percent, 100) + '%' }"></div>
+                    <div v-if="progress.expectedPercent !== null" class="goal-bar__now"
+                        :style="{ left: progress.expectedPercent + '%' }"></div>
+                </div>
             </div>
 
             <div class="text-sm text-base-content/70 flex flex-col gap-0.5">
@@ -82,13 +70,16 @@
                     </span>
                 </template>
                 <template v-else>
-                    <span><span class="tabular-nums font-medium text-base-content">{{ formatMoney(progress.remaining) }}</span> left to save</span>
-
-                    <span v-if="progress.targetDate" class="flex items-center gap-1">
-                        <CalendarClock :size="14" class="shrink-0" />
-                        <template v-if="progress.overdue">Deadline {{ formatDate(progress.targetDate) }} has passed</template>
-                        <template v-else>
-                            {{ progress.daysLeft }} {{ progress.daysLeft === 1 ? 'day' : 'days' }} left ·
+                    <span class="flex items-center gap-1 flex-wrap">
+                        <span><span class="tabular-nums font-medium text-base-content">{{ formatMoney(progress.remaining) }}</span> left</span>
+                        <template v-if="progress.overdue">
+                            <span aria-hidden="true">·</span>
+                            <span class="text-warning">deadline passed</span>
+                        </template>
+                        <template v-else-if="progress.targetDate">
+                            <span aria-hidden="true">·</span>
+                            <span>{{ progress.daysLeft }} {{ progress.daysLeft === 1 ? 'day' : 'days' }} left</span>
+                            <span aria-hidden="true">·</span>
                             <span class="tabular-nums">need ~{{ formatMoney(Math.ceil(progress.requiredAmount)) }}/{{ progress.requiredPer }}</span>
                         </template>
                     </span>
@@ -96,7 +87,7 @@
                     <span v-if="!active" class="italic">Paused — progress is kept</span>
                     <span v-else-if="progress.projectedDate" class="flex items-center gap-1">
                         <TrendingUp :size="14" class="shrink-0" />
-                        At current pace you will reach it in {{ formatMonthYear(progress.projectedDate) }}
+                        At current pace: {{ formatMonthYear(progress.projectedDate) }}
                     </span>
                     <span v-else class="flex items-center gap-1">
                         <TrendingUp :size="14" class="shrink-0" />
@@ -105,22 +96,29 @@
                 </template>
             </div>
 
-            <div class="text-xs text-base-content/50">
-                Since {{ formatDate(progress.startedAt) }}
-                <template v-if="progress.startAmount > 0"> · started with {{ formatMoney(progress.startAmount) }}</template>
-                <template v-if="progress.targetDate"> · deadline {{ formatDate(progress.targetDate) }}</template>
+            <div class="flex items-center justify-between gap-2 min-h-8">
+                <div class="text-xs text-base-content/50 min-w-0">
+                    Since {{ formatDate(progress.startedAt) }}
+                    <template v-if="progress.startAmount > 0"> · started with {{ formatMoney(progress.startAmount) }}</template>
+                    <template v-if="progress.targetDate"> · deadline {{ formatDate(progress.targetDate) }}</template>
+                </div>
+                <button v-if="active && !progress.completed && progress.tags.length" type="button"
+                    class="btn btn-soft btn-primary btn-sm shrink-0 report-hide" @click="contribute">
+                    <Plus :size="16" />
+                    Add contribution
+                </button>
             </div>
         </div>
     </div>
 </template>
 
 <script setup>
-import { CalendarClock, PartyPopper, Pause, Pencil, Play, Target, TrendingUp } from '@lucide/vue'
+import { PartyPopper, Plus, Target, TrendingUp } from '@lucide/vue'
 import { computed, inject } from 'vue'
-import { useBudgetsStore } from '../../services/budgets.js'
-import { formatDate, formatMoney } from '../../services/formatters.js'
-import { formatMonthYear, goalStatusLabel } from '../../services/goals.js'
-import DeleteHold from '../buttons/DeleteHold.vue'
+import { formatDate, formatMoney, formatMonthYear } from '../../services/formatters.js'
+import { goalStatusLabel } from '../../services/goals.js'
+import { useTransactionsStore } from '../../services/transactions.js'
+import BudgetMenu from './BudgetMenu.vue'
 
 const props = defineProps({
     budget: { type: Object, required: true },
@@ -130,10 +128,18 @@ const props = defineProps({
 
 defineEmits(['edit', 'view-tags'])
 
-const budgetsStore = useBudgetsStore()
+const transactionsStore = useTransactionsStore()
 const inReport = inject('inReport', false)
 
 const active = computed(() => props.budget.periods.some((period) => period.active))
+
+// Untitled goals are named after their tags.
+const name = computed(
+    () =>
+        props.budget.title ||
+        props.progress.tags.map((tag) => `${tag.emoji} ${tag.title}`).join(' · ') ||
+        'Savings goal',
+)
 
 const statusBadge = computed(
     () =>
@@ -146,22 +152,63 @@ const statusBadge = computed(
         })[props.progress.status] ?? 'badge-ghost',
 )
 
-const progressClass = computed(
+const barClass = computed(
     () =>
         ({
-            completed: 'progress-success',
-            on_track: 'progress-success',
-            behind: 'progress-warning',
-            paused: '',
-            in_progress: 'progress-primary',
-        })[props.progress.status] ?? '',
+            completed: 'bg-success',
+            on_track: 'bg-success',
+            behind: 'bg-warning',
+            paused: 'bg-base-content/40',
+            in_progress: 'bg-primary',
+        })[props.progress.status] ?? 'bg-primary',
 )
+
+const barTip = computed(() =>
+    props.progress.expectedAmount === null
+        ? `${props.progress.percent}% saved`
+        : `${props.progress.percent}% saved · expected by today ${formatMoney(Math.round(props.progress.expectedAmount))}`,
+)
+
+// Opens Add Transaction with the goal's tags picked and a hint about the sign.
+const contribute = () => {
+    transactionsStore.transactionDraftGoal = {
+        title: name.value,
+        tagIds: props.progress.tags.map((tag) => tag.id),
+    }
+    transactions_add_modal.showModal()
+}
 </script>
 
 <style scoped>
 .goal-card {
     position: relative;
     overflow: hidden;
+}
+
+.goal-bar {
+    position: relative;
+    display: block;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--color-base-content) 14%, transparent);
+}
+
+.goal-bar__fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: inherit;
+    transition: width 0.2s ease;
+}
+
+/* "Expected by today": where a straight line from the start to the deadline would be now. */
+.goal-bar__now {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 2px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: color-mix(in oklab, var(--color-base-content) 70%, transparent);
 }
 
 .goal-card--done {

@@ -1,5 +1,6 @@
 <template>
-    <dialog id="transactions_add_modal" class="modal" aria-labelledby="transactions_add_modal_title">
+    <dialog id="transactions_add_modal" class="modal" aria-labelledby="transactions_add_modal_title"
+        @close="onClose">
         <div class="modal-box max-w-sm">
             <ModalHeader title-id="transactions_add_modal_title" :icon="ArrowLeftRight">
                 Add Transaction
@@ -16,6 +17,7 @@
                         <TypeAmountHint :hint="typed.hint.value" @reset="typed.resetAmount" />
                     </template>
                 </AmountField>
+                <p v-if="goalHint" class="text-xs text-base-content/60 -mt-3 mb-4">{{ goalHint }}</p>
 
                 <TypeFieldsCard :type="typed.type.value" v-model:data="transaction.data" />
 
@@ -107,6 +109,30 @@ watch(
     },
 )
 
+// "Add contribution" on a savings goal: its tags are picked and the hint explains the sign.
+const goalHint = ref('')
+
+watch(
+    () => transactionsStore.transactionDraftGoal,
+    (goal) => {
+        if (!goal) return
+
+        transaction.value = { ...createDefault(), tags: [...goal.tagIds] }
+        typed.load()
+        goalHint.value = `Counts toward “${goal.title}”: an expense adds to the goal, income takes from it.`
+        transactionsStore.transactionDraftGoal = null
+    },
+)
+
+// Closing without saving drops the prefilled contribution so it doesn't leak into the next transaction.
+const onClose = () => {
+    if (!goalHint.value) return
+
+    goalHint.value = ''
+    transaction.value = createDefault()
+    typed.load()
+}
+
 const handleSubmit = async () => {
     const payload = typed.payload(transaction.value)
     // The form already shows the type's default tags as removable picks.
@@ -119,6 +145,7 @@ const handleSubmit = async () => {
     transaction.value = createDefault()
     typed.load()
     pendingFiles.value = []
+    goalHint.value = ''
     transactions_add_modal.close()
 }
 </script>

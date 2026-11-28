@@ -13,6 +13,8 @@ export const useTransactionsStore = defineStore('transactions', {
         transactions: [],
         transactionForEdit: null,
         transactionDraftAt: null,
+        // A savings goal asking for a contribution: { title, tagIds } (Add Transaction opens prefilled).
+        transactionDraftGoal: null,
         tagFilterDraft: null,
         selectedTagIds: [],
         filterUntagged: false,

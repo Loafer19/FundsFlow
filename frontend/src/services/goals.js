@@ -109,6 +109,20 @@ export const goalProgress = (budget, transactions, today = nowDateStr()) => {
         requiredAmount = round2(remaining / units)
     }
 
+    // Dated goals: where a straight line from the start to the deadline would be today ("expected by today").
+    let expectedAmount = null
+    let expectedPercent = null
+
+    if (deadline && !completed && !overdue && current && target > 0) {
+        const span = daysBetween(startedAt, deadline)
+
+        if (span > 0) {
+            const elapsed = Math.min(span, Math.max(0, daysBetween(startedAt, today)))
+            expectedAmount = round2(startAmount + (Math.max(0, target - startAmount) * elapsed) / span)
+            expectedPercent = Math.min(100, (expectedAmount / target) * 100)
+        }
+    }
+
     let status = 'behind'
     if (completed) status = 'completed'
     else if (!current) status = 'paused'
@@ -132,6 +146,8 @@ export const goalProgress = (budget, transactions, today = nowDateStr()) => {
         requiredPer,
         monthlyPace: round2(perDay * DAYS_PER_MONTH),
         projectedDate,
+        expectedAmount,
+        expectedPercent,
         tags: latest?.tags ?? [],
     }
 }
@@ -145,5 +161,4 @@ export const goalStatusLabel = (status) =>
         in_progress: 'In progress',
     })[status] ?? status
 
-export const formatMonthYear = (dateStr) =>
-    parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+export { formatMonthYear } from './formatters.js'

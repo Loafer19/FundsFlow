@@ -47,6 +47,18 @@ export const formatDate = (date) => {
     return new Intl.DateTimeFormat(config.locale, config).format(value)
 }
 
+// "09.2027", "2027/09", "September 2027": the user's date format without the day.
+export const formatMonthYear = (date) => {
+    const config = dateFormatMap[settings.dateFormat] ?? dateFormatMap['DD.MM.YYYY']
+    const value = asCalendarOrInstant(date)
+
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) return ''
+
+    const month = config.month === 'long' || config.month === 'short' ? config.month : '2-digit'
+
+    return new Intl.DateTimeFormat(config.locale ?? 'en-US', { month, year: 'numeric' }).format(value)
+}
+
 export const formatDateTime = (value) => {
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return String(value ?? '')
