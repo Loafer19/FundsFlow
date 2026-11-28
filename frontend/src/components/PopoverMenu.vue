@@ -76,6 +76,7 @@ const toggle = () => {
 
 const onKey = (event) => {
     if (event.key === 'Escape' && open.value) {
+        event.preventDefault() // keep a surrounding <dialog> open: Esc only closes the menu
         event.stopPropagation()
         close()
     }

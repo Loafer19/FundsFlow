@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import api from './api.js'
 import { persistCache } from './cache.js'
 import { apiErrorMessage } from './formatters.js'
+import { showModal } from './modal.js'
 import toasts from './toasts.js'
 
 const CACHE = 'tags'
@@ -9,7 +10,8 @@ const CACHE = 'tags'
 export const useTagsStore = defineStore('tags', {
     state: () => ({
         tags: [],
-        tagForEdit: null,
+        // What the tag form should show next: { tag, parentId } (tag = null creates a new one).
+        tagForm: null,
         isLoading: false,
     }),
 
@@ -51,6 +53,64 @@ export const useTagsStore = defineStore('tags', {
             persistCache(CACHE, this.tags)
         },
 
+        /** Opens the shared tag form: edit `tag`, or create a new one (optionally under `parentId`). */
+        openForm(tag = null, parentId = null) {
+            this.tagForm = { tag, parentId, at: Date.now() }
+            showModal('tag_form_modal')
+        },
+
+        /** Re-reads the list for fresh transaction counts (cheap; the manager calls it when it opens). */
+        async refreshCounts() {
+            try {
+                const { data } = await api.get('/tags')
+                const counts = new Map(data.map((tag) => [tag.id, tag.transactions_count ?? 0]))
+
+                this.tags = this.tags.map((tag) =>
+                    counts.has(tag.id) ? { ...tag, transactions_count: counts.get(tag.id) } : tag,
+                )
+                this.persist()
+            } catch {
+                // Counts are decoration; keep the old ones.
+            }
+        },
+
+        /** A starter set: one parent with its children, created in a row with a single toast. */
+        async createSet(set) {
+            this.isLoading = true
+
+            try {
+                const { data: parent } = await api.post('/tags', {
+                    title: set.title,
+                    emoji: set.emoji,
+                    parent_id: null,
+                    calc_balance: false,
+                })
+                this.tags.push({ ...parent, transactions_count: 0 })
+
+                for (const child of set.children) {
+                    const { data } = await api.post('/tags', {
+                        title: child.title,
+                        emoji: child.emoji,
+                        parent_id: parent.id,
+                        calc_balance: false,
+                    })
+                    this.tags.push({ ...data, transactions_count: 0 })
+                }
+
+                this.persist()
+                toasts.success('Tags created!')
+
+                return true
+            } catch (error) {
+                this.persist()
+                toasts.error(apiErrorMessage(error, 'Could not create tags: '))
+
+                return false
+            } finally {
+                this.isLoading = false
+            }
+        },
+
         normalizePayload(raw) {
             return {
                 ...raw,
@@ -64,7 +124,7 @@ export const useTagsStore = defineStore('tags', {
             try {
                 const response = await api.post('/tags', this.normalizePayload(raw))
 
-                this.tags.push(response.data)
+                this.tags.push({ ...response.data, transactions_count: 0 })
                 this.persist()
 
                 toasts.success('Tag created!')
@@ -86,7 +146,10 @@ export const useTagsStore = defineStore('tags', {
                 const response = await api.patch('/tags/' + raw.id, this.normalizePayload(raw))
 
                 const index = this.tags.findIndex((t) => t.id === raw.id)
-                this.tags[index] = response.data
+                this.tags[index] = {
+                    ...response.data,
+                    transactions_count: response.data.transactions_count ?? this.tags[index].transactions_count,
+                }
                 this.persist()
                 await patchTagCopies(response.data)
 

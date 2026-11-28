@@ -26,7 +26,7 @@ class TagController extends Controller
     /** Active and archived tags (archived ones still label their old transactions). */
     public function index(): AnonymousResourceCollection
     {
-        $tags = $this->listTags->execute(auth()->user(), withArchived: true);
+        $tags = $this->listTags->execute(auth()->user(), withArchived: true, withCounts: true);
 
         return TagResource::collection($tags);
     }

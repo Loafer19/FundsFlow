@@ -19,6 +19,8 @@ class TagResource extends JsonResource
             'emoji' => $this->emoji,
             'calc_balance' => $this->calc_balance,
             'archived_at' => $this->deleted_at?->toIso8601String(),
+            // Only on the tag list (withCount); nested copies on transactions/budgets omit it.
+            'transactions_count' => $this->whenCounted('transactions'),
         ];
     }
 }

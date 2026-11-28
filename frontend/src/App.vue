@@ -3,8 +3,7 @@
     <ConfirmDialog />
     <AuthModal />
     <TagsModal />
-    <TagsAddModal />
-    <TagsEditModal />
+    <TagFormModal />
     <TypesModal />
     <TypeAnalyticsModal />
     <TransactionsAddModal />
@@ -248,8 +247,7 @@ import RecurringAddModal from './modals/RecurringAddModal.vue'
 import RecurringEditModal from './modals/RecurringEditModal.vue'
 import RecurringModal from './modals/RecurringModal.vue'
 import SupportModal from './modals/SupportModal.vue'
-import TagsAddModal from './modals/TagsAddModal.vue'
-import TagsEditModal from './modals/TagsEditModal.vue'
+import TagFormModal from './modals/TagFormModal.vue'
 import TagsModal from './modals/TagsModal.vue'
 import TransactionsAddModal from './modals/TransactionsAddModal.vue'
 import TransactionsEditModal from './modals/TransactionsEditModal.vue'
